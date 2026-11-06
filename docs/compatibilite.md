@@ -22,8 +22,8 @@ Le contrôleur d'écran du Tab5 est **détecté au démarrage, avant d'initialis
 | Chaîne de compilation ESP32-P4 (ESP-IDF 5.5.5) | Constaté (squelette : 38 s, 204 048 octets) | idem | idem | à compiler (CI prévue) |
 | Détection du contrôleur d'écran | Constaté (« ST7121 détecté » au journal, piste A, 06/11) | Écrit, non testé | Écrit, non testé | sans objet |
 | Écran allumé, image LVGL « Bonjour » | Constaté, avec une réserve ouverte après coupure de courant (voir [dépannage](depannage.md#ouverts)) ; détail dans `mesures/1a.md` | Non pris en charge (table d'init à porter) | Non pris en charge | Prévu (phase 6) |
-| Tactile | Constaté (suit le doigt ; décalage corrigé au commit `e7a4803`, mesure du décalage résiduel : voir `mesures/1a.md`) | Non pris en charge | Non pris en charge | Prévu |
-| Redémarrage logiciel (`esp_rom_software_reset_system()`) | Écrit ; l'écran revient-il tout seul : voir `mesures/1a.md` | — | — | Prévu (boucle du lien C6 connue sur cette carte) |
+| Tactile | Constaté (suit le doigt ; décalage corrigé au commit `e7a4803`, écart résiduel moyen (−6, −4) px sur cinq cibles, [mesures/1a.md](mesures/1a.md)) | Non pris en charge | Non pris en charge | Prévu |
+| Redémarrage logiciel (`esp_rom_software_reset_system()`) | Constaté une fois (démarrage n° 2 du 06/11/2026, l'image est revenue) ; la série de 20 est prévue en 1b | — | — | Prévu (boucle du lien C6 connue sur cette carte) |
 | Wi-Fi par le C6 (esp_hosted épinglé) + SNTP — jalon 1b | Prévu | — | — | Prévu |
 | Audio duplex, annulation d'écho, mot d'activation — jalon 1c | Prévu | — | — | Prévu (ES8311 : volume limité à 75 %) |
 | Portail captif par SoftAP — jalon 1d | Prévu | — | — | Prévu |
@@ -33,6 +33,9 @@ Logiciel **sans carte** (même code pour toutes les cartes) :
 | Brique | État | Preuve et limite |
 |---|---|---|
 | Table météo WMO → libellé français + icône jour/nuit ; fuseaux IANA → chaîne POSIX TZ (posix_tz_db, MIT) | Écrit, vérifié à la compilation sur PC | 23 tests **exécutés sur le PC** (clang 23.1.5 x86-64, avec AddressSanitizer et UBSan, 0 échec) et évalués à la compilation par `static_assert` ; 18 mutations détectées sur 18 ; **jamais lancés sur une carte** (RISC-V : tailles, alignement et mémoire peuvent différer) |
+| Lecture JSON minimale, réponse Open-Meteo, date et heure locales en français | Écrit, vérifié sur PC | tests exécutés sur le PC avec les mêmes détecteurs, mutations détectées (53 de ce lot) ; **réponses Open-Meteo réelles captées par le PC puis rangées dans le test, aucune requête faite par la carte** ; jamais lancés sur une carte |
+| Assistant vocal : états, flux SSE, requêtes OpenAI-compatibles, découpe en phrases | Écrit, vérifié sur PC | tests exécutés sur le PC (135 mutations de ce lot détectées) ; **aucun service STT/LLM/TTS réel appelé** ; jamais lancés sur une carte |
+| Ensemble du noyau | 252 tests exécutés avec ASan + UBSan, 206 mutations détectées sur 206 (`main` au 06/11/2026) | ne prouve rien sur le comportement du RISC-V de la carte |
 | Page de réglages (front) et faux appareil | Écrit, essayé contre un faux appareil Node | 49 vérifications Playwright (rendu téléphone 390 × 844), 13 905 octets gzip ; **jamais servi par l'appareil** ; Chromium seulement (Safari iOS, Firefox : non vérifié) |
 | Contrat de l'API de réglages | Écrit ([api-reglages.md](api-reglages.md)) | implémenté par le faux appareil seulement |
 

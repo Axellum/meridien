@@ -25,11 +25,11 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 
 **Symptôme.** Coupure de courant du Tab5, puis remise : le premier démarrage ne montre pas d'image ; l'image « Bonjour » et la mire s'affichent après un second geste d'Axel (démarrage n° 9 propre, ST7121 détecté). Le premier démarrage « sans écran » **n'est pas dans le journal série** : le compteur de démarrages passe de 8 à 9.
 
-**Cause.** Inexpliquée au 06/11/2026. Piste à vérifier d'abord, par analogie avec le firmware ESPHome (écran noir après redémarrage, reset de l'écran par l'expandeur qui a besoin d'une seconde pour se stabiliser) : non vérifiée avec ce firmware.
+**Cause.** **Non trouvée** au 06/11/2026. Le journal ne contient qu'un démarrage après la coupure (n° 9), complet et propre : ST7121 détecté au 1er sondage, première image, rétroéclairage à 75 % à 1598 ms. Donc soit le premier démarrage n'a pas lancé ce firmware, soit il n'a pas été capturé (tablette sur batterie, sans port série). Hypothèses **non vérifiées** : l'alimentation USB du Tab5 n'allume peut-être pas la tablette sans appui sur le bouton ; le reset de l'écran par l'expandeur (qui a besoin d'une seconde, par analogie avec ESPHome) ne semble pas en cause puisque le n° 9 est propre. La cause lue du rallumage est « chien de garde » (`HP_SYS_HP_WDT_RESET`) aux **deux** remises sous tension observées : peut-être la cause normale d'un rallumage de cette carte, non vérifié, aucun plantage (`Guru`, `abort`, `Backtrace`) vu.
 
-**Solution.** Aucune. La piste matériel refait la coupure pas à pas pour voir le premier démarrage ; ce que le critère de 1a exige (« image après redémarrage **et** après coupure ») n'est donc pas encore pleinement constaté.
+**Solution.** Aucune appliquée. Pour l'utilisateur : après une coupure complète, un appui court sur le bouton allume la mire. Le critère de 1a (« image après redémarrage **et** après coupure ») est donc constaté **avec réserve** ; l'essai pas à pas (rebrancher l'USB sans toucher aucun bouton, attendre 30 s, noter ce qui s'affiche, port série ouvert) est à refaire au jalon 1b avant d'attribuer la cause au firmware ou à la carte. Axel a choisi de ne pas le refaire pendant 1a.
 
-**Vu sur** Tab5 ST7121, MAC `E8:F6:0A:E2:F6:B6`, firmware natif de la phase 1a (commit à relever dans `mesures/1a.md`), 06/11/2026. **Preuve** : rapport de la piste matériel, journal série. **Statut** : ouvert.
+**Vu sur** Tab5 ST7121, MAC `E8:F6:0A:E2:F6:B6`, firmware natif commit `e7a4803`, 06/11/2026. **Preuve** : journal du démarrage n° 9, constat d'Axel ; détail dans [mesures/1a.md](mesures/1a.md). **Statut** : ouvert.
 
 ### Retour à ESPHome jamais essayé
 
@@ -93,7 +93,7 @@ Le garde-fou de l'outil de session refuse toute commande contenant un `Remove-It
 | espp | 900 Mbit/s |
 | macro du composant `esp_lcd_st7121` | 1300 Mbit/s |
 
-**Solution.** 965 : c'est ce qui fait déjà fonctionner la tablette sous ESPHome. 900 puis 1300 seulement si l'écran reste noir. Marges DPI concordantes sur quatre sources : horloge 70 MHz, horizontales 40/2/40, verticales 24/20/200, 720 × 1280 en RGB565. **Vu sur** Tab5 ST7121. **Statut** : choix fait ; la valeur finale du code est à lire dans `mesures/1a.md`.
+**Solution.** 965 : c'est ce qui fait déjà fonctionner la tablette sous ESPHome. 900 puis 1300 seulement si l'écran reste noir. Marges DPI concordantes sur quatre sources : horloge 70 MHz, horizontales 40/2/40, verticales 24/20/200, 720 × 1280 en RGB565. **Vu sur** Tab5 ST7121. **Statut** : résolu — 965 Mbit/s est la valeur finale, l'image s'affiche avec elle (constaté le 06/11/2026, commit `e7a4803`) ; les essais à 900 et 1300 n'ont pas été faits, inutiles.
 
 ### Le composant `esp_lcd_st7123` 1.0.2 ne convient pas au Tab5 tel quel
 
@@ -113,11 +113,26 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 
 **Solution.** Point sur la couche supérieure (sans remplissage), écran non défilable, et une **mire** (cadre sur les bords + cinq cibles aux coins et au centre) pour mesurer le décalage restant entre le tactile et l'image à partir des appuis du journal série.
 
-**Vu sur** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Preuve** : message du commit ; mesure du décalage résiduel dans `mesures/1a.md`. **Statut** : corrigé dans le code, mesure à confirmer.
+**Vu sur** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Preuve** : constat d'Axel (le point est sous son doigt) et cinq appuis sur des cibles connues : écart moyen (−6, −4) px, de −12 à +10 px sur quatre cibles et −26 px en x sur la cinquième (haut droit), sans étalonnage appliqué (détail dans [mesures/1a.md](mesures/1a.md)). **Statut** : résolu ; précision de l'ordre d'un doigt.
+
+### Aucun journal par l'USB, ou une erreur de compilation sur un `|` entre deux drapeaux LVGL
+
+- **Pas de journal** : il faut `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y` (la console UART par défaut n'est pas câblée à l'USB du Tab5). Posé dans `boards/tab5/sdkconfig.defaults.board`.
+- **`A | B` sur deux drapeaux LVGL** : en C++ le résultat est un `int` que LVGL refuse ; un appel par drapeau. De même, les macros de configuration d'Espressif (initialiseurs désignés dans un ordre que C++ refuse) : la couche carte (`components/bsp_tab5/`) est donc écrite en **C**, l'application en C++.
+
+**Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : résolu.
+
+### Journal `swap_xy is not supported by this panel` au démarrage
+
+Émis par `esp_lvgl_port` à l'initialisation ; sans effet constaté sur l'image (orientation portrait native fixe, aucune rotation logicielle). Cause non explorée. **Vu sur** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Statut** : connu, sans effet constaté.
+
+### Marge faible du bootloader et test de la PSRAM
+
+Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement, à surveiller si on ajoute des options. Le démarrage prend environ 2,9 s de la remise à zéro à la première image, dont ~0,95 s de test de la PSRAM (`CONFIG_SPIRAM_MEMTEST=y`) et 1 s d'attente de l'expandeur : deux gains possibles, **à mesurer avant de sacrifier quoi que ce soit**, un changement à la fois. **Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : connu, pas traité.
 
 ### Écran noir après un redémarrage logiciel
 
-*Connu ailleurs, pas encore vu ici.* Sur le firmware ESPHome, la broche de reset de l'écran passe par l'expandeur PI4IOE5V6408, qui a besoin d'environ une seconde pour être fiable : reset trop tôt = écran noir. Le firmware natif reprend l'attente de 1 s avant le reset (propre à la carte : la 7B n'en a pas, son reset est une broche du P4). Sur P4, `esp_restart()` ne remet à zéro que les cœurs : terminer par `esp_rom_software_reset_system()`. À vérifier au jalon 1b par 20 redémarrages.
+*Connu ailleurs ; ici, un seul redémarrage logiciel essayé et réussi (n° 2 du 06/11/2026, `SW_SYS_RESET`, image revenue, Tab5 ST7121), pas de série de 20.* Sur le firmware ESPHome, la broche de reset de l'écran passe par l'expandeur PI4IOE5V6408, qui a besoin d'environ une seconde pour être fiable : reset trop tôt = écran noir. Le firmware natif reprend l'attente de 1 s avant le reset (propre à la carte : la 7B n'en a pas, son reset est une broche du P4). Sur P4, `esp_restart()` ne remet à zéro que les cœurs : terminer par `esp_rom_software_reset_system()`. À vérifier au jalon 1b par 20 redémarrages.
 
 ---
 
@@ -139,6 +154,14 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 
 Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constaté le 06/11 : le redémarrage USB a ramené le volume du firmware ESPHome de 85 à 100 (le firmware ESPHome ne le conserve apparemment pas ; non corrigé). Ouvrir le port avec `dtr=False, rts=False` avant `open()` quand on veut écouter sans réinitialiser.
 
+### Capture série sous Windows : rien ne s'affiche, ou le compteur de démarrages monte seul
+
+- Une impulsion RTS n'est transmise que si DTR est aussi mis à jour (esptool le fait) ; une lecture lancée sans délai après l'ouverture bloque.
+- `esptool flash-id` et `read-mac` **remettent la puce à zéro à chaque appel** : le compteur de démarrages du journal monte (le n° 3 du 06/11 est probablement celui-là). Ne pas les lancer pendant un essai de redémarrage.
+- Un USB-C mal enfoncé laisse la tablette allumée **sur batterie, sans port série** (Windows : `Present = False` pour la MAC) : aucun journal, donc aucune cause lisible pour ce qui se passe pendant ce temps.
+
+**Vu sur** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Statut** : contourné.
+
 ---
 
 ## Page de réglages et noyau
@@ -151,7 +174,7 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 **Solution définitive.** llvm-mingw (clang 23.1.5) installé sur H: le 06/11/2026, voir [outils.md](outils.md) : `. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers` puis `python test/host/lancer.py` compile, lie et **exécute** les tests, avec AddressSanitizer et UBSan.
 
-**Vu sur** PC d'Axel (Windows 11), `main` au 06/11/2026. **Preuve** : un programme fautif volontaire (lecture hors d'un tableau) est détecté par AddressSanitizer avec la ligne et le lieu d'allocation ; les 23 tests du noyau passent exécutés (avec et sans détecteurs) ; 18 mutations sur 18 détectées. **Limite** : le PC est en x86-64 ; un test réussi sur le PC ne prouve pas le comportement du RISC-V de la carte (tailles, alignement, mémoire disponible) : le constat sur carte reste nécessaire. **Statut** : résolu.
+**Vu sur** PC d'Axel (Windows 11), `main` au 06/11/2026. **Preuve** : un programme fautif volontaire (lecture hors d'un tableau) est détecté par AddressSanitizer avec la ligne et le lieu d'allocation ; les 23 tests du noyau passent exécutés (avec et sans détecteurs) ; 18 mutations sur 18 détectées. Après la fusion des pistes, le même contrôle exécute 252 tests (ASan + UBSan) et détecte 206 mutations sur 206. **Limite** : le PC est en x86-64 ; un test réussi sur le PC ne prouve pas le comportement du RISC-V de la carte (tailles, alignement, mémoire disponible) : le constat sur carte reste nécessaire. **Statut** : résolu.
 
 ### Un 404 sur l'essai d'un service LLM : erreur ou pas ?
 

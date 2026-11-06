@@ -17,8 +17,8 @@ Aucun Home Assistant, aucun ESPHome : firmware natif **ESP-IDF + LVGL 9**, code 
 ## État (06/11/2026)
 
 - **Phase 0 (préparation) faite** : recherches, audit du dépôt Tab5, chaîne de compilation prouvée, plan et coût chiffrés.
-- **Phase 1 en cours** (prouver le matériel, du plus risqué au moins risqué) : l'écran, le tactile et un « Bonjour » LVGL ont été essayés sur le Tab5 ST7121 ; une réserve reste ouverte après coupure de courant ([dépannage](docs/depannage.md#ouverts)). Wi-Fi par le C6, audio et portail captif : prévus.
-- **Sans carte** : table météo, fuseaux horaires, page de réglages et son faux appareil sont écrits et vérifiés sur le PC (49 vérifications), jamais servis par l'appareil.
+- **Phase 1 en cours** (prouver le matériel, du plus risqué au moins risqué) : l'écran, le tactile et un « Bonjour » LVGL ont été essayés sur le Tab5 ST7121 (jalon 1a, [mesures](docs/mesures/1a.md)) ; une réserve reste ouverte après coupure de courant ([dépannage](docs/depannage.md#ouverts)). Wi-Fi par le C6, audio et portail captif : prévus, notes de recherche écrites.
+- **Sans carte** : le noyau (météo, fuseaux, heure, assistant vocal : états, flux, requêtes, découpe en phrases) est écrit et vérifié sur le PC (252 tests exécutés avec AddressSanitizer et UBSan, 206 mutations détectées) ; la page de réglages et son faux appareil aussi (49 vérifications). Rien de cela n'a été lancé sur une carte ni servi par l'appareil.
 
 Ce qui est testé sur quelle carte, avec quelle version : **[docs/compatibilite.md](docs/compatibilite.md)**. Rien n'y est écrit « fonctionne » sans carte, commit et date.
 

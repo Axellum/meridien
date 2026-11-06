@@ -1,6 +1,6 @@
 # Architecture
 
-Mis à jour le 06/11/2026. Ce qui existe sur `main` est dit « sur main » ; ce qui vit encore sur la branche d'une session en cours est dit « sur branche » (fusionné après relecture). Ce qui n'existe pas encore est dit « prévu ».
+Mis à jour le 06/11/2026, après la fusion des quatre pistes de la première journée. Ce qui existe sur `main` est dit « sur main » ; ce qui vit encore sur la branche d'une session en cours serait dit « sur branche » (fusionné après relecture) ; il n'y en a plus aujourd'hui. Ce qui n'existe pas encore est dit « prévu ».
 
 ## Les couches
 
@@ -8,15 +8,15 @@ Mis à jour le 06/11/2026. Ce qui existe sur `main` est dit « sur main » ; ce 
                  page de réglages (HTML/CSS/JS, ~14 Ko gzip)         ← web/            sur main
                           │  REST (docs/api-reglages.md)
  ┌────────────────────────┴──────────────────────────────────────────┐
- │ application (main/)  écran « Bonjour » aujourd'hui ; plus tard     │  sur branche
- │ horloge, météo, assistant, réglages                                 │  (matériel)
+ │ application (main/)  écran « Bonjour » aujourd'hui ; plus tard     │  sur main
+ │ horloge, météo, assistant, réglages                                 │  (« Bonjour » seul)
  ├─────────────────────────────────────────────────────────────────────┤
- │ noyau pur (components/core/)  C++ standard, sans ESP-IDF            │  météo WMO, fuseaux :
- │ tables, formats, états, protocoles — testable sur le PC             │  sur main
+ │ noyau pur (components/core/)  C++ standard, sans ESP-IDF            │  météo, heure,
+ │ tables, formats, états, protocoles — testable sur le PC             │  assistant : sur main
  ├─────────────────────────────────────────────────────────────────────┤
- │ interface de carte (components/board_api/include/board.h, C pur)    │  sur branche
+ │ interface de carte (components/board_api/include/board.h, C pur)    │  sur main
  ├──────────────────────────────┬──────────────────────────────────────┤
- │ bsp_tab5  (boards/tab5/)     │ bsp_waveshare_7b (boards/…)          │  Tab5 : sur branche
+ │ bsp_tab5  (boards/tab5/)     │ bsp_waveshare_7b (boards/…)          │  Tab5 : sur main
  │ écran, tactile, expandeur    │ EK79007, GT911, ES8311/ES7210        │  7B : prévu
  └──────────────────────────────┴──────────────────────────────────────┘
         ESP-IDF 5.5.5 · LVGL 9.5 + esp_lvgl_port · ESP32-P4 (+ C6 pour le Wi-Fi)
@@ -28,12 +28,12 @@ Règles qui tiennent l'ensemble ([AGENTS.md](../AGENTS.md)) : le noyau n'inclut 
 
 | Dossier | Contenu | État |
 |---|---|---|
-| `main/` | `app_main`, écran « Bonjour » (`ui_bonjour.cpp`), palette (`palette.h`), infos de démarrage (`boot_info.*`), police Roboto Bold embarquée (accents, OFL) | sur branche |
-| `components/board_api/` | `board.h` : l'interface commune des cartes (C pur) | sur branche |
-| `components/bsp_tab5/` | reset par l'expandeur PI4IOE5V6408, détection du contrôleur (`tab5_detect.c`), écran (`tab5_display.c`), tactile (`tab5_touch.c`), entrées/sorties | sur branche |
-| `boards/tab5/` | `partitions.csv`, `sdkconfig.defaults.board` (puce rev 1.3, CPU, PSRAM, flash 16 Mo) | sur branche |
-| `components/core/` | `meteo_wmo.hpp`, `fuseaux.hpp` + `fuseaux_donnees.inc` (généré par `outils/generer_fuseaux.py` depuis `posix_tz_db`, MIT, voir `ATTRIBUTION.md`) | sur main |
-| `test/host/` | tests du noyau (constexpr évalués par `static_assert`) ; `lancer.py` avec preuve par mutations | sur main |
+| `main/` | `app_main`, écran « Bonjour » (`ui_bonjour.cpp`), palette (`palette.h`), infos de démarrage (`boot_info.*`), police Roboto Bold embarquée (accents, OFL) ; contient encore la **mire** d'essai du tactile, à retirer avant la phase 2 | sur main (essayé sur le Tab5 ST7121, [mesures/1a.md](mesures/1a.md)) |
+| `components/board_api/` | `board.h` : l'interface commune des cartes (C pur) | sur main |
+| `components/bsp_tab5/` | reset par l'expandeur PI4IOE5V6408, détection du contrôleur (`tab5_detect.c`), écran (`tab5_display.c`), tactile (`tab5_touch.c`), entrées/sorties | sur main (essayé sur le Tab5 ST7121) |
+| `boards/tab5/` | `partitions.csv`, `sdkconfig.defaults.board` (puce rev 1.3, CPU, PSRAM, flash 16 Mo) | sur main |
+| `components/core/` | météo : `meteo_wmo.hpp`, `meteo_openmeteo.hpp` (lecture de la réponse Open-Meteo) ; heure : `fuseaux.hpp` + `fuseaux_donnees.inc` (généré par `outils/generer_fuseaux.py` depuis `posix_tz_db`, MIT, voir `ATTRIBUTION.md`), `heure_fr.hpp` ; lecture JSON : `json_mini.hpp` ; assistant : `assistant_etats.hpp`, `assistant_texte.hpp`, `flux_sse.hpp`, `requetes_openai.hpp`, `extrait_openai.hpp`, `decoupe_phrases.hpp` | sur main (testé sur le PC seulement) |
+| `test/host/` | tests du noyau (constexpr évalués par `static_assert`, puis **exécutés** avec ASan + UBSan) ; `lancer.py` avec preuve par mutations (`mutations_*.py`) ; `controle_*.py` | sur main |
 | `web/` | `app/` (la page), `faux-serveur/` (faux appareil Node), `tests/parcours.py` (Playwright), `esquisses/` (les 3 propositions, la B retenue) | sur main |
 | `docs/` | cette documentation, le plan, les ADR, les recherches | sur main |
 | `tools/idf.ps1` | lanceur de compilation (voir ci-dessous) | sur main |
