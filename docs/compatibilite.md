@@ -28,6 +28,7 @@ States: **Observed** · **Written, not tested on a board** · **Planned** (miles
 | Screen on, LVGL “Bonjour” image | Observed, with a reservation left open after a power cut (see [troubleshooting](depannage.md#open)); details in `mesures/1a.md` | Not supported (init table to be ported) | Not supported | Planned (phase 6) |
 | Touch | Observed (follows the finger; offset fixed at commit `e7a4803`, mean residual error (−6, −4) px over five targets, [mesures/1a.md](mesures/1a.md)) | Not supported | Not supported | Planned |
 | Software reset (`esp_rom_software_reset_system()`) | Observed once (start-up no. 2 of 06/11/2026, the image came back); the series of 20 is planned in 1b | — | — | Planned (C6 link loop known on this board) |
+| Weather on the board (HTTPS Open-Meteo every 15 min, NVS cache, “stale” flag) | Observed (06/11/2026, commit `55644aa`: Lyon read in the log and equal to the live API, twice 15 min apart; state back from the cache after a **software** restart; Wi-Fi cut, power cut and change of place not tested; free internal RAM unexplained drop, see [mesures/meteo.md](mesures/meteo.md)) | Written, not tested | Written, not tested | Planned (phase 6) |
 | Wi-Fi through the C6 (esp_hosted pinned) + SNTP — milestone 1b | Planned | — | — | Planned |
 | Full-duplex audio, echo cancellation, wake word — milestone 1c | Planned | — | — | Planned (ES8311: volume limited to 75%) |
 | Captive portal through SoftAP — milestone 1d | Planned | — | — | Planned |
@@ -81,6 +82,7 @@ Le contrôleur d'écran du Tab5 est **détecté au démarrage, avant d'initialis
 | Écran allumé, image LVGL « Bonjour » | Constaté, avec une réserve ouverte après coupure de courant (voir [dépannage](depannage.md#ouverts)) ; détail dans `mesures/1a.md` | Non pris en charge (table d'init à porter) | Non pris en charge | Prévu (phase 6) |
 | Tactile | Constaté (suit le doigt ; décalage corrigé au commit `e7a4803`, écart résiduel moyen (−6, −4) px sur cinq cibles, [mesures/1a.md](mesures/1a.md)) | Non pris en charge | Non pris en charge | Prévu |
 | Redémarrage logiciel (`esp_rom_software_reset_system()`) | Constaté une fois (démarrage n° 2 du 06/11/2026, l'image est revenue) ; la série de 20 est prévue en 1b | — | — | Prévu (boucle du lien C6 connue sur cette carte) |
+| Météo sur la carte (Open-Meteo en HTTPS toutes les 15 min, cache NVS, indicateur « périmé ») | Constaté (06/11/2026, commit `55644aa` : Lyon lue dans le journal et égale à l'API réelle, deux fois à 15 min d'écart ; état revenu du cache après un redémarrage **logiciel** ; Wi-Fi coupé, coupure de courant et changement de lieu non testés ; baisse inexpliquée de la RAM interne libre, voir [mesures/meteo.md](mesures/meteo.md)) | Écrit, non testé | Écrit, non testé | Prévu (phase 6) |
 | Wi-Fi par le C6 (esp_hosted épinglé) + SNTP — jalon 1b | Prévu | — | — | Prévu |
 | Audio duplex, annulation d'écho, mot d'activation — jalon 1c | Prévu | — | — | Prévu (ES8311 : volume limité à 75 %) |
 | Portail captif par SoftAP — jalon 1d | Prévu | — | — | Prévu |

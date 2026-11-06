@@ -10,6 +10,7 @@
 #include "boot_info.h"
 #include "commande_serie.h"
 #include "ecran_principal.h"
+#include "meteo_client.h"
 #include "reseau.h"
 
 static const char *TAG = "ecran";
@@ -46,5 +47,7 @@ extern "C" void app_main(void) {
     // Le réseau démarre après la première image : l'écran garde le temps de démarrage mesuré en 1a (docs/mesures/1b.md dit
     // si le Wi-Fi l'a changé).
     ecran::reseau_demarrer(boot);
+    ecran::
+        meteo_client_demarrer(); // météo Open-Meteo : cache NVS lu tout de suite, requêtes dès que le Wi-Fi et l'heure sont là
     ecran::commande_serie_demarrer();
 }

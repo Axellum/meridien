@@ -21,9 +21,11 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
 endif()
 
 idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp" "sntp_rapide.cpp" "commande_serie.cpp" "ui_bonjour.cpp"
+                       "meteo_etat.cpp" "meteo_zone.cpp" "meteo_client.cpp"
                        INCLUDE_DIRS "."
                        PRIV_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
                        REQUIRES board_api core esp_event esp_netif esp_rom esp_system esp_timer esp_wifi freertos lwip nvs_flash
+                               esp_http_client esp-tls mbedtls esp_hw_support heap
                        EMBED_FILES "assets/roboto_700.ttf")
 
 # Ecran principal (session ecran-principal). Ajoute par target_sources() apres l'enregistrement, et non dans la liste SRCS

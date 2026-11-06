@@ -118,6 +118,12 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 `test/host/controle_i18n.py` reads only the `kXxx = "…";` constants of `main/ui_bonjour.cpp` and `main/boot_info.cpp`, checked against the “Bonjour screen” section of the translation table. The new texts of 1b (clock, network state) therefore live in `main/textes_1b.h`, **not covered** by the table and not through `tr()`; they will go through `tr()` with the settings page. **Status**: worked around, to be redone in phase 2.
 
+#### `verrous.py` fails with “No module named 'filelock'” after a build
+
+**Cause.** `tools/idf.ps1` puts the Python of the ESP-IDF environment first on the `PATH` for the rest of the PowerShell session (read in the script). The lock script that tells the sessions who builds or flashes (it lives outside the repository) needs `filelock`, which that Python does not have. Taking the lock before the build works; giving it back after the build, in the same session, fails and leaves the lock held.
+
+**Solution.** Give the lock back from another PowerShell call (or with the PC's own Python, not the ESP-IDF one) and check with the `etat` command that it is free. **Seen on** the author's PC, 06/11/2026, commit `793bdfc`. **Evidence**: the traceback at the `rendre` call after `.\tools\idf.ps1 build`; the same call from a fresh call worked. **Status**: worked around.
+
 ---
 
 ### Chip, display and touch
@@ -244,6 +250,12 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 `python web/tests/parcours.py` really calls Open-Meteo (place search, weather): without Internet it fails. Replayed on 06/11/2026 by the coordination session: 49/49 checks, exit code 0. The stylesheet uses `:has()`: on an old phone, only the red outline of an invalid field would be missing (Safari iOS and Firefox: not verified).
 
+#### A mutation keeps the compiler busy for minutes
+
+**Cause.** The proof by mutation compiles the tests with one change in the core. A mutant that removes the exit condition of a `constexpr` loop (here `&& base < PERIODE_S` in `delai_avant_essai_s`) makes clang evaluate the loop up to its limit of 2 billion steps (`-fconstexpr-steps=2000000000`, set so that the tests which read a real response compile): 765 s of CPU measured before the compiler was stopped.
+
+**Solution.** That mutant is left out of `test/host/mutations_meteo_appareil.py` (the reason is written at the top of the file); the real code leaves the loop after 7 turns, and `planning_normal_et_reessais` covers 1 000 000 and `INT_MAX` failures. When writing a mutation, check that it does not remove the end of a loop. **Seen on** the author's PC, 06/11/2026, clang 23.1.5. **Evidence**: process CPU time, mutant no. 32 of the list. **Status**: worked around.
+
 ---
 
 ## Version Française
@@ -363,6 +375,12 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 #### Le garde de traduction ne voit pas les textes ajoutés en 1b
 
 `test/host/controle_i18n.py` ne lit que les constantes `kXxx = "…";` de `main/ui_bonjour.cpp` et `main/boot_info.cpp`, confrontées à la section « Écran Bonjour » de la table de traduction. Les textes nouveaux de 1b (horloge, état du réseau) vivent donc dans `main/textes_1b.h`, **hors table** et sans passer par `tr()` ; ils passeront par `tr()` avec la page de réglages. **Statut** : contourné, à refaire en phase 2.
+
+#### `verrous.py` échoue avec « No module named 'filelock' » après une compilation
+
+**Cause.** `tools/idf.ps1` met le Python de l'environnement ESP-IDF en tête du `PATH` pour la suite de la session PowerShell (lu dans le script). Le script de verrous qui dit aux sessions qui compile ou flashe (il vit hors du dépôt) a besoin de `filelock`, que ce Python n'a pas. Prendre le verrou avant la compilation marche ; le rendre après, dans la même session, échoue et laisse le verrou tenu.
+
+**Solution.** Rendre le verrou depuis un autre appel PowerShell (ou avec le Python du PC, pas celui d'ESP-IDF) et vérifier avec la commande `etat` qu'il est libre. **Vu sur** PC de l'auteur, 06/11/2026, commit `793bdfc`. **Preuve** : la trace de l'appel `rendre` après `.\tools\idf.ps1 build` ; le même appel depuis un appel neuf a marché. **Statut** : contourné.
 
 ---
 
@@ -489,3 +507,9 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 #### Le parcours web demande le réseau
 
 `python web/tests/parcours.py` appelle vraiment Open-Meteo (recherche de lieu, météo) : sans Internet il échoue. Rejoué le 06/11/2026 par la session de coordination : 49/49 vérifications, code de sortie 0. La feuille de style utilise `:has()` : sur un téléphone ancien, seul le contour rouge d'un champ invalide manquerait (Safari iOS et Firefox : non vérifié).
+
+#### Une mutation occupe le compilateur pendant des minutes
+
+**Cause.** La preuve par mutation compile les tests avec une modification du noyau. Un mutant qui retire la condition de sortie d'une boucle `constexpr` (ici `&& base < PERIODE_S` dans `delai_avant_essai_s`) fait évaluer la boucle à clang jusqu'à sa limite de 2 milliards de pas (`-fconstexpr-steps=2000000000`, réglée pour que les tests qui relisent une vraie réponse compilent) : 765 s de CPU mesurées avant d'arrêter le compilateur.
+
+**Solution.** Ce mutant est écarté de `test/host/mutations_meteo_appareil.py` (la raison est écrite en tête du fichier) ; le vrai code sort de la boucle après 7 tours, et `planning_normal_et_reessais` couvre 1 000 000 et `INT_MAX` échecs. En écrivant une mutation, vérifier qu'elle ne supprime pas la fin d'une boucle. **Vu sur** PC de l'auteur, 06/11/2026, clang 23.1.5. **Preuve** : temps CPU du processus, mutant n° 32 de la liste. **Statut** : contourné.
