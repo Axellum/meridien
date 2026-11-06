@@ -63,9 +63,48 @@ What the CI proves and does not prove: it compiles the Tab5 firmware and runs th
 
 Measured on 06/11/2026 (commit `29a548e`, runner `ubuntu-24.04` with clang 18.1.3 and g++ 13/14, private repository, no board involved): all seven jobs green in the last manual run. Durations: `tests-noyau` 3 to 5.5 min, `firmware-tab5` about 6 min (fresh `sdkconfig`, managed components downloaded; `build/meridien.bin` is 811 200 bytes, the same size as the PC build, its SHA-256 was not compared byte for byte with the PC's), `ruff`, `clang-format` and `gitleaks` under 11 s each, `parcours-web` about 1 min (49 checks out of 49, Node 22), `mutations-noyau` 35 to 48 min depending on the runner (206 mutations out of 206 detected). The first full run failed `parcours-web` for a real reason: the reformatting had split the weather table that the fake device (`web/faux-serveur/serveur.mjs`) reads with a regular expression, so it could not start; that table is now protected by `// clang-format off` … `// clang-format on` in `meteo_wmo.hpp`. Not covered: the memory leak detector is off (as on the PC); g++ is run without UBSan (see above); branch protection is not set up by the workflow itself.
 
+### Rendering the screen on the PC (no board)
+
+The board is a bottleneck (one unit, one flash at a time), so the interface can be drawn on the PC and written as a PNG. No board, no serial port, no lock, no ESP-IDF build.
+
+```powershell
+.\tools\rendre.ps1                                  # every scene, 720x1280 and 1280x720 -> docs\captures\ecran\
+.\tools\rendre.ps1 -Scene bonjour -Taille 720x1280  # one scene, one size
+.\tools\rendre.ps1 -Variante attente                # one variant (see the scene adapters for the list)
+.\tools\rendre.ps1 -Instant 2026-11-06T14:05:00Z    # another fixed instant (UTC)
+.\tools\rendre.ps1 -Nettoyer                        # forget the build cache (LVGL included)
+```
+
+Output: `docs/captures/ecran/<scene>-<variant>-<width>x<height>.png`, for example [`bonjour-connecte-720x1280.png`](captures/ecran/bonjour-connecte-720x1280.png) (the screen the board runs today). Two renders of the same code give the same bytes. The script refuses to start if `ninja` or `esphome` is running (one heavy build at a time on this PC); `-Forcer` overrides.
+
+**What is the same as the firmware.** LVGL 9.5.0 (checked against `dependencies.lock`), compiled with the firmware's own configuration (`tools/rendu/sdkconfig_lvgl.h`, a copy of the 106 `CONFIG_LV_*` lines of the firmware's `sdkconfig`; the script compares it with the `sdkconfig` of the repository when there is one, and warns of any difference); RGB565 display with partial 50-line buffers like `bsp_tab5`; LVGL's default theme; TinyTTF with the same `main/assets/roboto_700.ttf`. The interface files (`main/ui_*.cpp`) and `main/horloge.cpp` are compiled **unchanged**; the date and time text comes from the real pure core.
+
+**What is replaced.**
+
+| Firmware | On the PC | Where |
+|---|---|---|
+| `esp_log.h`, `freertos/*.h`, `esp_err.h`, `esp_rom_sys.h` | minimal stand-ins | `tools/rendu/bouchons/` |
+| the `board_*` functions of `board.h` (the real header is used) | fixed answers: Tab5 ST7121, the size asked for | `tools/rendu/banc.cpp` |
+| `reseau_etat()` (Wi-Fi, SNTP) | state chosen by the variant | `tools/rendu/scene_*.cpp` |
+| `std::time()` | the fixed instant (`_time64` is overridden) | `tools/rendu/banc.cpp` |
+| display, DSI, touch | an in-memory buffer, no touch | `tools/rendu/banc.cpp` |
+
+LVGL sources are found in `managed_components/lvgl__lvgl` of the repository (after an `idf.py reconfigure`), then in the main checkout, then in its `.cache/composants/`; `MERIDIEN_LVGL` forces a folder. Build cache: `.cache/rendu/` (ignored by git). **To add a scene**: write `tools/rendu/scene_<name>.cpp` (the variants and their invented data, see `scene_bonjour.cpp`) and declare it in `SCENES` of `tools/rendu/rendre.py`. A `main/ui_*.cpp` file must include no ESP-IDF header other than those listed above (rule 3 of the interface contract between sessions): otherwise the missing stand-in is added to the bench, never patched into the interface.
+
+**What this render does NOT cover** (it is LVGL's software drawing on x86-64, not the panel):
+
+- **Colours as the panel shows them**: the bench widens the 5-6-5 bits to 8 bits by repeating the high bits; the real panel's gamma, white point and internal processing are not simulated, and not compared with a photo of the board (not verified).
+- **Tearing, DSI timings, DMA2D copy, PPA, refresh rate, speed and memory use**: nothing is measured here (x86-64, not the RISC-V).
+- **Touch, backlight, brightness.**
+- **Invented data**: boot number 42, 612 ms, Wi-Fi states: fixtures, not measurements. The weather fixtures will be added with the weather screen.
+- **1280x720**: a simulated size of the display. The board native size is 720x1280 and the landscape orientation is being developed on another branch; the current « Bonjour » screen was drawn for 720x1280 and overflows at the bottom in 1280x720 (seen in `bonjour-*-1280x720.png`).
+- **A pixel-by-pixel comparison with the board**: not done. The same font file, the same LVGL version and configuration make the same layout expected, not proved.
+
+Measured on 06/11/2026: first run (463 LVGL files compiled with 4 jobs, then one scene) 8.8 s; later runs about 1 s. Seen on: the PC (Windows, clang 23.1.5 llvm-mingw, LVGL 9.5.0), no board, commits `a1b67be` and `2345297`.
+
 ### Not installed (on purpose)
 
-- **LVGL simulator on the PC** (SDL2) and reference screenshots: phase 5 of the [plan](plan.md).
+- **Interactive LVGL simulator on the PC** (SDL2, with touch) and automatic comparison with reference screenshots in the CI: phase 5 of the [plan](plan.md). The PNG render above is the first step.
 - **cppcheck**: `clang-tidy` covers the need for now.
 - No tool replaces a test on the board: a test that passes on the PC (x86-64) says nothing about memory, alignment or timing on the RISC-V.
 
@@ -136,8 +175,47 @@ Ce que la CI prouve et ne prouve pas : elle compile le firmware du Tab5 et exéc
 
 Mesuré le 06/11/2026 (commit `29a548e`, runner `ubuntu-24.04` avec clang 18.1.3 et g++ 13/14, dépôt privé, aucune carte en jeu) : les sept jobs sont verts dans le dernier lancement manuel. Durées : `tests-noyau` 3 à 5,5 min, `firmware-tab5` environ 6 min (`sdkconfig` neuf, composants gérés téléchargés ; `build/meridien.bin` fait 811 200 octets, la taille du build du PC, dont le SHA-256 n'a pas été comparé octet par octet), `ruff`, `clang-format` et `gitleaks` moins de 11 s chacun, `parcours-web` environ 1 min (49 vérifications sur 49, Node 22), `mutations-noyau` de 35 à 48 min selon le runner (206 mutations détectées sur 206). Le premier run complet a fait échouer `parcours-web` pour une vraie raison : le reformatage avait coupé le tableau météo que le faux appareil (`web/faux-serveur/serveur.mjs`) lit par expression régulière, qui ne démarrait donc plus ; ce tableau est maintenant protégé par `// clang-format off` … `// clang-format on` dans `meteo_wmo.hpp`. Non couvert : le détecteur de fuites mémoire est coupé (comme sur le PC) ; g++ tourne sans UBSan (voir plus haut) ; la protection de la branche `main` n'est pas posée par le workflow lui-même.
 
+### Rendu de l'écran sur le PC (sans carte)
+
+La carte est un goulot (un exemplaire, un flash à la fois) : l'interface peut donc être dessinée sur le PC et écrite en PNG. Ni carte, ni port série, ni verrou, ni compilation ESP-IDF.
+
+```powershell
+.\tools\rendre.ps1                                  # toutes les scènes, 720x1280 et 1280x720 -> docs\captures\ecran\
+.\tools\rendre.ps1 -Scene bonjour -Taille 720x1280  # une scène, une taille
+.\tools\rendre.ps1 -Variante attente                # une variante (la liste est dans les adaptateurs de scène)
+.\tools\rendre.ps1 -Instant 2026-11-06T14:05:00Z    # un autre instant fixé (UTC)
+.\tools\rendre.ps1 -Nettoyer                        # oublie le cache de compilation (LVGL compris)
+```
+
+Sortie : `docs/captures/ecran/<scène>-<variante>-<largeur>x<hauteur>.png`, par exemple [`bonjour-connecte-720x1280.png`](captures/ecran/bonjour-connecte-720x1280.png) (l'écran que la carte fait tourner aujourd'hui). Deux rendus du même code donnent les mêmes octets. Le script refuse de démarrer si `ninja` ou `esphome` tourne (une seule compilation lourde à la fois sur ce PC) ; `-Forcer` passe outre.
+
+**Ce qui est identique au firmware.** LVGL 9.5.0 (vérifié contre `dependencies.lock`), compilé avec la configuration du firmware (`tools/rendu/sdkconfig_lvgl.h`, copie des 106 lignes `CONFIG_LV_*` du `sdkconfig` du firmware ; le script le compare au `sdkconfig` du dépôt s'il existe et prévient de tout écart) ; affichage RGB565 en tampons partiels de 50 lignes comme `bsp_tab5` ; thème par défaut de LVGL ; TinyTTF avec le même `main/assets/roboto_700.ttf`. Les fichiers d'interface (`main/ui_*.cpp`) et `main/horloge.cpp` sont compilés **sans modification** ; le texte de l'heure et de la date vient du vrai noyau pur.
+
+**Ce qui est remplacé.**
+
+| Firmware | Sur le PC | Où |
+|---|---|---|
+| `esp_log.h`, `freertos/*.h`, `esp_err.h`, `esp_rom_sys.h` | remplaçants minimaux | `tools/rendu/bouchons/` |
+| les fonctions `board_*` de `board.h` (l'en-tête réel est utilisé) | réponses fixes : Tab5 ST7121, la taille demandée | `tools/rendu/banc.cpp` |
+| `reseau_etat()` (Wi-Fi, SNTP) | état choisi par la variante | `tools/rendu/scene_*.cpp` |
+| `std::time()` | l'instant fixé (`_time64` est redéfini) | `tools/rendu/banc.cpp` |
+| affichage, DSI, tactile | un tampon en mémoire, pas de tactile | `tools/rendu/banc.cpp` |
+
+Les sources de LVGL sont cherchées dans `managed_components/lvgl__lvgl` du dépôt (après un `idf.py reconfigure`), puis dans le dépôt principal, puis dans son `.cache/composants/` ; `MERIDIEN_LVGL` impose un dossier. Cache de compilation : `.cache/rendu/` (ignoré par git). **Ajouter une scène** : écrire `tools/rendu/scene_<nom>.cpp` (les variantes et leurs données inventées, voir `scene_bonjour.cpp`) et la déclarer dans `SCENES` de `tools/rendu/rendre.py`. Un fichier `main/ui_*.cpp` ne doit inclure aucun en-tête ESP-IDF hors ceux listés ci-dessus (règle 3 du contrat d'interface entre sessions) : sinon on ajoute le remplaçant manquant au banc, on ne modifie jamais l'interface pour lui.
+
+**Ce que ce rendu ne couvre PAS** (c'est le dessin logiciel de LVGL sur x86-64, pas la dalle) :
+
+- **Les couleurs telles que la dalle les montre** : le banc élargit les 5-6-5 bits à 8 bits en répétant les bits de poids fort ; le gamma, le point blanc et le traitement interne de la vraie dalle ne sont pas simulés, ni comparés à une photo de la carte (non vérifié).
+- **La déchirure, les temps du DSI, la copie DMA2D, le PPA, la cadence, la vitesse et la mémoire** : rien n'est mesuré ici (x86-64, pas le RISC-V).
+- **Le tactile, le rétroéclairage, la luminosité.**
+- **Les données inventées** : démarrage n° 42, 612 ms, états du Wi-Fi : des fixtures, pas des mesures. Les fixtures météo viendront avec l'écran météo.
+- **1280x720** : une taille simulée de l'affichage. La taille native de la carte est 720x1280 et l'orientation paysage se développe sur une autre branche ; l'écran « Bonjour » actuel a été dessiné pour 720x1280 et déborde en bas en 1280x720 (visible dans `bonjour-*-1280x720.png`).
+- **Une comparaison pixel à pixel avec la carte** : non faite. Même fichier de police, même version et même configuration de LVGL : la même mise en page est attendue, pas prouvée.
+
+Mesuré le 06/11/2026 : premier lancement (463 fichiers de LVGL compilés à 4 en parallèle, puis une scène) 8,8 s ; lancements suivants environ 1 s. Vu sur : le PC (Windows, clang 23.1.5 llvm-mingw, LVGL 9.5.0), aucune carte, commits `a1b67be` and `2345297`.
+
 ### Ce qui n'est pas installé (volontairement)
 
-- **Simulateur LVGL sur PC** (SDL2) et captures de référence : phase 5 du [plan](plan.md).
+- **Simulateur LVGL interactif sur PC** (SDL2, avec tactile) et comparaison automatique à des captures de référence dans la CI : phase 5 du [plan](plan.md). Le rendu PNG ci-dessus en est la première étape.
 - **cppcheck** : `clang-tidy` couvre le besoin pour l'instant.
 - Aucun outil ne remplace l'essai sur la carte : un test qui passe sur le PC (x86-64) ne dit rien de la mémoire, de l'alignement ni du temps sur le RISC-V.
