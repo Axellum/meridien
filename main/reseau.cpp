@@ -18,6 +18,7 @@
 #include "freertos/task.h"
 #include "sdkconfig.h"
 
+#include "diagnostic_sntp.h"
 #include "horloge.h"
 // Généré par CMake depuis reglages_locaux.cmake (hors git, voir main/CMakeLists.txt) : MERIDIEN_WIFI_SSID et
 // MERIDIEN_WIFI_MOT_DE_PASSE. Sans ce fichier de réglages locaux, ce sont des chaînes vides.
@@ -156,6 +157,7 @@ void sur_evenement_ip(void *, esp_event_base_t, int32_t id, void *donnees) {
     });
     ESP_LOGI(TAG, "adresse IP obtenue : %s à %d ms", ip, static_cast<int>(ms));
     demarrer_sntp();
+    diagnostic_sntp_demarrer(); // temporaire (jalon 1b) : mesure DNS, perte UDP et état du SNTP de lwIP
 }
 
 // Initialise la pile IP et le Wi-Fi (routé vers le coprocesseur par esp_wifi_remote) et lance la connexion.
