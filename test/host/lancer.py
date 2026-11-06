@@ -84,6 +84,9 @@ def lancer(cxx, mode):
     from controle_i18n import controle_i18n  # noqa: PLC0415  (contrôles croisés de la traduction, sans compilation)
 
     echecs += controle_i18n()
+    from controle_reglages import controle_reglages  # noqa: PLC0415  (contrat de l'API, pages et clavier contre leurs sources)
+
+    echecs += controle_reglages()
     print("\nRÉSULTAT :", "tout passe" if echecs == 0 else f"{echecs} fichier(s) en échec")
     return 1 if echecs else 0
 
@@ -137,11 +140,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
+from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (réglages sur l'écran et installation guidée : voir ce fichier)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
 MUTATIONS += MUTATIONS_ASSISTANT
 MUTATIONS += MUTATIONS_I18N
+MUTATIONS += MUTATIONS_REGLAGES
 
 
 def mutations(cxx, mode):
