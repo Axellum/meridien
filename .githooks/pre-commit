@@ -1,0 +1,9 @@
+#!/bin/sh
+# Contrôle avant chaque commit : secrets, tests du noyau (exécutés), Python. Détail : tools/verifier.ps1 -Rapide.
+# Activé par : git config core.hooksPath .githooks   (ne jamais contourner avec --no-verify : corriger la cause.)
+racine=$(git rev-parse --show-toplevel)
+if [ ! -f "$racine/tools/verifier.ps1" ]; then
+    echo "pre-commit : tools/verifier.ps1 absent de ce dossier, contrôle sauté (fusionner main dans la branche)." >&2
+    exit 0
+fi
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$racine/tools/verifier.ps1" -Rapide

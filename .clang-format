@@ -1,0 +1,7 @@
+# Cible de mise en forme du C/C++ (clang-format 23). Le code existant n'y est pas encore conforme (tableaux alignés à la
+# main, trois pistes en cours) : le contrôle de tools/verifier.ps1 n'est qu'un avertissement tant que le code n'a pas été
+# reformaté d'un coup, dans un commit à part, après la fusion des pistes. Un tableau aligné exprès se protège avec
+# « // clang-format off » ... « // clang-format on ».
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 120
