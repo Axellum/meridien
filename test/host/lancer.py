@@ -97,7 +97,7 @@ MUTATIONS = [
      "seuls_les_codes_0_a_2_changent_entre_jour_et_nuit", "la nuit montre le soleil"),
     ("meteo_wmo.hpp", "case 97:", "case 98:", "test_meteo_wmo.cpp", "tous_les_codes_sont_connus_jour_et_nuit",
      "le code 97 est devenu 98"),
-    ("meteo_wmo.hpp", 'Icone::Inconnue, false};\n    }', 'Icone::Inconnue, true};\n    }', "test_meteo_wmo.cpp",
+    ("meteo_wmo.hpp", 'Icone::Inconnue, false};', 'Icone::Inconnue, true};', "test_meteo_wmo.cpp",
      "codes_inconnus_donnent_meteo_inconnue", "un code inconnu est déclaré connu"),
     ("meteo_wmo.hpp", '"Orage avec petite grêle", Icone::OrageGrele', '"Orage avec petite grêle", Icone::Orage',
      "test_meteo_wmo.cpp", "regroupements_d_icones", "la grêle prend l'icône d'orage"),

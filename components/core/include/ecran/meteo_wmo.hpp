@@ -102,66 +102,40 @@ constexpr std::string_view nom_icone(Icone icone) noexcept {
 // `jour` = champ `is_day` d'Open-Meteo (1 = jour). Les libellés de 0 à 2 sont neutres (valables de nuit).
 constexpr Condition decrire(int code_wmo, bool jour) noexcept {
     switch (code_wmo) {
-    case 0:
-        return {"Ciel dégagé", jour ? Icone::Soleil : Icone::Lune, true};
-    case 1:
-        return {"Plutôt dégagé", jour ? Icone::PeuNuageuxJour : Icone::PeuNuageuxNuit, true};
-    case 2:
-        return {"Partiellement nuageux", jour ? Icone::NuageuxJour : Icone::NuageuxNuit, true};
-    case 3:
-        return {"Couvert", Icone::Couvert, true};
-    case 45:
-        return {"Brouillard", Icone::Brouillard, true};
-    case 48:
-        return {"Brouillard givrant", Icone::Brouillard, true};
-    case 51:
-        return {"Bruine légère", Icone::Bruine, true};
-    case 53:
-        return {"Bruine modérée", Icone::Bruine, true};
-    case 55:
-        return {"Bruine dense", Icone::Bruine, true};
-    case 56:
-        return {"Bruine verglaçante légère", Icone::PluieVerglacante, true};
-    case 57:
-        return {"Bruine verglaçante dense", Icone::PluieVerglacante, true};
-    case 61:
-        return {"Pluie faible", Icone::Pluie, true};
-    case 63:
-        return {"Pluie modérée", Icone::Pluie, true};
-    case 65:
-        return {"Pluie forte", Icone::PluieForte, true};
-    case 66:
-        return {"Pluie verglaçante légère", Icone::PluieVerglacante, true};
-    case 67:
-        return {"Pluie verglaçante forte", Icone::PluieVerglacante, true};
-    case 71:
-        return {"Neige faible", Icone::Neige, true};
-    case 73:
-        return {"Neige modérée", Icone::Neige, true};
-    case 75:
-        return {"Neige forte", Icone::NeigeForte, true};
-    case 77:
-        return {"Grains de neige", Icone::GrainsDeNeige, true};
-    case 80:
-        return {"Averses faibles", Icone::Averses, true};
-    case 81:
-        return {"Averses modérées", Icone::Averses, true};
-    case 82:
-        return {"Averses violentes", Icone::AversesViolentes, true};
-    case 85:
-        return {"Averses de neige faibles", Icone::AversesDeNeige, true};
-    case 86:
-        return {"Averses de neige fortes", Icone::AversesDeNeige, true};
-    case 95:
-        return {"Orage", Icone::Orage, true};
-    case 96:
-        return {"Orage avec petite grêle", Icone::OrageGrele, true};
-    case 97:
-        return {"Orage violent", Icone::Orage, true};
-    case 99:
-        return {"Orage avec forte grêle", Icone::OrageGrele, true};
-    default:
-        return {"Météo inconnue", Icone::Inconnue, false};
+        // clang-format off
+        // Une ligne par code : web/faux-serveur/serveur.mjs et web/tests/parcours.py lisent ce tableau par expression
+        // régulière (case N: return {"libellé"). clang-format ne doit pas couper ces lignes.
+        case 0: return {"Ciel dégagé", jour ? Icone::Soleil : Icone::Lune, true};
+        case 1: return {"Plutôt dégagé", jour ? Icone::PeuNuageuxJour : Icone::PeuNuageuxNuit, true};
+        case 2: return {"Partiellement nuageux", jour ? Icone::NuageuxJour : Icone::NuageuxNuit, true};
+        case 3: return {"Couvert", Icone::Couvert, true};
+        case 45: return {"Brouillard", Icone::Brouillard, true};
+        case 48: return {"Brouillard givrant", Icone::Brouillard, true};
+        case 51: return {"Bruine légère", Icone::Bruine, true};
+        case 53: return {"Bruine modérée", Icone::Bruine, true};
+        case 55: return {"Bruine dense", Icone::Bruine, true};
+        case 56: return {"Bruine verglaçante légère", Icone::PluieVerglacante, true};
+        case 57: return {"Bruine verglaçante dense", Icone::PluieVerglacante, true};
+        case 61: return {"Pluie faible", Icone::Pluie, true};
+        case 63: return {"Pluie modérée", Icone::Pluie, true};
+        case 65: return {"Pluie forte", Icone::PluieForte, true};
+        case 66: return {"Pluie verglaçante légère", Icone::PluieVerglacante, true};
+        case 67: return {"Pluie verglaçante forte", Icone::PluieVerglacante, true};
+        case 71: return {"Neige faible", Icone::Neige, true};
+        case 73: return {"Neige modérée", Icone::Neige, true};
+        case 75: return {"Neige forte", Icone::NeigeForte, true};
+        case 77: return {"Grains de neige", Icone::GrainsDeNeige, true};
+        case 80: return {"Averses faibles", Icone::Averses, true};
+        case 81: return {"Averses modérées", Icone::Averses, true};
+        case 82: return {"Averses violentes", Icone::AversesViolentes, true};
+        case 85: return {"Averses de neige faibles", Icone::AversesDeNeige, true};
+        case 86: return {"Averses de neige fortes", Icone::AversesDeNeige, true};
+        case 95: return {"Orage", Icone::Orage, true};
+        case 96: return {"Orage avec petite grêle", Icone::OrageGrele, true};
+        case 97: return {"Orage violent", Icone::Orage, true};
+        case 99: return {"Orage avec forte grêle", Icone::OrageGrele, true};
+        default: return {"Météo inconnue", Icone::Inconnue, false};
+        // clang-format on
     }
 }
 
