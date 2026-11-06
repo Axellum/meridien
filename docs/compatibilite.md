@@ -32,7 +32,7 @@ Logiciel **sans carte** (même code pour toutes les cartes) :
 
 | Brique | État | Preuve et limite |
 |---|---|---|
-| Table météo WMO → libellé français + icône jour/nuit ; fuseaux IANA → chaîne POSIX TZ (posix_tz_db, MIT) | Écrit, vérifié à la compilation sur PC | tests évalués par `static_assert`, 18 mutations détectées sur 18 ; **pas exécutés** (aucun compilateur hôte sur le PC : g++ croisé RISC-V d'ESP-IDF en `-fsyntax-only`) ; jamais lancés sur une carte |
+| Table météo WMO → libellé français + icône jour/nuit ; fuseaux IANA → chaîne POSIX TZ (posix_tz_db, MIT) | Écrit, vérifié à la compilation sur PC | 23 tests **exécutés sur le PC** (clang 23.1.5 x86-64, avec AddressSanitizer et UBSan, 0 échec) et évalués à la compilation par `static_assert` ; 18 mutations détectées sur 18 ; **jamais lancés sur une carte** (RISC-V : tailles, alignement et mémoire peuvent différer) |
 | Page de réglages (front) et faux appareil | Écrit, essayé contre un faux appareil Node | 49 vérifications Playwright (rendu téléphone 390 × 844), 13 905 octets gzip ; **jamais servi par l'appareil** ; Chromium seulement (Safari iOS, Firefox : non vérifié) |
 | Contrat de l'API de réglages | Écrit ([api-reglages.md](api-reglages.md)) | implémenté par le faux appareil seulement |
 

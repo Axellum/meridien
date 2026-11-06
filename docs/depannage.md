@@ -145,7 +145,13 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 ### Aucun compilateur hôte sur le PC : les tests du noyau ne s'exécutent pas
 
-**Cause.** Pas de `gcc`, `clang` ni `cl` installé. **Solution.** Les tests sont des fonctions `constexpr` évaluées **à la compilation** (`static_assert`) par le g++ croisé RISC-V d'ESP-IDF en `-fsyntax-only` (`python test/host/lancer.py`), avec une **preuve par mutations** (18 modifications du noyau, 18 détectées). **Limite** : un test évalué à la compilation prouve la logique, pas l'exécution sur la carte. **Statut** : contourné.
+**Cause.** Pas de `gcc`, `clang` ni `cl` installé (ni Visual Studio) sur le PC d'Axel.
+
+**Solution provisoire (jusqu'au 06/11/2026).** Les tests sont des fonctions `constexpr` évaluées **à la compilation** (`static_assert`) par le g++ croisé RISC-V d'ESP-IDF en `-fsyntax-only`.
+
+**Solution définitive.** llvm-mingw (clang 23.1.5) installé sur H: le 06/11/2026, voir [outils.md](outils.md) : `. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers` puis `python test/host/lancer.py` compile, lie et **exécute** les tests, avec AddressSanitizer et UBSan.
+
+**Vu sur** PC d'Axel (Windows 11), `main` au 06/11/2026. **Preuve** : un programme fautif volontaire (lecture hors d'un tableau) est détecté par AddressSanitizer avec la ligne et le lieu d'allocation ; les 23 tests du noyau passent exécutés (avec et sans détecteurs) ; 18 mutations sur 18 détectées. **Limite** : le PC est en x86-64 ; un test réussi sur le PC ne prouve pas le comportement du RISC-V de la carte (tailles, alignement, mémoire disponible) : le constat sur carte reste nécessaire. **Statut** : résolu.
 
 ### Un 404 sur l'essai d'un service LLM : erreur ou pas ?
 
