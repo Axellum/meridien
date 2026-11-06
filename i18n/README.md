@@ -45,8 +45,8 @@ _statut: complet
 - Un mapping plat : une ligne = `"texte français": "traduction"`, en guillemets doubles. Seuls échappements permis :
   antislash-guillemet et double antislash. Les caractères invisibles (espace insécable U+00A0) s'écrivent tels quels.
 - `# --- Titre ---` ouvre une section. Celles dont le titre commence par « Écran » sont ce que **l'écran** affiche (elles
-  seront contrôlées contre la police embarquée) ; les autres (« Page de réglages », « Appareil ») ne passent que par la
-  page web ou l'API.
+  sont contrôlées contre la police embarquée par `components/core/outils/verifier_glyphes.py`, voir plus bas) ; les
+  autres (« Page de réglages », « Appareil ») ne passent que par la page web ou l'API.
 - Mêmes clés, même ordre, mêmes sections dans tous les fichiers de langue complets.
 - **Marqueurs** (`%d`, `%s`, `%u`, `%02d`… et `{noms}`) : identiques à la clé et dans le même ordre. Une traduction qui
   les change ferait afficher n'importe quoi (ou planter un `printf`) : le générateur et les tests le refusent.
@@ -77,8 +77,22 @@ python test/host/lancer.py                                 # dont test_i18n.cpp
 Les sorties générées (`components/core/include/ecran/i18n_donnees.inc`, `web/app/lang/*.json`) sont versionnées : ne pas
 les modifier à la main, `--verifier` le détecterait.
 
+## Polices : les caractères de chaque langue
+
+`python components/core/outils/verifier_glyphes.py` (fontTools, lecture seule ; ne modifie ni la police ni `main/`)
+compare la table `cmap` de `main/assets/roboto_700.ttf` avec trois listes : les caractères des sections « Écran » de
+chaque langue, les lettres propres à chaque langue (alphabets écrits dans le script, indépendants des textes
+actuels), et, pour information, les textes de la page et de l'API (rendus par le navigateur du téléphone). Code de
+sortie 1 si un caractère de l'écran ou d'un alphabet manque. Passé le 06/11/2026 sur la police du dépôt (Roboto Bold,
+927 caractères) : **aucun glyphe manquant** pour le français, l'anglais, l'allemand, le néerlandais, l'espagnol,
+l'italien ni le turc (liste vide ; voir l'ADR-0006). La présence dans la `cmap` prouve que la police sait dessiner le
+caractère, pas que TinyTTF l'affiche correctement sur la carte : cela reste à constater sur l'écran.
+
+*Vu sur* : PC (Windows 11), fontTools 4.66.1, `main/assets/roboto_700.ttf` (SHA-256 `35757eaa…ff190`, celui de
+`main/assets/README.md`), branche `depot-langues`, 06/11/2026 ; aucune carte.
+
 ## Ajouter une langue
 
 Un nouveau fichier `i18n/<code>.yaml` avec l'indice suivant (7, 8…), puis ajouter le code à `ORDRE_FIGE` du générateur,
-à `CODES`/`NOMS`/`Langue` de `i18n.hpp` et aux tests de `test/host/test_i18n.cpp`. Vérifier d'abord que la police
-embarquée contient les caractères de la langue.
+à `CODES`/`NOMS`/`Langue` de `i18n.hpp` et aux tests de `test/host/test_i18n.cpp`. Ajouter ses lettres propres à
+`ALPHABETS` de `verifier_glyphes.py` et vérifier d'abord que la police embarquée les contient.
