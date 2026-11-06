@@ -102,6 +102,16 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 `test/host/controle_i18n.py` reads only the `kXxx = "…";` constants of `main/ui_bonjour.cpp` and `main/boot_info.cpp`, checked against the “Bonjour screen” section of the translation table. The new texts of 1b (clock, network state) therefore live in `main/textes_1b.h`, **not covered** by the table and not through `tr()`; they will go through `tr()` with the settings page. **Status**: worked around, to be redone in phase 2.
 
+#### `idf.py set-target` fails while downloading components: “No such file or directory” on a very long path
+
+**Symptom.** In a new git worktree, `.\tools\idf.ps1 set-target esp32p4` stops during the component download with a Python `FileNotFoundError: [Errno 2] No such file or directory: '…\.cache\composants\service_…\espressif__esp_hosted_2.12.12_…\examples\host_network_split__power_save\…\host_wakeup_demo_using_udp_packet.c'`. A half-written `build/` is then left behind, and the next `set-target` stops on “doesn't seem to be a CMake build directory”.
+
+**Cause.** The 260-character Windows path limit (`LongPathsEnabled` is 0 on this PC) meets the component cache that `tools/idf.ps1` puts inside the project (`<worktree>\.cache\composants`). The longest file of `esp_hosted` 2.12.12 lies 184 characters below the worktree root; with the folder `reglages-appareil-b3aad6` (root of 76 characters) its path is exactly 260 characters. The other worktrees, whose names are 2 to 5 characters shorter, come out at 251–258 and pass: **a worktree folder name of 24 characters or more fails** here.
+
+**Solution.** Worked around, not fixed in the repository: delete the half-written `build/` and `sdkconfig*`, then run the build with a private copy of `tools/idf.ps1` (not committed) in which `IDF_COMPONENT_CACHE_PATH` points to a short folder outside the repository (here `C:\Users\axell\.tab5\cache-composants`); everything else is identical. Durable options **not done**: have `tools/idf.ps1` keep an `IDF_COMPONENT_CACHE_PATH` that is already set (one line), or give worktrees shorter names. Turning on Windows long paths is a system setting and was not touched.
+
+**Seen on** the build PC (Windows 11, ESP-IDF 5.5.5), branch `claude/reglages-appareil-b3aad6`, 06/11/2026; no board involved. **Evidence**: Python traceback in the build log; path length computed (260) and the same computation for the other worktrees; with the short cache the configuration, the download of the components (including `espressif/mdns` 1.13.1) and the build (exit code 0) went through. **Status**: worked around.
+
 ---
 
 ### Chip, display and touch
@@ -321,6 +331,16 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 #### Le garde de traduction ne voit pas les textes ajoutés en 1b
 
 `test/host/controle_i18n.py` ne lit que les constantes `kXxx = "…";` de `main/ui_bonjour.cpp` et `main/boot_info.cpp`, confrontées à la section « Écran Bonjour » de la table de traduction. Les textes nouveaux de 1b (horloge, état du réseau) vivent donc dans `main/textes_1b.h`, **hors table** et sans passer par `tr()` ; ils passeront par `tr()` avec la page de réglages. **Statut** : contourné, à refaire en phase 2.
+
+#### `idf.py set-target` échoue au téléchargement des composants : « No such file or directory » sur un chemin très long
+
+**Symptôme.** Dans un nouveau worktree git, `.\tools\idf.ps1 set-target esp32p4` s'arrête pendant le téléchargement des composants sur une `FileNotFoundError: [Errno 2] No such file or directory: '…\.cache\composants\service_…\espressif__esp_hosted_2.12.12_…\examples\host_network_split__power_save\…\host_wakeup_demo_using_udp_packet.c'` de Python. Un `build/` à moitié écrit reste, et le `set-target` suivant s'arrête sur « doesn't seem to be a CMake build directory ».
+
+**Cause.** La limite de 260 caractères des chemins Windows (`LongPathsEnabled` vaut 0 sur ce PC) rencontre le cache de composants que `tools/idf.ps1` place dans le projet (`<worktree>\.cache\composants`). Le plus long fichier d'`esp_hosted` 2.12.12 est à 184 caractères sous la racine du worktree ; avec le dossier `reglages-appareil-b3aad6` (racine de 76 caractères) son chemin fait exactement 260 caractères. Les autres worktrees, aux noms plus courts de 2 à 5 caractères, tombent à 251–258 et passent : **un nom de dossier de worktree de 24 caractères ou plus échoue** ici.
+
+**Solution.** Contournée, pas corrigée dans le dépôt : supprimer le `build/` à moitié écrit et `sdkconfig*`, puis lancer la compilation avec une copie privée de `tools/idf.ps1` (non commitée) où `IDF_COMPONENT_CACHE_PATH` désigne un dossier court hors du dépôt (ici `C:\Users\axell\.tab5\cache-composants`) ; tout le reste est identique. Pistes durables **non faites** : faire respecter par `tools/idf.ps1` un `IDF_COMPONENT_CACHE_PATH` déjà défini (une ligne), ou donner des noms plus courts aux worktrees. Activer les chemins longs de Windows est un réglage système : non touché.
+
+**Vu sur** le PC de compilation (Windows 11, ESP-IDF 5.5.5), branche `claude/reglages-appareil-b3aad6`, 06/11/2026 ; aucune carte en jeu. **Preuve** : trace Python dans le journal de compilation ; longueur du chemin calculée (260) et même calcul pour les autres worktrees ; avec le cache court, la configuration, le téléchargement des composants (dont `espressif/mdns` 1.13.1) et la compilation (code de sortie 0) sont passés. **Statut** : contourné.
 
 ---
 

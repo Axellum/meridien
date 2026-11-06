@@ -10,9 +10,15 @@ Contents / Sommaire — English: 1 Rules · 2 Pairing · 3 Device · 4 Wi-Fi · 
 
 # English
 
-Written on 06/11/2026 (track B), languages added on 06/11/2026. **Design contract: no route exists on the device yet.** The front end and the fake server in `web/` implement it; the firmware (phase 3) will have to follow it as written. Everything written here as behaviour of the device is **not verified** until it has been observed on a board.
+Written on 06/11/2026 (track B), languages added on 06/11/2026. **Design contract; the firmware serves a first subset of it (box below), the other routes do not exist on the device yet.** The front end and the fake server in `web/` implement all of it; the firmware will have to follow it as written. Everything written here as behaviour of the device is **not verified** until it has been observed on a board.
 
 Original decisions: [ADR-0002](decisions/0002-assistant-vocal-en-cascade.md) (three services), [ADR-0003](decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md) (page served by the device, local HTTP, pairing token, secrets, update), [ADR-0006](decisions/0006-ecran-en-sept-langues.md) (seven languages).
+
+> **Firmware status — milestone “réglages”, 06/11/2026: subset V1, Wi-Fi station mode only (no access point, no captive portal).** Served by `main/serveur_web.cpp` on port 80; the logic is in the pure core (`components/core/include/ecran/api_reglages.hpp`), tested on the PC with mutations. **Compiled, not yet observed on a board** (see [mesures/reglages.md](mesures/reglages.md)).
+> - **Real**: `GET /api/status`, `POST` and `DELETE /api/pair`, `GET /api/system`, `GET` and `PUT /api/location`, `GET` and `PUT /api/display`, `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (read-only), the static files (gzip).
+> - **Empty, without error** (the page opens without a red message): `GET /api/services` (nothing configured), `GET /api/presets` (none), `GET /api/update` (`inactif`).
+> - **`501` `non_disponible`**, with the sentence “This function is not available on this screen yet.” in the screen language: Wi-Fi scan and change, saving and testing the STT / LLM / TTS services, export / import, update and rollback.
+> - **Known gaps with the text below**: `GET /api/geocode` is **synchronous** (it holds the server's single task for up to 8 s: rule 7 is not kept for this one route); beyond 5 open connections the oldest is closed instead of answering `503` (rule 8); `validee` is always `true` (no rollback yet); `compile_le` is the local time of the build PC, without “Z”; the `fuseau` reported is the saved city's, **not** the zone the on-screen clock uses (the clock is still fixed on Europe/Paris).
 
 ## 1. Rules that apply to every route
 
@@ -286,9 +292,15 @@ Seven languages (ADR-0006), in this fixed order and with these **indices, which 
 
 # Français
 
-Rédigé le 06/11/2026 (piste B), langues ajoutées le 06/11/2026. **Contrat de conception : aucune route n'existe encore sur l'appareil.** Le front et le faux serveur de `web/` l'implémentent ; le firmware (phase 3) devra le respecter tel quel. Tout ce qui est écrit ici comme comportement de l'appareil est **non vérifié** tant qu'il n'a pas été constaté sur une carte.
+Rédigé le 06/11/2026 (piste B), langues ajoutées le 06/11/2026. **Contrat de conception ; le firmware en sert un premier sous-ensemble (encadré ci-dessous), les autres routes n'existent pas encore sur l'appareil.** Le front et le faux serveur de `web/` l'implémentent en entier ; le firmware devra le respecter tel quel. Tout ce qui est écrit ici comme comportement de l'appareil est **non vérifié** tant qu'il n'a pas été constaté sur une carte.
 
 Décisions d'origine : [ADR-0002](decisions/0002-assistant-vocal-en-cascade.md) (trois services), [ADR-0003](decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md) (page servie par l'appareil, HTTP local, jeton d'appairage, secrets, mise à jour), [ADR-0006](decisions/0006-ecran-en-sept-langues.md) (sept langues).
+
+> **État du firmware — jalon « réglages », 06/11/2026 : sous-ensemble V1, mode station Wi-Fi seulement (ni point d'accès, ni portail captif).** Servi par `main/serveur_web.cpp` sur le port 80 ; la logique est dans le noyau pur (`components/core/include/ecran/api_reglages.hpp`), testée sur le PC avec des mutations. **Compilé, pas encore constaté sur une carte** (voir [mesures/reglages.md](mesures/reglages.md)).
+> - **Réel** : `GET /api/status`, `POST` et `DELETE /api/pair`, `GET /api/system`, `GET` et `PUT /api/location`, `GET` et `PUT /api/display`, `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (lecture seule), les fichiers statiques (gzip).
+> - **Vide, sans erreur** (la page s'ouvre sans message rouge) : `GET /api/services` (rien de réglé), `GET /api/presets` (aucun), `GET /api/update` (`inactif`).
+> - **`501` `non_disponible`**, avec la phrase « Cette fonction n’est pas encore disponible sur cet écran. » dans la langue de l'écran : scan et changement de Wi-Fi, enregistrement et test des services STT / LLM / TTS, export / import, mise à jour et retour arrière.
+> - **Écarts connus avec le texte ci-dessous** : `GET /api/geocode` est **synchrone** (il garde l'unique tâche du serveur jusqu'à 8 s : la règle 7 n'est pas tenue pour cette seule route) ; au-delà de 5 connexions ouvertes, la plus ancienne est fermée au lieu de répondre `503` (règle 8) ; `validee` vaut toujours `true` (pas encore de retour arrière) ; `compile_le` est l'heure locale du PC de compilation, sans « Z » ; le `fuseau` rendu est celui de la ville enregistrée, **pas** celui que l'horloge de l'écran utilise (l'horloge est encore fixée sur Europe/Paris).
 
 ## 1. Règles qui valent pour toutes les routes
 
