@@ -13,6 +13,7 @@ régression fait échouer la compilation. Le mode utilisé est affiché ; aucun 
 quand il ne l'est pas.
 """
 import argparse
+import functools
 import glob
 import os
 import shutil
@@ -25,6 +26,17 @@ RACINE = Path(__file__).resolve().parents[2]
 TESTS = sorted((RACINE / "test" / "host").glob("test_*.cpp"))
 INCLUDE_NOYAU = RACINE / "components" / "core" / "include"
 DRAPEAUX = ["-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic"]
+
+
+@functools.lru_cache(maxsize=None)
+def drapeaux_constexpr(cxx):
+    """Les tests qui relisent une vraie réponse JSON dépassent la limite par défaut de GCC (33 554 432 opérations
+    constexpr) : on la relève. Clang l'appelle autrement (-fconstexpr-steps, non essayé ici : pas de clang sur ce PC)."""
+    try:
+        version = subprocess.run([cxx, "--version"], capture_output=True, text=True, timeout=60).stdout.lower()
+    except (OSError, subprocess.SubprocessError):
+        version = ""
+    return ["-fconstexpr-steps=2000000000"] if "clang" in version else ["-fconstexpr-ops-limit=2000000000"]
 
 
 def trouver_compilateur(force=None):
@@ -44,7 +56,7 @@ def trouver_compilateur(force=None):
 
 
 def compiler(cxx, mode, source, include_noyau, sortie_exe=None):
-    cmd = [cxx, *DRAPEAUX, "-I", str(include_noyau), "-I", str(RACINE / "test" / "host")]
+    cmd = [cxx, *DRAPEAUX, *drapeaux_constexpr(cxx), "-I", str(include_noyau), "-I", str(RACINE / "test" / "host")]
     if mode == "syntaxe":
         cmd += ["-fsyntax-only", str(source)]
     else:
