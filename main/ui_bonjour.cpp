@@ -38,7 +38,7 @@ constexpr const char *kDuree = "Carte prête après %d ms";
 constexpr const char *kToucherAucun = "Toucher : aucun";
 constexpr const char *kToucher = "Toucher : x = %d, y = %d";
 constexpr const char *kRedemarrer = "Redémarrer";
-}  // namespace texte
+} // namespace texte
 
 constexpr int32_t kDiametrePoint = 96;
 constexpr int32_t kLargeurTexte = 640;
@@ -49,13 +49,9 @@ lv_obj_t *g_libelle_toucher = nullptr;
 int g_compteur_appui = 0;
 int32_t g_x_min = INT32_MAX, g_x_max = INT32_MIN, g_y_min = INT32_MAX, g_y_max = INT32_MIN;
 
-lv_color_t couleur(uint32_t rgb)
-{
-    return lv_color_hex(rgb);
-}
+lv_color_t couleur(uint32_t rgb) { return lv_color_hex(rgb); }
 
-lv_obj_t *creer_libelle(lv_obj_t *parent, const lv_font_t *police, uint32_t couleur_rgb)
-{
+lv_obj_t *creer_libelle(lv_obj_t *parent, const lv_font_t *police, uint32_t couleur_rgb) {
     lv_obj_t *libelle = lv_label_create(parent);
     lv_obj_set_width(libelle, kLargeurTexte);
     lv_label_set_long_mode(libelle, LV_LABEL_LONG_WRAP);
@@ -72,8 +68,7 @@ constexpr int32_t kEpaisseurTrait = 2;
 constexpr int32_t kMargeCible = 60;
 constexpr int32_t kEpaisseurCadre = 4;
 
-lv_obj_t *creer_trait(lv_obj_t *parent, int32_t x, int32_t y, int32_t largeur, int32_t hauteur, uint32_t couleur_rgb)
-{
+lv_obj_t *creer_trait(lv_obj_t *parent, int32_t x, int32_t y, int32_t largeur, int32_t hauteur, uint32_t couleur_rgb) {
     lv_obj_t *trait = lv_obj_create(parent);
     lv_obj_remove_style_all(trait);
     lv_obj_remove_flag(trait, LV_OBJ_FLAG_CLICKABLE);
@@ -85,8 +80,7 @@ lv_obj_t *creer_trait(lv_obj_t *parent, int32_t x, int32_t y, int32_t largeur, i
     return trait;
 }
 
-void creer_cible(lv_obj_t *parent, int32_t centre_x, int32_t centre_y)
-{
+void creer_cible(lv_obj_t *parent, int32_t centre_x, int32_t centre_y) {
     lv_obj_t *cible = lv_obj_create(parent);
     lv_obj_remove_style_all(cible);
     lv_obj_remove_flag(cible, LV_OBJ_FLAG_CLICKABLE);
@@ -100,8 +94,7 @@ void creer_cible(lv_obj_t *parent, int32_t centre_x, int32_t centre_y)
     creer_trait(cible, kCoteCible / 2 - 1, 0, kEpaisseurTrait, kCoteCible, kCouleurs.texte);
 }
 
-void creer_mire(lv_obj_t *couche, int32_t largeur, int32_t hauteur)
-{
+void creer_mire(lv_obj_t *couche, int32_t largeur, int32_t hauteur) {
     lv_obj_t *cadre = lv_obj_create(couche);
     lv_obj_remove_style_all(cadre);
     lv_obj_remove_flag(cadre, LV_OBJ_FLAG_CLICKABLE);
@@ -118,13 +111,9 @@ void creer_mire(lv_obj_t *couche, int32_t largeur, int32_t hauteur)
     creer_cible(couche, largeur - kMargeCible, hauteur - kMargeCible);
 }
 
-void placer_point(int32_t x, int32_t y)
-{
-    lv_obj_set_pos(g_point, x - kDiametrePoint / 2, y - kDiametrePoint / 2);
-}
+void placer_point(int32_t x, int32_t y) { lv_obj_set_pos(g_point, x - kDiametrePoint / 2, y - kDiametrePoint / 2); }
 
-void sur_toucher(lv_event_t *evenement)
-{
+void sur_toucher(lv_event_t *evenement) {
     const lv_event_code_t code = lv_event_get_code(evenement);
     if (code != LV_EVENT_PRESSED && code != LV_EVENT_PRESSING && code != LV_EVENT_RELEASED) {
         return;
@@ -165,20 +154,18 @@ void sur_toucher(lv_event_t *evenement)
     }
 }
 
-void sur_bouton_redemarrer(lv_event_t *evenement)
-{
+void sur_bouton_redemarrer(lv_event_t *evenement) {
     if (lv_event_get_code(evenement) != LV_EVENT_CLICKED) {
         return;
     }
     ESP_LOGW(TAG, "redémarrage logiciel demandé par l'écran (esp_rom_software_reset_system)");
-    vTaskDelay(pdMS_TO_TICKS(200));  // laisser partir le journal sur l'USB
+    vTaskDelay(pdMS_TO_TICKS(200)); // laisser partir le journal sur l'USB
     board_restart();
 }
 
-}  // namespace
+} // namespace
 
-void ui_bonjour_creer(const BootInfo &boot)
-{
+void ui_bonjour_creer(const BootInfo &boot) {
     const board_info_t *carte = board_get_info();
     const board_boot_timeline_t *jalons = board_get_boot_timeline();
 
@@ -194,7 +181,7 @@ void ui_bonjour_creer(const BootInfo &boot)
     lv_obj_set_style_bg_color(ecran, couleur(kCouleurs.fond), 0);
     lv_obj_set_style_bg_opa(ecran, LV_OPA_COVER, 0);
     lv_obj_add_flag(ecran, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(ecran, LV_OBJ_FLAG_SCROLLABLE);  // un glissement ne doit pas faire défiler l'écran
+    lv_obj_remove_flag(ecran, LV_OBJ_FLAG_SCROLLABLE); // un glissement ne doit pas faire défiler l'écran
     lv_obj_set_flex_flow(ecran, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(ecran, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_top(ecran, 90, 0);
@@ -208,15 +195,17 @@ void ui_bonjour_creer(const BootInfo &boot)
     lv_obj_set_style_pad_top(libelle, 50, 0);
     lv_label_set_text_fmt(libelle, texte::kControleur, carte->display_controller);
 
-    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kTactile, carte->touch_controller);
-    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kCarte, carte->board_name,
-                          (int)carte->width, (int)carte->height);
+    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kTactile,
+                          carte->touch_controller);
+    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kCarte,
+                          carte->board_name, (int)carte->width, (int)carte->height);
 
     libelle = creer_libelle(ecran, police_texte, kCouleurs.texte);
     lv_obj_set_style_pad_top(libelle, 40, 0);
     lv_label_set_text_fmt(libelle, boot.counter_persistent ? texte::kDemarrage : texte::kDemarrageNonGarde,
                           static_cast<unsigned>(boot.boot_count));
-    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kCause, boot.reset_reason);
+    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kCause,
+                          boot.reset_reason);
     lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kDuree,
                           (int)jalons->lvgl_ready_ms);
 
@@ -254,4 +243,4 @@ void ui_bonjour_creer(const BootInfo &boot)
     lv_obj_remove_flag(g_point, LV_OBJ_FLAG_SCROLLABLE);
 }
 
-}  // namespace ecran
+} // namespace ecran

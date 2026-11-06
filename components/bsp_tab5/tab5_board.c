@@ -33,43 +33,21 @@ static board_boot_timeline_t s_timeline;
 static lv_display_t *s_display;
 static char s_touch_label[40];
 
-static int32_t now_ms(void)
-{
-    return (int32_t)(esp_timer_get_time() / 1000);
-}
+static int32_t now_ms(void) { return (int32_t)(esp_timer_get_time() / 1000); }
 
-const board_info_t *board_get_info(void)
-{
-    return &s_info;
-}
+const board_info_t *board_get_info(void) { return &s_info; }
 
-const board_boot_timeline_t *board_get_boot_timeline(void)
-{
-    return &s_timeline;
-}
+const board_boot_timeline_t *board_get_boot_timeline(void) { return &s_timeline; }
 
-lv_display_t *board_get_display(void)
-{
-    return s_display;
-}
+lv_display_t *board_get_display(void) { return s_display; }
 
-bool board_display_lock(uint32_t timeout_ms)
-{
-    return lvgl_port_lock(timeout_ms);
-}
+bool board_display_lock(uint32_t timeout_ms) { return lvgl_port_lock(timeout_ms); }
 
-void board_display_unlock(void)
-{
-    lvgl_port_unlock();
-}
+void board_display_unlock(void) { lvgl_port_unlock(); }
 
-esp_err_t board_set_backlight_percent(int percent)
-{
-    return tab5_backlight_set_percent(percent);
-}
+esp_err_t board_set_backlight_percent(int percent) { return tab5_backlight_set_percent(percent); }
 
-static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_handle_t io, esp_lcd_touch_handle_t touch)
-{
+static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_handle_t io, esp_lcd_touch_handle_t touch) {
     const lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     ESP_RETURN_ON_ERROR(lvgl_port_init(&port_cfg), TAG, "lvgl_port_init");
 
@@ -81,16 +59,17 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
         .hres = TAB5_LCD_H_RES,
         .vres = TAB5_LCD_V_RES,
         .monochrome = false,
-        .rotation = {.swap_xy = false, .mirror_x = false, .mirror_y = false},  // orientation native fixe
+        .rotation = {.swap_xy = false, .mirror_x = false, .mirror_y = false}, // orientation native fixe
         .color_format = LV_COLOR_FORMAT_RGB565,
-        .flags = {
-            .buff_dma = true,
-            .buff_spiram = false,
-            .sw_rotate = false,  // aucune rotation logicielle
-            .swap_bytes = false,
-            .full_refresh = false,
-            .direct_mode = false,
-        },
+        .flags =
+            {
+                .buff_dma = true,
+                .buff_spiram = false,
+                .sw_rotate = false, // aucune rotation logicielle
+                .swap_bytes = false,
+                .full_refresh = false,
+                .direct_mode = false,
+            },
     };
     const lvgl_port_display_dsi_cfg_t dsi_cfg = {.flags = {.avoid_tearing = false}};
     s_display = lvgl_port_add_disp_dsi(&disp_cfg, &dsi_cfg);
@@ -107,8 +86,7 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
     return ESP_OK;
 }
 
-esp_err_t board_init(void)
-{
+esp_err_t board_init(void) {
     s_timeline.init_start_ms = now_ms();
 
     // 1. Laisser l'expandeur se stabiliser (voir EXPANDER_SETTLE_MS), puis initialiser I2C, retroeclairage a 0 %, expandeur.
@@ -154,7 +132,9 @@ esp_err_t board_init(void)
     ESP_RETURN_ON_ERROR(lvgl_attach(panel, io, touch), TAG, "LVGL");
     s_timeline.lvgl_ready_ms = now_ms();
 
-    ESP_LOGI(TAG, "Carte prête : %s, écran %s %dx%d (orientation native), jalons ms : attente expandeur %d, détection %d, dalle %d, LVGL %d",
+    ESP_LOGI(TAG,
+             "Carte prête : %s, écran %s %dx%d (orientation native), jalons ms : attente expandeur %d, détection %d, "
+             "dalle %d, LVGL %d",
              s_info.board_name, s_info.display_controller, (int)s_info.width, (int)s_info.height,
              (int)s_timeline.expander_ready_ms, (int)s_timeline.controller_detected_ms, (int)s_timeline.panel_ready_ms,
              (int)s_timeline.lvgl_ready_ms);

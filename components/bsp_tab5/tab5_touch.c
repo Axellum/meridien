@@ -10,8 +10,7 @@
 
 static const char *TAG = "tab5_touch";
 
-esp_err_t tab5_touch_create(esp_lcd_touch_handle_t *touch)
-{
+esp_err_t tab5_touch_create(esp_lcd_touch_handle_t *touch) {
     // Orientation native de la dalle (portrait) : ni echange ni miroir. Le reset est fait par l'expandeur
     // (tab5_touch_reset_pulse) : le pilote ne gere donc aucune broche de reset.
     esp_lcd_touch_config_t touch_cfg = {0};
@@ -20,7 +19,7 @@ esp_err_t tab5_touch_create(esp_lcd_touch_handle_t *touch)
     touch_cfg.rst_gpio_num = GPIO_NUM_NC;
     touch_cfg.int_gpio_num = TAB5_PIN_TOUCH_INT;
     touch_cfg.levels.reset = 0;
-    touch_cfg.levels.interrupt = 0;  // front descendant (comme le BSP d'Espressif)
+    touch_cfg.levels.interrupt = 0; // front descendant (comme le BSP d'Espressif)
 
     const esp_lcd_panel_io_i2c_config_t io_cfg = ESP_LCD_TOUCH_IO_I2C_ST7123_CONFIG();
     esp_lcd_panel_io_handle_t io = NULL;

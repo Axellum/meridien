@@ -12,25 +12,26 @@
 #include <cstddef>
 #include <cstdio>
 
-#define VERIFIER(cond)                \
-    do {                              \
-        if (!(cond)) return __LINE__; \
+#define VERIFIER(cond)                                                                                                 \
+    do {                                                                                                               \
+        if (!(cond))                                                                                                   \
+            return __LINE__;                                                                                           \
     } while (0)
 
 struct Cas {
-    const char* nom;
+    const char *nom;
     int (*fonction)();
 };
 
-#define TEST_A_LA_COMPILATION(nom) \
-    static_assert(nom() == 0, #nom " : une verification a echoue (le numero de ligne est dans le message du compilateur)");
+#define TEST_A_LA_COMPILATION(nom)                                                                                     \
+    static_assert(nom() == 0,                                                                                          \
+                  #nom " : une verification a echoue (le numero de ligne est dans le message du compilateur)");
 #define TESTS_A_LA_COMPILATION(LISTE) LISTE(TEST_A_LA_COMPILATION)
 #define CAS(nom) {#nom, nom},
 
-template <std::size_t N>
-inline int lancer_tous(const Cas (&cas)[N]) {
+template <std::size_t N> inline int lancer_tous(const Cas (&cas)[N]) {
     int echecs = 0;
-    for (const Cas& c : cas) {
+    for (const Cas &c : cas) {
         const int ligne = c.fonction();
         if (ligne == 0) {
             std::printf("  ok      %s\n", c.nom);

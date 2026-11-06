@@ -16,7 +16,7 @@
 // --- Broches (les memes sur les trois revisions d'ecran) ---
 #define TAB5_PIN_I2C_SDA GPIO_NUM_31
 #define TAB5_PIN_I2C_SCL GPIO_NUM_32
-#define TAB5_PIN_BACKLIGHT GPIO_NUM_22  // LEDC
+#define TAB5_PIN_BACKLIGHT GPIO_NUM_22 // LEDC
 #define TAB5_PIN_TOUCH_INT GPIO_NUM_23
 #define TAB5_I2C_PORT I2C_NUM_1
 
@@ -31,24 +31,24 @@
 #define TAB5_DSI_PHY_LDO_CHANNEL 3
 #define TAB5_DSI_PHY_LDO_MV 2500
 
-#define TAB5_I2C_ADDR_SITRONIX_TOUCH 0x55  // ST7121 et ST7123 : meme adresse, version lue au registre 0x0000
-#define TAB5_I2C_ADDR_GT911_BACKUP 0x14    // ILI9881C d'origine
+#define TAB5_I2C_ADDR_SITRONIX_TOUCH 0x55 // ST7121 et ST7123 : meme adresse, version lue au registre 0x0000
+#define TAB5_I2C_ADDR_GT911_BACKUP 0x14   // ILI9881C d'origine
 
 typedef enum {
     TAB5_DISPLAY_UNKNOWN = 0,
-    TAB5_DISPLAY_ILI9881C,  // GT911 en 0x14
-    TAB5_DISPLAY_ST7123,    // version tactile Sitronix = 3
-    TAB5_DISPLAY_ST7121,    // version tactile Sitronix = 1
+    TAB5_DISPLAY_ILI9881C, // GT911 en 0x14
+    TAB5_DISPLAY_ST7123,   // version tactile Sitronix = 3
+    TAB5_DISPLAY_ST7121,   // version tactile Sitronix = 1
 } tab5_display_controller_t;
 
 const char *tab5_display_controller_name(tab5_display_controller_t controller);
 
 // tab5_io.c
-esp_err_t tab5_io_init(void);  // bus I2C, retroeclairage a 0 %, expandeur 0x43
+esp_err_t tab5_io_init(void); // bus I2C, retroeclairage a 0 %, expandeur 0x43
 i2c_master_bus_handle_t tab5_i2c_bus(void);
-esp_err_t tab5_lcd_reset_pulse(void);    // reset de la dalle (bit 4) : bas en push-pull, puis entree a pull-up
-esp_err_t tab5_touch_reset_pulse(void);  // reset du tactile (bit 5) : bas puis haut, en push-pull
-esp_err_t tab5_touch_enable(void);       // tactile hors reset (bit 5 haut)
+esp_err_t tab5_lcd_reset_pulse(void);   // reset de la dalle (bit 4) : bas en push-pull, puis entree a pull-up
+esp_err_t tab5_touch_reset_pulse(void); // reset du tactile (bit 5) : bas puis haut, en push-pull
+esp_err_t tab5_touch_enable(void);      // tactile hors reset (bit 5 haut)
 esp_err_t tab5_backlight_set_percent(int percent);
 
 // tab5_detect.c : lit la version du tactile Sitronix (ou cherche le GT911) ; attend que la puce reponde.

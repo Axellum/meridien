@@ -22,8 +22,7 @@ static const char *TAG = "tab5_detect";
 #define SITRONIX_VERSION_ST7121 1
 #define SITRONIX_VERSION_ST7123 3
 
-const char *tab5_display_controller_name(tab5_display_controller_t controller)
-{
+const char *tab5_display_controller_name(tab5_display_controller_t controller) {
     switch (controller) {
     case TAB5_DISPLAY_ILI9881C:
         return "ILI9881C";
@@ -36,8 +35,7 @@ const char *tab5_display_controller_name(tab5_display_controller_t controller)
     }
 }
 
-esp_err_t tab5_detect_controller(tab5_display_controller_t *controller, uint8_t *touch_version, int32_t *elapsed_ms)
-{
+esp_err_t tab5_detect_controller(tab5_display_controller_t *controller, uint8_t *touch_version, int32_t *elapsed_ms) {
     *controller = TAB5_DISPLAY_UNKNOWN;
     *touch_version = 0;
     i2c_master_bus_handle_t bus = tab5_i2c_bus();
@@ -46,7 +44,7 @@ esp_err_t tab5_detect_controller(tab5_display_controller_t *controller, uint8_t 
     const i2c_device_config_t device_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = TAB5_I2C_ADDR_SITRONIX_TOUCH,
-        .scl_speed_hz = 100000,  // meme vitesse que la configuration du pilote tactile ST7123
+        .scl_speed_hz = 100000, // meme vitesse que la configuration du pilote tactile ST7123
     };
     i2c_master_dev_handle_t device = NULL;
     ESP_RETURN_ON_ERROR(i2c_master_bus_add_device(bus, &device_cfg, &device), TAG, "peripherique 0x55");
@@ -62,7 +60,8 @@ esp_err_t tab5_detect_controller(tab5_display_controller_t *controller, uint8_t 
             if (i2c_master_transmit_receive(device, reg, sizeof(reg), &version, 1, 50) == ESP_OK) {
                 if (version != last_logged_version) {
                     last_logged_version = version;
-                    ESP_LOGI(TAG, "version du tactile Sitronix lue : %u (tentative %d)", (unsigned)version, attempt + 1);
+                    ESP_LOGI(TAG, "version du tactile Sitronix lue : %u (tentative %d)", (unsigned)version,
+                             attempt + 1);
                 }
                 if (version == SITRONIX_VERSION_ST7121) {
                     *controller = TAB5_DISPLAY_ST7121;
@@ -86,7 +85,8 @@ esp_err_t tab5_detect_controller(tab5_display_controller_t *controller, uint8_t 
     if (*controller == TAB5_DISPLAY_UNKNOWN) {
         // Pas de supposition (espp retombe sur ST7123) : un mauvais choix donne un ecran noir sans explication.
         ESP_LOGE(TAG, "controleur non identifie apres %d ms (%s)", (int)*elapsed_ms,
-                 sitronix_acked ? "puce Sitronix presente mais version illisible ou inconnue" : "aucune puce tactile ne repond");
+                 sitronix_acked ? "puce Sitronix presente mais version illisible ou inconnue"
+                                : "aucune puce tactile ne repond");
         return ESP_ERR_NOT_FOUND;
     }
     return ESP_OK;
