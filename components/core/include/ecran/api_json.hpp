@@ -190,4 +190,22 @@ class Ecrivain {
     bool apres_cle_ = false;
 };
 
+// Entier en texte décimal, dans `tampon` (pour un identifiant écrit comme une chaîne, ou inséré dans une phrase).
+constexpr std::string_view entier_en_texte(std::int64_t v, char (&tampon)[24]) noexcept {
+    Ecrivain e(tampon, sizeof tampon);
+    e.brut("");
+    std::uint64_t m = v < 0 ? (~static_cast<std::uint64_t>(v) + 1) : static_cast<std::uint64_t>(v);
+    char renverse[24] = {};
+    int n = 0;
+    do {
+        renverse[n++] = static_cast<char>('0' + m % 10);
+        m /= 10;
+    } while (m != 0);
+    if (v < 0)
+        e.octet('-');
+    while (n > 0)
+        e.octet(renverse[--n]);
+    return e.vue();
+}
+
 } // namespace ecran::api
