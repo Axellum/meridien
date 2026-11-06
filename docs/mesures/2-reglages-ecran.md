@@ -18,7 +18,7 @@ Règle de lecture : tout ce qui est écrit sans la mention « constaté sur le P
 | Changement de Wi-Fi (délai de 30 s, causes, « l'ancien réseau est conservé ») | `changement_wifi.hpp` | l'écran suit le délai ; le retour arrière réel est à `main/reseau.*` |
 | Clavier à l'écran, 7 langues (le turc distingue i pointé et i sans point) | `clavier.hpp`, `main/ui_clavier.cpp` | |
 | Écrans : liste, sections, onglets de l'assistant, éditeurs, liste Wi-Fi, connexion, recherche de ville, étapes | `main/ui_reglages.cpp`, `ui_installation.cpp`, `ui_commun.cpp` | LVGL pur, aucun include ESP-IDF, tailles tirées de la taille logique (pas de 1280/720 écrit) |
-| Hôte des réglages (interface) et hôte en mémoire vive | `main/hote_reglages.h`, `hote_memoire.*` | l'adaptateur de mémoire permanente reste à écrire |
+| Hôte des réglages (interface) et hôte en mémoire vive | `components/core/include/ecran/hote_reglages.hpp`, `hote_memoire.*` | l'adaptateur de l'appareil est écrit au jalon 6 (voir `docs/mesures/6-reglages-appareil.md`) |
 | Textes | `i18n/*.yaml`, `i18n_donnees.inc`, `web/app/lang/*.json` | 53 clés ajoutées dans 6 langues ; **traductions écrites par une IA** |
 | Interface réseau demandée à `reseau.*` | `main/bouchons/reseau_wifi.h` + bouchon | proposition, pas du code de `reseau.cpp` |
 | Scènes de rendu | `tools/rendu/scenes/scene_installation.cpp`, `scene_reglages.cpp`, `scene_parcours.cpp`, `parcours_outils.h` | le banc lui-même (`tools/rendre.ps1`) est celui de la piste « rendu-pc » |
