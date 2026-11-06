@@ -1,4 +1,5 @@
-"""Mutations du noyau « écran principal » (visuel_icones, visuel_astres, visuel_echelles), lues par lancer.py --mutations.
+"""Mutations du noyau « écran principal » (visuel_icones, visuel_astres, visuel_echelles, visuel_dates, visuel_textes,
+visuel_themes, visuel_vue), lues par lancer.py --mutations.
 
 Même format que MUTATIONS dans lancer.py : (fichier du noyau, texte exact à remplacer — il doit apparaître UNE fois —,
 remplacement, test qui doit échouer, nom de la fonction de test qui doit être citée (None : n'importe laquelle), ce
@@ -11,6 +12,10 @@ l'accepte exprès (0x7F ou 0x80).
 ICONES = "test_visuel_icones.cpp"
 ASTRES = "test_visuel_astres.cpp"
 ECHELLES = "test_visuel_echelles.cpp"
+DATES = "test_visuel_dates.cpp"
+TEXTES = "test_visuel_textes.cpp"
+THEMES_T = "test_visuel_themes.cpp"
+VUE = "test_visuel_vue.cpp"
 
 MUTATIONS_VISUEL = [
     # --- visuel_icones.hpp ---
@@ -84,4 +89,29 @@ MUTATIONS_VISUEL = [
      "les_formats_de_nombres_utilisent_le_vrai_signe_moins", "le signe moins est un autre caractère (U+2211)"),
     ("visuel_echelles.hpp", "return dixiemes >= 0 ? (dixiemes + 5) / 10 : -((-dixiemes + 5) / 10);", "return dixiemes / 10;",
      ECHELLES, "les_formats_de_nombres_utilisent_le_vrai_signe_moins", "la température est tronquée au lieu d'être arrondie"),
+    # --- visuel_dates.hpp ---
+    ("visuel_dates.hpp", '{"Paz", "Pzt", "Sal"', '{"Paz", "Paz", "Sal"', DATES,
+     "les_sept_jours_courts_de_chaque_langue_sont_distincts_et_courts", "dimanche et lundi s'abrègent pareil en turc"),
+    ("visuel_dates.hpp", 'p.texte(" de ");\n        p.texte(m);', 'p.texte(" ");\n        p.texte(m);', DATES,
+     "la_date_suit_la_tournure_de_chaque_langue", "la date espagnole perd le « de » avant le mois"),
+    ("visuel_dates.hpp", 'p.texte(". ");', 'p.texte(" ");', DATES, "la_date_suit_la_tournure_de_chaque_langue",
+     "la date allemande perd le point après le jour"),
+    ("visuel_dates.hpp", 'p.texte("1er");', 'p.texte("1");', DATES,
+     "le_premier_du_mois_est_ecrit_1er_en_francais_seulement", "le premier du mois s'écrit « 1 » en français"),
+    # --- visuel_textes.hpp ---
+    ("visuel_textes.hpp", '"over %d min"', '"over min"', TEXTES, "les_marques_de_format_sont_les_memes_dans_toutes_les_langues",
+     "la traduction néerlandaise de « dans %d min » perd son nombre"),
+    ("visuel_textes.hpp", '"Sabit"', '""', TEXTES, "chaque_texte_a_ses_six_traductions", "« Stable » n'a pas de traduction turque"),
+    # --- visuel_themes.hpp ---
+    ("visuel_themes.hpp", "{0x050A1A, 0x14244A}, // nuit", "{0x050A1A, 0xA0B4FF}, // nuit", THEMES_T, None,
+     "le bas du ciel de nuit est clair : l'heure blanche ne s'y lit plus"),
+    ("visuel_themes.hpp", "t.niveau_uv[static_cast<int>(c) - 1]", "t.niveau_uv[static_cast<int>(c)]", THEMES_T,
+     "les_accesseurs_par_role_lisent_le_bon_tableau", "la couleur d'un indice UV est celle du niveau suivant"),
+    # --- visuel_vue.hpp ---
+    ("visuel_vue.hpp", "v.lever_s = j.sans_soleil() ? 0 : j.lever_s;", "v.lever_s = j.lever_s;", VUE,
+     "la_nuit_polaire_n_a_pas_de_lever_ni_de_coucher", "une nuit polaire affiche un lever de soleil"),
+    ("visuel_vue.hpp", "v.uv_est_max = true;", "v.uv_est_max = false;", VUE,
+     "le_minimum_le_maximum_et_le_soleil_sont_ceux_du_jour_en_cours", "le maximum du jour est présenté comme l'indice du moment"),
+    ("visuel_vue.hpp", "(r.pression_dixiemes_hpa > 0)", "(r.pression_dixiemes_hpa >= 0)", VUE,
+     "les_valeurs_hors_plage_restent_inconnues", "une pression de 0 hPa est affichée"),
 ]
