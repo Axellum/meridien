@@ -72,6 +72,22 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 **Solution.** Delete `sdkconfig`, run `.\tools\idf.ps1 set-target esp32p4` again, then check the value in the generated `sdkconfig` (not in the defaults file). **Seen on** Tab5 ST7121, 06/11/2026. **Status**: resolved.
 
+#### In a git worktree, CMake fails: `grabRef.cmake` “file failed to open head-ref”
+
+**Symptom.** In a worktree created by `git worktree add` (one per session), `idf.py set-target` or the first build stops in `grabRef.cmake` (`file failed to open head-ref`), while the main checkout builds.
+
+**Cause.** ESP-IDF reads the branch reference as a file `<git dir>/refs/heads/<branch>`; a branch that exists only in `packed-refs` (no loose file) has none. The version string (`git describe`) then cannot be computed.
+
+**Solution.** Create the loose reference with the same commit: write the commit hash into the file `<git dir of the worktree's repository>/refs/heads/<branch>` (a `git update-ref` alone did not create it). Also: a binary built from a tree with modified tracked files carries `-dirty` in its version (`project_version` in `build/project_description.json`): commit first, then build the binary that is handed over.
+
+**Seen on** the author's PC, worktree `claude/ecran-principal-f0f722`, 06/11/2026. **Evidence**: the build failed with that message, then succeeded after the file was created (version `jalon-1a-tab5-st7121-49-g6a0e6cc`, no `-dirty`). **Status**: worked around (cause read in the CMake script, not explored further).
+
+#### The build stops on `-Werror=format-truncation` in the interface
+
+**Cause.** The ESP-IDF build compiles with `-Werror=all`: an `snprintf` into a buffer the compiler cannot prove large enough (here 40 bytes for “min %s · max %s” with two 15-byte texts) is an error, not a warning.
+
+**Solution.** A buffer sized for the worst case of the format (48 bytes there). **Seen on** ESP-IDF 5.5.5, 06/11/2026. **Status**: resolved.
+
 #### A PowerShell script is refused: a deletion aimed at the ESP-IDF folder
 
 The safeguard of the author's AI session tool refuses any command containing a `Remove-Item` aimed at the ESP-IDF folder owned by ESPHome, even inside a script written elsewhere. Do not delete in scripts; move or ignore. **Status**: worked around.
@@ -291,6 +307,22 @@ La recette de remise en état (trois écritures : début de flash, application, 
 **Cause.** Les valeurs par défaut ne sont relues que lorsque `sdkconfig` n'existe pas.
 
 **Solution.** Supprimer `sdkconfig`, relancer `.\tools\idf.ps1 set-target esp32p4`, puis vérifier la valeur dans le `sdkconfig` généré (pas dans le fichier de défauts). **Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : résolu.
+
+#### Dans un worktree git, CMake échoue : `grabRef.cmake` « file failed to open head-ref »
+
+**Symptôme.** Dans un worktree créé par `git worktree add` (un par session), `idf.py set-target` ou la première compilation s'arrête dans `grabRef.cmake` (`file failed to open head-ref`), alors que le dépôt principal se compile.
+
+**Cause.** ESP-IDF lit la référence de la branche comme un fichier `<dossier git>/refs/heads/<branche>` ; une branche qui n'existe que dans `packed-refs` (pas de fichier) n'en a pas. La version (`git describe`) ne peut alors pas être calculée.
+
+**Solution.** Créer la référence en fichier avec le même commit : écrire l'empreinte du commit dans le fichier `<dossier git du dépôt du worktree>/refs/heads/<branche>` (un `git update-ref` seul ne l'a pas créé). Autre point : un binaire compilé avec des fichiers suivis modifiés porte `-dirty` dans sa version (`project_version` de `build/project_description.json`) : commiter d'abord, puis compiler le binaire que l'on remet.
+
+**Vu sur** PC de l'auteur, worktree `claude/ecran-principal-f0f722`, 06/11/2026. **Preuve** : la compilation échouait avec ce message, puis réussissait après la création du fichier (version `jalon-1a-tab5-st7121-49-g6a0e6cc`, sans `-dirty`). **Statut** : contourné (cause lue dans le script CMake, pas creusée davantage).
+
+#### La compilation s'arrête sur `-Werror=format-truncation` dans l'interface
+
+**Cause.** La compilation d'ESP-IDF utilise `-Werror=all` : un `snprintf` dans un tampon que le compilateur ne peut pas prouver assez grand (ici 40 octets pour « min %s · max %s » avec deux textes de 15 octets) est une erreur, pas un avertissement.
+
+**Solution.** Un tampon dimensionné pour le pire cas du format (48 octets ici). **Vu sur** ESP-IDF 5.5.5, 06/11/2026. **Statut** : résolu.
 
 #### Un script PowerShell est refusé : suppression visant le dossier d'ESP-IDF
 
