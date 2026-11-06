@@ -31,12 +31,19 @@ env:
   GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb" # gitleaks_8.30.1_linux_x64.tar.gz
 
 jobs:
-  # Le noyau pur (components/core) compilé ET exécuté avec g++ et les détecteurs d'erreurs mémoire (AddressSanitizer) et
-  # de comportements indéfinis (UBSan). Mêmes options que clang++-san.cmd sur le PC d'Axel.
+  # Le noyau pur (components/core) compilé ET exécuté sous Linux, avec les détecteurs d'erreurs mémoire (AddressSanitizer)
+  # et de comportements indéfinis (UBSan), par deux compilateurs de l'image du runner :
+  #   - clang++-18 avec ASan + UBSan complets (mêmes options que clang++-san.cmd sur le PC d'Axel) ;
+  #   - g++-14 avec ASan seul. Essai du 06/11/2026 : g++ 14.2 avec -fsanitize=undefined ne sait plus évaluer les
+  #     static_assert des tests (« is not a constant expression », fuseaux.hpp:49), tant que null, bounds, pointer-overflow,
+  #     nonnull-attribute, returns-nonnull-attribute et vptr sont actifs ; en retirer un seul ne suffit pas. Sans UBSan, g++
+  #     compile et exécute les 252 tests. Le détecteur de fuites est coupé, comme sur le PC (non pris en charge sous Windows).
   tests-noyau:
     name: tests-noyau
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      ASAN_OPTIONS: detect_leaks=0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,22 +51,33 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Compilateur g++-14 avec ASan et UBSan
+      - name: Compilateurs avec détecteurs
         run: |
+          clang++-18 --version | head -n 1
           g++-14 --version | head -n 1
+          sudo tee /usr/local/bin/clang++-san > /dev/null <<'EOF'
+          #!/bin/sh
+          exec clang++-18 -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer "$@"
+          EOF
           sudo tee /usr/local/bin/g++-san > /dev/null <<'EOF'
           #!/bin/sh
-          exec g++-14 -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer "$@"
+          exec g++-14 -fsanitize=address -fno-omit-frame-pointer "$@"
           EOF
-          sudo chmod +x /usr/local/bin/g++-san
-      - name: Tests du noyau (compilés et exécutés)
+          sudo chmod +x /usr/local/bin/clang++-san /usr/local/bin/g++-san
+      - name: Tests du noyau, clang++-18 avec ASan et UBSan
         run: |
           set -o pipefail
-          python test/host/lancer.py --cxx /usr/local/bin/g++-san | tee noyau.log
+          python test/host/lancer.py --cxx /usr/local/bin/clang++-san | tee noyau-clang.log
           # Le lanceur retombe en « syntaxe » (rien d'exécuté) sans bon compilateur : on exige le mode complet.
-          grep -q 'mode        : complet' noyau.log
+          grep -q 'mode        : complet' noyau-clang.log
+      - name: Tests du noyau, g++-14 avec ASan
+        run: |
+          set -o pipefail
+          python test/host/lancer.py --cxx /usr/local/bin/g++-san | tee noyau-gpp.log
+          grep -q 'mode        : complet' noyau-gpp.log
 
   # Chaque mutation du noyau doit faire échouer le test qui la vise. Compilation seule : pas besoin des détecteurs.
+  # clang++-18 comme sur le PC d'Axel, où les 206 mutations sont détectées.
   mutations-noyau:
     name: mutations-noyau
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -74,8 +92,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Mutations du noyau
         run: |
-          g++-14 --version | head -n 1
-          python test/host/lancer.py --mutations --cxx "$(command -v g++-14)"
+          clang++-18 --version | head -n 1
+          python test/host/lancer.py --mutations --cxx "$(command -v clang++-18)"
 
   ruff:
     name: ruff
