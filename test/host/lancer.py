@@ -4,6 +4,7 @@
     python test/host/lancer.py               # compile (et lance, si possible) chaque test_*.cpp
     python test/host/lancer.py --mutations   # prouve que chaque test échoue sans le code qu'il vérifie
     python test/host/lancer.py --cxx CHEMIN  # force un compilateur
+    python test/host/lancer.py --seulement test_api,test_appairage [--mutations]   # un sujet à la fois
 
 Compilateur : --cxx, sinon la variable CXX, sinon g++ / clang++ / c++ du PATH (mode « complet » : compile,
 lie, EXÉCUTE). À défaut, le g++ croisé RISC-V d'ESP-IDF (dossier donné par tools/local.ps1 ou MERIDIEN_IDF_RACINE,
@@ -138,12 +139,14 @@ from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assist
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
 from mutations_meteo_appareil import MUTATIONS_METEO_APPAREIL  # noqa: E402  (météo sur l'appareil : requête, zone, cache)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
+from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (page de réglages : JSON, valeurs, appairage, API)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
 MUTATIONS += MUTATIONS_METEO_APPAREIL
 MUTATIONS += MUTATIONS_ASSISTANT
 MUTATIONS += MUTATIONS_I18N
+MUTATIONS += MUTATIONS_REGLAGES
 
 
 def mutations(cxx, mode):
@@ -184,7 +187,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--mutations", action="store_true", help="prouve que les tests échouent sans le code")
     ap.add_argument("--cxx", help="compilateur à utiliser")
+    ap.add_argument("--seulement", help="fichiers de test à traiter, séparés par des virgules (un morceau du nom suffit) : "
+                    "ne compile et ne mute que ceux-là (pour travailler sur un sujet sans relancer les 30 minutes de tout)")
     a = ap.parse_args()
+    if a.seulement:
+        morceaux = [m.strip() for m in a.seulement.split(",") if m.strip()]
+        TESTS[:] = [t for t in TESTS if any(m in t.name for m in morceaux)]
+        MUTATIONS[:] = [m for m in MUTATIONS if any(x in m[3] for x in morceaux)]
+        print(f"--seulement : {len(TESTS)} fichier(s) de test, {len(MUTATIONS)} mutation(s) retenus")
     cxx, mode = trouver_compilateur(a.cxx)
     if not cxx:
         print("Aucun compilateur C++ trouvé (ni g++, ni clang++, ni le g++ croisé d'ESP-IDF).", file=sys.stderr)

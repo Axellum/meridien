@@ -22,10 +22,12 @@ endif()
 
 idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp" "sntp_rapide.cpp" "commande_serie.cpp" "ui_bonjour.cpp"
                        "meteo_etat.cpp" "meteo_zone.cpp" "meteo_client.cpp"
+                       "appairage.cpp" "reglages.cpp" "serveur_web.cpp" "ui_appairage.cpp"
                        INCLUDE_DIRS "."
                        PRIV_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
                        REQUIRES board_api core esp_event esp_netif esp_rom esp_system esp_timer esp_wifi freertos lwip nvs_flash
                                esp_http_client esp-tls mbedtls esp_hw_support heap
+                               esp_http_server app_update esp_app_format espressif__mdns
                        EMBED_FILES "assets/roboto_700.ttf")
 
 # Ecran principal (session ecran-principal). Ajoute par target_sources() apres l'enregistrement, et non dans la liste SRCS
@@ -47,4 +49,21 @@ if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/ui_reglages.h")
 endif()
 if(_meridien_bouchons)
     target_include_directories(${COMPONENT_LIB} PRIVATE "bouchons")
+endif()
+
+# La page de reglages (web/app) est embarquee dans le firmware, compressee en gzip, par tools/embarquer_web.py : le fichier
+# C++ genere (web_fichiers.cpp) est dans le dossier de construction, jamais dans git. Il est refait des qu'un fichier de
+# web/app ou le generateur change.
+if(NOT CMAKE_BUILD_EARLY_EXPANSION)
+    idf_build_get_property(_python PYTHON)
+    set(_web_dossier "${CMAKE_CURRENT_LIST_DIR}/../web/app")
+    set(_web_generateur "${CMAKE_CURRENT_LIST_DIR}/../tools/embarquer_web.py")
+    set(_web_cpp "${CMAKE_CURRENT_BINARY_DIR}/web_fichiers.cpp")
+    file(GLOB_RECURSE _web_sources CONFIGURE_DEPENDS "${_web_dossier}/*")
+    add_custom_command(OUTPUT "${_web_cpp}"
+                       COMMAND ${_python} "${_web_generateur}" "${_web_dossier}" "${_web_cpp}"
+                       DEPENDS ${_web_sources} "${_web_generateur}"
+                       COMMENT "Page de reglages : web/app -> gzip dans le firmware"
+                       VERBATIM)
+    target_sources(${COMPONENT_LIB} PRIVATE "${_web_cpp}")
 endif()

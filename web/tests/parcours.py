@@ -6,9 +6,21 @@
 Lance web/faux-serveur/serveur.mjs (Node) sur des ports de test, déroule le parcours, écrit les captures dans
 web/captures/ et rend un tableau « vérification : OK / ÉCHEC ». Code de sortie 0 seulement si tout passe.
 Réseau requis : la recherche de lieu et la météo appellent vraiment Open-Meteo.
+
+Contre le VRAI appareil (le firmware qui sert la page lui-même) :
+
+    $env:URL_APPAREIL = "http://192.168.x.y"      # l'adresse affichée sur l'écran de l'appareil
+    $env:CODE_APPAIRAGE = "123456"                 # le code affiché sur l'écran de l'appareil
+    python web/tests/parcours.py
+
+Aucun faux serveur n'est lancé. Les étapes que le firmware ne fait pas encore (services STT/LLM/TTS, export / import, changement
+de Wi-Fi, mise à jour) sont SAUTÉES et listées comme telles : elles ne comptent ni comme réussies ni comme ratées. Le parcours
+change vraiment les réglages de l'appareil (thème, luminosité, langues, ville) ; il remet l'affichage dans son état de départ à
+la fin. L'essai du verrou d'appairage bloque l'appairage 60 secondes.
 """
 import gzip
 import json
+import os
 import re
 import subprocess
 import sys
@@ -25,13 +37,16 @@ CAPTURES = RACINE / "web" / "captures"
 LANGUES_PAGE = RACINE / "web" / "app" / "lang"
 CODES_LANGUES = ["fr", "en", "de", "nl", "es", "it", "tr"]   # ordre figé par l'ADR-0006 (indices 0 à 6)
 PORT, PORT_SERVICE = 18100, 18101
-BASE = f"http://127.0.0.1:{PORT}"
-CODE = "246810"
+URL_APPAREIL = os.environ.get("URL_APPAREIL", "").strip().rstrip("/")   # vide : faux appareil (comportement d'origine)
+REEL = bool(URL_APPAREIL)
+BASE = URL_APPAREIL if REEL else f"http://127.0.0.1:{PORT}"
+CODE = os.environ.get("CODE_APPAIRAGE", "").strip() if REEL else "246810"
 CLE_BONNE = "sk-secret-TEST-9f3a"   # la clé que le faux service accepte (valeur de test, pas un secret réel)
 CLE_FAUSSE = "sk-faux-0000-leak"    # le faux service la cite dans sa réponse d'erreur, comme certains vrais services
-VERROU_S = 3
+VERROU_S = 60 if REEL else 3        # durée du verrou d'appairage : 60 s sur l'appareil (noyau, appairage.hpp), 3 s sur le faux
 BUDGET_GZ = 30 * 1024               # budget annoncé : 30 Ko compressés (HTML + CSS + JS)
 
+sautes = []        # (étape, raison) : étapes que l'appareil réel ne fait pas encore
 resultats = []     # (nom, ok, détail)
 registre = []      # toutes les réponses /api/ vues par le navigateur : {url, statut, corps, requete}
 hotes = set()      # tous les hôtes joints par le navigateur (la page ne doit parler qu'à l'appareil)
@@ -56,6 +71,12 @@ def etape(titre, fonction, page=None):
                 pass
 
 
+def sauter(titre, raison):
+    """Étape que l'appareil réel ne fait pas encore : dite, jamais comptée comme réussie."""
+    print(f"\n== {titre}\n  SAUTÉE : {raison}")
+    sautes.append((titre, raison))
+
+
 def attendre_serveur():
     for _ in range(60):
         try:
@@ -63,7 +84,7 @@ def attendre_serveur():
             return
         except Exception:  # noqa: BLE001
             time.sleep(0.25)
-    raise RuntimeError("le faux appareil ne démarre pas")
+    raise RuntimeError(f"{'l’appareil ne répond pas à ' + BASE if REEL else 'le faux appareil ne démarre pas'}")
 
 
 def nouveau_contexte(nav, largeur=390, sombre=False):
@@ -152,9 +173,16 @@ DEPASSEMENTS = """() => {
 
 def main():
     CAPTURES.mkdir(exist_ok=True)
-    env = {**__import__("os").environ, "PORT": str(PORT), "PORT_SERVICE": str(PORT_SERVICE), "CODE_APPAIRAGE": CODE,
-           "CLE_MOCK": CLE_BONNE, "VERROU_S": str(VERROU_S), "REBOOT_MS": "2500"}
-    srv = subprocess.Popen(["node", str(RACINE / "web" / "faux-serveur" / "serveur.mjs")], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if REEL:
+        if not re.fullmatch(r"\d{6}", CODE):
+            print("URL_APPAREIL est défini : CODE_APPAIRAGE doit contenir les 6 chiffres affichés sur l'écran de l'appareil.")
+            return 2
+        print(f"Appareil réel : {BASE} (aucun faux serveur lancé)")
+        srv = None
+    else:
+        env = {**os.environ, "PORT": str(PORT), "PORT_SERVICE": str(PORT_SERVICE), "CODE_APPAIRAGE": CODE,
+               "CLE_MOCK": CLE_BONNE, "VERROU_S": str(VERROU_S), "REBOOT_MS": "2500"}
+        srv = subprocess.Popen(["node", str(RACINE / "web" / "faux-serveur" / "serveur.mjs")], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
         attendre_serveur()
         with sync_playwright() as p:
@@ -178,7 +206,8 @@ def main():
             etape("Appairage par le code affiché à l'écran", t_appairage, page)
 
             def t_ville():
-                expect(page.locator(".hero .ville")).to_have_text("Choisissez-la")
+                if not REEL:  # l'appareil réel a toujours une ville (Lyon par défaut, contrat meteo_zone.h)
+                    expect(page.locator(".hero .ville")).to_have_text("Choisissez-la")
                 page.screenshot(path=str(CAPTURES / "02-accueil-sans-ville.png"))
                 champ = page.locator("#ville-q")
                 champ.press_sequentially("Ly", delay=80)
@@ -252,7 +281,11 @@ def main():
                 expect(page.locator("#det-tts .res.err")).to_contain_text("Le service ne répond pas", timeout=20000)
                 verifier("service injoignable : « Le service ne répond pas. Est-il lancé… »", "Est-il lancé" in page.locator("#det-tts .res.err").inner_text())
                 page.screenshot(path=str(CAPTURES / "08-test-injoignable.png"))
-            etape("Assistant : saisir un service LLM et « Tester »", t_services, page)
+            SANS_SERVICES = "l'appareil répond 501 « non_disponible » (services STT/LLM/TTS : pas dans ce firmware)"
+            if REEL:
+                sauter("Assistant : saisir un service LLM et « Tester »", SANS_SERVICES)
+            else:
+                etape("Assistant : saisir un service LLM et « Tester »", t_services, page)
 
             def t_secret():
                 code, svc = api(page, "GET", "/api/services")
@@ -263,7 +296,10 @@ def main():
                 verifier(f"la clé n'apparaît dans AUCUNE des {len(registre)} réponses de l'API", not fuites, str(fuites[:3]))
                 code, exp = api(page, "GET", "/api/settings/export")
                 verifier("export : sans clé ni mot de passe", CLE_BONNE not in json.dumps(exp) and "mot_de_passe" not in json.dumps(exp) and "sk-" not in json.dumps(exp))
-            etape("Secrets : la clé n'est jamais lisible", t_secret, page)
+            if REEL:
+                sauter("Secrets : la clé n'est jamais lisible", "aucune clé n'existe dans ce firmware (le contrôle sur les réponses reste couvert par les tests du noyau)")
+            else:
+                etape("Secrets : la clé n'est jamais lisible", t_secret, page)
 
             def t_export_import():
                 with page.expect_download() as dl:
@@ -290,10 +326,18 @@ def main():
                 verifier("import : la luminosité du fichier est appliquée", True)
                 verifier("import : la clé glissée dans le fichier n'est pas enregistrée ni renvoyée",
                          "sk-injectee" not in json.dumps(svc) and not any("sk-injectee" in r["corps"] for r in registre if "/api/settings/import" in r["url"]) and svc["llm"]["cle_definie"] is True)
-            etape("Export et import des réglages sans clés", t_export_import, page)
+            if REEL:
+                sauter("Export et import des réglages sans clés", "l'appareil répond 501 « non_disponible »")
+            else:
+                etape("Export et import des réglages sans clés", t_export_import, page)
+
+            depart_affichage = {}  # état de l'appareil réel avant le parcours, remis à la fin
 
             def t_ecran():
-                ouvrir(page, "Réfléchir")  # referme
+                if REEL:
+                    depart_affichage.update({k: v for k, v in api(page, "GET", "/api/display")[1].items() if k in ("langue_ecran", "langue_assistant", "theme", "luminosite")})
+                else:
+                    ouvrir(page, "Réfléchir")  # referme
                 page.get_by_role("radio", name="Sombre").click()
                 expect(page.locator("#toast")).to_contain_text("Enregistré")
                 _, d = api(page, "GET", "/api/display")
@@ -304,6 +348,8 @@ def main():
                 verifier("luminosité 55 % enregistrée", d["luminosite"] == 55, str(d["luminosite"]))
                 page.locator("#ecran").scroll_into_view_if_needed()
                 page.screenshot(path=str(CAPTURES / "10-ecran.png"))
+                if REEL:  # remettre l'écran de l'appareil comme avant le parcours
+                    api(page, "PUT", "/api/display", {k: depart_affichage[k] for k in ("theme", "luminosite") if k in depart_affichage})
             etape("Écran : thème et luminosité", t_ecran, page)
 
             def t_wifi():
@@ -320,7 +366,10 @@ def main():
                 page.get_by_role("button", name="Se connecter").click()
                 expect(page.locator("#toast")).to_contain_text("Connecté à", timeout=20000)
                 verifier("réseau ouvert : connexion réussie", api(page, "GET", "/api/wifi")[1]["ssid"] == "Café Libre")
-            etape("Wi-Fi : mot de passe refusé puis réseau ouvert", t_wifi, page)
+            if REEL:
+                sauter("Wi-Fi : mot de passe refusé puis réseau ouvert", "l'appareil répond 501 « non_disponible » (changer de réseau : pas dans ce firmware ; mode station seulement)")
+            else:
+                etape("Wi-Fi : mot de passe refusé puis réseau ouvert", t_wifi, page)
 
             def depot(contenu, nom="ecran.bin"):
                 page.locator('input[aria-label="Fichier de mise à jour"]').set_input_files(files=[{"name": nom, "mimeType": "application/octet-stream", "buffer": contenu}])
@@ -351,7 +400,10 @@ def main():
                 expect(page.locator("#appareil")).to_contain_text("Version 0.1.0", timeout=15000)
                 verifier("retour arrière demandé : version 0.1.0 remise", "Retour à la version 0.1.0" in page.locator("#appareil").inner_text())
                 verifier("le jeton a disparu au redémarrage (la page a redemandé le code)", True)
-            etape("Mise à jour par la page, avec retour arrière", t_maj, page)
+            if REEL:
+                sauter("Mise à jour par la page, avec retour arrière", "l'appareil répond 501 « non_disponible » (mise à jour par la page : pas dans ce firmware)")
+            else:
+                etape("Mise à jour par la page, avec retour arrière", t_maj, page)
 
             def t_verrou():
                 brut = lambda c: page.request.post(BASE + "/api/pair", data=json.dumps({"code": c}), headers={"Content-Type": "application/json"})  # noqa: E731
@@ -396,6 +448,7 @@ def main():
                 fr = catalogue("fr")
                 cle_code_faux = "Ce code n’est pas le bon. Regardez l’écran de l’appareil."
                 c4, p4 = nouveau_contexte(nav, largeur=360)
+                depart_langues = {}  # langues de l'appareil avant le parcours (remises à la fin sur l'appareil réel)
                 fichiers_vus = []
                 p4.on("request", lambda r: fichiers_vus.append(r.url.rsplit("/", 1)[-1]) if "/lang/" in r.url else None)
                 try:
@@ -404,7 +457,9 @@ def main():
                     noms = [x["nom"] for x in d["langues"]]
                     verifier("langues : l'appareil propose sept langues dans l'ordre figé (fr en de nl es it tr)", [x["code"] for x in d["langues"]] == CODES_LANGUES, str(d["langues"]))
                     verifier("langues : chaque langue porte son nom dans sa propre langue", noms == ["Français", "English", "Deutsch", "Nederlands", "Español", "Italiano", "Türkçe"], str(noms))
-                    verifier("langues : français par défaut, pour l'écran comme pour l'assistant", d["langue_ecran"] == "fr" and d["langue_assistant"] == "fr", f"{d['langue_ecran']} / {d['langue_assistant']}")
+                    depart_langues = {k: d[k] for k in ("langue_ecran", "langue_assistant")}
+                    if not REEL:  # sur l'appareil réel, les langues sont celles que la personne a choisies
+                        verifier("langues : français par défaut, pour l'écran comme pour l'assistant", d["langue_ecran"] == "fr" and d["langue_assistant"] == "fr", f"{d['langue_ecran']} / {d['langue_assistant']}")
                     opt_ecran = p4.evaluate("[...document.querySelectorAll('#langue-ecran option')].map(o => [o.value, o.textContent])")
                     opt_assistant = p4.evaluate("[...document.querySelectorAll('#langue-assistant option')].map(o => o.value)")
                     verifier("page : deux sélecteurs distincts (écran, assistant), sept options chacun", opt_ecran == [[x["code"], x["nom"]] for x in d["langues"]] and opt_assistant == CODES_LANGUES, f"{opt_ecran} / {opt_assistant}")
@@ -490,8 +545,8 @@ def main():
                         verifier_attribution(p6, attendu, f"repli {attendu}")
                         c6.close()
                 finally:
-                    try:  # remettre le faux appareil dans son état de départ
-                        api(p4, "PUT", "/api/display", {"langue_ecran": "fr", "langue_assistant": "fr"})
+                    try:  # remettre l'appareil dans son état de départ (français partout pour le faux appareil)
+                        api(p4, "PUT", "/api/display", depart_langues if REEL else {"langue_ecran": "fr", "langue_assistant": "fr"})
                     except Exception:  # noqa: BLE001
                         pass
                     c4.close()
@@ -519,17 +574,20 @@ def main():
         verifier(f"poids gzip : page + la langue la plus lourde ({lourde}, {page_gz + langues_gz[lourde]} octets) <= budget de {BUDGET_GZ} octets", page_gz + langues_gz[lourde] <= BUDGET_GZ)
         (CAPTURES / "poids.json").write_text(json.dumps({"brut": brut, "gzip": gz, "total_gzip": total_gz, "budget_gzip": BUDGET_GZ, "langues_gzip": langues_gz}, indent=2), encoding="utf-8")
     finally:
-        srv.terminate()
-        try:
-            srv.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            srv.kill()
+        if srv is not None:
+            srv.terminate()
+            try:
+                srv.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                srv.kill()
 
-    verifier("la page ne parle qu'à l'appareil (aucune police, image, script ou CDN externe)", hotes == {f"127.0.0.1:{PORT}"}, str(sorted(hotes)))
+    verifier("la page ne parle qu'à l'appareil (aucune police, image, script ou CDN externe)", hotes == {urllib.parse.urlsplit(BASE).netloc}, str(sorted(hotes)))
     graves = [m for m in erreurs_console if "Failed to load resource" not in m]
     verifier("console du navigateur : aucune erreur JavaScript", not graves, "; ".join(graves[:3]))
     echecs = [r for r in resultats if not r[1]]
-    print(f"\nRÉSULTAT : {len(resultats) - len(echecs)}/{len(resultats)} vérifications OK")
+    print(f"\nRÉSULTAT : {len(resultats) - len(echecs)}/{len(resultats)} vérifications OK" + (f", {len(sautes)} étape(s) sautée(s)" if sautes else ""))
+    for titre, raison in sautes:
+        print(f"  SAUTÉE : {titre}  [{raison}]")
     for nom, _, detail in echecs:
         print(f"  ÉCHEC : {nom}  [{detail}]")
     return 1 if echecs else 0

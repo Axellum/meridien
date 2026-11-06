@@ -1,0 +1,4 @@
+# mDNS : l'appareil s'annonce « ecran-xxxx.local » (page de reglages, jalon « reglages »). Le composant n'est plus dans ESP-IDF
+# 5.x : il vient du registre. Version epinglee (publiee le 15/09/2026, releve du registre le 06/11/2026) ; a relever apres essai.
+dependencies:
+  espressif/mdns: "1.13.1"
