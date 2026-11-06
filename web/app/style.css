@@ -33,6 +33,7 @@ small{display:block;font-size:14px;line-height:1.35;color:var(--doux)}
 .carte>h2 .i{color:var(--ac)}
 .aide{font-size:14px;color:var(--doux);margin-top:6px}
 .aide.avert{color:var(--texte);background:var(--soft);border-radius:10px;padding:8px 10px}
+.aide a{color:var(--ac);text-underline-offset:2px}
 
 /* ---- champs et boutons ---- */
 .f{margin-top:14px}

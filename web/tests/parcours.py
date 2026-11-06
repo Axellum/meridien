@@ -7,6 +7,7 @@ Lance web/faux-serveur/serveur.mjs (Node) sur des ports de test, déroule le par
 web/captures/ et rend un tableau « vérification : OK / ÉCHEC ». Code de sortie 0 seulement si tout passe.
 Réseau requis : la recherche de lieu et la météo appellent vraiment Open-Meteo.
 """
+import gzip
 import json
 import re
 import subprocess
@@ -16,10 +17,13 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from controle_langues import lire_yaml  # même dossier : python web/tests/parcours.py met ce dossier dans sys.path
 from playwright.sync_api import expect, sync_playwright
 
 RACINE = Path(__file__).resolve().parents[2]
 CAPTURES = RACINE / "web" / "captures"
+LANGUES_PAGE = RACINE / "web" / "app" / "lang"
+CODES_LANGUES = ["fr", "en", "de", "nl", "es", "it", "tr"]   # ordre figé par l'ADR-0006 (indices 0 à 6)
 PORT, PORT_SERVICE = 18100, 18101
 BASE = f"http://127.0.0.1:{PORT}"
 CODE = "246810"
@@ -98,6 +102,27 @@ def api(page, methode, chemin, corps=None):
     return r.status, (r.json() if "json" in (r.headers.get("content-type") or "") else {})
 
 
+def catalogue(code):
+    """Le petit fichier JSON d'une langue, tel que la page le charge (web/app/lang/<code>.json)."""
+    return json.loads((LANGUES_PAGE / f"{code}.json").read_text(encoding="utf-8"))
+
+
+def norm(texte):
+    """Espaces normalisés (l'espace insécable devient une espace) : on compare ce qu'on lit, pas la typographie."""
+    return " ".join(texte.split())
+
+
+def verifier_attribution(page, code, quand):
+    """L'attribution CC BY 4.0 d'Open-Meteo : visible, traduite, « Open-Meteo » est un lien vers open-meteo.com."""
+    zone = page.locator("#attribution")
+    lien = zone.locator("a")
+    attendu = norm(catalogue(code)["meteo.attribution"].replace("{lien}", "Open-Meteo"))
+    texte = norm(zone.inner_text())
+    verifier(f"attribution ({quand}) : texte de la licence, dans la langue de la page", texte == attendu and "CC BY 4.0" in texte, f"{texte!r} au lieu de {attendu!r}")
+    verifier(f"attribution ({quand}) : « Open-Meteo » est un lien vers open-meteo.com",
+             lien.count() == 1 and lien.inner_text() == "Open-Meteo" and lien.get_attribute("href") == "https://open-meteo.com/", str(lien.count()))
+
+
 def sans_null(page, quand):
     """append()/replaceChildren() écrivent « null » à l'écran quand on leur passe null : bug vu au premier lancement."""
     texte = page.locator("body").inner_text()
@@ -174,7 +199,7 @@ def main():
                 verifier("Lyon : chaîne POSIX tirée de la table du noyau", zone["posix"] == "CET-1CEST,M3.5.0,M10.5.0/3", zone["posix"])
                 verifier("Lyon : coordonnées proches de 45,75 N / 4,85 E", abs(zone["latitude"] - 45.75) < 0.3 and abs(zone["longitude"] - 4.85) < 0.3)
                 expect(page.locator(".hero .temp b")).to_have_text(re.compile(r"-?\d+\s°C"), timeout=20000)
-                aide = page.locator("#ville > .aide").inner_text()
+                aide = page.locator("#ville > .aide:not(#attribution)").inner_text()  # l'attribution Open-Meteo est aussi une « aide »
                 verifier("fuseau et heure locale affichés", re.search(r"Europe/Paris · il est \d{1,2}\sh\s\d{2}", aide) is not None, aide)
                 page.screenshot(path=str(CAPTURES / "04-ville-lyon.png"))
                 # la météo affichée correspond à celle d'Open-Meteo lue directement au même moment
@@ -363,20 +388,136 @@ def main():
                     c.close()
             etape("Largeurs de téléphone", t_largeurs)
 
+            # ---- sept langues : sélecteurs distincts, fichiers chargés à la demande, repli, attribution ----
+            def t_langues():
+                src = (RACINE / "components/core/include/ecran/meteo_wmo.hpp").read_text(encoding="utf-8")
+                libelles_fr = re.findall(r'return \{"([^"]+)", ', src)
+                ids = list(lire_yaml(RACINE / "i18n" / "page.yaml"))
+                fr = catalogue("fr")
+                cle_code_faux = "Ce code n’est pas le bon. Regardez l’écran de l’appareil."
+                c4, p4 = nouveau_contexte(nav, largeur=360)
+                fichiers_vus = []
+                p4.on("request", lambda r: fichiers_vus.append(r.url.rsplit("/", 1)[-1]) if "/lang/" in r.url else None)
+                try:
+                    appairer(p4)
+                    d = api(p4, "GET", "/api/display")[1]
+                    noms = [x["nom"] for x in d["langues"]]
+                    verifier("langues : l'appareil propose sept langues dans l'ordre figé (fr en de nl es it tr)", [x["code"] for x in d["langues"]] == CODES_LANGUES, str(d["langues"]))
+                    verifier("langues : chaque langue porte son nom dans sa propre langue", noms == ["Français", "English", "Deutsch", "Nederlands", "Español", "Italiano", "Türkçe"], str(noms))
+                    verifier("langues : français par défaut, pour l'écran comme pour l'assistant", d["langue_ecran"] == "fr" and d["langue_assistant"] == "fr", f"{d['langue_ecran']} / {d['langue_assistant']}")
+                    opt_ecran = p4.evaluate("[...document.querySelectorAll('#langue-ecran option')].map(o => [o.value, o.textContent])")
+                    opt_assistant = p4.evaluate("[...document.querySelectorAll('#langue-assistant option')].map(o => o.value)")
+                    verifier("page : deux sélecteurs distincts (écran, assistant), sept options chacun", opt_ecran == [[x["code"], x["nom"]] for x in d["langues"]] and opt_assistant == CODES_LANGUES, f"{opt_ecran} / {opt_assistant}")
+                    verifier("chargement à la demande : au départ, seul fr.json est demandé", set(fichiers_vus) == {"fr.json"}, str(fichiers_vus))
+                    verifier_attribution(p4, "fr", "fr")
+                    p4.locator("#attribution").scroll_into_view_if_needed()
+                    p4.screenshot(path=str(CAPTURES / "15-attribution-fr.png"))
+
+                    # deux réglages distincts : changer l'un ne change pas l'autre
+                    p4.locator("#langue-assistant").select_option("tr")
+                    expect(p4.locator("#toast")).to_contain_text("Enregistré")
+                    d = api(p4, "GET", "/api/display")[1]
+                    verifier("langue de l'assistant = turc ; langue de l'écran inchangée (fr)", d["langue_assistant"] == "tr" and d["langue_ecran"] == "fr", f"{d['langue_assistant']} / {d['langue_ecran']}")
+                    verifier("la page reste en français quand on change la langue de l'assistant", p4.locator("html").get_attribute("lang") == "fr")
+                    p4.locator("#langue-ecran").select_option("de")
+                    expect(p4.locator("html")).to_have_attribute("lang", "de")
+                    de = catalogue("de")
+                    expect(p4.locator("#toast")).to_contain_text(de["toast.enregistre"])
+                    d = api(p4, "GET", "/api/display")[1]
+                    verifier("langue de l'écran = allemand ; langue de l'assistant (turc) inchangée", d["langue_ecran"] == "de" and d["langue_assistant"] == "tr", f"{d['langue_ecran']} / {d['langue_assistant']}")
+                    verifier("la page passe à l'allemand tout de suite : titre de carte, étiquette du sélecteur, titre de l'onglet",
+                             p4.locator("#t-ville").inner_text() == de["ville.titre"] and norm(p4.locator("label[for=langue-ecran]").inner_text()) == norm(de["ecran.langue_ecran"]) and p4.title() == de["app.titre"],
+                             f"{p4.locator('#t-ville').inner_text()!r} / {p4.title()!r}")
+                    verifier("chargement à la demande : fr.json puis de.json seulement (pas les cinq autres)", set(fichiers_vus) == {"fr.json", "de.json"}, str(fichiers_vus))
+                    verifier("le sélecteur de la langue de l'assistant a gardé le turc", p4.locator("#langue-assistant").input_value() == "tr")
+                    p4.locator("#ecran").scroll_into_view_if_needed()
+                    p4.screenshot(path=str(CAPTURES / "16-ecran-allemand.png"))
+
+                    # les sept langues, une par une : page, identifiants, français résiduel, attribution, météo, largeur
+                    for code in CODES_LANGUES:
+                        api(p4, "PUT", "/api/display", {"langue_ecran": code})
+                        p4.reload()
+                        expect(p4.locator("#ville")).to_be_visible()
+                        expect(p4.locator("html")).to_have_attribute("lang", code)
+                        cat = catalogue(code)
+                        sections = ["ville", "assistant", "ecran", "wifi", "appareil"]
+                        liens = [norm(x) for x in p4.locator("nav.ancres a").all_inner_texts()]
+                        verifier(f"{code} : onglets, titre de carte et titre de l'onglet du navigateur dans la langue",
+                                 liens == [norm(cat["nav." + s]) for s in sections] and p4.locator("#t-ville").inner_text() == cat["ville.titre"] and p4.title() == cat["app.titre"], str(liens))
+                        texte = p4.evaluate("document.getElementById('racine').textContent")  # y compris les cartes repliées
+                        bruts = [i for i in ids if i in texte]
+                        verifier(f"{code} : aucun identifiant brut (« ville.titre ») affiché", not bruts, str(bruts[:4]))
+                        if code != "fr":
+                            propres_au_francais = [v for k, v in fr.items() if "{" not in v and len(v) >= 6 and v != cat.get(k)]
+                            restes = sorted({v for v in propres_au_francais if v in texte})
+                            verifier(f"{code} : aucun texte français visible dans la page", not restes, str(restes[:4]))
+                        verifier_attribution(p4, code, code)
+                        expect(p4.locator(".hero .temp b")).to_have_text(re.compile(r"-?\d+\s°C"), timeout=20000)
+                        etiquette = p4.locator(".hero .temp small").inner_text()
+                        traduits = lire_yaml(RACINE / "i18n" / f"{code}.yaml")
+                        verifier(f"{code} : le libellé météo est un libellé de la table WMO du noyau, dans la langue", etiquette in {traduits.get(fr_l, fr_l) for fr_l in libelles_fr}, etiquette)
+                        p4.locator("button[aria-expanded]").nth(1).click()
+                        r = p4.evaluate(DEPASSEMENTS)
+                        verifier(f"{code} : 360 px, pas de défilement horizontal (carte « LLM » ouverte)", r["defilement"] <= r["largeur"] and not r["sortis"], json.dumps(r))
+                        if code in ("nl", "tr"):
+                            p4.screenshot(path=str(CAPTURES / f"17-page-{code}.png"), full_page=True)
+
+                    # une phrase qui vient de l'appareil (pas de la page) arrive dans la langue de l'écran
+                    api(p4, "PUT", "/api/display", {"langue_ecran": "de"})
+                    c5, p5 = nouveau_contexte(nav)
+                    p5.goto(BASE)
+                    de_yaml = lire_yaml(RACINE / "i18n" / "de.yaml")
+                    expect(p5.locator("#code")).to_be_visible()
+                    verifier("appairage (page non connectée) : l'invite est en allemand, d'après /api/status", norm(p5.locator(".appairage > p").inner_text()) == norm(de["appairage.invite"]), p5.locator(".appairage > p").inner_text())
+                    p5.locator("#code").fill("000000")
+                    expect(p5.locator(".appairage .res")).to_be_visible()
+                    verifier("code faux : la phrase envoyée par l'appareil est affichée en allemand, telle quelle",
+                             norm(p5.locator(".appairage .res").inner_text()) == norm(de_yaml[cle_code_faux]), p5.locator(".appairage .res").inner_text())
+                    p5.locator("#code").fill(CODE)  # le bon code remet le compteur d'essais à zéro
+                    expect(p5.locator("#ville")).to_be_visible()
+                    c5.close()
+
+                    # repli : fichier de la langue absent -> anglais ; anglais absent aussi -> français
+                    for absentes, attendu in ((["de"], "en"), (["de", "en"], "fr")):
+                        c6, p6 = nouveau_contexte(nav)
+                        for absente in absentes:
+                            p6.route(f"**/lang/{absente}.json", lambda r: r.fulfill(status=404, content_type="text/plain", body="absent"))
+                        appairer(p6)
+                        expect(p6.locator("html")).to_have_attribute("lang", attendu)
+                        cat = catalogue(attendu)
+                        verifier(f"repli : {' et '.join(a + '.json' for a in absentes)} introuvable (écran en allemand) -> la page s'affiche en {attendu}",
+                                 p6.locator("#t-ville").inner_text() == cat["ville.titre"] and p6.title() == cat["app.titre"], p6.locator("#t-ville").inner_text())
+                        verifier_attribution(p6, attendu, f"repli {attendu}")
+                        c6.close()
+                finally:
+                    try:  # remettre le faux appareil dans son état de départ
+                        api(p4, "PUT", "/api/display", {"langue_ecran": "fr", "langue_assistant": "fr"})
+                    except Exception:  # noqa: BLE001
+                        pass
+                    c4.close()
+            etape("Sept langues : sélecteurs, chargement à la demande, repli, attribution", t_langues)
+
             ctx.close()
             nav.close()
 
         # ---- poids ----
-        print("\n== Poids de la page (servie en gzip, comme sur l'appareil)")
-        brut = {f: (RACINE / "web" / "app" / f).stat().st_size for f in ("index.html", "style.css", "app.js")}
-        gz = {f: next((e[1] for e in poids.get("res", []) if e[0] == f), None) for f in ("style.css", "app.js")}
+        print("\n== Poids de la page + un fichier de langue (servis en gzip, comme sur l'appareil)")
+        fichiers = ("index.html", "style.css", "app.js", "fr.json")
+        brut = {f: (RACINE / "web" / "app" / ("lang" if f.endswith(".json") else ".") / f).stat().st_size for f in fichiers}
+        gz = {f: next((e[1] for e in poids.get("res", []) if e[0] == f), None) for f in fichiers[1:]}
         gz["index.html"] = poids["nav"][0]
         total_gz = sum(v for v in gz.values() if v)
-        for f in ("index.html", "style.css", "app.js"):
+        for f in fichiers:
             print(f"  {f:11} {brut[f]:>7} octets bruts -> {gz[f]:>6} octets gzip")
         print(f"  TOTAL       {sum(brut.values()):>7} octets bruts -> {total_gz:>6} octets gzip (budget {BUDGET_GZ})")
-        verifier(f"poids gzip total ({total_gz} octets) <= budget de {BUDGET_GZ} octets", total_gz <= BUDGET_GZ)
-        (CAPTURES / "poids.json").write_text(json.dumps({"brut": brut, "gzip": gz, "total_gzip": total_gz, "budget_gzip": BUDGET_GZ}, indent=2), encoding="utf-8")
+        verifier(f"poids gzip : page + fr.json ({total_gz} octets) <= budget de {BUDGET_GZ} octets", all(gz.values()) and total_gz <= BUDGET_GZ, str(gz))
+        # les six autres langues, compressées ici avec le même niveau 9 : la page + la plus lourde doit tenir aussi
+        langues_gz = {c: len(gzip.compress((LANGUES_PAGE / f"{c}.json").read_bytes(), 9)) for c in CODES_LANGUES}
+        page_gz = total_gz - (gz["fr.json"] or 0)
+        lourde = max(langues_gz, key=lambda c: langues_gz[c])
+        print("  fichiers de langue (gzip niveau 9) : " + ", ".join(f"{c} {n}" for c, n in langues_gz.items()))
+        verifier(f"poids gzip : page + la langue la plus lourde ({lourde}, {page_gz + langues_gz[lourde]} octets) <= budget de {BUDGET_GZ} octets", page_gz + langues_gz[lourde] <= BUDGET_GZ)
+        (CAPTURES / "poids.json").write_text(json.dumps({"brut": brut, "gzip": gz, "total_gzip": total_gz, "budget_gzip": BUDGET_GZ, "langues_gzip": langues_gz}, indent=2), encoding="utf-8")
     finally:
         srv.terminate()
         try:

@@ -4,9 +4,11 @@ Page servie par l'appareil lui-même (HTTP local), ouverte depuis un téléphone
 
 | Dossier | Contenu |
 |---|---|
-| `app/` | La page : `index.html`, `style.css`, `app.js`. Sans framework, sans étape de compilation, sans police ni image externe. |
-| `faux-serveur/serveur.mjs` | Faux appareil (Node, aucune dépendance) qui répond comme l'API du contrat, avec de vrais appels à Open-Meteo et les vraies tables du noyau (`components/core/`). |
+| `app/` | La page : `index.html`, `style.css`, `app.js`. Sans framework, sans étape de compilation, sans police ni image externe. `app.js` n'écrit aucun texte d'écran. |
+| `app/lang/<code>.json` | Un petit fichier par langue (fr, en, de, nl, es, it, tr), **généré** par `components/core/outils/generer_i18n.py` depuis `i18n/page.yaml` et `i18n/<code>.yaml` : ne pas les modifier à la main. La page ne charge que celui dont elle a besoin. |
+| `faux-serveur/serveur.mjs` | Faux appareil (Node, aucune dépendance) qui répond comme l'API du contrat, avec de vrais appels à Open-Meteo, les vraies tables du noyau (`components/core/`) et les mêmes fichiers `i18n/<code>.yaml` que le firmware : ses phrases sortent dans la langue de l'écran. |
 | `tests/parcours.py` | Parcours Playwright (Chromium, rendu téléphone 390 × 844) contre le faux appareil. |
+| `tests/controle_langues.py` | Contrôle sans navigateur : `app.js` n'écrit aucun texte français, chaque identifiant de `page.yaml` est cité, chaque texte passé à `T()` dans le faux serveur est une clé des fichiers de langue. Lancé aussi par `test/host/lancer.py`. |
 | `captures/` | Captures et mesures écrites par le parcours (`poids.json`, `reglages-exporte.json`). |
 | `esquisses/` | Les trois esquisses proposées à Axel. |
 
@@ -28,7 +30,7 @@ python web/tests/parcours.py
 
 Prérequis : Node, Python avec `playwright` et son Chromium. Le script lance et arrête le faux appareil, écrit `web/captures/`, rend un tableau OK / ÉCHEC et un code de sortie non nul au moindre échec.
 
-## Ce que le parcours prouve (49 vérifications, toutes OK au dernier passage)
+## Ce que le parcours prouve (119 vérifications, toutes OK au dernier passage, code de sortie 0)
 
 - Appairage : mauvais code → phrase française ; bon code → page ; 5 essais ratés → verrou 429, qui se lève.
 - « Lyon » (3 lettres seulement envoyées, vraie recherche Open-Meteo) → zone enregistrée Lyon, `Europe/Paris`, POSIX `CET-1CEST,M3.5.0,M10.5.0/3`, coordonnées proches de Lyon ; la météo affichée est celle qu'Open-Meteo donne en direct au même moment, avec le libellé de la table WMO du noyau.
@@ -37,10 +39,14 @@ Prérequis : Node, Python avec `playwright` et son Chromium. Le script lance et 
 - Export sans clé ni mot de passe, avec `cles_a_ressaisir` ; import : simulation puis application, une clé glissée dans le fichier est ignorée et signalée.
 - Écran (thème, luminosité), Wi-Fi (mot de passe refusé → ancien réseau conservé ; réseau ouvert), mise à jour (fichier qui n'est pas un firmware refusé ; image cassée → retour arrière automatique annoncé ; bonne image ; retour arrière demandé) avec reconnexion et nouvel appairage après redémarrage.
 - Pas de défilement horizontal à 360, 390 et 430 px ; aucune erreur JavaScript ; aucun « null / undefined / NaN » affiché ; aucune requête hors de l'appareil.
+- **Sept langues** (69 vérifications, plus une sur le poids) : l'appareil propose fr, en, de, nl, es, it, tr dans cet ordre, chacune sous son propre nom ; français par défaut pour l'écran **et** pour l'assistant ; deux sélecteurs distincts (changer l'un ne change pas l'autre) ; au départ seul `fr.json` est demandé, puis `de.json` quand on passe à l'allemand (pas les cinq autres). Pour chacune des sept langues : onglets, titre de carte et titre de l'onglet du navigateur dans la langue, aucun identifiant brut (`ville.titre`) affiché, aucun texte français visible (les six autres), libellé météo = un libellé de la table WMO du noyau traduit, pas de défilement horizontal à 360 px. Une phrase qui vient de l'appareil (code faux) arrive en allemand telle que l'appareil l'envoie. **Repli** : `de.json` introuvable → page en anglais ; `de.json` et `en.json` introuvables → page en français.
+- **Attribution Open-Meteo (CC BY 4.0)** : visible dans la carte « Ville » dans la langue de la page, « Open-Meteo » est un lien vers `https://open-meteo.com/` (vérifié pour chacune des sept langues et pour les deux replis).
+
+Les textes de la page viennent de traductions écrites par une IA ; seul le français est relu par l'auteur. Ces vérifications prouvent que le bon texte est affiché au bon endroit, pas que la traduction est juste ni que les phrases allemandes et néerlandaises tiennent sur l'écran de l'appareil (non vérifié).
 
 ## Poids
 
-Mesuré sur la réponse gzip du faux appareil (`encodedBodySize`) : `index.html` 1 016 + `style.css` 2 388 + `app.js` 10 501 = **13 905 octets** (46 250 octets bruts), pour un budget annoncé de 30 Ko. Sur l'appareil, ces trois fichiers seront à servir déjà compressés (§12 du contrat).
+Mesuré sur la réponse gzip du faux appareil (`encodedBodySize`), le 06/11/2026 : `index.html` 1 037 + `style.css` 2 409 + `app.js` 11 304 = **14 750 octets** ; avec un fichier de langue (`fr.json`, 2 161) : **16 911 octets** (56 089 octets bruts), pour un budget annoncé de 30 Ko (30 720). Les sept fichiers de langue pèsent entre 2 067 octets (`en`) et 2 338 octets (`de`) compressés au niveau 9 : la page avec l'allemand, la plus lourde, fait 17 088 octets. Sur l'appareil, ces fichiers seront à servir déjà compressés (§12 du contrat).
 
 ## Choix qui s'écartent de l'esquisse ou du contrat
 

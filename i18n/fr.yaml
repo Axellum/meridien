@@ -1,0 +1,9 @@
+# ============================================================================
+# i18n/fr.yaml — langue SOURCE : le français est la clé de toutes les traductions (façon gettext, comme sur le Tab5).
+# Ce fichier ne porte que les métadonnées de la langue ; il ne contient aucune traduction.
+# NE JAMAIS CHANGER `_index: 0`. L'ordre des langues est figé (l'indice est enregistré en NVS) : fr 0, en 1, de 2, nl 3,
+# es 4, it 5, tr 6 ; une nouvelle langue prend le numéro suivant. Voir i18n/README.md et l'ADR-0006.
+# ============================================================================
+_langue: Français
+_code: fr
+_index: 0
