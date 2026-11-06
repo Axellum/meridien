@@ -10,11 +10,11 @@
 #include "lvgl.h"
 
 #include "ecran/ecrans_reglages.hpp"
+#include "ecran/hote_reglages.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/installation.hpp"
 #include "ecran/registre_reglages.hpp"
 #include "ecran/texte_modele.hpp"
-#include "hote_reglages.h"
 #include "palette_reglages.h"
 
 namespace ecran::ui {

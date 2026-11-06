@@ -2,9 +2,10 @@
 // ui_installation.cpp, ui_clavier.cpp) ne touchent ni la mémoire permanente, ni le Wi-Fi, ni le réseau : ils parlent à cette
 // interface. Même principe que board.h pour les cartes : l'interface ne sait pas qui répond.
 //
-//  - HoteMemoire (hote_memoire.cpp) répond en mémoire vive, sans ESP-IDF : c'est ce que le rendu PC et les essais utilisent, et ce
-//    que l'appareil utilise tant que l'adaptateur de mémoire permanente n'est pas branché.
-//  - L'adaptateur de l'appareil (NVS, Wi-Fi de main/reseau.*, recherche de lieu) vient avec le jalon « binaire flashable ».
+//  - HoteMemoire (main/hote_memoire.cpp) répond en mémoire vive, sans ESP-IDF : c'est ce que le rendu PC et les essais utilisent.
+//  - HoteAppareil (ecran/hote_appareil.hpp) répond sur l'appareil : mêmes réglages que l'API web (affichage, ville), mémoire
+//    permanente pour le reste, Wi-Fi de main/reseau.*, recherche de lieu. Sa logique est pure et testée sur le PC ; seuls les
+//    « ports » (main/hote_appareil_esp.cpp) touchent ESP-IDF.
 //
 // Aucune méthode ne rend ni ne reçoit un secret en clair, sauf `definir_texte` pour l'enregistrer (la valeur vient du clavier) :
 // l'écran ne relit jamais une clé ou un mot de passe (docs/api-reglages.md, « écriture seule »).

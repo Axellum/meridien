@@ -7,7 +7,7 @@
 
 #include "lvgl.h"
 
-#include "hote_reglages.h"
+#include "ecran/hote_reglages.hpp"
 
 namespace ecran {
 

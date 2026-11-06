@@ -1,4 +1,4 @@
-// HoteReglages en mémoire vive (hote_reglages.h) : les valeurs partent des défauts du registre, rien n'est gardé après un
+// HoteReglages en mémoire vive (ecran/hote_reglages.hpp) : les valeurs partent des défauts du registre, rien n'est gardé après un
 // redémarrage, le Wi-Fi, la recherche de lieu et les tests de service sont simulés par des données que l'appelant fournit.
 // Sert au rendu PC (scènes de tools/rendu) et à l'appareil tant que l'adaptateur de mémoire permanente n'existe pas.
 // Aucun include ESP-IDF ni LVGL.
@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "ecran/hote_reglages.hpp"
 #include "ecran/registre_reglages.hpp"
-#include "hote_reglages.h"
 
 namespace ecran {
 
