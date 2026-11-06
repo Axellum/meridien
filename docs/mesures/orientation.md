@@ -2,7 +2,7 @@
 
 > **Summary (EN)** — Landscape orientation on the M5Stack Tab5 (ST7121 display): the interface is now 1280 × 720 on the 720 × 1280 portrait panel. Same principle as the author's ESPHome firmware (`rotation: 270`): LVGL renders landscape, each dirty area is rotated by the ESP32-P4's PPA accelerator and copied to the single DSI frame buffer; touch is rotated in the touch layer. Done through `esp_lvgl_port` (`sw_rotate` + `CONFIG_LVGL_PORT_ENABLE_PPA`), `lv_display_set_rotation(90)` in LVGL's convention = ESPHome's 270. A working document in French; every "Vu sur" line gives board, screen revision, commit and date.
 > - Hardware rotation (panel swap/mirror) is not an option: `esp_lcd_panel_swap_xy` answers "not supported" on the DSI panel (seen in the 1a log) and espp reports it non-functional on the ST7121.
-> - Status of this page: **sources read and formulas derived; nothing measured on the board yet** (see "Mesures" below, which stays empty until the board has run the binary).
+> - Status of this page: **sources read and formulas derived; nothing measured on the board yet** (see § 5, which stays empty until the board has run the binary). § 6: the main screen was rendered on the PC (LVGL 9.5.0, x86-64): it fits at 1280 × 720 and, after a scale fix, at 1024 × 600; that render is not a photo of the board.
 
 Piste ecran-principal, branche `claude/ecran-principal-f0f722`, tirée du jalon 1b (`97520e2`). Carte : M5Stack Tab5 (écran ST7121).
 
@@ -60,3 +60,16 @@ Voir le § 5 pour ce qui sera relevé. Candidats :
 - Rendu et envoi par image et par zone, sur l'écran principal et pendant un glissement du doigt (lignes `affichage sur … ms` du journal) : **non mesuré**.
 - Sens de l'image et du tactile (le point du doigt est sous le doigt) : **non constaté**.
 - Déchirure : **à juger par Axel** sur l'écran réel ; un seul changement entier (appui long : bascule vers l'écran de diagnostic) et un glissement du doigt.
+
+## 6. Rendu PC de l'écran principal (avant carte)
+
+Ce rendu est le dessin logiciel de LVGL 9.5.0 sur x86-64, compilé avec la configuration du firmware par l'outil de la session `rendu-pc` (sa branche, non fusionnée au moment de l'essai ; une scène `principal` écrite pour l'occasion, avec des données inventées). **Ce n'est pas une photo du Tab5** : la dalle, la rotation par le PPA, le tactile et les temps d'affichage ne sont pas couverts.
+
+**Vu sur** PC de l'auteur, rendu LVGL 9.5.0 (configuration identique au `sdkconfig`, 106 options), commit `44149ff`, 06/11/2026.
+
+- 1280 × 720 : l'heure, la date et le bloc météo tiennent, y compris dans les pires cas essayés (heure à chiffres larges « 20:08 », date la plus longue « mercredi 30 septembre 2026 », libellé de 39 octets sur trois lignes, températures négatives, « Données périmées » et « Exemple » affichés ensemble).
+- 1024 × 600 (Waveshare 7B, **non essayée sur la carte**) : avant le correctif d'échelle l'heure de 270 px était **coupée** (« 1:4( ») ; après la mise à l'échelle des cotes (facteur 0,8) elle tient. Constaté sur le rendu PC seulement.
+- Libellé météo rempli jusqu'au bout sans zéro final (hors contrat) : l'écran dit « Météo indisponible » pour le libellé au lieu de lire au-delà du champ.
+- Un premier rendu « pires cas » montrait une mention « Exemple » parasite : cause **dans la scène de rendu** (un libellé de 45 octets écrasait le champ voisin de la structure), pas dans l'écran ; scène corrigée.
+
+Ce qui reste **non vérifié** : tout ce qui dépend de la carte (voir § 5).
