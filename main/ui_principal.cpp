@@ -85,6 +85,15 @@ void changer_texte(lv_obj_t *etiquette, const char *neuf) {
     }
 }
 
+// Ne réapplique la couleur que si elle change : LVGL invalide (donc redessine) l'objet même quand la valeur posée est identique,
+// et la mise à jour tourne deux fois par seconde (une image redessinée toutes les 500 ms sur un écran qui ne bouge pas).
+void changer_couleur_texte(lv_obj_t *etiquette, uint32_t rgb) {
+    const lv_color_t neuve = couleur(rgb);
+    if (!lv_color_eq(lv_obj_get_style_text_color(etiquette, LV_PART_MAIN), neuve)) {
+        lv_obj_set_style_text_color(etiquette, neuve, 0);
+    }
+}
+
 void montrer(lv_obj_t *objet, bool visible) {
     const bool cache = lv_obj_has_flag(objet, LV_OBJ_FLAG_HIDDEN);
     if (visible && cache) {
@@ -275,7 +284,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
         montrer(g.min_max, false);
         montrer(g.perimee, false);
         changer_texte(g.libelle, texte_principal::kMeteoIndisponible);
-        lv_obj_set_style_text_color(g.libelle, couleur(kCouleurs.texte_discret), 0);
+        changer_couleur_texte(g.libelle, kCouleurs.texte_discret);
         return;
     }
 
@@ -292,7 +301,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     // Le contrat veut un libellé terminé par un zéro ; un champ rempli jusqu'au bout (non terminé) ne doit pas être lu au-delà.
     const bool libelle_ok = m.libelle[0] != '\0' && std::memchr(m.libelle, '\0', sizeof m.libelle) != nullptr;
     changer_texte(g.libelle, libelle_ok ? m.libelle : texte_principal::kMeteoIndisponible);
-    lv_obj_set_style_text_color(g.libelle, couleur(kCouleurs.texte), 0);
+    changer_couleur_texte(g.libelle, kCouleurs.texte);
 
     int mini = 0;
     int maxi = 0;
