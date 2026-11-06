@@ -1,0 +1,96 @@
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0x20c (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff100d8
+Core1 Saved PC:0x4fc058e0
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x1664
+load:0x4ff29ed0,len:0xe24
+load:0x4ff2cbd0,len:0x3548
+entry 0x4ff29eda
+I (8) boot: ESP-IDF v5.5.5 2nd stage bootloader
+I (8) boot: compile time Nov  6 2026 12:00:50
+I (9) boot: Multicore bootloader
+I (10) boot: chip revision: v1.3
+I (10) boot: efuse block revision: v0.3
+I (11) boot.esp32p4: SPI Speed      : 80MHz
+I (11) boot.esp32p4: SPI Mode       : DIO
+I (11) boot.esp32p4: SPI Flash Size : 16MB
+I (11) boot: Enabling RNG early entropy source...
+I (12) boot: Partition Table:
+I (12) boot: ## Label            Usage          Type ST Offset   Length
+I (13) boot:  0 otadata          OTA data         01 00 00009000 00002000
+I (13) boot:  1 phy_init         RF data          01 01 0000b000 00001000
+I (14) boot:  2 ota_0            OTA app          00 10 00010000 00400000
+I (15) boot:  3 ota_1            OTA app          00 11 00410000 00400000
+I (15) boot:  4 nvs              WiFi data        01 02 00810000 00070000
+I (16) boot:  5 esphome_nvs      Unknown data     01 99 00f90000 00070000
+I (17) boot: End of partition table
+I (18) boot: No factory image, trying OTA 0
+I (18) esp_image: segment 0: paddr=00010020 vaddr=40080020 size=34aa0h (215712) map
+I (50) esp_image: segment 1: paddr=00044ac8 vaddr=30100000 size=0007ch (   124) load
+I (51) esp_image: segment 2: paddr=00044b4c vaddr=4ff00000 size=0b4cch ( 46284) load
+I (60) esp_image: segment 3: paddr=00050020 vaddr=40000020 size=79a24h (498212) map
+I (131) esp_image: segment 4: paddr=000c9a4c vaddr=4ff0b4cc size=08fe0h ( 36832) load
+I (138) esp_image: segment 5: paddr=000d2a34 vaddr=4ff14500 size=033b4h ( 13236) load
+I (142) esp_image: segment 6: paddr=000d5df0 vaddr=50108080 size=00020h (    32) load
+I (148) boot: Loaded app from partition at offset 0x10000
+I (152) boot: Set actual ota_seq=1 in otadata[0]
+I (152) boot: Disabling RNG early entropy source...
+I (156) hex_psram: vendor id    : 0x0d (AP)
+I (156) hex_psram: Latency      : 0x01 (Fixed)
+I (156) hex_psram: DriveStr.    : 0x00 (25 Ohm)
+I (157) hex_psram: dev id       : 0x03 (generation 4)
+I (157) hex_psram: density      : 0x07 (256 Mbit)
+I (157) hex_psram: good-die     : 0x06 (Pass)
+I (158) hex_psram: SRF          : 0x02 (Slow Refresh)
+I (158) hex_psram: BurstType    : 0x00 ( Wrap)
+I (158) hex_psram: BurstLen     : 0x03 (2048 Byte)
+I (159) hex_psram: BitMode      : 0x01 (X16 Mode)
+I (159) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)
+I (160) hex_psram: DriveStrength: 0x00 (1/1)
+I (160) MSPI Timing: Enter psram timing tuning
+I (333) esp_psram: Found 32MB PSRAM device
+I (333) esp_psram: Speed: 200MHz
+I (334) hex_psram: psram CS IO is dedicated
+I (334) cpu_start: Multicore app
+I (1285) esp_psram: SPI SRAM memory test OK
+I (1295) cpu_start: Pro cpu start user code
+I (1295) cpu_start: cpu freq: 360000000 Hz
+I (1295) app_init: Application information:
+I (1295) app_init: Project name:     ecran_autonome
+I (1296) app_init: App version:      00078e2-dirty
+I (1296) app_init: Compile time:     Nov  6 2026 12:00:28
+I (1296) app_init: ELF file SHA256:  b286e3987...
+I (1296) app_init: ESP-IDF:          v5.5.5
+I (1296) efuse_init: Min chip rev:     v1.0
+I (1297) efuse_init: Max chip rev:     v1.99 
+I (1297) efuse_init: Chip rev:         v1.3
+I (1297) heap_init: Initializing. RAM available for dynamic allocation:
+I (1298) heap_init: At 4FF194B0 len 00021B10 (134 KiB): RETENT_RAM
+I (1298) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (1298) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM
+I (1299) heap_init: At 501080A0 len 00007F60 (31 KiB): RTCRAM
+I (1299) heap_init: At 3010007C len 00001F84 (7 KiB): SPM
+I (1299) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator
+I (1300) spi_flash: detected chip: generic
+I (1300) spi_flash: flash io: dio
+I (1301) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (1301) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (1302) main_task: Started on CPU0
+I (1302) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (1302) main_task: Calling app_main()
+I (1302) ecran: écran autonome, phase 1a ; ESP-IDF v5.5.5 ; application démarrée à 4 ms
+I (1302) boot_info: cause du redémarrage : réinitialisation par l'USB (code 11)
+I (1332) boot_info: démarrage n° 1
+I (2492) tab5_detect: version du tactile Sitronix lue : 1 (tentative 4)
+I (2492) tab5: Contrôleur d'écran détecté : ST7121 (tactile : Sitronix (version 1) ; détection en 33 ms)
+I (2492) tab5_display: ST7121 : DSI 2 voies à 965 Mbit/s, pixels à 70 MHz, 720x1280 RGB565
+I (2492) st7121: version: 1.0.1
+I (2752) ST7123: Firmware version: 1(1.80.1.16), Max.X: 720, Max.Y: 1280, Max.Touchs: 10
+I (2752) ST7123: Touch panel create success, version: 1.0.2
+I (2752) LVGL: Starting LVGL task
+E (2752) lcd_panel: esp_lcd_panel_swap_xy(50): swap_xy is not supported by this panel
+I (2762) tab5: Carte prête : M5Stack Tab5, écran ST7121 720x1280 (orientation native), jalons ms : attente expandeur 1030, détection 1191, dalle 1448, LVGL 1465
+I (2942) ecran: rétroéclairage allumé à 75 % à 1638 ms ; première image affichée
+I (2942) main_task: Returned from app_main()
