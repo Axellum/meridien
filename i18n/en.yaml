@@ -321,3 +321,4 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "Back on version {version}."
 "Il n’y a pas de version précédente à remettre.": "There is no previous version to restore."
 "Cette page n’existe pas.": "This page doesn’t exist."
+"Cette fonction n’est pas encore disponible sur cet écran.": "This feature isn’t available on this screen yet."

@@ -321,3 +321,4 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "Terug op versie {version}."
 "Il n’y a pas de version précédente à remettre.": "Er is geen vorige versie om terug te zetten."
 "Cette page n’existe pas.": "Deze pagina bestaat niet."
+"Cette fonction n’est pas encore disponible sur cet écran.": "Deze functie is op dit scherm nog niet beschikbaar."

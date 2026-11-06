@@ -321,3 +321,4 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "Sürüm {version} geri yüklendi."
 "Il n’y a pas de version précédente à remettre.": "Geri yüklenecek önceki sürüm yok."
 "Cette page n’existe pas.": "Bu sayfa yok."
+"Cette fonction n’est pas encore disponible sur cet écran.": "Bu özellik bu ekranda henüz kullanılamıyor."
