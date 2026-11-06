@@ -21,7 +21,8 @@ constexpr bool egal(std::string_view a, std::string_view b) { return a == b; }
 constexpr std::size_t caracteres(std::string_view s) {
     std::size_t n = 0;
     for (char c : s) {
-        if ((static_cast<unsigned char>(c) & 0xC0U) != 0x80U) ++n;
+        if ((static_cast<unsigned char>(c) & 0xC0U) != 0x80U)
+            ++n;
     }
     return n;
 }
@@ -49,7 +50,8 @@ constexpr int exactement_ces_29_codes_sont_connus() {
     for (int code = -10; code <= 200; ++code) {
         if (decrire(code, true).connu) {
             bool dans_la_source = false;
-            for (int c : CODES_OPEN_METEO) dans_la_source = dans_la_source || (c == code);
+            for (int c : CODES_OPEN_METEO)
+                dans_la_source = dans_la_source || (c == code);
             VERIFIER(dans_la_source);
             ++connus;
         }
@@ -105,9 +107,9 @@ constexpr int libelles_francais_exacts_avec_accents() {
         {99, "Orage avec forte grêle"},
     };
     VERIFIER(sizeof(ATTENDUS) / sizeof(ATTENDUS[0]) == NOMBRE_CODES);
-    for (const Attendu& a : ATTENDUS) {
+    for (const Attendu &a : ATTENDUS) {
         VERIFIER(egal(decrire(a.code, true).libelle, a.libelle));
-        VERIFIER(egal(decrire(a.code, false).libelle, a.libelle));  // le libellé ne dépend pas du jour
+        VERIFIER(egal(decrire(a.code, false).libelle, a.libelle)); // le libellé ne dépend pas du jour
     }
     return 0;
 }
@@ -116,8 +118,9 @@ constexpr int libelles_courts_distincts_et_sans_chiffre() {
     for (std::size_t i = 0; i < NOMBRE_CODES; ++i) {
         const std::string_view l = decrire(CODES_OPEN_METEO[i], true).libelle;
         VERIFIER(caracteres(l) <= 26);                  // tient sur une ligne d'écran
-        VERIFIER(l.front() >= 'A' && l.front() <= 'Z');  // commence par une majuscule
-        for (char c : l) VERIFIER(!(c >= '0' && c <= '9'));  // jamais un code à l'écran
+        VERIFIER(l.front() >= 'A' && l.front() <= 'Z'); // commence par une majuscule
+        for (char c : l)
+            VERIFIER(!(c >= '0' && c <= '9')); // jamais un code à l'écran
         for (std::size_t j = i + 1; j < NOMBRE_CODES; ++j) {
             VERIFIER(!egal(l, decrire(CODES_OPEN_METEO[j], true).libelle));
         }
@@ -133,7 +136,8 @@ constexpr int seuls_les_codes_0_a_2_changent_entre_jour_et_nuit() {
     VERIFIER(decrire(2, true).icone == Icone::NuageuxJour);
     VERIFIER(decrire(2, false).icone == Icone::NuageuxNuit);
     for (int code : CODES_OPEN_METEO) {
-        if (code > 2) VERIFIER(decrire(code, true).icone == decrire(code, false).icone);
+        if (code > 2)
+            VERIFIER(decrire(code, true).icone == decrire(code, false).icone);
     }
     return 0;
 }
@@ -145,23 +149,17 @@ constexpr int regroupements_d_icones() {
         int n;
     };
     constexpr Groupe GROUPES[] = {
-        {Icone::Couvert, {3}, 1},
-        {Icone::Brouillard, {45, 48}, 2},
-        {Icone::Bruine, {51, 53, 55}, 3},
-        {Icone::PluieVerglacante, {56, 57, 66, 67}, 4},
-        {Icone::Pluie, {61, 63}, 2},
-        {Icone::PluieForte, {65}, 1},
-        {Icone::Neige, {71, 73}, 2},
-        {Icone::NeigeForte, {75}, 1},
-        {Icone::GrainsDeNeige, {77}, 1},
-        {Icone::Averses, {80, 81}, 2},
-        {Icone::AversesViolentes, {82}, 1},
-        {Icone::AversesDeNeige, {85, 86}, 2},
-        {Icone::Orage, {95, 97}, 2},
-        {Icone::OrageGrele, {96, 99}, 2},
+        {Icone::Couvert, {3}, 1},           {Icone::Brouillard, {45, 48}, 2},
+        {Icone::Bruine, {51, 53, 55}, 3},   {Icone::PluieVerglacante, {56, 57, 66, 67}, 4},
+        {Icone::Pluie, {61, 63}, 2},        {Icone::PluieForte, {65}, 1},
+        {Icone::Neige, {71, 73}, 2},        {Icone::NeigeForte, {75}, 1},
+        {Icone::GrainsDeNeige, {77}, 1},    {Icone::Averses, {80, 81}, 2},
+        {Icone::AversesViolentes, {82}, 1}, {Icone::AversesDeNeige, {85, 86}, 2},
+        {Icone::Orage, {95, 97}, 2},        {Icone::OrageGrele, {96, 99}, 2},
     };
-    for (const Groupe& g : GROUPES) {
-        for (int i = 0; i < g.n; ++i) VERIFIER(decrire(g.codes[i], true).icone == g.icone);
+    for (const Groupe &g : GROUPES) {
+        for (int i = 0; i < g.n; ++i)
+            VERIFIER(decrire(g.codes[i], true).icone == g.icone);
     }
     return 0;
 }
@@ -172,8 +170,10 @@ constexpr int chaque_icone_a_un_identifiant_ascii_unique() {
     for (int i = 0; i < N; ++i) {
         const std::string_view a = nom_icone(static_cast<Icone>(i));
         VERIFIER(!a.empty());
-        for (char c : a) VERIFIER((c >= 'a' && c <= 'z') || c == '_');
-        for (int j = i + 1; j < N; ++j) VERIFIER(!egal(a, nom_icone(static_cast<Icone>(j))));
+        for (char c : a)
+            VERIFIER((c >= 'a' && c <= 'z') || c == '_');
+        for (int j = i + 1; j < N; ++j)
+            VERIFIER(!egal(a, nom_icone(static_cast<Icone>(j))));
     }
     return 0;
 }
@@ -183,25 +183,26 @@ constexpr int toute_icone_rendue_a_un_code_source() {
     for (int i = 1; i < static_cast<int>(Icone::Nombre); ++i) {
         bool utilisee = false;
         for (int code : CODES_OPEN_METEO) {
-            for (bool jour : {true, false}) utilisee = utilisee || (decrire(code, jour).icone == static_cast<Icone>(i));
+            for (bool jour : {true, false})
+                utilisee = utilisee || (decrire(code, jour).icone == static_cast<Icone>(i));
         }
         VERIFIER(utilisee);
     }
     return 0;
 }
 
-}  // namespace
+} // namespace
 
-#define LISTE(X)                                       \
-    X(le_tableau_a_29_codes)                           \
-    X(tous_les_codes_sont_connus_jour_et_nuit)         \
-    X(exactement_ces_29_codes_sont_connus)             \
-    X(codes_inconnus_donnent_meteo_inconnue)           \
-    X(libelles_francais_exacts_avec_accents)           \
-    X(libelles_courts_distincts_et_sans_chiffre)       \
-    X(seuls_les_codes_0_a_2_changent_entre_jour_et_nuit) \
-    X(regroupements_d_icones)                          \
-    X(chaque_icone_a_un_identifiant_ascii_unique)      \
+#define LISTE(X)                                                                                                       \
+    X(le_tableau_a_29_codes)                                                                                           \
+    X(tous_les_codes_sont_connus_jour_et_nuit)                                                                         \
+    X(exactement_ces_29_codes_sont_connus)                                                                             \
+    X(codes_inconnus_donnent_meteo_inconnue)                                                                           \
+    X(libelles_francais_exacts_avec_accents)                                                                           \
+    X(libelles_courts_distincts_et_sans_chiffre)                                                                       \
+    X(seuls_les_codes_0_a_2_changent_entre_jour_et_nuit)                                                               \
+    X(regroupements_d_icones)                                                                                          \
+    X(chaque_icone_a_un_identifiant_ascii_unique)                                                                      \
     X(toute_icone_rendue_a_un_code_source)
 
 TESTS_A_LA_COMPILATION(LISTE)

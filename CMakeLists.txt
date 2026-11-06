@@ -13,7 +13,7 @@ set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults;${BOARD_DEF
 
 # Les composants du projet sont dans components/ (noyau pur, pilotes, interface, couche carte).
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(ecran_autonome)
+project(meridien)
 
 # La couche carte (components/bsp_<carte>) n'est requise par aucun composant : le code applicatif ne
 # connait que board_api. On la lie ici, la seule ligne du projet qui nomme la carte.

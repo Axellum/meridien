@@ -13,8 +13,7 @@ const char *TAG = "boot_info";
 const char *kNamespace = "ecran";
 const char *kKeyBootCount = "boots";
 
-const char *reset_reason_fr(esp_reset_reason_t reason)
-{
+const char *reset_reason_fr(esp_reset_reason_t reason) {
     switch (reason) {
     case ESP_RST_POWERON:
         return "mise sous tension";
@@ -39,10 +38,9 @@ const char *reset_reason_fr(esp_reset_reason_t reason)
     }
 }
 
-}  // namespace
+} // namespace
 
-BootInfo boot_info_load()
-{
+BootInfo boot_info_load() {
     BootInfo info = {0, false, reset_reason_fr(esp_reset_reason())};
     ESP_LOGI(TAG, "cause du redémarrage : %s (code %d)", info.reset_reason, static_cast<int>(esp_reset_reason()));
 
@@ -87,4 +85,4 @@ BootInfo boot_info_load()
     return info;
 }
 
-}  // namespace ecran
+} // namespace ecran

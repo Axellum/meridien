@@ -10,12 +10,12 @@
 //   - sequence d'initialisation : celle par defaut du composant esp_lcd_st7121 (identique a celle du BSP esp-bsp, sauf les
 //     temporisations SLPOUT 120 ms / DISPON 0 ms au lieu de 80 / 800 ms).
 #include "esp_check.h"
-#include "esp_ldo_regulator.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_st7121.h"
+#include "esp_ldo_regulator.h"
 #include "esp_log.h"
 
 #include "tab5_internal.h"
@@ -27,14 +27,15 @@ static const char *TAG = "tab5_display";
 
 static esp_ldo_channel_handle_t s_phy_ldo;
 
-static esp_err_t create_st7121(esp_lcd_dsi_bus_handle_t dsi_bus, esp_lcd_panel_io_handle_t io, esp_lcd_panel_handle_t *panel)
-{
+static esp_err_t create_st7121(esp_lcd_dsi_bus_handle_t dsi_bus, esp_lcd_panel_io_handle_t io,
+                               esp_lcd_panel_handle_t *panel) {
     esp_lcd_dpi_panel_config_t dpi = {0};
     dpi.virtual_channel = 0;
     dpi.dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT;
     dpi.dpi_clock_freq_mhz = ST7121_DPI_CLOCK_MHZ;
     dpi.in_color_format = LCD_COLOR_FMT_RGB565;
-    dpi.num_fbs = 1;  // un seul tampon d'image : LVGL dessine dans des tampons partiels et la dalle est mise a jour par copie
+    dpi.num_fbs =
+        1; // un seul tampon d'image : LVGL dessine dans des tampons partiels et la dalle est mise a jour par copie
     dpi.video_timing.h_size = TAB5_LCD_H_RES;
     dpi.video_timing.v_size = TAB5_LCD_V_RES;
     dpi.video_timing.hsync_back_porch = 40;
@@ -43,16 +44,17 @@ static esp_err_t create_st7121(esp_lcd_dsi_bus_handle_t dsi_bus, esp_lcd_panel_i
     dpi.video_timing.vsync_back_porch = 24;
     dpi.video_timing.vsync_pulse_width = 20;
     dpi.video_timing.vsync_front_porch = 200;
-    dpi.flags.use_dma2d = true;  // copie des tampons LVGL vers le tampon d'image par DMA2D (comme le BSP d'Espressif)
+    dpi.flags.use_dma2d = true; // copie des tampons LVGL vers le tampon d'image par DMA2D (comme le BSP d'Espressif)
 
     st7121_vendor_config_t vendor = {0};
-    vendor.init_cmds = NULL;  // sequence par defaut du composant
+    vendor.init_cmds = NULL; // sequence par defaut du composant
     vendor.init_cmds_size = 0;
     vendor.mipi_config.dsi_bus = dsi_bus;
     vendor.mipi_config.dpi_config = &dpi;
 
     esp_lcd_panel_dev_config_t panel_cfg = {0};
-    panel_cfg.reset_gpio_num = -1;  // reset materiel fait par l'expandeur (tab5_lcd_reset_pulse) ; ici reset logiciel (SWRESET)
+    panel_cfg.reset_gpio_num =
+        -1; // reset materiel fait par l'expandeur (tab5_lcd_reset_pulse) ; ici reset logiciel (SWRESET)
     panel_cfg.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB;
     panel_cfg.bits_per_pixel = 16;
     panel_cfg.vendor_config = &vendor;
@@ -66,8 +68,8 @@ static esp_err_t create_st7121(esp_lcd_dsi_bus_handle_t dsi_bus, esp_lcd_panel_i
     return ESP_OK;
 }
 
-esp_err_t tab5_display_create(tab5_display_controller_t controller, esp_lcd_panel_handle_t *panel, esp_lcd_panel_io_handle_t *io)
-{
+esp_err_t tab5_display_create(tab5_display_controller_t controller, esp_lcd_panel_handle_t *panel,
+                              esp_lcd_panel_io_handle_t *io) {
     if (controller != TAB5_DISPLAY_ST7121) {
         // Detecte, mais pas encore porte : aucun exemplaire a essayer en phase 1a (le ST7123 est en SAV, aucun ILI9881C).
         ESP_LOGE(TAG, "contrôleur %s détecté mais pas pris en charge dans cette version (seul le ST7121 l'est)",

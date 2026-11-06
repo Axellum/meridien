@@ -1,7 +1,11 @@
-# Cible de mise en forme du C/C++ (clang-format 23). Le code existant n'y est pas encore conforme (tableaux alignés à la
-# main, trois pistes en cours) : le contrôle de tools/verifier.ps1 n'est qu'un avertissement tant que le code n'a pas été
-# reformaté d'un coup, dans un commit à part, après la fusion des pistes. Un tableau aligné exprès se protège avec
+# Mise en forme du C/C++ (clang-format 23.1.5 ; version épinglée dans docs/outils.md et dans la CI).
+# Le contrôle est bloquant : tools/verifier.ps1 (crochet avant commit et vérification complète) et la CI refusent un
+# fichier qui s'en écarte. Corriger avec : clang-format -i --style=file <fichier>
+# Les fichiers générés sont exclus par .clang-format-ignore. Un tableau aligné exprès se protège avec
 # « // clang-format off » ... « // clang-format on ».
 BasedOnStyle: LLVM
 IndentWidth: 4
 ColumnLimit: 120
+# Les commentaires ne sont pas recoupés : les paragraphes et listes en français écrits à la main se retrouvaient avec
+# des mots orphelins sur une ligne à eux. La limite de 120 colonnes ne vaut que pour le code.
+ReflowComments: Never

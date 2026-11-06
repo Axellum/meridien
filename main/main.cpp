@@ -15,8 +15,7 @@ static const char *TAG = "ecran";
 // un brownout a été vu à 100 % sur une alimentation juste, audit du 16/10/2026).
 static constexpr int kBacklightPercent = 75;
 
-extern "C" void app_main(void)
-{
+extern "C" void app_main(void) {
     ESP_LOGI(TAG, "écran autonome, phase 1a ; ESP-IDF %s ; application démarrée à %d ms", esp_get_idf_version(),
              static_cast<int>(esp_timer_get_time() / 1000));
 
@@ -31,10 +30,10 @@ extern "C" void app_main(void)
 
     if (board_display_lock(0)) {
         ecran::ui_bonjour_creer(boot);
-        lv_refr_now(board_get_display());  // première image dessinée avant d'allumer le rétroéclairage
+        lv_refr_now(board_get_display()); // première image dessinée avant d'allumer le rétroéclairage
         board_display_unlock();
     }
-    vTaskDelay(pdMS_TO_TICKS(100));  // laisser finir le transfert DMA de la dernière bande
+    vTaskDelay(pdMS_TO_TICKS(100)); // laisser finir le transfert DMA de la dernière bande
     board_set_backlight_percent(kBacklightPercent);
     ESP_LOGI(TAG, "rétroéclairage allumé à %d %% à %d ms ; première image affichée", kBacklightPercent,
              static_cast<int>(esp_timer_get_time() / 1000));

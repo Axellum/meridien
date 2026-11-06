@@ -27,4 +27,4 @@ inline constexpr Palette kPaletteSombre = {
     .bouton_texte = 0xF2F5F7,
 };
 
-}  // namespace ecran
+} // namespace ecran

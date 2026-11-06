@@ -9,4 +9,4 @@ namespace ecran {
 // Construit l'écran sur l'affichage de la carte. À appeler après board_init().
 void ui_bonjour_creer(const BootInfo &boot);
 
-}  // namespace ecran
+} // namespace ecran

@@ -17,20 +17,21 @@ extern "C" {
 #endif
 
 typedef struct {
-    const char *board_name;          // "M5Stack Tab5"
-    const char *display_controller;  // detecte a l'execution, avant d'initialiser le DSI : "ST7121", "ST7123", "ILI9881C"
-    const char *touch_controller;    // puce tactile lue, avec sa version : "Sitronix (version 1)"
-    int32_t width;                   // pixels, orientation native
+    const char *board_name; // "M5Stack Tab5"
+    const char
+        *display_controller;      // detecte a l'execution, avant d'initialiser le DSI : "ST7121", "ST7123", "ILI9881C"
+    const char *touch_controller; // puce tactile lue, avec sa version : "Sitronix (version 1)"
+    int32_t width;                // pixels, orientation native
     int32_t height;
 } board_info_t;
 
 // Jalons du demarrage, en millisecondes depuis le lancement de l'application (esp_timer), pour mesurer avant de sacrifier.
 typedef struct {
-    int32_t init_start_ms;           // entree dans board_init()
-    int32_t expander_ready_ms;       // attente de l'expandeur ecoulee et expandeur initialise
-    int32_t controller_detected_ms;  // controleur d'ecran identifie (apres le reset du LCD et du tactile)
-    int32_t panel_ready_ms;          // DSI + dalle initialises
-    int32_t lvgl_ready_ms;           // LVGL, affichage et tactile enregistres
+    int32_t init_start_ms;          // entree dans board_init()
+    int32_t expander_ready_ms;      // attente de l'expandeur ecoulee et expandeur initialise
+    int32_t controller_detected_ms; // controleur d'ecran identifie (apres le reset du LCD et du tactile)
+    int32_t panel_ready_ms;         // DSI + dalle initialises
+    int32_t lvgl_ready_ms;          // LVGL, affichage et tactile enregistres
 } board_boot_timeline_t;
 
 // Alimentations, reset de l'ecran et du tactile, detection du controleur, DSI, dalle, LVGL, tactile.
@@ -51,8 +52,7 @@ esp_err_t board_set_backlight_percent(int percent);
 
 // Redemarrage logiciel. Sur ESP32-P4, esp_restart() ne remet a zero que les coeurs (boucle du lien C6 vue sur la 7B) :
 // la seule forme autorisee dans ce projet est la remise a zero du systeme par la ROM.
-static inline void __attribute__((noreturn)) board_restart(void)
-{
+static inline void __attribute__((noreturn)) board_restart(void) {
     esp_rom_software_reset_system();
     for (;;) {
     }

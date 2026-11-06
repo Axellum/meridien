@@ -20,13 +20,9 @@ static const char *TAG = "tab5_io";
 static i2c_master_bus_handle_t s_bus;
 static esp_io_expander_handle_t s_expander;
 
-i2c_master_bus_handle_t tab5_i2c_bus(void)
-{
-    return s_bus;
-}
+i2c_master_bus_handle_t tab5_i2c_bus(void) { return s_bus; }
 
-static esp_err_t backlight_init(void)
-{
+static esp_err_t backlight_init(void) {
     ledc_timer_config_t timer = {
         .speed_mode = BACKLIGHT_LEDC_MODE,
         .duty_resolution = BACKLIGHT_LEDC_BITS,
@@ -41,14 +37,13 @@ static esp_err_t backlight_init(void)
         .channel = BACKLIGHT_LEDC_CHANNEL,
         .intr_type = LEDC_INTR_DISABLE,
         .timer_sel = BACKLIGHT_LEDC_TIMER,
-        .duty = 0,  // eteint tant que l'application n'a pas dessine sa premiere image
+        .duty = 0, // eteint tant que l'application n'a pas dessine sa premiere image
         .hpoint = 0,
     };
     return ledc_channel_config(&channel);
 }
 
-esp_err_t tab5_backlight_set_percent(int percent)
-{
+esp_err_t tab5_backlight_set_percent(int percent) {
     if (percent < 0) {
         percent = 0;
     }
@@ -56,13 +51,12 @@ esp_err_t tab5_backlight_set_percent(int percent)
         percent = 100;
     }
     const uint32_t max_duty = (1U << BACKLIGHT_LEDC_BITS) - 1U;
-    ESP_RETURN_ON_ERROR(ledc_set_duty(BACKLIGHT_LEDC_MODE, BACKLIGHT_LEDC_CHANNEL, max_duty * (uint32_t)percent / 100U), TAG,
-                        "duty");
+    ESP_RETURN_ON_ERROR(ledc_set_duty(BACKLIGHT_LEDC_MODE, BACKLIGHT_LEDC_CHANNEL, max_duty * (uint32_t)percent / 100U),
+                        TAG, "duty");
     return ledc_update_duty(BACKLIGHT_LEDC_MODE, BACKLIGHT_LEDC_CHANNEL);
 }
 
-esp_err_t tab5_io_init(void)
-{
+esp_err_t tab5_io_init(void) {
     // Retroeclairage a 0 % d'abord : la broche flotte tant que le LEDC n'est pas configure.
     ESP_RETURN_ON_ERROR(backlight_init(), TAG, "retroeclairage");
 
@@ -78,44 +72,45 @@ esp_err_t tab5_io_init(void)
 
     // Attention : creer le pilote de l'expandeur le REMET A ZERO (registre 0x01, puis tous les registres par defaut :
     // sorties a bas, haute impedance). Au demarrage c'est l'etat voulu ; ce n'est pas un appel a refaire en marche.
-    ESP_RETURN_ON_ERROR(esp_io_expander_new_i2c_pi4ioe5v6408(s_bus, ESP_IO_EXPANDER_I2C_PI4IOE5V6408_ADDRESS_LOW, &s_expander),
-                        TAG, "expandeur 0x43");
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_new_i2c_pi4ioe5v6408(s_bus, ESP_IO_EXPANDER_I2C_PI4IOE5V6408_ADDRESS_LOW, &s_expander), TAG,
+        "expandeur 0x43");
     return ESP_OK;
 }
 
 // Reset de la dalle. La ligne LCD_RST est tenue a bas en push-pull, puis rendue en ENTREE a pull-up (drain ouvert) pour la
 // remonter : la laisser en sortie haute rend l'I2C instable (docs/recherche/01-pile-et-qualite.md ; meme sequence que le BSP
 // d'Espressif, bsp_feature_en.c, cas BSP_FEATURE_LCD).
-esp_err_t tab5_lcd_reset_pulse(void)
-{
+esp_err_t tab5_lcd_reset_pulse(void) {
     ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_OUTPUT), TAG, "dir");
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, TAB5_EXPANDER_LCD_RST, 0), TAG, "niveau bas");
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL),
-                        TAG, "push-pull");
-    vTaskDelay(pdMS_TO_TICKS(10));  // espp : 10 ms bas ; ESPHome : 5 ms
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL), TAG,
+        "push-pull");
+    vTaskDelay(pdMS_TO_TICKS(10)); // espp : 10 ms bas ; ESPHome : 5 ms
     ESP_RETURN_ON_ERROR(esp_io_expander_set_pullupdown(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_PULL_UP), TAG,
                         "pull-up");
     ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_INPUT), TAG, "entree");
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_OUTPUT_MODE_OPEN_DRAIN),
-                        TAG, "drain ouvert");
-    vTaskDelay(pdMS_TO_TICKS(120));  // le controleur n'accepte SLPOUT que ~120 ms apres le reset
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_OUTPUT_MODE_OPEN_DRAIN), TAG,
+        "drain ouvert");
+    vTaskDelay(pdMS_TO_TICKS(120)); // le controleur n'accepte SLPOUT que ~120 ms apres le reset
     return ESP_OK;
 }
 
-esp_err_t tab5_touch_enable(void)
-{
+esp_err_t tab5_touch_enable(void) {
     ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_expander, TAB5_EXPANDER_TOUCH_RST, IO_EXPANDER_OUTPUT), TAG, "dir");
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, TAB5_EXPANDER_TOUCH_RST, 1), TAG, "niveau haut");
     return esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_TOUCH_RST, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL);
 }
 
-esp_err_t tab5_touch_reset_pulse(void)
-{
+esp_err_t tab5_touch_reset_pulse(void) {
     ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_expander, TAB5_EXPANDER_TOUCH_RST, IO_EXPANDER_OUTPUT), TAG, "dir");
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, TAB5_EXPANDER_TOUCH_RST, 0), TAG, "niveau bas");
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_TOUCH_RST, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL),
-                        TAG, "push-pull");
-    vTaskDelay(pdMS_TO_TICKS(20));  // espp : 20 ms bas puis 50 ms avant de parler a la puce
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_TOUCH_RST, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL), TAG,
+        "push-pull");
+    vTaskDelay(pdMS_TO_TICKS(20)); // espp : 20 ms bas puis 50 ms avant de parler a la puce
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, TAB5_EXPANDER_TOUCH_RST, 1), TAG, "niveau haut");
     vTaskDelay(pdMS_TO_TICKS(50));
     return ESP_OK;
