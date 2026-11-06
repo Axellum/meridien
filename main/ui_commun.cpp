@@ -60,7 +60,9 @@ lv_obj_t *creer_texte(lv_obj_t *parent, const char *texte, const lv_font_t *poli
 lv_obj_t *creer_bouton(lv_obj_t *parent, const char *texte, StyleBouton style, lv_event_cb_t cb, void *donnee) {
     const PaletteReglages &p = *g_env.p;
     lv_obj_t *b = lv_button_create(parent);
-    lv_obj_set_height(b, S(72));
+    lv_obj_set_height(b, S(kToucheMinPx));
+    lv_obj_set_style_min_height(b, S(kToucheMinPx),
+                                0); // un appelant ne peut pas le rendre plus petit que la zone tactile minimale
     lv_obj_set_style_radius(b, S(16), 0);
     lv_obj_set_style_shadow_width(b, 0, 0);
     lv_obj_set_style_border_width(b, 0, 0);

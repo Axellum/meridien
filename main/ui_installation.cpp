@@ -265,8 +265,7 @@ lv_obj_t *construire_etape(Entree &e) {
                                        env().f.petite, p.texte_discret);
     lv_obj_set_width(indicateur, LV_SIZE_CONTENT);
     if (installation::sortie_libre(mode)) {
-        lv_obj_t *q = creer_bouton(haut, T("Quitter l’installation"), StyleBouton::Discret, sur_quitter, nullptr);
-        lv_obj_set_height(q, S(56));
+        creer_bouton(haut, T("Quitter l’installation"), StyleBouton::Discret, sur_quitter, nullptr);
     }
     creer_texte(entete, titre_etape(etape), env().f.titre, p.texte);
 

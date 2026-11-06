@@ -243,9 +243,8 @@ lv_obj_t *creer_ecran_standard(const char *titre, bool titre_deja_traduit, lv_ob
     lv_obj_set_flex_flow(barre, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(barre, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_remove_flag(barre, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_t *retour = creer_bouton(barre, T("Retour"), StyleBouton::Discret,
-                                    action_retour != nullptr ? action_retour : bouton_retour_action, nullptr);
-    lv_obj_set_height(retour, S(60));
+    creer_bouton(barre, T("Retour"), StyleBouton::Discret,
+                 action_retour != nullptr ? action_retour : bouton_retour_action, nullptr);
     lv_obj_t *libelle = lv_label_create(barre);
     lv_label_set_long_mode(libelle, LV_LABEL_LONG_DOT);
     lv_label_set_text(libelle, titre_deja_traduit ? titre : T(titre));
@@ -496,11 +495,10 @@ void rangee_pastilles(lv_obj_t *parent, const registre::Reglage &r) {
     lv_obj_remove_flag(ligne, LV_OBJ_FLAG_SCROLLABLE);
     const int32_t choisie = hote().nombre(r.id);
     for (std::size_t i = 0; i < r.nb_options; ++i) {
-        lv_obj_t *b = creer_bouton(
+        creer_bouton(
             ligne, libelle_option(r.options[i]),
             static_cast<int32_t>(i) == choisie ? StyleBouton::Principal : StyleBouton::Discret, sur_pastille,
             reinterpret_cast<void *>((static_cast<intptr_t>(index_reglage(r)) << 8) | static_cast<intptr_t>(i)));
-        lv_obj_set_height(b, S(64));
     }
     if (!r.aide.empty()) {
         creer_texte(carte, T(r.aide.data()), env().f.petite, p.texte_discret);
@@ -548,10 +546,21 @@ void rangee_curseur(lv_obj_t *parent, const registre::Reglage &r) {
     resume_reglage(r, t, sizeof t);
     lv_obj_t *valeur = creer_texte(tete, t, env().f.texte, p.texte);
     lv_obj_set_width(valeur, LV_SIZE_CONTENT);
-    lv_obj_t *curseur = lv_slider_create(carte);
-    lv_obj_set_width(curseur, LV_PCT(96));
-    lv_obj_set_height(curseur, S(22));
-    lv_obj_set_style_pad_all(curseur, S(12), LV_PART_KNOB);
+    // Zone tactile : LVGL 9.5 accepte le toucher sur toute la barre élargie de LV_DPX(8) seulement (lv_slider.c:250 pose l'élargissement,
+    // lv_obj_pos.c:1195-1205 le lit ; le test « rond seul » de lv_slider.c:269-277 ne tourne que si LV_OBJ_FLAG_ADV_HITTEST est posé,
+    // ce que le curseur ne fait pas). On élargit donc la barre jusqu'à kToucheMinPx de haut, dans une zone de cette hauteur : un parent
+    // ne laisse passer le toucher que dans ses propres limites (lv_indev.c:636), il doit donc contenir toute la zone élargie. Le rond
+    // déborde de la barre de la moitié de sa taille aux deux bouts : la zone laisse S(30) de chaque côté pour le contenir.
+    lv_obj_t *zone = creer_ligne(carte);
+    const int32_t haut_zone = S(kToucheMinPx);
+    const int32_t marge_tactile = (haut_zone - S(22)) / 2;
+    lv_obj_set_height(zone, haut_zone);
+    lv_obj_set_style_pad_hor(zone, S(30), 0);
+    lv_obj_t *curseur = lv_slider_create(zone);
+    lv_obj_set_flex_grow(curseur, 1);
+    lv_obj_set_height(curseur, haut_zone - 2 * marge_tactile);
+    lv_obj_set_ext_click_area(curseur, marge_tactile);
+    lv_obj_set_style_pad_all(curseur, S(16), LV_PART_KNOB);
     lv_obj_set_style_bg_color(curseur, couleur(p.separateur), LV_PART_MAIN);
     lv_obj_set_style_bg_color(curseur, couleur(p.accent), LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(curseur, couleur(p.accent), LV_PART_KNOB);
@@ -748,8 +757,7 @@ void rangee_action_ou_info(lv_obj_t *parent, std::string_view id) {
             creer_texte(c, i.adresse, env().f.texte, p.texte);
             creer_texte(c, T("Code d’appairage"), env().f.petite, p.texte_discret);
             creer_texte(c, i.code, env().f.titre, p.accent);
-            lv_obj_t *b = creer_bouton(c, T("Nouveau code"), StyleBouton::Discret, sur_nouveau_code, nullptr);
-            lv_obj_set_height(b, S(60));
+            creer_bouton(c, T("Nouveau code"), StyleBouton::Discret, sur_nouveau_code, nullptr);
         } else {
             creer_texte(c, T("Le Wi-Fi n’est pas connecté : la page de réglages n’est pas joignable."), env().f.petite,
                         p.avertissement);
@@ -1032,9 +1040,13 @@ lv_obj_t *construire_editeur_texte(Entree &e) {
         lv_label_set_text(message, T(r->aide.data()));
     }
     if (secret && mode == ModeSaisie::Reglage && hote().secret_defini(r->id)) {
-        creer_texte(corps, T("Clé enregistrée"), env().f.petite, p.succes);
-        lv_obj_t *b = creer_bouton(corps, T("Effacer"), StyleBouton::Discret, sur_effacer_secret, nullptr);
-        lv_obj_set_height(b, S(60));
+        // Le texte et le bouton sur une seule rangée : le bouton garde sa zone tactile minimale sans prendre une rangée de plus au
+        // clavier, qui occupe déjà plus de la moitié de l'écran.
+        lv_obj_t *rangee = creer_ligne(corps);
+        lv_obj_t *enregistree = creer_texte(rangee, T("Clé enregistrée"), env().f.petite, p.succes);
+        lv_obj_set_width(enregistree, 0);
+        lv_obj_set_flex_grow(enregistree, 1);
+        creer_bouton(rangee, T("Effacer"), StyleBouton::Discret, sur_effacer_secret, nullptr);
     }
 
     const bool accents = clavier_hauteur(env().hauteur, true) > 0 && i18n::langue_courante() != i18n::Langue::En &&

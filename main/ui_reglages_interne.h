@@ -47,6 +47,12 @@ void env_choisir_theme(); // relit « affichage.theme » auprès de l'hôte
 
 // Un nombre de pixels à l'échelle de l'écran (720 px de petit côté = 1.0).
 int32_t S(int32_t px);
+
+// Plus petite zone tactile (côté le plus court, à l'échelle de 720 px) : tout bouton, toute rangée-bouton et le curseur doivent la
+// respecter, zone d'accroche comprise. Le rendu le vérifie (scene_parcours : « zones-tactiles-… »). Exception connue : les touches
+// du clavier à six rangées (fr, nl, es, it) font 59 px à 1280×720, plancher 56 px contrôlé par le même parcours.
+constexpr int32_t kToucheMinPx = 72;
+
 lv_color_t couleur(uint32_t rgb);
 const char *T(const char *francais); // texte traduit dans la langue courante, terminé par un zéro
 
