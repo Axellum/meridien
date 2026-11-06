@@ -1,5 +1,12 @@
 # ADR-0005 — Une couche carte : développer sur le Tab5, garder la 7B compilable
 
+> **Summary (EN)** — Proposed on 2026-11-06, awaiting the owner's validation.
+> - Context: development happens on the Tab5 (1280×720); the Waveshare 7B (1024×600) is kept compatible and tested "from time to time".
+> - Decision: one folder per board (`boards/tab5/`, `boards/waveshare_7b/`) holding its pins, drivers and `sdkconfig.defaults.board`; the application code only knows interfaces (display, touch, backlight, audio, hardware clock); no `if (tab5)` outside `boards/` and the `bsp_*` components.
+> - On the Tab5 the display controller is detected at run time (ST7121 / ST7123 / ILI9881C, from the Sitronix touch version register at I2C 0x55; a GT911 at 0x14 means ILI9881C) before the DSI is initialised. The UI is drawn from the real screen size rather than absolute coordinates, which avoids the 936 geometry values that had to be reworked for the 7B in the Tab5 repository.
+> - The CI is meant to compile both boards from the first day; the physical test of the 7B happens at the end of phases 2, 4 and 5, not at every batch. Orientation is fixed per board and wired into the panel (software rotation costs about 13 ms per full screen and needs more frame buffers).
+> - Consequence: the cost of 7B compatibility is spread from the start instead of a late port.
+
 - **Statut** : proposée le 06/11/2026, à valider par Axel.
 - **Contexte** : développement sur le Tab5 (1280×720), compatibilité Waveshare 7B (1024×600) testée « de temps en temps ». Faits matériels : [04-audit-depot-tab5.md](../recherche/04-audit-depot-tab5.md).
 - **Décision** :
