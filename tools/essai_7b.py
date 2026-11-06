@@ -34,10 +34,13 @@ verifiee (la carte est dans un etat inconnu : lire le message, ne rien tenter d'
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
+import io
 import json
 import os
+import random
 import re
 import struct
 import subprocess
@@ -510,6 +513,250 @@ def _entree_table(nom: str, type_: int, sous: int, decalage: int, taille: int) -
     return struct.pack("<2sBBII16sI", MAGIE_PARTITION, type_, sous, decalage, taille, nom.encode().ljust(16, b"\0"), 0)
 
 
+# --- Carte simulee : l'essai complet, y compris la restauration, rejoue contre une flash en memoire ---------------------------
+class _FausseCarte:
+    """Flash simulee qui repond comme esptool (read-mac, flash-id, read-flash, verify-flash, write-flash, chip-id).
+
+    Defauts simulables : un secteur que la lecture AVEC stub ne sait pas lire (comme sur le P4), une flash qui change entre deux
+    lectures, une ecriture a l'adresse 0 qui echoue (restauration impossible), une MAC differente.
+    """
+
+    def __init__(self, mac="aa:bb:cc:dd:ee:01", taille=8 * 1024 * 1024):
+        self.flash = bytearray(random.Random(7).randbytes(taille))
+        self.mac = mac
+        self.secteur_mauvais = None
+        self.alterer_apres = None  # numero de l'appel read-flash apres lequel un octet de la flash change
+        self.echec_ecriture_zero = False
+        self.bruit_apres = None  # a partir de cet appel read-flash, les donnees LUES different de la flash (flash intacte)
+        self.illisible = None  # un secteur que meme la lecture sans stub refuse
+        self.corrompre_ecriture = False  # une ecriture a l'adresse 0 reussit mais altere un octet (la puce le verrait)
+        self.appels = []
+        self._lectures = 0
+
+    def _reponse(self, args, code=0, sortie=""):
+        return subprocess.CompletedProcess(args, code, sortie, "")
+
+    def esptool(self, port, args, sans_stub=False, delai=0, avant="default-reset"):
+        self.appels.append((tuple(args), sans_stub))
+        cmd = args[0]
+        if cmd == "read-mac":
+            return self._reponse(args, 0, f"MAC: {self.mac}\n")
+        if cmd == "flash-id":
+            return self._reponse(args, 0, f"Detected flash size: {len(self.flash) // (1024 * 1024)}MB\n")
+        if cmd == "chip-id":
+            return self._reponse(args)
+        if cmd == "read-flash":
+            adresse, longueur, fichier = int(args[1], 0), int(args[2], 0), args[3]
+            self._lectures += 1
+            if self.alterer_apres is not None and self._lectures == self.alterer_apres + 1:
+                self.flash[5 * 1024 * 1024] ^= 0xFF
+            if not sans_stub and self.secteur_mauvais is not None and adresse <= self.secteur_mauvais < adresse + longueur:
+                return self._reponse(args, 2, "Packet content transfer stopped")
+            if self.illisible is not None and adresse <= self.illisible < adresse + longueur:
+                return self._reponse(args, 2, "Failed to read")
+            donnees = bytes(self.flash[adresse : adresse + longueur])
+            if self.bruit_apres is not None and self._lectures > self.bruit_apres:
+                donnees = bytes([donnees[0] ^ 0xFF]) + donnees[1:]
+            Path(fichier).write_bytes(donnees)
+            return self._reponse(args)
+        if cmd == "verify-flash":
+            adresse, donnees = int(args[1], 0), Path(args[2]).read_bytes()
+            return self._reponse(args, 0 if bytes(self.flash[adresse : adresse + len(donnees)]) == donnees else 2)
+        if cmd == "write-flash":
+            reste, paires, i = args[1:], [], 0
+            while i < len(reste):
+                if reste[i].startswith("--"):
+                    i += 2
+                    continue
+                paires.append((int(reste[i], 0), Path(reste[i + 1])))
+                i += 2
+            if self.echec_ecriture_zero and any(a == 0 for a, _ in paires):
+                return self._reponse(args, 2, "write failed")
+            for adresse, fichier in paires:
+                donnees = fichier.read_bytes()
+                self.flash[adresse : adresse + len(donnees)] = donnees
+                if self.corrompre_ecriture and adresse == 0:
+                    self.flash[len(donnees) - 1] ^= 0xFF
+            return self._reponse(args)
+        return self._reponse(args, 2, f"commande inconnue {cmd}")
+
+    def ecritures(self):
+        return [a for a, _ in self.appels if a[0] == "write-flash"]
+
+
+JOURNAL_SIMULE = "\n".join(
+    [
+        "I (900) ws7b_display: EK79007 : DSI 2 voies",
+        "I (950) ws7b_board: Tactile : Goodix GT911 (0x5d)",
+        "I (960) ws7b_board: Codecs audio sur le bus I2C : ES8311 present, ES7210 present",
+        "I (970) ws7b_board: Carte prête : Waveshare 7B",
+        "I (2100) ws7b_wifi: lien avec le coprocesseur etabli a 2100 ms",
+        "I (3400) reseau: adresse IP obtenue : x à 3400 ms",
+        "I (3900) sntp_rapide: horloge réglée à +120 ms",
+    ]
+)
+
+
+@contextlib.contextmanager
+def _remplacer(**choses):
+    """Remplace des fonctions du module le temps d'un bloc (les etapes les cherchent dans les globales a chaque appel)."""
+    globales = globals()
+    anciennes = {nom: globales[nom] for nom in choses}
+    globales.update(choses)
+    try:
+        yield
+    finally:
+        globales.update(anciennes)
+
+
+def _simulation(verifier) -> None:
+    """Rejoue sauvegarde, flash, essai et restauration contre une carte simulee ; verifie surtout que la flash est REMISE."""
+    silence = contextlib.redirect_stdout(io.StringIO())
+
+    def capture_ok(port, secondes, sortie, reinitialiser=True, arret=None):
+        return JOURNAL_SIMULE
+
+    def capture_plantee(port, secondes, sortie, reinitialiser=True, arret=None):
+        raise RuntimeError("port disparu")
+
+    def dossiers(tmp):
+        build = Path(tmp) / "build"
+        (build / "bootloader").mkdir(parents=True)
+        (build / "partition_table").mkdir()
+        rng = random.Random(11)
+        (build / "bootloader" / "bootloader.bin").write_bytes(rng.randbytes(20000))
+        (build / "partition_table" / "partition-table.bin").write_bytes(rng.randbytes(3072))
+        (build / "ota_data_initial.bin").write_bytes(rng.randbytes(8192))
+        (build / "meridien.bin").write_bytes(rng.randbytes(300000))
+        return build, Path(tmp) / "sauvegarde", Path(tmp) / "journaux"
+
+    futur = dt.datetime.now() + dt.timedelta(hours=1)
+    mac = "aa:bb:cc:dd:ee:01"
+    os.environ["MERIDIEN_MAC_7B"] = mac
+
+    # 1. Essai nominal ; la lecture avec stub echoue au secteur 0x300000 (comme sur le P4) -> decoupe puis sans stub
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte()
+        origine = bytes(carte.flash)
+        carte.secteur_mauvais = 0x300000
+        build, dossier, journaux = dossiers(tmp)
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 3)
+        verifier(code == 0, "simulation : essai nominal, code de sortie 0")
+        verifier(bytes(carte.flash) == origine, "simulation : la flash est IDENTIQUE a l'origine apres l'essai (restauration)")
+        verifier(any(sans for _, sans in carte.appels), "simulation : un secteur illisible avec le stub est lu sans stub")
+        verifier(len(carte.ecritures()) == 2, "simulation : deux ecritures seulement (les quatre images, puis la restauration)")
+        rapport = json.loads((journaux / "rapport_essai.json").read_text(encoding="utf-8"))
+        verifier(rapport["restauration_verifiee"] is True, "simulation : le rapport dit que la restauration est verifiee")
+        marque = json.loads((dossier / "sauvegarde_ok.json").read_text(encoding="utf-8"))
+        verifier(marque["sha256"] == empreinte(origine), "simulation : l'empreinte notee est celle de la flash d'origine")
+        verifier(not (dossier / "flash_lecture2.bin").exists(), "simulation : une seule copie de la flash gardee sur le disque")
+        premier_write = next(i for i, (a, _) in enumerate(carte.appels) if a[0] == "write-flash")
+        dernier_read = max(i for i, (a, _) in enumerate(carte.appels) if a[0] == "read-flash")
+        verifier(dernier_read > premier_write, "simulation : la restauration est relue apres l'ecriture")
+        lectures_avant = [a for a, _ in carte.appels[:premier_write] if a[0] == "verify-flash"]
+        verifier(len(lectures_avant) == 1, "simulation : verify-flash (MD5 de la puce) passe AVANT toute ecriture")
+
+    # 2. Le port disparait pendant l'essai : la restauration a lieu quand meme
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte()
+        origine = bytes(carte.flash)
+        build, dossier, journaux = dossiers(tmp)
+        with _remplacer(esptool=carte.esptool, capturer=capture_plantee), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 3)
+        verifier(code == 1, "simulation : un plantage de l'essai rend le code 1")
+        verifier(bytes(carte.flash) == origine, "simulation : le plantage de l'essai n'empeche pas la restauration")
+
+    # 3. La restauration echoue : le script le dit, rend 3, et n'efface rien
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte()
+        build, dossier, journaux = dossiers(tmp)
+        carte.echec_ecriture_zero = True
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 2)
+        verifier(code == 3, "simulation : restauration impossible -> code 3")
+        rapport = json.loads((journaux / "rapport_essai.json").read_text(encoding="utf-8"))
+        verifier(rapport["restauration_verifiee"] is False, "simulation : le rapport dit que la restauration N'EST PAS verifiee")
+        verifier(not any(a[0] == "erase-flash" for a, _ in carte.appels), "simulation : aucun effacement de puce, jamais")
+
+    # 4. MAC differente : refus avant la moindre lecture de la flash
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte(mac="aa:bb:cc:dd:ee:99")
+        try:
+            with _remplacer(esptool=carte.esptool), silence:
+                verifier_carte("COMX")
+            verifier(False, "simulation : une MAC differente doit refuser")
+        except Refus:
+            verifier(True, "simulation : une MAC differente refuse")
+        verifier([a[0] for a, _ in carte.appels] == ["read-mac"], "simulation : seule la MAC a ete lue avant le refus")
+
+    # 5. Heure limite passee : la sauvegarde se fait (lecture seule), aucune ecriture n'a lieu
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte()
+        build, dossier, journaux = dossiers(tmp)
+        passe = dt.datetime.now() - dt.timedelta(minutes=1)
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, passe, 2)
+        verifier(code == 2 and carte.ecritures() == [], "simulation : heure limite passee -> code 2 et AUCUNE ecriture")
+
+    # 6. La flash change entre les deux lectures : la sauvegarde est refusee, rien n'est ecrit
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte()
+        carte.alterer_apres = 5
+        build, dossier, journaux = dossiers(tmp)
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 2)
+        verifier(code == 2 and carte.ecritures() == [], "simulation : deux lectures differentes -> refus, AUCUNE ecriture")
+        verifier(not (dossier / "sauvegarde_ok.json").exists(), "simulation : pas de sauvegarde_ok.json si les lectures different")
+
+    # 6b. Les DONNEES lues different d'une lecture a l'autre alors que la flash, elle, est intacte (le MD5 de la puce ne le voit
+    #     pas) : seule la comparaison des deux empreintes protege
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte()
+        carte.bruit_apres = 4
+        build, dossier, journaux = dossiers(tmp)
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 2)
+        verifier(code == 2 and carte.ecritures() == [], "simulation : lectures differentes, flash intacte -> refus sans ecriture")
+
+    # 6c. Une ecriture de restauration qui reussit mais altere la flash est vue par verify-flash SEUL (sans relecture)
+    for relire in (False, True):
+        with tempfile.TemporaryDirectory() as tmp:
+            carte = _FausseCarte()
+            _build, dossier, _journaux = dossiers(tmp)
+            with _remplacer(esptool=carte.esptool), silence:
+                etape_sauvegarde("COMX", dossier)
+                carte.corrompre_ecriture = True
+                restauree = etape_restaurer("COMX", dossier, relire=relire)
+            verifier(restauree is False, f"simulation : une restauration alteree est refusee (relecture={relire})")
+
+    # 6d. Lecture d'un secteur : avec le stub en echec on retente sans stub ; illisible meme sans stub -> refus
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte()
+        carte.secteur_mauvais = 0x300000
+        with _remplacer(esptool=carte.esptool), silence:
+            lu = lire_morceau("COMX", 0x300000, SECTEUR, {})
+        verifier(lu == bytes(carte.flash[0x300000 : 0x300000 + SECTEUR]), "simulation : un secteur refuse avec le stub est lu sans stub")
+        carte.illisible = 0x300000
+        try:
+            with _remplacer(esptool=carte.esptool), silence:
+                lire_morceau("COMX", 0x300000, SECTEUR, {})
+            verifier(False, "simulation : un secteur illisible doit refuser")
+        except Refus:
+            verifier(True, "simulation : un secteur illisible meme sans stub refuse la sauvegarde")
+
+    # 7. Flasher a la main sans sauvegarde confirmee : refus
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = _FausseCarte()
+        build, dossier, _journaux = dossiers(tmp)
+        try:
+            with _remplacer(esptool=carte.esptool), silence:
+                etape_flasher("COMX", build, dossier)
+            verifier(False, "simulation : flasher sans sauvegarde doit refuser")
+        except Refus:
+            verifier(carte.ecritures() == [], "simulation : flasher sans sauvegarde confirmee refuse, rien n'est ecrit")
+
+
 def autotest() -> int:
     """Verifie les fonctions pures avec des donnees fabriquees. Aucune carte, aucun port."""
     ok = True
@@ -621,6 +868,16 @@ def autotest() -> int:
             json.dumps({"fichier": "flash.bin", "sha256": empreinte(b"\xff" * 16)}), encoding="utf-8"
         )
         verifier(charger_marque(Path(tmp))["sha256"] == empreinte(b"\xff" * 16), "garde-fou : sauvegarde intacte acceptee")
+
+    # carte simulee : l'essai complet et surtout la restauration
+    ancien_mac = os.environ.get("MERIDIEN_MAC_7B")
+    try:
+        _simulation(verifier)
+    finally:
+        if ancien_mac is None:
+            os.environ.pop("MERIDIEN_MAC_7B", None)
+        else:
+            os.environ["MERIDIEN_MAC_7B"] = ancien_mac
 
     print("AUTOTEST " + ("OK" if ok else "ECHEC"))
     return 0 if ok else 1
