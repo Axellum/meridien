@@ -107,21 +107,40 @@ static void sur_flush_fin(lv_event_t *e) {
 // partiel de 36 000 px en largeur logique) par l'accelerateur PPA et par le processeur (lv_draw_sw_rotate, le chemin de
 // secours d'esp_lvgl_port sans PPA). A retirer quand le choix est consigne dans docs/mesures/orientation.md.
 #define BANC_LARGEUR 1280
-#define BANC_HAUTEUR 28
+#define BANC_HAUTEUR_MAX 28
+#define BANC_HAUTEUR_MIN 7
 #define BANC_ESSAIS 20
 #define ALIGNE(n, a) (((n) + (a) - 1) & ~((a) - 1))
 
 static void banc_rotation(void) {
-    const size_t octets = ALIGNE((size_t)BANC_LARGEUR * BANC_HAUTEUR * 2, 64);
-    uint8_t *src = heap_caps_aligned_calloc(64, 1, octets, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    uint8_t *dst = heap_caps_aligned_calloc(64, 1, octets, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    if (src == NULL || dst == NULL) {
-        ESP_LOGW(TAG, "banc de rotation : mémoire insuffisante, non fait");
+    // Le tampon de dessin (2 x 72 000 octets) et celui de la rotation occupent deja la memoire interne accessible au DMA au
+    // moment ou ce banc tourne : une bande de 28 lignes (2 x 71 680 octets) n'y tient pas toujours (essai du 2026-11-06 :
+    // « memoire insuffisante »). On essaie donc des bandes de plus en plus etroites (28, 14, 7 lignes) et on journalise ce qui
+    // reste. Le temps affiche est celui de la bande effectivement mesuree.
+    int hauteur = BANC_HAUTEUR_MAX;
+    uint8_t *src = NULL;
+    uint8_t *dst = NULL;
+    size_t octets = 0;
+    for (; hauteur >= BANC_HAUTEUR_MIN; hauteur /= 2) {
+        octets = ALIGNE((size_t)BANC_LARGEUR * (size_t)hauteur * 2, 64);
+        src = heap_caps_aligned_calloc(64, 1, octets, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+        dst = heap_caps_aligned_calloc(64, 1, octets, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+        if (src != NULL && dst != NULL) {
+            break;
+        }
         heap_caps_free(src);
         heap_caps_free(dst);
+        src = NULL;
+        dst = NULL;
+    }
+    if (src == NULL || dst == NULL) {
+        ESP_LOGW(TAG,
+                 "banc de rotation : mémoire insuffisante, non fait (interne libre %u o, plus grand bloc DMA %u o)",
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
         return;
     }
-    for (size_t i = 0; i < (size_t)BANC_LARGEUR * BANC_HAUTEUR * 2; i++) {
+    for (size_t i = 0; i < (size_t)BANC_LARGEUR * (size_t)hauteur * 2; i++) {
         src[i] = (uint8_t)(i * 31u);
     }
 
@@ -133,13 +152,13 @@ static void banc_rotation(void) {
         ppa_srm_oper_config_t op = {0};
         op.in.buffer = src;
         op.in.pic_w = BANC_LARGEUR;
-        op.in.pic_h = BANC_HAUTEUR;
+        op.in.pic_h = hauteur;
         op.in.block_w = BANC_LARGEUR;
-        op.in.block_h = BANC_HAUTEUR;
+        op.in.block_h = hauteur;
         op.in.srm_cm = PPA_SRM_COLOR_MODE_RGB565;
         op.out.buffer = dst;
         op.out.buffer_size = octets;
-        op.out.pic_w = BANC_HAUTEUR;
+        op.out.pic_w = hauteur;
         op.out.pic_h = BANC_LARGEUR;
         op.out.srm_cm = PPA_SRM_COLOR_MODE_RGB565;
         op.rotation_angle = PPA_SRM_ROTATION_ANGLE_90;
@@ -157,14 +176,14 @@ static void banc_rotation(void) {
 
     const int64_t t1 = esp_timer_get_time();
     for (int i = 0; i < BANC_ESSAIS; i++) {
-        lv_draw_sw_rotate(src, dst, BANC_LARGEUR, BANC_HAUTEUR, BANC_LARGEUR * 2, BANC_HAUTEUR * 2,
-                          LV_DISPLAY_ROTATION_90, LV_COLOR_FORMAT_RGB565);
+        lv_draw_sw_rotate(src, dst, BANC_LARGEUR, hauteur, BANC_LARGEUR * 2, hauteur * 2, LV_DISPLAY_ROTATION_90,
+                          LV_COLOR_FORMAT_RGB565);
     }
     const uint32_t cpu_us = (uint32_t)((esp_timer_get_time() - t1) / BANC_ESSAIS);
 
     if (ppa_err == ESP_OK) {
         ESP_LOGI(TAG, "banc de rotation d'une bande %d x %d px (moyenne de %d) : PPA %u µs, processeur %u µs",
-                 BANC_LARGEUR, BANC_HAUTEUR, BANC_ESSAIS, (unsigned)ppa_us, (unsigned)cpu_us);
+                 BANC_LARGEUR, hauteur, BANC_ESSAIS, (unsigned)ppa_us, (unsigned)cpu_us);
     } else {
         ESP_LOGW(TAG, "banc de rotation : le PPA a refusé (%s) ; processeur seul : %u µs la bande",
                  esp_err_to_name(ppa_err), (unsigned)cpu_us);
