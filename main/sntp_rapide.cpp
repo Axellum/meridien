@@ -27,6 +27,7 @@ constexpr int kMancheMs = 1500; // entre deux envois (les serveurs sont tous int
 constexpr int kManchesMax = 8;  // 12 s au plus, puis le SNTP de lwIP reste seul
 constexpr int kEcouteMs = 200;  // pas d'écoute du socket
 constexpr int kTailleSntp = 48;
+constexpr uint32_t kPileOctets = 6144; // la marge réellement restante est journalisée en fin de tâche
 constexpr uint64_t kSecondesEntre1900Et1970 = 2208988800ULL;
 constexpr int64_t kUnixMinimum = 1767225600; // 1er janvier 2026 : en dessous, la réponse est absurde
 
@@ -134,11 +135,13 @@ void tache_acquisition(void *) {
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &delai, sizeof(delai));
 
     uint8_t requete[kTailleSntp] = {};
-    requete[0] = 0x23;                // pas d'alerte, version 4, mode client
-    esp_fill_random(requete + 40, 8); // nonce, dans l'horodatage d'émission
+    requete[0] = 0x23; // pas d'alerte, version 4, mode client
 
     bool regle = false;
     for (int manche = 0; manche < kManchesMax && !regle; ++manche) {
+        // Nonce neuf à chaque manche, dans l'horodatage d'émission : une réponse en retard d'une manche précédente est refusée,
+        // l'erreur possible sur l'heure reste donc inférieure à la durée d'une manche.
+        esp_fill_random(requete + 40, 8);
         const int64_t debut_manche = esp_timer_get_time();
         for (int i = 0; i < nombre; ++i) {
             sendto(s, requete, sizeof(requete), 0, reinterpret_cast<const sockaddr *>(&serveurs[i]),
@@ -182,6 +185,8 @@ void tache_acquisition(void *) {
     } else {
         ESP_LOGW(TAG, "aucune réponse après %d manches : le SNTP de lwIP reste seul", kManchesMax);
     }
+    ESP_LOGI(TAG, "pile : %u octets libres au minimum sur %u",
+             static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)), static_cast<unsigned>(kPileOctets));
     vTaskDelete(nullptr);
 }
 
@@ -193,7 +198,7 @@ void sntp_rapide_demarrer(void (*quand_regle)()) {
     }
     g_demarre = true;
     g_quand_regle = quand_regle;
-    if (xTaskCreate(tache_acquisition, "sntp_rapide", 4096, nullptr, 3, nullptr) != pdPASS) {
+    if (xTaskCreate(tache_acquisition, "sntp_rapide", kPileOctets, nullptr, 3, nullptr) != pdPASS) {
         ESP_LOGW(TAG, "tâche non créée : le SNTP de lwIP reste seul");
     }
 }
