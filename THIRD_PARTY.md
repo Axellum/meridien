@@ -1,0 +1,113 @@
+# Third-party components / Composants tiers
+
+*English first, then « Version française » below.*
+
+Meridien is released under the MIT licence ([LICENSE](LICENSE)). It uses, or plans to use, the components listed here.
+Shared in case it is useful, and made with the help of an AI: check the primary sources before you redistribute anything.
+**This is not legal advice.**
+
+How to read this file. **Read** = the licence file or the source headers of the exact version named were opened on
+2026-11-06 (the sources are named in each row). **Not verified** = not read, so do not rely on it. Versions come from
+[`dependencies.lock`](dependencies.lock) and from the sources themselves, not from memory.
+
+## In the firmware today
+
+| Component | Version | Licence (SPDX) | Read in | Notes |
+|---|---|---|---|---|
+| [ESP-IDF](https://github.com/espressif/esp-idf) | 5.5.5 | Apache-2.0 | `LICENSE` of the 5.5.5 tree ([link](https://github.com/espressif/esp-idf/blob/v5.5.5/LICENSE)); `docs/en/COPYRIGHT.rst` of the tree says original code is Apache-2.0 | ESP-IDF also includes third-party code under other licences, listed in that `COPYRIGHT.rst`. **Not reviewed here: not verified.** |
+| [LVGL](https://github.com/lvgl/lvgl) | 9.5.0 | MIT | `LICENCE.txt` of the package (« Copyright (c) 2025 LVGL Kft ») | LVGL bundles optional third-party libraries (its `COPYRIGHTS.md`). In the `sdkconfig` of the build of 2026-11-06 only the software renderer and TinyTTF were enabled (rows below). |
+| stb_truetype, inside LVGL's TinyTTF (`src/libs/tiny_ttf`) | as bundled with LVGL 9.5.0 | MIT **or** public domain (Unlicense), at your choice | `src/libs/tiny_ttf/LICENSE.txt` (« Copyright (c) 2017 Sean Barrett ») | Renders the embedded Roboto Bold at run time. |
+| Montserrat 14 px, LVGL's built-in font, with Font Awesome 5 Free symbols | in LVGL 9.5.0 | OFL-1.1 | `scripts/built_in_font/font_license/Montserrat/OFL.txt` (« Copyright 2011 The Montserrat Project Authors ») and `.../FontAwesome5/LICENSE.txt` (fonts under OFL 1.1, « Copyright (c) 2022 Fonticons, Inc. ») | Linked in the image of the build of 2026-11-06 (`lv_font_montserrat_14` in the map file); it is the only built-in size enabled there. |
+| [esp_lvgl_port](https://github.com/espressif/esp-bsp/tree/master/components/esp_lvgl_port) | 2.9.0 | Apache-2.0 | `license.txt` and the SPDX headers of 53 source files; 4 other files of the package carry CC0-1.0 (not examined) | LVGL glue for ESP-IDF. |
+| [esp_lcd_st7121](https://github.com/espressif/esp-iot-solution/tree/master/components/display/lcd/esp_lcd_st7121) | 1.0.1 | Apache-2.0 | `license.txt` and SPDX headers | Display driver (Tab5, ST7121 screen). |
+| [esp_lcd_touch_st7123](https://github.com/espressif/esp-iot-solution/tree/master/components/display/lcd_touch/esp_lcd_touch_st7123) | 1.0.2 | Apache-2.0 | `license.txt` and SPDX headers | Touch driver (Tab5). |
+| [esp_lcd_touch](https://github.com/espressif/esp-bsp/tree/master/components/lcd_touch/esp_lcd_touch) | 1.2.1 | Apache-2.0 | `license.txt` and SPDX headers | Pulled in by the touch driver. |
+| [esp_io_expander_pi4ioe5v6408](https://github.com/espressif/esp-bsp/tree/master/components/io_expander/esp_io_expander_pi4ioe5v6408) | 1.0.1 | Apache-2.0 | `license.txt` and SPDX headers | I/O expander driver (Tab5). |
+| [esp_io_expander](https://github.com/espressif/esp-bsp/tree/master/components/io_expander/esp_io_expander) | 1.2.1 | Apache-2.0 | `license.txt` and SPDX headers | Pulled in by the previous one. |
+| [cmake_utilities](https://github.com/espressif/esp-iot-solution/tree/master/tools/cmake_utilities) | 0.5.3 | Apache-2.0 | `license.txt` and SPDX header | Build-time dependency of the two `esp_lcd_*` packages. |
+| Roboto Bold (`main/assets/roboto_700.ttf`) | 3.015 (font name table) | OFL-1.1 | [`main/assets/OFL.txt`](main/assets/OFL.txt); name table of the font file (« Copyright 2011 The Roboto Project Authors », licence URL <https://openfontlicense.org>) | Embedded as is, according to [`main/assets/README.md`](main/assets/README.md); the SHA-256 given there matches the file (checked 2026-11-06). Source of the family: <https://github.com/googlefonts/roboto-classic>. The `OFL.txt` copied there also carries notices for other families that this repository does not ship. |
+| [posix_tz_db](https://github.com/nayarsystems/posix_tz_db) (`zones.csv`) | commit `93447c0` (2025-09-29) | MIT | [`components/core/outils/posix_tz_db/LICENSE`](components/core/outils/posix_tz_db/LICENSE) | Source of the time-zone table `fuseaux_donnees.inc`. The upstream licence file leaves its copyright line unfilled (« [year] [fullname] »), so no holder is named. Details, and the 7 zones added from the tz database: [`components/core/ATTRIBUTION.md`](components/core/ATTRIBUTION.md). |
+| [tz database (IANA)](https://github.com/eggert/tz) | data read 2026-11-06 | public domain | upstream `LICENSE`: files are in the public domain, except `date.c`, `newstrftime.3`, `strftime.c` (BSD 3-clause), which this project does not use | Only data lines are used, for the 7 additions listed in [`components/core/ATTRIBUTION.md`](components/core/ATTRIBUTION.md). |
+| [Open-Meteo](https://open-meteo.com/) (weather API; no client library) | API v1 | **CC-BY-4.0** (API data) | <https://open-meteo.com/en/licence> and <https://open-meteo.com/en/terms>, both read 2026-11-06 | **Attribution is a condition**, see below. Also covers the real API responses kept as test fixtures in `test/host/donnees/` and the WMO weather-code table (`meteo_wmo.hpp`, codes as listed on <https://open-meteo.com/en/docs>). |
+
+### Open-Meteo: what the licence asks, and where we stand
+
+- The licence page asks for credit, a link to the licence ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) and a
+  mention of changes (we parse and round the values). It also asks for a **link next to every place where the data are
+  displayed**, for example the text « Weather data by Open-Meteo.com » linking to <https://open-meteo.com/>.
+- The terms page offers the free API for **non-commercial use** only. It lists personal home automation and apps with no
+  subscription or advertising as non-commercial, and subscriptions or advertising as commercial. Anyone who redistributes
+  a product built on this firmware is responsible for their own use of the API.
+- **Status in this repository (2026-11-06): not done yet.** `README.md` names Open-Meteo in a table, but neither the README
+  nor the settings page (`web/app`) shows the credit and the link. It is planned (`docs/plan.md`, « dépôt propre », item 2).
+
+## Planned, not in the build yet
+
+| Component | Version | Licence | Read in | Notes |
+|---|---|---|---|---|
+| [esp-sr](https://github.com/espressif/esp-sr) (WakeNet wake word, audio front end) | 2.6.1 is the latest seen (`idf_component.yml` on `master`, read 2026-11-06); not in `dependencies.lock` | « ESPRESSIF MIT License »: MIT-style text, but the permission is granted for use on Espressif products | [`LICENSE`](https://github.com/espressif/esp-sr/blob/master/LICENSE) on `master`, read 2026-11-06 | This firmware only runs on ESP32-P4, an Espressif chip, but whether that covers a chip on a third-party board is **not settled** (`docs/recherche/06-audio-duplex-aec-esp-sr.md`, §4). No separate licence file was found for the models. To settle **before any binary is published**. Licences of its own dependencies (`esp-dl`, `dl_fft`, `cjson`, `esp-dsp`): **not verified**. |
+| Weather icon pack « The Weather is Nice Today » (Laura Reen, icon-icons.com), via the `IconeMeteo.ttf` font of the [Tab5 project](https://github.com/Axellum/M5-Tab5-ESPHome-LVGL) | not in this repository | **not verified** | Tab5 `Tab5/fonts/icone_meteo/README.md`: the drawings are retouched and « the pack's terms are on its page » | The pack page answered HTTP 403 to an automated request on 2026-11-06 and was not read. Axel noted « licence ok » on 2026-11-06 (`docs/plan.md`) but the text has not been read. **Do not add the icons to this repository until the licence text is read and attached here.** |
+
+## Not listed
+
+Development tools that are not distributed with the repository (host compiler, gitleaks, ruff, Playwright, Node, esptool…)
+are not listed. The settings page (`web/app`) declares no third-party font, image or script (`web/README.md`); its
+icons are drawn in the project and were not compared with any existing icon set (**not verified**).
+
+---
+
+# Version française
+
+Meridien est publié sous licence MIT ([LICENSE](LICENSE)). Il utilise, ou prévoit d'utiliser, les composants ci-dessous.
+Partagé au cas où ça servirait, fait avec l'aide d'une IA : relire les sources d'origine avant toute redistribution.
+**Ce n'est pas un avis juridique.**
+
+**Lu** = le fichier de licence ou les en-têtes de source de la version citée ont été ouverts le 06/11/2026 (la source est
+nommée à chaque ligne). **Non vérifié** = non lu : ne pas s'y fier. Les versions viennent de
+[`dependencies.lock`](dependencies.lock) et des sources, pas de la mémoire.
+
+## Dans le firmware aujourd'hui
+
+| Composant | Version | Licence (SPDX) | Lu dans | Remarques |
+|---|---|---|---|---|
+| ESP-IDF | 5.5.5 | Apache-2.0 | `LICENSE` de l'arbre 5.5.5 ; `docs/en/COPYRIGHT.rst` de l'arbre : le code d'origine est sous Apache-2.0 | Contient aussi du code tiers sous d'autres licences, listées dans ce `COPYRIGHT.rst`. **Non passé en revue ici : non vérifié.** |
+| LVGL | 9.5.0 | MIT | `LICENCE.txt` du paquet (« Copyright (c) 2025 LVGL Kft ») | Embarque des bibliothèques tierces facultatives (`COPYRIGHTS.md`). Dans le `sdkconfig` du build du 06/11/2026, seuls le rendu logiciel et TinyTTF étaient activés. |
+| stb_truetype, dans TinyTTF de LVGL | celle livrée avec LVGL 9.5.0 | MIT **ou** domaine public (Unlicense), au choix | `src/libs/tiny_ttf/LICENSE.txt` (« Copyright (c) 2017 Sean Barrett ») | Dessine Roboto Bold à l'exécution. |
+| Montserrat 14 px (police intégrée de LVGL) avec symboles Font Awesome 5 Free | dans LVGL 9.5.0 | OFL-1.1 | `scripts/built_in_font/font_license/Montserrat/OFL.txt` et `.../FontAwesome5/LICENSE.txt` (polices sous OFL 1.1, « Copyright (c) 2022 Fonticons, Inc. ») | Présente dans l'image du build du 06/11/2026 (fichier `.map`) ; seule taille intégrée activée. |
+| esp_lvgl_port | 2.9.0 | Apache-2.0 | `license.txt` et en-têtes SPDX de 53 fichiers source ; 4 autres fichiers du paquet portent CC0-1.0 (non examinés) | Liaison LVGL / ESP-IDF. |
+| esp_lcd_st7121 | 1.0.1 | Apache-2.0 | `license.txt` et en-têtes SPDX | Pilote d'écran (Tab5, écran ST7121). |
+| esp_lcd_touch_st7123 | 1.0.2 | Apache-2.0 | idem | Pilote tactile (Tab5). |
+| esp_lcd_touch | 1.2.1 | Apache-2.0 | idem | Tiré par le pilote tactile. |
+| esp_io_expander_pi4ioe5v6408 | 1.0.1 | Apache-2.0 | idem | Pilote de l'expandeur d'E/S (Tab5). |
+| esp_io_expander | 1.2.1 | Apache-2.0 | idem | Tiré par le précédent. |
+| cmake_utilities | 0.5.3 | Apache-2.0 | idem | Dépendance de compilation des deux paquets `esp_lcd_*`. |
+| Roboto Bold (`main/assets/roboto_700.ttf`) | 3.015 (table de noms de la police) | OFL-1.1 | [`main/assets/OFL.txt`](main/assets/OFL.txt) ; table de noms de la police (« Copyright 2011 The Roboto Project Authors », URL de licence <https://openfontlicense.org>) | Embarquée telle quelle d'après [`main/assets/README.md`](main/assets/README.md) ; le SHA-256 qui y figure correspond au fichier (vérifié le 06/11/2026). Le `OFL.txt` copié porte aussi des avis d'autres familles que ce dépôt ne livre pas. |
+| posix_tz_db (`zones.csv`) | commit `93447c0` (29/09/2025) | MIT | [`components/core/outils/posix_tz_db/LICENSE`](components/core/outils/posix_tz_db/LICENSE) | Source de la table des fuseaux. La ligne de copyright du dépôt d'origine n'est pas remplie (« [year] [fullname] ») : aucun titulaire nommé. Détail et 7 zones ajoutées depuis la base tz : [`components/core/ATTRIBUTION.md`](components/core/ATTRIBUTION.md). |
+| Base tz (IANA) | données lues le 06/11/2026 | domaine public | `LICENSE` d'origine : domaine public, sauf `date.c`, `newstrftime.3`, `strftime.c` (BSD 3 clauses), que ce projet n'utilise pas | Seules des lignes de données sont reprises (7 ajouts, voir `ATTRIBUTION.md`). |
+| Open-Meteo (API météo, sans bibliothèque) | API v1 | **CC-BY-4.0** (données de l'API) | <https://open-meteo.com/en/licence> et <https://open-meteo.com/en/terms>, lues le 06/11/2026 | **L'attribution est une condition**, voir ci-dessous. Couvre aussi les vraies réponses de l'API gardées comme données de test (`test/host/donnees/`) et la table des codes météo WMO. |
+
+### Open-Meteo : ce que la licence demande, et où on en est
+
+- La page de licence demande la mention de la source, un lien vers la licence
+  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) et l'indication des modifications (nous analysons et
+  arrondissons les valeurs). Elle demande aussi un **lien à côté de chaque endroit où les données s'affichent**, par
+  exemple le texte « Weather data by Open-Meteo.com » pointant vers <https://open-meteo.com/>.
+- Les conditions d'utilisation réservent l'API gratuite à un **usage non commercial** : la domotique personnelle et les
+  applications sans abonnement ni publicité y sont rangées ; abonnement ou publicité = commercial. Qui redistribue un
+  produit fondé sur ce firmware répond de son propre usage de l'API.
+- **État dans ce dépôt (06/11/2026) : pas encore fait.** Le `README.md` nomme Open-Meteo dans un tableau, mais ni lui ni la
+  page de réglages (`web/app`) n'affichent la mention et le lien. C'est prévu (`docs/plan.md`, « dépôt propre », point 2).
+
+## Prévus, pas encore dans la compilation
+
+| Composant | Version | Licence | Lu dans | Remarques |
+|---|---|---|---|---|
+| esp-sr (mot d'activation WakeNet, traitement audio) | 2.6.1 est la plus récente vue (`idf_component.yml` de `master`, lu le 06/11/2026) ; absent de `dependencies.lock` | « ESPRESSIF MIT License » : texte de type MIT, mais la permission vaut pour l'usage sur des produits Espressif | [`LICENSE`](https://github.com/espressif/esp-sr/blob/master/LICENSE) de `master`, lu le 06/11/2026 | Le firmware ne tourne que sur ESP32-P4, une puce Espressif ; que cela couvre une puce sur une carte tierce n'est **pas tranché** (`docs/recherche/06-audio-duplex-aec-esp-sr.md`, §4). Aucun fichier de licence propre aux modèles trouvé. À trancher **avant toute publication d'un binaire**. Licences de ses dépendances (`esp-dl`, `dl_fft`, `cjson`, `esp-dsp`) : **non vérifiées**. |
+| Pack d'icônes météo « The Weather is Nice Today » (Laura Reen, icon-icons.com), via la police `IconeMeteo.ttf` du projet Tab5 | absent de ce dépôt | **non vérifiée** | `Tab5/fonts/icone_meteo/README.md` du projet Tab5 : dessins retouchés, « conditions sur la page du pack » | La page du pack a répondu HTTP 403 à une requête automatique le 06/11/2026 : non lue. Axel a noté « licence ok » le 06/11/2026 (`docs/plan.md`), mais le texte n'a pas été lu. **Ne pas ajouter ces icônes au dépôt avant d'avoir lu le texte de la licence et de l'y avoir joint.** |
+
+## Non listés
+
+Les outils de développement qui ne sont pas livrés avec le dépôt (compilateur hôte, gitleaks, ruff, Playwright, Node,
+esptool…) ne sont pas listés. La page de réglages (`web/app`) ne déclare ni police, ni image, ni script tiers
+(`web/README.md`) ; ses icônes sont dessinées dans le projet et n'ont pas été comparées à un jeu d'icônes existant
+(**non vérifié**).
