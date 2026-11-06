@@ -140,6 +140,7 @@ from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept lan
 from mutations_meteo_appareil import MUTATIONS_METEO_APPAREIL  # noqa: E402  (météo sur l'appareil : requête, zone, cache)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
 from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (page de réglages : JSON, valeurs, appairage, API)
+from mutations_visuel import MUTATIONS_VISUEL  # noqa: E402  (écran principal : icônes, lune et soleil, échelles)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
@@ -147,6 +148,7 @@ MUTATIONS += MUTATIONS_METEO_APPAREIL
 MUTATIONS += MUTATIONS_ASSISTANT
 MUTATIONS += MUTATIONS_I18N
 MUTATIONS += MUTATIONS_REGLAGES
+MUTATIONS += MUTATIONS_VISUEL
 
 
 def mutations(cxx, mode):

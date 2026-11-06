@@ -1,3 +1,4 @@
 # Fichiers generes (jamais a la main) : le formateur n'y touche pas.
 components/core/include/ecran/fuseaux_donnees.inc
 test/host/donnees/*
+components/core/include/ecran/visuel_icones_table.inc
