@@ -1,0 +1,14 @@
+{
+  "brut": {
+    "index.html": 4231,
+    "style.css": 7419,
+    "app.js": 34600
+  },
+  "gzip": {
+    "style.css": 2388,
+    "app.js": 10501,
+    "index.html": 1016
+  },
+  "total_gzip": 13905,
+  "budget_gzip": 30720
+}
