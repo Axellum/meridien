@@ -63,7 +63,7 @@ const T = (fr, vars) => {
 
 /* ---------- état de l'appareil (en mémoire) ---------- */
 const etat = {
-  nom: 'ecran-8e87', version: '0.1.0', precedente: '0.0.9', demarre: Date.now(),
+  nom: 'ecran-1a2b', version: '0.1.0', precedente: '0.0.9', demarre: Date.now(),
   zone: null, display: { langue_ecran: 'fr', langue_assistant: 'fr', theme: 'auto', luminosite: 80 },
   services: { stt: null, llm: null, tts: null },
   wifi: { etat: 'connecte', ssid: 'Maison', niveau: 3, force: -61, ip: '192.168.1.52' }, // adresse d'exemple, pas celle d'un vrai réseau

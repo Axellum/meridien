@@ -24,7 +24,7 @@ nouvelle prend le numéro suivant, à la fin.
 - Le **français** est la langue de l'auteur : c'est la seule relue par lui.
 - Les **six autres** sont écrites par une IA (Claude) depuis le français et l'anglais. **Aucune n'a été relue par un
   locuteur.** Les dates (jours, mois) et quelques libellés (« Redémarrer », « Orage », « Brouillard »…) sont repris tels
-  quels des fichiers `lang/` du Tab5 (dépôt `00ProjetTab`), qui ont, eux, servi sur un écran. Tout le reste est du
+  quels des fichiers `lang/` du Tab5 (dépôt Tab5 d'origine), qui ont, eux, servi sur un écran. Tout le reste est du
   vocabulaire nouveau : à relire avant de s'y fier.
 - Les contrôles automatiques prouvent que les marqueurs sont intacts, que rien ne manque et que l'encodage est valide ;
   ils ne prouvent **pas** qu'une traduction est juste, ni qu'elle tient sur l'écran.

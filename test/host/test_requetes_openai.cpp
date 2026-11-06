@@ -29,10 +29,10 @@ constexpr int assemblage_adresse_et_route() {
         {"https://api.openai.com/v1", "chat/completions", "https://api.openai.com/v1/chat/completions"},
         {"https://api.openai.com/v1/", "/chat/completions", "https://api.openai.com/v1/chat/completions"},
         {"https://api.openai.com/v1///", "///audio/speech", "https://api.openai.com/v1/audio/speech"},
-        {"http://192.168.0.20:1234/v1", "audio/transcriptions", "http://192.168.0.20:1234/v1/audio/transcriptions"},
+        {"http://192.168.1.20:1234/v1", "audio/transcriptions", "http://192.168.1.20:1234/v1/audio/transcriptions"},
         // « /v1 » doublé : la base finit par /v1 et la route commence par v1/
-        {"http://192.168.0.20:1234/v1", "v1/chat/completions", "http://192.168.0.20:1234/v1/chat/completions"},
-        {"http://192.168.0.20:1234/v1/", "/v1/audio/speech", "http://192.168.0.20:1234/v1/audio/speech"},
+        {"http://192.168.1.20:1234/v1", "v1/chat/completions", "http://192.168.1.20:1234/v1/chat/completions"},
+        {"http://192.168.1.20:1234/v1/", "/v1/audio/speech", "http://192.168.1.20:1234/v1/audio/speech"},
         {"http://h/api/v1", "v1/models", "http://h/api/v1/models"},
         {"http://h/v1", "v1", "http://h/v1"},
         // pas un vrai doublon : on ne retire que le segment « v1 » entier
@@ -40,8 +40,8 @@ constexpr int assemblage_adresse_et_route() {
         {"http://h/v1", "v1x/abc", "http://h/v1/v1x/abc"},
         {"http://h/v1", "v2/abc", "http://h/v1/v2/abc"},
         // « /v1 » manquant : NON corrigé en silence (c'est l'utilisateur qui le voit dans le message d'erreur)
-        {"http://192.168.0.20:1234", "chat/completions", "http://192.168.0.20:1234/chat/completions"},
-        {"http://192.168.0.20:1234/", "chat/completions", "http://192.168.0.20:1234/chat/completions"},
+        {"http://192.168.1.20:1234", "chat/completions", "http://192.168.1.20:1234/chat/completions"},
+        {"http://192.168.1.20:1234/", "chat/completions", "http://192.168.1.20:1234/chat/completions"},
         // Google : « …/v1beta/openai » n'a pas de /v1 et n'en reçoit pas
         {"https://generativelanguage.googleapis.com/v1beta/openai/", "chat/completions",
          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"},

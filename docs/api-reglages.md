@@ -42,7 +42,7 @@ The session token lives in RAM (at most 4 sessions; the oldest is closed when a 
 `GET /api/system` →
 ```json
 {
-  "nom": "ecran-8e87",
+  "nom": "ecran-1a2b",
   "modele": "M5Stack Tab5",
   "version": "0.1.0",
   "compile_le": "2026-11-06T11:20:00Z",
@@ -70,7 +70,7 @@ The session token lives in RAM (at most 4 sessions; the oldest is closed when a 
 {"etat": "connecte", "ssid": "Maison", "niveau": 3, "force": -61, "ip": "192.168.1.52",
  "message": "Connected to “Maison”."}
 ```
-(`192.168.1.52` is an example address, not a real network's.) `etat` ∈ `connecte`, `connexion`, `echec`, `deconnecte`, `point_d_acces`. After a `PUT`, the page reads this state every 1.5 s until `connecte` or `echec` (20 s at most). On `echec`, the device **goes back to the previous network** (or to the commissioning access point) and says so: "Password refused by “Maison”. The previous network is kept." **Access-point case**: when changing network, the phone loses the device. The `202` then carries `"adresse_apres": "http://ecran-8e87.local"` and the page shows "Reconnect your phone to your Wi-Fi, then open http://ecran-8e87.local." (captive portal and mDNS: not demonstrated on P4+C6, see the plan, milestone 1d).
+(`192.168.1.52` is an example address, not a real network's.) `etat` ∈ `connecte`, `connexion`, `echec`, `deconnecte`, `point_d_acces`. After a `PUT`, the page reads this state every 1.5 s until `connecte` or `echec` (20 s at most). On `echec`, the device **goes back to the previous network** (or to the commissioning access point) and says so: "Password refused by “Maison”. The previous network is kept." **Access-point case**: when changing network, the phone loses the device. The `202` then carries `"adresse_apres": "http://ecran-1a2b.local"` and the page shows "Reconnect your phone to your Wi-Fi, then open http://ecran-1a2b.local." (captive portal and mDNS: not demonstrated on P4+C6, see the plan, milestone 1d).
 
 ## 5. Weather zone and time zone
 
@@ -318,7 +318,7 @@ Le jeton de session vit en RAM (4 sessions au plus, la plus ancienne est fermée
 `GET /api/system` →
 ```json
 {
-  "nom": "ecran-8e87",
+  "nom": "ecran-1a2b",
   "modele": "M5Stack Tab5",
   "version": "0.1.0",
   "compile_le": "2026-11-06T11:20:00Z",
@@ -346,7 +346,7 @@ Le jeton de session vit en RAM (4 sessions au plus, la plus ancienne est fermée
 {"etat": "connecte", "ssid": "Maison", "niveau": 3, "force": -61, "ip": "192.168.1.52",
  "message": "Connecté à « Maison »."}
 ```
-(`192.168.1.52` est une adresse d'exemple, pas celle d'un vrai réseau.) `etat` ∈ `connecte`, `connexion`, `echec`, `deconnecte`, `point_d_acces`. Après `PUT`, la page lit cet état toutes les 1,5 s jusqu'à `connecte` ou `echec` (20 s au plus). Sur `echec`, l'appareil **revient au réseau précédent** (ou au point d'accès de mise en service) et le dit : « Mot de passe refusé par « Maison ». L’ancien réseau est conservé. » **Cas du point d'accès** : en changeant de réseau, le téléphone perd l'appareil. Le `202` porte alors `"adresse_apres": "http://ecran-8e87.local"` et la page affiche « Reconnectez votre téléphone à votre Wi-Fi, puis ouvrez http://ecran-8e87.local. » (portail captif et mDNS : non démontrés sur P4+C6, voir plan, jalon 1d).
+(`192.168.1.52` est une adresse d'exemple, pas celle d'un vrai réseau.) `etat` ∈ `connecte`, `connexion`, `echec`, `deconnecte`, `point_d_acces`. Après `PUT`, la page lit cet état toutes les 1,5 s jusqu'à `connecte` ou `echec` (20 s au plus). Sur `echec`, l'appareil **revient au réseau précédent** (ou au point d'accès de mise en service) et le dit : « Mot de passe refusé par « Maison ». L’ancien réseau est conservé. » **Cas du point d'accès** : en changeant de réseau, le téléphone perd l'appareil. Le `202` porte alors `"adresse_apres": "http://ecran-1a2b.local"` et la page affiche « Reconnectez votre téléphone à votre Wi-Fi, puis ouvrez http://ecran-1a2b.local. » (portail captif et mDNS : non démontrés sur P4+C6, voir plan, jalon 1d).
 
 ## 5. Zone météo et fuseau
 

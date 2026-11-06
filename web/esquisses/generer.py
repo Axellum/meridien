@@ -104,12 +104,12 @@ SERVICES = [
          resume="OpenAI · clé enregistrée", etat=("ok", "Prêt")),
     dict(id="llm", ico="chat", titre="Réfléchir", tech="Assistant (LLM)",
          opts=["OpenAI", "Google", "Mon PC · LM Studio", "Ollama", "Autre"], choix="Mon PC · LM Studio",
-         url="http://192.168.0.20:1234/v1", modele="Choisir dans la liste du service", cle="non",
+         url="http://192.168.1.20:1234/v1", modele="Choisir dans la liste du service", cle="non",
          res=(True, "Le service répond en 0,4 s. 3 modèles trouvés."),
          resume="Mon PC · LM Studio · sans clé", etat=("ok", "Prêt")),
     dict(id="tts", ico="speaker", titre="Parler", tech="Texte vers voix (TTS)",
          opts=["OpenAI", "Ollama", "Kokoro (mon PC)", "Autre"], choix="Kokoro (mon PC)",
-         url="http://192.168.0.20:8880/v1", modele="Choisir dans la liste du service", cle="non",
+         url="http://192.168.1.20:8880/v1", modele="Choisir dans la liste du service", cle="non",
          res=(False, "Le service ne répond pas. Est-il lancé et sur le même réseau ?"),
          resume="Kokoro · ne répond pas", etat=("err", "À vérifier")),
 ]
@@ -161,7 +161,7 @@ def esquisse_a():
     stt, llm, tts = SERVICES
     return f"""
 <div class="app">
-  <header class="top"><span class="logo">{ic("tablet")}</span><div><b>Mon écran</b><small>ecran-8e87 · connecté à « Maison »</small></div></header>
+  <header class="top"><span class="logo">{ic("tablet")}</span><div><b>Mon écran</b><small>ecran-1a2b · connecté à « Maison »</small></div></header>
   <div class="prog" role="img" aria-label="Étape 1 sur 4"><i class="on"></i><i></i><i></i><i></i></div>
   <p class="nb-etape">Étape 1 sur 4</p>
 
@@ -201,7 +201,7 @@ def esquisse_b():
 
     return f"""
 <div class="app b">
-  <header class="top sticky"><span class="logo">{ic("tablet")}</span><div><b>Mon écran</b><small>ecran-8e87 · connecté</small></div></header>
+  <header class="top sticky"><span class="logo">{ic("tablet")}</span><div><b>Mon écran</b><small>ecran-1a2b · connecté</small></div></header>
   <nav class="ancres" aria-label="Sections"><span class="on">Météo</span><span>Assistant</span><span>Écran</span><span>Wi-Fi</span><span>Appareil</span></nav>
 
   <section class="carte">
@@ -506,7 +506,7 @@ LOTS = [
 
 def cadre(classe, theme, contenu):
     return (f'<figure class="tel {classe}" data-theme="{theme}" style="margin-top:0;margin-bottom:0">'
-            f'<div class="url"><span>ecran-8e87.local</span></div>{contenu}</figure>')
+            f'<div class="url"><span>ecran-1a2b.local</span></div>{contenu}</figure>')
 
 
 def planche():
