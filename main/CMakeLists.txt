@@ -41,9 +41,13 @@ if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/meteo_etat.h")
     target_sources(${COMPONENT_LIB} PRIVATE "bouchons/meteo_etat_bouchon.cpp")
     set(_meridien_bouchons TRUE)
 endif()
-# Meme principe pour main/ui_reglages.h (ADR-0007), ecrit par la session reglages-ecran : le bouton "Reglages" de l'ecran
-# principal appelle ui_reglages_ouvrir() ; le bouchon affiche "Reglages : bientot" deux secondes.
-if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/ui_reglages.h")
+# Meme principe pour ui_reglages_ouvrir() (ADR-0007), definie par la session reglages-ecran : le bouton "Reglages" de l'ecran
+# principal l'appelle ; le bouchon affiche "Reglages : bientot" deux secondes. Le test porte sur le fichier qui DEFINIT la
+# fonction (la colle main/ui_reglages_ouvrir.cpp), pas sur main/ui_reglages.h : la session reglages-ecran livre l'en-tete avant
+# la colle, et tester l'en-tete laisserait ui_reglages_ouvrir() indefinie (erreur d'edition de liens) entre les deux. Le bouchon
+# garde son propre en-tete (bouchons/ui_reglages.h, trouve en premier depuis bouchons/) ; les fichiers de main/ trouvent
+# main/ui_reglages.h en premier quand il existe.
+if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/ui_reglages_ouvrir.cpp")
     target_sources(${COMPONENT_LIB} PRIVATE "bouchons/ui_reglages_bouchon.cpp")
     set(_meridien_bouchons TRUE)
 endif()
