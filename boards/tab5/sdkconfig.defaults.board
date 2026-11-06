@@ -49,3 +49,7 @@ CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
 # CONFIG_ESP_HOSTED_TRANSPORT_RESTART_ON_FAILURE is not set
 # Pas de commandes de console esp_hosted (aucune console interactive dans ce projet).
 # CONFIG_ESP_HOSTED_CLI_ENABLED is not set
+# Tic FreeRTOS a 1 kHz : esp_hosted le recommande (avertissement au demarrage « CONFIG_FREERTOS_HZ is 100 ... to avoid bus
+# level jitters ») et ESPHome le pose pour tous ses firmwares ESP-IDF (esphome/components/esp32/__init__.py). Defaut ESP-IDF : 100.
+# Essai du jalon 1b contre l'heure SNTP irreguliere (docs/mesures/1b.md) ; le Tab5 seul est concerne (carte = ce fichier).
+CONFIG_FREERTOS_HZ=1000
