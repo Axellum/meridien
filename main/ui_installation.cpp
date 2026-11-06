@@ -295,7 +295,7 @@ lv_obj_t *construire_etape(Entree &e) {
     lv_obj_set_style_pad_all(corps, S(16), 0);
     lv_obj_set_style_pad_row(corps, S(12), 0);
     lv_obj_set_scroll_dir(corps, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(corps, LV_SCROLLBAR_MODE_OFF);
+    style_defilement(corps);
 
     switch (static_cast<Etape>(etape)) {
     case Etape::Langue:

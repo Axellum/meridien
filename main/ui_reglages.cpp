@@ -260,7 +260,7 @@ lv_obj_t *creer_ecran_standard(const char *titre, bool titre_deja_traduit, lv_ob
     lv_obj_set_style_pad_all(corps, S(16), 0);
     lv_obj_set_style_pad_row(corps, S(12), 0);
     lv_obj_set_scroll_dir(corps, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(corps, LV_SCROLLBAR_MODE_OFF);
+    style_defilement(corps);
 
     if (ecran_sortie != nullptr) {
         *ecran_sortie = ecran;
@@ -1444,7 +1444,7 @@ lv_obj_t *construire_recherche_ville(Entree &) {
     lv_obj_set_style_pad_row(g_ville.resultats, S(8), 0);
     lv_obj_add_flag(g_ville.resultats, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scroll_dir(g_ville.resultats, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(g_ville.resultats, LV_SCROLLBAR_MODE_OFF);
+    style_defilement(g_ville.resultats);
 
     g_ville.clavier = clavier_creer(corps, champ, clavier_hauteur(env().hauteur, true), lancer_recherche, nullptr);
     // La réponse peut arriver après la demande : on redessine les résultats quand l'état de la recherche change.

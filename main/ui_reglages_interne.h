@@ -53,6 +53,9 @@ int32_t S(int32_t px);
 // du clavier à six rangées (fr, nl, es, it) font 59 px à 1280×720, plancher 56 px contrôlé par le même parcours.
 constexpr int32_t kToucheMinPx = 72;
 
+// Un conteneur qui défile montre une barre de défilement tant que son contenu dépasse (sinon un bouton coupé net n'est pas lisible
+// comme « il y a une suite »). À appeler sur chaque conteneur qui défile.
+void style_defilement(lv_obj_t *conteneur);
 lv_color_t couleur(uint32_t rgb);
 const char *T(const char *francais); // texte traduit dans la langue courante, terminé par un zéro
 

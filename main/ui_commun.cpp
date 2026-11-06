@@ -135,6 +135,17 @@ lv_obj_t *creer_conteneur_plat(lv_obj_t *parent, lv_flex_flow_t sens) {
 }
 } // namespace
 
+void style_defilement(lv_obj_t *conteneur) {
+    const PaletteReglages &p = *g_env.p;
+    lv_obj_set_scrollbar_mode(conteneur, LV_SCROLLBAR_MODE_AUTO); // visible seulement quand le contenu dépasse
+    lv_obj_set_style_width(conteneur, S(8), LV_PART_SCROLLBAR);
+    lv_obj_set_style_pad_right(conteneur, S(4),
+                               LV_PART_SCROLLBAR); // dans la marge du conteneur : ne recouvre aucune carte
+    lv_obj_set_style_radius(conteneur, S(4), LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_color(conteneur, couleur(p.texte_discret), LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_opa(conteneur, LV_OPA_COVER, LV_PART_SCROLLBAR);
+}
+
 lv_obj_t *creer_colonne(lv_obj_t *parent) {
     lv_obj_t *c = creer_conteneur_plat(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(c, S(8), 0);
