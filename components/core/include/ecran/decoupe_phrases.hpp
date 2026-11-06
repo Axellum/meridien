@@ -41,20 +41,24 @@ namespace detail {
 
 // Abréviations françaises qui précèdent un point sans finir la phrase (en minuscules ASCII ; « tél » en UTF-8).
 inline constexpr std::string_view ABREVIATIONS[] = {
-    "m",    "mm",   "mme",  "mmes", "mlle", "mlles", "me",   "dr",   "drs",  "pr",   "prs",  "mgr",  "st",
-    "ste",  "sts",  "stes", "cie",  "cf",   "etc",   "ex",   "env",  "av",   "apr",  "ap",   "vs",   "fig",  "vol",
-    "chap", "art",  "tél",  "tel",  "bd",   "boul",  "pp",   "p",    "n",    "no",   "nos",  "approx", "qqch", "qqn",
-    "ibid", "op",   "cit",  "trad", "suiv", "sq",    "sqq",  "resp", "jr",   "sr",   "inc",  "ltd",  "co",   "mr",
-    "mrs",  "ms",   "j.-c", "c.-à-d"};
+    "m",    "mm",  "mme",    "mmes", "mlle", "mlles", "me",  "dr",  "drs",  "pr",   "prs",   "mgr",
+    "st",   "ste", "sts",    "stes", "cie",  "cf",    "etc", "ex",  "env",  "av",   "apr",   "ap",
+    "vs",   "fig", "vol",    "chap", "art",  "tél",   "tel", "bd",  "boul", "pp",   "p",     "n",
+    "no",   "nos", "approx", "qqch", "qqn",  "ibid",  "op",  "cit", "trad", "suiv", "sq",    "sqq",
+    "resp", "jr",  "sr",     "inc",  "ltd",  "co",    "mr",  "mrs", "ms",   "j.-c", "c.-à-d"};
 
 constexpr bool est_blanc_phrase(char c) noexcept { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; }
 
-constexpr char minuscule_ascii(char c) noexcept { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; }
+constexpr char minuscule_ascii(char c) noexcept {
+    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+}
 
 constexpr bool meme_mot_sans_casse(std::string_view mot, std::string_view modele_minuscule) noexcept {
-    if (mot.size() != modele_minuscule.size()) return false;
+    if (mot.size() != modele_minuscule.size())
+        return false;
     for (std::size_t i = 0; i < mot.size(); ++i) {
-        if (minuscule_ascii(mot[i]) != modele_minuscule[i]) return false;
+        if (minuscule_ascii(mot[i]) != modele_minuscule[i])
+            return false;
     }
     return true;
 }
@@ -64,24 +68,30 @@ constexpr bool point_d_abreviation(std::string_view mot) noexcept {
     while (!mot.empty() && (mot.front() == '(' || mot.front() == '[' || mot.front() == '"' || mot.front() == '\'')) {
         mot.remove_prefix(1);
     }
-    if (mot.empty()) return false;
+    if (mot.empty())
+        return false;
     // numéro de liste : 1 ou 2 chiffres
     if (mot.size() <= 2) {
         bool chiffres = true;
-        for (char c : mot) chiffres = chiffres && c >= '0' && c <= '9';
-        if (chiffres) return true;
+        for (char c : mot)
+            chiffres = chiffres && c >= '0' && c <= '9';
+        if (chiffres)
+            return true;
     }
     // initiale : une seule majuscule
-    if (mot.size() == 1 && mot[0] >= 'A' && mot[0] <= 'Z') return true;
+    if (mot.size() == 1 && mot[0] >= 'A' && mot[0] <= 'Z')
+        return true;
     for (std::string_view a : ABREVIATIONS) {
-        if (meme_mot_sans_casse(mot, a)) return true;
+        if (meme_mot_sans_casse(mot, a))
+            return true;
     }
     // forme à points internes : composantes de 1 à 2 lettres ASCII (« p.ex », « U.S.A », « i.e »)
     if (mot.find('.') != std::string_view::npos) {
         std::size_t lettres = 0;
         for (std::size_t i = 0; i <= mot.size(); ++i) {
             if (i == mot.size() || mot[i] == '.') {
-                if (lettres == 0 || lettres > 2) return false;
+                if (lettres == 0 || lettres > 2)
+                    return false;
                 lettres = 0;
             } else if ((mot[i] >= 'a' && mot[i] <= 'z') || (mot[i] >= 'A' && mot[i] <= 'Z')) {
                 ++lettres;
@@ -99,7 +109,8 @@ constexpr bool a_du_contenu(std::string_view s) noexcept {
     for (std::size_t i = 0; i < s.size();) {
         const unsigned char c = static_cast<unsigned char>(s[i]);
         if (c < 0x80U) {
-            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return true;
+            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+                return true;
             ++i;
             continue;
         }
@@ -109,34 +120,38 @@ constexpr bool a_du_contenu(std::string_view s) noexcept {
             continue;
         }
         const std::uint32_t cp = utf8::point_de_code(s, i, n);
-        const bool ponctuation = cp < 0xC0U || (cp >= 0x2000U && cp <= 0x206FU);  // Latin-1 symboles, ponctuation générale
-        if (!ponctuation) return true;
+        const bool ponctuation =
+            cp < 0xC0U || (cp >= 0x2000U && cp <= 0x206FU); // Latin-1 symboles, ponctuation générale
+        if (!ponctuation)
+            return true;
         i += n;
     }
     return false;
 }
 
 constexpr std::string_view rogner_blancs(std::string_view s) noexcept {
-    while (!s.empty() && est_blanc_phrase(s.front())) s.remove_prefix(1);
-    while (!s.empty() && est_blanc_phrase(s.back())) s.remove_suffix(1);
+    while (!s.empty() && est_blanc_phrase(s.front()))
+        s.remove_prefix(1);
+    while (!s.empty() && est_blanc_phrase(s.back()))
+        s.remove_suffix(1);
     return s;
 }
 
-}  // namespace detail
+} // namespace detail
 
-template <std::size_t LIMITE = 200>
-class DecoupePhrases {
+template <std::size_t LIMITE = 200> class DecoupePhrases {
     static_assert(LIMITE >= 32, "limite trop petite pour une phrase");
 
-public:
+  public:
     // Ajoute un morceau de réponse (taille quelconque, même coupé au milieu d'un caractère UTF-8) ; appelle
     // `sur_phrase(std::string_view)` pour chaque phrase complète (vue valable pendant l'appel seulement).
-    template <class F>
-    constexpr void ajouter(std::string_view morceau, F&& sur_phrase) {
+    template <class F> constexpr void ajouter(std::string_view morceau, F &&sur_phrase) {
         while (!morceau.empty()) {
-            std::size_t k = LIMITE - n_;  // > 0 : après chaque extraction il reste de la place
-            if (k > morceau.size()) k = morceau.size();
-            for (std::size_t i = 0; i < k; ++i) buf_[n_ + i] = morceau[i];
+            std::size_t k = LIMITE - n_; // > 0 : après chaque extraction il reste de la place
+            if (k > morceau.size())
+                k = morceau.size();
+            for (std::size_t i = 0; i < k; ++i)
+                buf_[n_ + i] = morceau[i];
             n_ += k;
             morceau.remove_prefix(k);
             extraire(sur_phrase);
@@ -144,8 +159,7 @@ public:
     }
 
     // Fin de la réponse : émet ce qui reste (même sans ponctuation finale) et repart à zéro.
-    template <class F>
-    constexpr void terminer(F&& sur_phrase) {
+    template <class F> constexpr void terminer(F &&sur_phrase) {
         extraire(sur_phrase);
         emettre(sur_phrase, n_);
         n_ = 0;
@@ -154,23 +168,25 @@ public:
     constexpr std::size_t en_attente() const noexcept { return n_; }
     constexpr void remettre_a_zero() noexcept { n_ = 0; }
 
-private:
-    template <class F>
-    constexpr void emettre(F& sur_phrase, std::size_t fin) {
+  private:
+    template <class F> constexpr void emettre(F &sur_phrase, std::size_t fin) {
         const std::string_view phrase = detail::rogner_blancs(std::string_view(buf_, fin));
-        if (!phrase.empty() && detail::a_du_contenu(phrase)) sur_phrase(phrase);
+        if (!phrase.empty() && detail::a_du_contenu(phrase))
+            sur_phrase(phrase);
     }
 
     // Retire les `k` premiers octets, puis les blancs qui suivent.
     constexpr void retirer(std::size_t k) noexcept {
-        while (k < n_ && detail::est_blanc_phrase(buf_[k])) ++k;
-        for (std::size_t i = k; i < n_; ++i) buf_[i - k] = buf_[i];
+        while (k < n_ && detail::est_blanc_phrase(buf_[k]))
+            ++k;
+        for (std::size_t i = k; i < n_; ++i)
+            buf_[i - k] = buf_[i];
         n_ -= k;
     }
 
     // Cherche la première coupe naturelle. Rend vrai avec `fin` (fin de la phrase, exclue) et `suite` (premier
     // octet à garder). Faux = rien pour l'instant (ou une confirmation attend le prochain morceau).
-    constexpr bool chercher_coupe(std::size_t& fin, std::size_t& suite) const noexcept {
+    constexpr bool chercher_coupe(std::size_t &fin, std::size_t &suite) const noexcept {
         for (std::size_t i = 0; i < n_;) {
             const char c = buf_[i];
             if (c == '\n') {
@@ -193,13 +209,15 @@ private:
                     break;
                 }
             }
-            std::size_t k = j;  // fermants collés : " ' ) ] » ” ’
+            std::size_t k = j; // fermants collés : " ' ) ] » ” ’
             while (k < n_) {
                 const std::size_t f = fermant_en(k);
-                if (f == 0) break;
+                if (f == 0)
+                    break;
                 k += f;
             }
-            if (k >= n_) return false;  // on ne sait pas encore ce qui suit : attendre le prochain morceau
+            if (k >= n_)
+                return false; // on ne sait pas encore ce qui suit : attendre le prochain morceau
             if (detail::est_blanc_phrase(buf_[k])) {
                 const bool point_seul = (j == i + 1 && buf_[i] == '.');
                 if (!(point_seul && point_d_abreviation_avant(i))) {
@@ -213,45 +231,50 @@ private:
         return false;
     }
 
-    constexpr bool ellipse_en(std::size_t i) const noexcept {  // « … » = E2 80 A6
-        return i + 3 <= n_ && static_cast<unsigned char>(buf_[i]) == 0xE2U && static_cast<unsigned char>(buf_[i + 1]) == 0x80U &&
-               static_cast<unsigned char>(buf_[i + 2]) == 0xA6U;
+    constexpr bool ellipse_en(std::size_t i) const noexcept { // « … » = E2 80 A6
+        return i + 3 <= n_ && static_cast<unsigned char>(buf_[i]) == 0xE2U &&
+               static_cast<unsigned char>(buf_[i + 1]) == 0x80U && static_cast<unsigned char>(buf_[i + 2]) == 0xA6U;
     }
 
     // Longueur du fermant qui commence en `i` (0 si ce n'en est pas un).
     constexpr std::size_t fermant_en(std::size_t i) const noexcept {
         const char c = buf_[i];
-        if (c == '"' || c == '\'' || c == ')' || c == ']') return 1;
+        if (c == '"' || c == '\'' || c == ')' || c == ']')
+            return 1;
         const unsigned char u = static_cast<unsigned char>(c);
-        if (u == 0xC2U && i + 2 <= n_ && static_cast<unsigned char>(buf_[i + 1]) == 0xBBU) return 2;  // »
+        if (u == 0xC2U && i + 2 <= n_ && static_cast<unsigned char>(buf_[i + 1]) == 0xBBU)
+            return 2; // »
         if (u == 0xE2U && i + 3 <= n_ && static_cast<unsigned char>(buf_[i + 1]) == 0x80U) {
             const unsigned char t = static_cast<unsigned char>(buf_[i + 2]);
-            if (t == 0x9DU || t == 0x99U) return 3;  // ” ’
+            if (t == 0x9DU || t == 0x99U)
+                return 3; // ” ’
         }
         return 0;
     }
 
     constexpr bool point_d_abreviation_avant(std::size_t i) const noexcept {
         std::size_t debut = i;
-        while (debut > 0 && !detail::est_blanc_phrase(buf_[debut - 1])) --debut;
+        while (debut > 0 && !detail::est_blanc_phrase(buf_[debut - 1]))
+            --debut;
         return detail::point_d_abreviation(std::string_view(buf_ + debut, i - debut));
     }
 
     // Tampon plein sans coupe naturelle : où couper ? (toujours ≥ 1)
     constexpr std::size_t coupe_forcee() const noexcept {
         const std::size_t moitie = LIMITE / 2;
-        for (std::size_t p = n_ - 1; p-- > moitie;) {  // p = n_-2 … moitie
-            if ((buf_[p] == ',' || buf_[p] == ';' || buf_[p] == ':') && buf_[p + 1] == ' ') return p + 1;
+        for (std::size_t p = n_ - 1; p-- > moitie;) { // p = n_-2 … moitie
+            if ((buf_[p] == ',' || buf_[p] == ';' || buf_[p] == ':') && buf_[p + 1] == ' ')
+                return p + 1;
         }
         for (std::size_t p = n_; p-- > moitie;) {
-            if (buf_[p] == ' ') return p;
+            if (buf_[p] == ' ')
+                return p;
         }
         const std::size_t entier = utf8::coupe_sans_casser(std::string_view(buf_, n_), n_);
         return entier == 0 ? n_ : entier;
     }
 
-    template <class F>
-    constexpr void extraire(F& sur_phrase) {
+    template <class F> constexpr void extraire(F &sur_phrase) {
         while (n_ > 0) {
             std::size_t fin = 0;
             std::size_t suite = 0;
@@ -272,4 +295,4 @@ private:
     std::size_t n_ = 0;
 };
 
-}  // namespace ecran::assistant
+} // namespace ecran::assistant

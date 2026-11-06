@@ -22,17 +22,18 @@ struct Rec {
             trop_long = true;
             return;
         }
-        for (char c : p) t[n++] = c;
+        for (char c : p)
+            t[n++] = c;
         t[n++] = '|';
         ++nb;
         utf8_valide = utf8_valide && utf8::valide(p);
-        if (p.size() > plus_longue) plus_longue = p.size();
+        if (p.size() > plus_longue)
+            plus_longue = p.size();
     }
     constexpr std::string_view vue() const { return std::string_view(t, n); }
 };
 
-template <std::size_t L = 200>
-constexpr bool decoupe_donne(std::string_view texte, std::string_view attendu) {
+template <std::size_t L = 200> constexpr bool decoupe_donne(std::string_view texte, std::string_view attendu) {
     DecoupePhrases<L> d;
     Rec r;
     d.ajouter(texte, r);
@@ -42,7 +43,8 @@ constexpr bool decoupe_donne(std::string_view texte, std::string_view attendu) {
 
 constexpr int phrases_simples() {
     VERIFIER(decoupe_donne("Bonjour. Comment ça va ? Très bien !", "Bonjour.|Comment ça va ?|Très bien !|"));
-    VERIFIER(decoupe_donne("Bonjour tout le monde", "Bonjour tout le monde|"));  // sans ponctuation finale : émis à la fin
+    VERIFIER(
+        decoupe_donne("Bonjour tout le monde", "Bonjour tout le monde|")); // sans ponctuation finale : émis à la fin
     VERIFIER(decoupe_donne("", ""));
     VERIFIER(decoupe_donne("   ", ""));
     VERIFIER(decoupe_donne("Oui.", "Oui.|"));
@@ -64,8 +66,10 @@ constexpr int abreviations_courantes_ne_coupent_pas() {
     VERIFIER(decoupe_donne("M. Dupont est là. Mme Martin aussi.", "M. Dupont est là.|Mme Martin aussi.|"));
     VERIFIER(decoupe_donne("Mme. Martin vient. Dr. Leroy aussi.", "Mme. Martin vient.|Dr. Leroy aussi.|"));
     VERIFIER(decoupe_donne("Mlle. Rose et Pr. Chêne sont là. Fin.", "Mlle. Rose et Pr. Chêne sont là.|Fin.|"));
-    VERIFIER(decoupe_donne("Il a des pommes, des poires, etc. Puis il part.", "Il a des pommes, des poires, etc. Puis il part.|"));
-    VERIFIER(decoupe_donne("Il y en a plusieurs, p. ex. celui-ci. Fin.", "Il y en a plusieurs, p. ex. celui-ci.|Fin.|"));
+    VERIFIER(decoupe_donne("Il a des pommes, des poires, etc. Puis il part.",
+                           "Il a des pommes, des poires, etc. Puis il part.|"));
+    VERIFIER(
+        decoupe_donne("Il y en a plusieurs, p. ex. celui-ci. Fin.", "Il y en a plusieurs, p. ex. celui-ci.|Fin.|"));
     VERIFIER(decoupe_donne("Voir cf. la note. Fin.", "Voir cf. la note.|Fin.|"));
     VERIFIER(decoupe_donne("Rue St. Jean, av. J.-C. Fin.", "Rue St. Jean, av. J.-C. Fin.|"));
     VERIFIER(decoupe_donne("Tél. mercredi. Fin.", "Tél. mercredi.|Fin.|"));
@@ -89,7 +93,8 @@ constexpr int initiales_et_sigles_ne_coupent_pas() {
 }
 
 constexpr int nombres_decimaux_et_adresses_ne_coupent_pas() {
-    VERIFIER(decoupe_donne("Il fait 3.5 degrés. Voir exemple.fr pour plus. Fin.", "Il fait 3.5 degrés.|Voir exemple.fr pour plus.|Fin.|"));
+    VERIFIER(decoupe_donne("Il fait 3.5 degrés. Voir exemple.fr pour plus. Fin.",
+                           "Il fait 3.5 degrés.|Voir exemple.fr pour plus.|Fin.|"));
     VERIFIER(decoupe_donne("La v1.2.3 est sortie. Ok.", "La v1.2.3 est sortie.|Ok.|"));
     VERIFIER(decoupe_donne("Il est 10.30 pile. Ok.", "Il est 10.30 pile.|Ok.|"));
     VERIFIER(decoupe_donne("Il a payé 1.000,50 euros. Ok.", "Il a payé 1.000,50 euros.|Ok.|"));
@@ -134,11 +139,11 @@ constexpr int phrase_a_cheval_sur_deux_morceaux_attend_la_confirmation() {
     DecoupePhrases<> d;
     Rec r;
     d.ajouter("Bonjour.", r);
-    VERIFIER(r.nb == 0);  // le blanc qui confirme la fin n'est pas arrivé
+    VERIFIER(r.nb == 0); // le blanc qui confirme la fin n'est pas arrivé
     d.ajouter(" Ça va", r);
     VERIFIER(egal(r.vue(), "Bonjour.|"));
     d.ajouter(" ?", r);
-    VERIFIER(r.nb == 1);  // « ? » est au bout : on attend encore
+    VERIFIER(r.nb == 1); // « ? » est au bout : on attend encore
     d.ajouter(" Oui", r);
     VERIFIER(egal(r.vue(), "Bonjour.|Ça va ?|"));
     d.terminer(r);
@@ -202,7 +207,8 @@ constexpr int coupe_forcee_ignore_les_separateurs_de_la_premiere_moitie() {
     x[2] = 'a';
     x[3] = ',';
     x[4] = ' ';
-    for (int i = 5; i < 55; ++i) x[i] = 'b';
+    for (int i = 5; i < 55; ++i)
+        x[i] = 'b';
     DecoupePhrases<40> d;
     Rec r;
     d.ajouter(std::string_view(x, 55), r);
@@ -215,7 +221,8 @@ constexpr int coupe_forcee_ignore_les_separateurs_de_la_premiere_moitie() {
 constexpr int coupe_forcee_sans_espace_au_dernier_caractere_entier() {
     // 100 « x » sans espace ni ponctuation : tranches de 40, 40 puis 20 octets
     char x[100] = {};
-    for (char& c : x) c = 'x';
+    for (char &c : x)
+        c = 'x';
     DecoupePhrases<40> d;
     Rec r;
     d.ajouter(std::string_view(x, 100), r);
@@ -234,13 +241,14 @@ constexpr int coupe_forcee_sans_espace_au_dernier_caractere_entier() {
     f.ajouter(std::string_view(e, 61), s);
     f.terminer(s);
     VERIFIER(s.utf8_valide && s.nb == 2 && s.n == 63);
-    VERIFIER(s.t[39] == '|' && s.t[62] == '|');  // 1 + 19 « é » = 39 octets, puis 11 « é » = 22 octets
+    VERIFIER(s.t[39] == '|' && s.t[62] == '|'); // 1 + 19 « é » = 39 octets, puis 11 « é » = 22 octets
     return 0;
 }
 
 constexpr int jamais_plus_de_limite_octets_en_attente() {
     constexpr std::string_view TEXTE =
-        "un texte long sans aucune ponctuation qui continue encore et encore pour verifier que le tampon ne retient jamais "
+        "un texte long sans aucune ponctuation qui continue encore et encore pour verifier que le tampon ne retient "
+        "jamais "
         "plus que la limite fixee a la construction de l objet meme si le flux est tres long ";
     DecoupePhrases<64> d;
     Rec r;
@@ -259,16 +267,16 @@ constexpr int jamais_plus_de_limite_octets_en_attente() {
 
 constexpr std::string_view COMPOSITE =
     "M. Dupont a dit : « Bonjour ! » Il fait 3.5 degrés… Voyons voir. Étapes :\n1. Ouvrir\n2. Fermer, puis attendre, "
-    "etc. Ensuite, on part ?! Oui. www.exemple.fr est un site.\nFin sans point  é€😀 aussi, peut-être ; et voilà : c'est fini";
+    "etc. Ensuite, on part ?! Oui. www.exemple.fr est un site.\nFin sans point  é€😀 aussi, peut-être ; et voilà : "
+    "c'est fini";
 
-template <std::size_t L>
-constexpr int coupures_en_deux_morceaux(std::size_t premiere, std::size_t derniere) {
+template <std::size_t L> constexpr int coupures_en_deux_morceaux(std::size_t premiere, std::size_t derniere) {
     DecoupePhrases<L> ref;
     Rec attendu;
     ref.ajouter(COMPOSITE, attendu);
     ref.terminer(attendu);
     VERIFIER(attendu.nb >= 6 && attendu.utf8_valide);
-    for (std::size_t coupe = premiere; coupe <= derniere; ++coupe) {  // une coupure à chaque position
+    for (std::size_t coupe = premiere; coupe <= derniere; ++coupe) { // une coupure à chaque position
         DecoupePhrases<L> d;
         Rec r;
         d.ajouter(COMPOSITE.substr(0, coupe), r);
@@ -279,16 +287,16 @@ constexpr int coupures_en_deux_morceaux(std::size_t premiere, std::size_t dernie
     return 0;
 }
 
-template <std::size_t L>
-constexpr int morceaux_de_tailles_variees() {
+template <std::size_t L> constexpr int morceaux_de_tailles_variees() {
     DecoupePhrases<L> ref;
     Rec attendu;
     ref.ajouter(COMPOSITE, attendu);
     ref.terminer(attendu);
-    for (std::size_t taille : {1, 2, 3, 5, 7, 11, 29, 64}) {  // 1 = octet par octet
+    for (std::size_t taille : {1, 2, 3, 5, 7, 11, 29, 64}) { // 1 = octet par octet
         DecoupePhrases<L> d;
         Rec r;
-        for (std::size_t i = 0; i < COMPOSITE.size(); i += taille) d.ajouter(COMPOSITE.substr(i, taille), r);
+        for (std::size_t i = 0; i < COMPOSITE.size(); i += taille)
+            d.ajouter(COMPOSITE.substr(i, taille), r);
         d.terminer(r);
         VERIFIER(r.utf8_valide && egal(r.vue(), attendu.vue()));
     }
@@ -296,20 +304,19 @@ constexpr int morceaux_de_tailles_variees() {
 }
 
 // Les coupures sont réparties en tranches de 31 positions : le compilateur plafonne le nombre de pas d'une
-// évaluation constexpr (clang : 1 048 576). 8 tranches couvrent les positions 0 à COMPOSITE.size() (vérifié ci-dessous).
+// évaluation constexpr (clang : 1 048 576). 8 tranches couvrent les positions 0 à COMPOSITE.size() (vérifié
+// ci-dessous).
 constexpr std::size_t LARGEUR_TRANCHE = 31;
 constexpr std::size_t NB_TRANCHES = 8;
-static_assert(NB_TRANCHES * LARGEUR_TRANCHE > COMPOSITE.size(), "les tranches doivent couvrir toutes les positions de coupure");
+static_assert(NB_TRANCHES * LARGEUR_TRANCHE > COMPOSITE.size(),
+              "les tranches doivent couvrir toutes les positions de coupure");
 
-template <std::size_t L, std::size_t K>
-constexpr int coupures_en_deux_tranche() {
+template <std::size_t L, std::size_t K> constexpr int coupures_en_deux_tranche() {
     constexpr std::size_t fin = (K + 1) * LARGEUR_TRANCHE - 1;
     return coupures_en_deux_morceaux<L>(K * LARGEUR_TRANCHE, fin < COMPOSITE.size() ? fin : COMPOSITE.size());
 }
-template <std::size_t K>
-constexpr int coupures_en_deux_limite_200() { return coupures_en_deux_tranche<200, K>(); }
-template <std::size_t K>
-constexpr int coupures_en_deux_limite_40() { return coupures_en_deux_tranche<40, K>(); }
+template <std::size_t K> constexpr int coupures_en_deux_limite_200() { return coupures_en_deux_tranche<200, K>(); }
+template <std::size_t K> constexpr int coupures_en_deux_limite_40() { return coupures_en_deux_tranche<40, K>(); }
 constexpr int morceaux_varies_avec_la_limite_par_defaut() { return morceaux_de_tailles_variees<200>(); }
 constexpr int morceaux_varies_avec_une_petite_limite() { return morceaux_de_tailles_variees<40>(); }
 
@@ -329,40 +336,54 @@ constexpr int a_du_contenu_ponctuation_et_lettres() {
     VERIFIER(detail::a_du_contenu("日本"));
     VERIFIER(!detail::a_du_contenu(""));
     VERIFIER(!detail::a_du_contenu("... !? - ** « » … – —"));
-    VERIFIER(!detail::a_du_contenu("\xFF\xFE"));  // octets invalides seuls : rien à dire
+    VERIFIER(!detail::a_du_contenu("\xFF\xFE")); // octets invalides seuls : rien à dire
     return 0;
 }
 
-}  // namespace
+} // namespace
 
-#define LISTE(X)                                                            \
-    X(phrases_simples)                                                      \
-    X(blancs_de_bord_retires)                                               \
-    X(retours_a_la_ligne_coupent)                                           \
-    X(abreviations_courantes_ne_coupent_pas)                                \
-    X(abreviations_sans_tenir_compte_de_la_casse)                           \
-    X(initiales_et_sigles_ne_coupent_pas)                                   \
-    X(nombres_decimaux_et_adresses_ne_coupent_pas)                          \
-    X(listes_numerotees_ne_sont_pas_coupees)                                \
-    X(points_de_suspension_et_ponctuation_multiple)                         \
-    X(guillemets_et_parentheses_fermants_restent_avec_la_phrase)            \
-    X(phrases_sans_contenu_ne_sont_pas_emises)                              \
-    X(phrase_a_cheval_sur_deux_morceaux_attend_la_confirmation)             \
-    X(decimal_coupe_entre_deux_morceaux)                                    \
-    X(une_reponse_apres_l_autre)                                            \
-    X(coupe_forcee_a_la_derniere_espace)                                    \
-    X(coupe_forcee_prefere_la_virgule)                                      \
-    X(coupe_forcee_ignore_les_separateurs_de_la_premiere_moitie)            \
-    X(coupe_forcee_sans_espace_au_dernier_caractere_entier)                 \
-    X(jamais_plus_de_limite_octets_en_attente)                              \
-    X(coupures_en_deux_limite_200<0>) X(coupures_en_deux_limite_200<1>) X(coupures_en_deux_limite_200<2>) X(coupures_en_deux_limite_200<3>) \
-    X(coupures_en_deux_limite_200<4>) X(coupures_en_deux_limite_200<5>) X(coupures_en_deux_limite_200<6>) X(coupures_en_deux_limite_200<7>) \
-    X(morceaux_varies_avec_la_limite_par_defaut) \
-    X(coupures_en_deux_limite_40<0>) X(coupures_en_deux_limite_40<1>) X(coupures_en_deux_limite_40<2>) X(coupures_en_deux_limite_40<3>) \
-    X(coupures_en_deux_limite_40<4>) X(coupures_en_deux_limite_40<5>) X(coupures_en_deux_limite_40<6>) X(coupures_en_deux_limite_40<7>) \
-    X(morceaux_varies_avec_une_petite_limite) \
-    X(le_texte_composite_donne_les_phrases_attendues)                       \
+// clang-format off
+#define LISTE(X) \
+    X(phrases_simples)                                             \
+    X(blancs_de_bord_retires)                                      \
+    X(retours_a_la_ligne_coupent)                                  \
+    X(abreviations_courantes_ne_coupent_pas)                       \
+    X(abreviations_sans_tenir_compte_de_la_casse)                  \
+    X(initiales_et_sigles_ne_coupent_pas)                          \
+    X(nombres_decimaux_et_adresses_ne_coupent_pas)                 \
+    X(listes_numerotees_ne_sont_pas_coupees)                       \
+    X(points_de_suspension_et_ponctuation_multiple)                \
+    X(guillemets_et_parentheses_fermants_restent_avec_la_phrase)   \
+    X(phrases_sans_contenu_ne_sont_pas_emises)                     \
+    X(phrase_a_cheval_sur_deux_morceaux_attend_la_confirmation)    \
+    X(decimal_coupe_entre_deux_morceaux)                           \
+    X(une_reponse_apres_l_autre)                                   \
+    X(coupe_forcee_a_la_derniere_espace)                           \
+    X(coupe_forcee_prefere_la_virgule)                             \
+    X(coupe_forcee_ignore_les_separateurs_de_la_premiere_moitie)   \
+    X(coupe_forcee_sans_espace_au_dernier_caractere_entier)        \
+    X(jamais_plus_de_limite_octets_en_attente)                     \
+    X(coupures_en_deux_limite_200<0>)                              \
+    X(coupures_en_deux_limite_200<1>)                              \
+    X(coupures_en_deux_limite_200<2>)                              \
+    X(coupures_en_deux_limite_200<3>)                              \
+    X(coupures_en_deux_limite_200<4>)                              \
+    X(coupures_en_deux_limite_200<5>)                              \
+    X(coupures_en_deux_limite_200<6>)                              \
+    X(coupures_en_deux_limite_200<7>)                              \
+    X(morceaux_varies_avec_la_limite_par_defaut)                   \
+    X(coupures_en_deux_limite_40<0>)                               \
+    X(coupures_en_deux_limite_40<1>)                               \
+    X(coupures_en_deux_limite_40<2>)                               \
+    X(coupures_en_deux_limite_40<3>)                               \
+    X(coupures_en_deux_limite_40<4>)                               \
+    X(coupures_en_deux_limite_40<5>)                               \
+    X(coupures_en_deux_limite_40<6>)                               \
+    X(coupures_en_deux_limite_40<7>)                               \
+    X(morceaux_varies_avec_une_petite_limite)                      \
+    X(le_texte_composite_donne_les_phrases_attendues)              \
     X(a_du_contenu_ponctuation_et_lettres)
+// clang-format on
 
 TESTS_A_LA_COMPILATION(LISTE)
 

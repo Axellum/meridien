@@ -31,29 +31,30 @@
 namespace ecran::assistant {
 
 enum class Lecture : std::uint8_t {
-    Texte,     // trouvé : `Extrait::texte` est rempli
-    Absent,    // chemin absent, ou valeur `null` : normal (premier et dernier morceaux d'un flux)
-    Invalide,  // JSON illisible à cet endroit, ou valeur de mauvais type
-    TropLong   // la chaîne décodée ne tient pas dans le tableau fourni
+    Texte,    // trouvé : `Extrait::texte` est rempli
+    Absent,   // chemin absent, ou valeur `null` : normal (premier et dernier morceaux d'un flux)
+    Invalide, // JSON illisible à cet endroit, ou valeur de mauvais type
+    TropLong  // la chaîne décodée ne tient pas dans le tableau fourni
 };
 
 struct Extrait {
     Lecture lecture;
-    std::string_view texte;  // vue dans le tableau `sortie` de l'appelant ; vide sauf si `lecture == Texte`
+    std::string_view texte; // vue dans le tableau `sortie` de l'appelant ; vide sauf si `lecture == Texte`
 };
 
 namespace detail {
 
 struct Etape {
-    std::string_view cle;  // vide = « premier élément du tableau »
+    std::string_view cle; // vide = « premier élément du tableau »
 };
 
 class Lecteur {
-public:
+  public:
     constexpr explicit Lecteur(std::string_view s) noexcept : s_(s) {}
 
     constexpr void sauter_blancs() noexcept {
-        while (i_ < s_.size() && (s_[i_] == ' ' || s_[i_] == '\t' || s_[i_] == '\n' || s_[i_] == '\r')) ++i_;
+        while (i_ < s_.size() && (s_[i_] == ' ' || s_[i_] == '\t' || s_[i_] == '\n' || s_[i_] == '\r'))
+            ++i_;
     }
     constexpr bool fin() const noexcept { return i_ >= s_.size(); }
     constexpr char courant() const noexcept { return i_ < s_.size() ? s_[i_] : '\0'; }
@@ -71,17 +72,19 @@ public:
     // Consomme le mot `mot` (null, true…) s'il est là, suivi d'une fin de valeur.
     constexpr bool consommer_mot(std::string_view mot) noexcept {
         sauter_blancs();
-        if (s_.size() - i_ < mot.size() || s_.substr(i_, mot.size()) != mot) return false;
+        if (s_.size() - i_ < mot.size() || s_.substr(i_, mot.size()) != mot)
+            return false;
         const std::size_t apres = i_ + mot.size();
         if (apres < s_.size()) {
             const char c = s_[apres];
-            if (c != ',' && c != '}' && c != ']' && c != ' ' && c != '\t' && c != '\n' && c != '\r') return false;
+            if (c != ',' && c != '}' && c != ']' && c != ' ' && c != '\t' && c != '\n' && c != '\r')
+                return false;
         }
         i_ = apres;
         return true;
     }
 
-    constexpr bool sauter_chaine() noexcept {  // positionné sur le guillemet ouvrant
+    constexpr bool sauter_chaine() noexcept { // positionné sur le guillemet ouvrant
         ++i_;
         while (i_ < s_.size()) {
             const char c = s_[i_];
@@ -100,21 +103,25 @@ public:
     // Saute une valeur JSON entière (chaîne, objet, tableau, nombre, mot). Faux si elle est tronquée.
     constexpr bool sauter_valeur() noexcept {
         sauter_blancs();
-        if (fin()) return false;
+        if (fin())
+            return false;
         char c = s_[i_];
-        if (c == '"') return sauter_chaine();
+        if (c == '"')
+            return sauter_chaine();
         if (c == '{' || c == '[') {
             std::size_t profondeur = 0;
             while (i_ < s_.size()) {
                 c = s_[i_];
                 if (c == '"') {
-                    if (!sauter_chaine()) return false;
+                    if (!sauter_chaine())
+                        return false;
                     continue;
                 }
                 if (c == '{' || c == '[') {
                     ++profondeur;
                 } else if (c == '}' || c == ']') {
-                    if (profondeur > 0) --profondeur;
+                    if (profondeur > 0)
+                        --profondeur;
                     if (profondeur == 0) {
                         ++i_;
                         return true;
@@ -137,29 +144,38 @@ public:
     constexpr Lecture trouver(std::string_view cle) noexcept {
         while (true) {
             sauter_blancs();
-            if (fin()) return Lecture::Invalide;
+            if (fin())
+                return Lecture::Invalide;
             if (s_[i_] == '}') {
                 ++i_;
                 return Lecture::Absent;
             }
-            if (s_[i_] != '"') return Lecture::Invalide;
+            if (s_[i_] != '"')
+                return Lecture::Invalide;
             const std::size_t debut = i_ + 1;
-            if (!sauter_chaine()) return Lecture::Invalide;
+            if (!sauter_chaine())
+                return Lecture::Invalide;
             const std::string_view nom = s_.substr(debut, i_ - 1 - debut);
-            if (!consommer(':')) return Lecture::Invalide;
+            if (!consommer(':'))
+                return Lecture::Invalide;
             sauter_blancs();
-            if (nom == cle) return Lecture::Texte;  // « Texte » = trouvé (position sur la valeur)
-            if (!sauter_valeur()) return Lecture::Invalide;
+            if (nom == cle)
+                return Lecture::Texte; // « Texte » = trouvé (position sur la valeur)
+            if (!sauter_valeur())
+                return Lecture::Invalide;
             sauter_blancs();
-            if (consommer(',')) continue;
-            if (consommer('}')) return Lecture::Absent;
+            if (consommer(','))
+                continue;
+            if (consommer('}'))
+                return Lecture::Absent;
             return Lecture::Invalide;
         }
     }
 
     // Décode la chaîne JSON qui commence au guillemet courant, dans `sortie`.
-    constexpr Lecture decoder_chaine(Tampon& sortie) noexcept {
-        if (i_ >= s_.size() || s_[i_] != '"') return Lecture::Invalide;
+    constexpr Lecture decoder_chaine(Tampon &sortie) noexcept {
+        if (i_ >= s_.size() || s_[i_] != '"')
+            return Lecture::Invalide;
         ++i_;
         while (i_ < s_.size()) {
             const char c = s_[i_];
@@ -168,46 +184,65 @@ public:
                 return sortie.ok() ? Lecture::Texte : Lecture::TropLong;
             }
             if (c == '\\') {
-                if (i_ + 1 >= s_.size()) return Lecture::Invalide;
+                if (i_ + 1 >= s_.size())
+                    return Lecture::Invalide;
                 const char e = s_[i_ + 1];
                 i_ += 2;
                 switch (e) {
-                    case '"': sortie.ecrire('"'); break;
-                    case '\\': sortie.ecrire('\\'); break;
-                    case '/': sortie.ecrire('/'); break;
-                    case 'b': sortie.ecrire('\b'); break;
-                    case 'f': sortie.ecrire('\f'); break;
-                    case 'n': sortie.ecrire('\n'); break;
-                    case 'r': sortie.ecrire('\r'); break;
-                    case 't': sortie.ecrire('\t'); break;
-                    case 'u': {
-                        std::uint32_t cp = 0;
-                        if (!hex4(cp)) return Lecture::Invalide;
-                        if (cp >= 0xD800U && cp <= 0xDBFFU) {  // première moitié d'une paire de surrogates
-                            std::uint32_t bas = 0;
-                            const std::size_t retour = i_;
-                            if (i_ + 1 < s_.size() && s_[i_] == '\\' && s_[i_ + 1] == 'u') {
-                                i_ += 2;
-                                if (hex4(bas) && bas >= 0xDC00U && bas <= 0xDFFFU) {
-                                    cp = 0x10000U + ((cp - 0xD800U) << 10) + (bas - 0xDC00U);
-                                } else {
-                                    i_ = retour;  // pas une paire : le second \u sera relu seul
-                                    cp = 0xFFFDU;
-                                }
+                case '"':
+                    sortie.ecrire('"');
+                    break;
+                case '\\':
+                    sortie.ecrire('\\');
+                    break;
+                case '/':
+                    sortie.ecrire('/');
+                    break;
+                case 'b':
+                    sortie.ecrire('\b');
+                    break;
+                case 'f':
+                    sortie.ecrire('\f');
+                    break;
+                case 'n':
+                    sortie.ecrire('\n');
+                    break;
+                case 'r':
+                    sortie.ecrire('\r');
+                    break;
+                case 't':
+                    sortie.ecrire('\t');
+                    break;
+                case 'u': {
+                    std::uint32_t cp = 0;
+                    if (!hex4(cp))
+                        return Lecture::Invalide;
+                    if (cp >= 0xD800U && cp <= 0xDBFFU) { // première moitié d'une paire de surrogates
+                        std::uint32_t bas = 0;
+                        const std::size_t retour = i_;
+                        if (i_ + 1 < s_.size() && s_[i_] == '\\' && s_[i_ + 1] == 'u') {
+                            i_ += 2;
+                            if (hex4(bas) && bas >= 0xDC00U && bas <= 0xDFFFU) {
+                                cp = 0x10000U + ((cp - 0xD800U) << 10) + (bas - 0xDC00U);
                             } else {
+                                i_ = retour; // pas une paire : le second \u sera relu seul
                                 cp = 0xFFFDU;
                             }
-                        } else if (cp >= 0xDC00U && cp <= 0xDFFFU) {
-                            cp = 0xFFFDU;  // seconde moitié sans la première
+                        } else {
+                            cp = 0xFFFDU;
                         }
-                        if (cp != 0) {  // \u0000 : ignoré
-                            char tmp[4] = {};
-                            const std::size_t n = utf8::encoder(cp, tmp);
-                            sortie.ecrire(std::string_view(tmp, n));
-                        }
-                        break;
+                    } else if (cp >= 0xDC00U && cp <= 0xDFFFU) {
+                        cp = 0xFFFDU; // seconde moitié sans la première
                     }
-                    default: return Lecture::Invalide;
+                    if (cp != 0) { // \u0000 : ignoré
+                        char tmp[4] = {};
+                        const std::size_t n = utf8::encoder(cp, tmp);
+                        sortie.ecrire(std::string_view(tmp, n));
+                    }
+                    break;
+                }
+                default:
+                    return Lecture::Invalide;
                 }
                 continue;
             }
@@ -225,12 +260,13 @@ public:
             sortie.ecrire(c);
             ++i_;
         }
-        return Lecture::Invalide;  // chaîne jamais fermée
+        return Lecture::Invalide; // chaîne jamais fermée
     }
 
-private:
-    constexpr bool hex4(std::uint32_t& valeur) noexcept {
-        if (i_ + 4 > s_.size()) return false;
+  private:
+    constexpr bool hex4(std::uint32_t &valeur) noexcept {
+        if (i_ + 4 > s_.size())
+            return false;
         std::uint32_t v = 0;
         for (std::size_t k = 0; k < 4; ++k) {
             const char c = s_[i_ + k];
@@ -259,92 +295,109 @@ private:
 // consommée). Une étape à clé attend un objet (ou `null`, d'où `Absent`) et se place sur la valeur de la clé ; une
 // étape vide attend un tableau et se place sur son premier élément. `tolere_tableau_racine` : une racine
 // « [ { … } ] » est lue comme son premier élément.
-constexpr Lecture descendre(Lecteur& l, const Etape* etapes, std::size_t n, bool tolere_tableau_racine) noexcept {
+constexpr Lecture descendre(Lecteur &l, const Etape *etapes, std::size_t n, bool tolere_tableau_racine) noexcept {
     if (tolere_tableau_racine && l.consommer('[')) {
         l.sauter_blancs();
-        if (l.courant() == ']') return Lecture::Absent;
+        if (l.courant() == ']')
+            return Lecture::Absent;
     }
     for (std::size_t k = 0; k < n; ++k) {
         if (etapes[k].cle.empty()) {
-            if (!l.consommer('[')) return l.consommer_mot("null") ? Lecture::Absent : Lecture::Invalide;
+            if (!l.consommer('['))
+                return l.consommer_mot("null") ? Lecture::Absent : Lecture::Invalide;
             l.sauter_blancs();
-            if (l.courant() == ']') return Lecture::Absent;
+            if (l.courant() == ']')
+                return Lecture::Absent;
         } else {
-            if (!l.consommer('{')) return l.consommer_mot("null") ? Lecture::Absent : Lecture::Invalide;
+            if (!l.consommer('{'))
+                return l.consommer_mot("null") ? Lecture::Absent : Lecture::Invalide;
             const Lecture r = l.trouver(etapes[k].cle);
-            if (r != Lecture::Texte) return r;
+            if (r != Lecture::Texte)
+                return r;
         }
     }
     return Lecture::Texte;
 }
 
 // La valeur finale doit être une chaîne ou `null` (-> Absent).
-constexpr Extrait lire_chaine_finale(Lecteur& l, char* sortie, std::size_t capacite) noexcept {
+constexpr Extrait lire_chaine_finale(Lecteur &l, char *sortie, std::size_t capacite) noexcept {
     Tampon t(sortie, capacite);
     l.sauter_blancs();
-    if (l.consommer_mot("null")) return {Lecture::Absent, std::string_view()};
+    if (l.consommer_mot("null"))
+        return {Lecture::Absent, std::string_view()};
     const Lecture r = l.decoder_chaine(t);
-    if (r != Lecture::Texte) return {r, std::string_view()};
+    if (r != Lecture::Texte)
+        return {r, std::string_view()};
     return {Lecture::Texte, t.vue()};
 }
 
 constexpr bool est_blanc(char c) noexcept { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
 
 constexpr std::string_view rogner(std::string_view s) noexcept {
-    while (!s.empty() && est_blanc(s.front())) s.remove_prefix(1);
-    while (!s.empty() && est_blanc(s.back())) s.remove_suffix(1);
+    while (!s.empty() && est_blanc(s.front()))
+        s.remove_prefix(1);
+    while (!s.empty() && est_blanc(s.back()))
+        s.remove_suffix(1);
     return s;
 }
 
 constexpr bool contient_sans_casse(std::string_view texte, std::string_view motif_minuscule) noexcept {
-    if (motif_minuscule.empty() || texte.size() < motif_minuscule.size()) return false;
+    if (motif_minuscule.empty() || texte.size() < motif_minuscule.size())
+        return false;
     for (std::size_t i = 0; i + motif_minuscule.size() <= texte.size(); ++i) {
         bool ok = true;
         for (std::size_t k = 0; k < motif_minuscule.size() && ok; ++k) {
             char c = texte[i + k];
-            if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');  // casse ASCII seulement
+            if (c >= 'A' && c <= 'Z')
+                c = static_cast<char>(c - 'A' + 'a'); // casse ASCII seulement
             ok = (c == motif_minuscule[k]);
         }
-        if (ok) return true;
+        if (ok)
+            return true;
     }
     return false;
 }
 
-}  // namespace detail
+} // namespace detail
 
 // `choices[0].delta.content` d'un événement SSE de `chat/completions`. `sortie`/`capacite` : tableau de l'appelant
 // qui reçoit le texte décodé (`Extrait::texte` est une vue dedans). `Absent` pour un morceau sans texte.
-constexpr Extrait contenu_du_delta(std::string_view json, char* sortie, std::size_t capacite) noexcept {
+constexpr Extrait contenu_du_delta(std::string_view json, char *sortie, std::size_t capacite) noexcept {
     constexpr detail::Etape CHEMIN[] = {{"choices"}, {""}, {"delta"}, {"content"}};
     detail::Lecteur l(json);
     const Lecture r = detail::descendre(l, CHEMIN, 4, false);
-    if (r != Lecture::Texte) return {r, std::string_view()};
+    if (r != Lecture::Texte)
+        return {r, std::string_view()};
     return detail::lire_chaine_finale(l, sortie, capacite);
 }
 
 // Champ `text` d'une réponse de `audio/transcriptions` (format json), espaces de bord retirés (whisper.cpp en met).
 // Un texte vide après rognage reste `Texte` avec une vue vide : l'appelant envoie alors `RienReconnu`.
-constexpr Extrait texte_transcription(std::string_view json, char* sortie, std::size_t capacite) noexcept {
+constexpr Extrait texte_transcription(std::string_view json, char *sortie, std::size_t capacite) noexcept {
     constexpr detail::Etape CHEMIN[] = {{"text"}};
     detail::Lecteur l(json);
     const Lecture r = detail::descendre(l, CHEMIN, 1, false);
-    if (r != Lecture::Texte) return {r, std::string_view()};
+    if (r != Lecture::Texte)
+        return {r, std::string_view()};
     const Extrait e = detail::lire_chaine_finale(l, sortie, capacite);
-    if (e.lecture != Lecture::Texte) return e;
+    if (e.lecture != Lecture::Texte)
+        return e;
     return {Lecture::Texte, detail::rogner(e.texte)};
 }
 
 // `error.message` (ou `error` si c'est une chaîne) d'un corps d'erreur. NE JAMAIS afficher ni journaliser ce texte.
-constexpr Extrait message_d_erreur(std::string_view json, char* sortie, std::size_t capacite) noexcept {
+constexpr Extrait message_d_erreur(std::string_view json, char *sortie, std::size_t capacite) noexcept {
     constexpr detail::Etape ERREUR[] = {{"error"}};
     constexpr detail::Etape MESSAGE[] = {{"message"}};
     detail::Lecteur l(json);
     Lecture r = detail::descendre(l, ERREUR, 1, true);
-    if (r != Lecture::Texte) return {r, std::string_view()};
+    if (r != Lecture::Texte)
+        return {r, std::string_view()};
     l.sauter_blancs();
     if (l.courant() != '"') {
         r = detail::descendre(l, MESSAGE, 1, false);
-        if (r != Lecture::Texte) return {r, std::string_view()};
+        if (r != Lecture::Texte)
+            return {r, std::string_view()};
     }
     return detail::lire_chaine_finale(l, sortie, capacite);
 }
@@ -355,4 +408,4 @@ constexpr bool mentionne_modele(std::string_view message) noexcept {
     return detail::contient_sans_casse(message, "model") || detail::contient_sans_casse(message, "modèle");
 }
 
-}  // namespace ecran::assistant
+} // namespace ecran::assistant

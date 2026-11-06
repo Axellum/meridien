@@ -20,14 +20,16 @@ constexpr bool est_actif(Etat e) { return e != Etat::Pret && e != Etat::Erreur; 
 constexpr std::size_t caracteres(std::string_view s) {
     std::size_t n = 0;
     for (char c : s) {
-        if ((static_cast<unsigned char>(c) & 0xC0U) != 0x80U) ++n;
+        if ((static_cast<unsigned char>(c) & 0xC0U) != 0x80U)
+            ++n;
     }
     return n;
 }
 
 constexpr bool a_un_non_ascii(std::string_view s) {
     for (char c : s) {
-        if (static_cast<unsigned char>(c) >= 0x80U) return true;
+        if (static_cast<unsigned char>(c) >= 0x80U)
+            return true;
     }
     return false;
 }
@@ -36,29 +38,33 @@ constexpr bool a_un_non_ascii(std::string_view s) {
 constexpr Machine machine_dans(Etat cible) {
     Machine m;
     switch (cible) {
-        case Etat::Pret: break;
-        case Etat::Ecoute: m.traiter(Evenement::MotActivation); break;
-        case Etat::Transcription:
-            m.traiter(Evenement::MotActivation);
-            m.traiter(Evenement::FinDeParole);
-            break;
-        case Etat::Reflexion:
-            m.traiter(Evenement::MotActivation);
-            m.traiter(Evenement::FinDeParole);
-            m.traiter(Evenement::TexteReconnu);
-            break;
-        case Etat::Reponse:
-            m.traiter(Evenement::MotActivation);
-            m.traiter(Evenement::FinDeParole);
-            m.traiter(Evenement::TexteReconnu);
-            m.traiter(Evenement::MorceauReponse);
-            break;
-        case Etat::Erreur:
-            m.traiter(Evenement::MotActivation);
-            m.traiter(Evenement::FinDeParole);
-            m.traiter(Evenement::ErreurStt);
-            break;
-        case Etat::Nombre: break;
+    case Etat::Pret:
+        break;
+    case Etat::Ecoute:
+        m.traiter(Evenement::MotActivation);
+        break;
+    case Etat::Transcription:
+        m.traiter(Evenement::MotActivation);
+        m.traiter(Evenement::FinDeParole);
+        break;
+    case Etat::Reflexion:
+        m.traiter(Evenement::MotActivation);
+        m.traiter(Evenement::FinDeParole);
+        m.traiter(Evenement::TexteReconnu);
+        break;
+    case Etat::Reponse:
+        m.traiter(Evenement::MotActivation);
+        m.traiter(Evenement::FinDeParole);
+        m.traiter(Evenement::TexteReconnu);
+        m.traiter(Evenement::MorceauReponse);
+        break;
+    case Etat::Erreur:
+        m.traiter(Evenement::MotActivation);
+        m.traiter(Evenement::FinDeParole);
+        m.traiter(Evenement::ErreurStt);
+        break;
+    case Etat::Nombre:
+        break;
     }
     return m;
 }
@@ -67,7 +73,8 @@ constexpr int le_jeu_d_etats_et_d_evenements_est_celui_attendu() {
     VERIFIER(NE == 6);
     VERIFIER(NV == 11);
     VERIFIER(NB_CAUSES == 10);
-    for (std::size_t i = 0; i < NE; ++i) VERIFIER(machine_dans(etat_n(i)).etat() == etat_n(i));
+    for (std::size_t i = 0; i < NE; ++i)
+        VERIFIER(machine_dans(etat_n(i)).etat() == etat_n(i));
     return 0;
 }
 
@@ -75,17 +82,17 @@ constexpr int aucune_transition_vers_un_etat_inconnu() {
     // Toutes les paires état × événement : état suivant dans le jeu, action dans le jeu, cohérence service/cause.
     for (std::size_t s = 0; s < NE; ++s) {
         for (std::size_t e = 0; e < NV; ++e) {
-            const Transition& t = transition(etat_n(s), ev_n(e));
+            const Transition &t = transition(etat_n(s), ev_n(e));
             VERIFIER(static_cast<std::size_t>(t.suivant) < NE);
             VERIFIER(static_cast<std::size_t>(t.action) < static_cast<std::size_t>(Action::Nombre));
             VERIFIER(static_cast<std::size_t>(t.service) < static_cast<std::size_t>(Service::Nombre));
             VERIFIER(static_cast<std::size_t>(t.cause) < NB_CAUSES);
             if (t.pris && t.suivant == Etat::Erreur) {
-                VERIFIER(t.cause != Cause::Aucune);  // une erreur a toujours une phrase à afficher
+                VERIFIER(t.cause != Cause::Aucune); // une erreur a toujours une phrase à afficher
             } else {
                 VERIFIER(t.service == Service::Aucun && t.cause == Cause::Aucune);
             }
-            if (!t.pris) {  // ignoré : ne bouge pas et ne déclenche rien
+            if (!t.pris) { // ignoré : ne bouge pas et ne déclenche rien
                 VERIFIER(t.suivant == etat_n(s));
                 VERIFIER(t.action == Action::Aucune);
             }
@@ -99,7 +106,7 @@ constexpr int la_machine_suit_la_table_pour_toutes_les_paires() {
         for (std::size_t e = 0; e < NV; ++e) {
             Machine m = machine_dans(etat_n(s));
             const Resultat r = m.traiter(ev_n(e));
-            const Transition& t = transition(etat_n(s), ev_n(e));
+            const Transition &t = transition(etat_n(s), ev_n(e));
             VERIFIER(r.avant == etat_n(s));
             VERIFIER(r.apres == t.suivant && m.etat() == t.suivant);
             VERIFIER(r.action == t.action);
@@ -120,7 +127,7 @@ constexpr int cheminement_nominal_de_l_echange() {
     VERIFIER(r.apres == Etat::Reflexion && r.action == Action::EnvoyerAuLlm);
     r = m.traiter(Evenement::MorceauReponse);
     VERIFIER(r.apres == Etat::Reponse && r.pris_en_compte);
-    r = m.traiter(Evenement::MorceauReponse);  // les morceaux suivants gardent l'état ET réarment le minuteur
+    r = m.traiter(Evenement::MorceauReponse); // les morceaux suivants gardent l'état ET réarment le minuteur
     VERIFIER(r.apres == Etat::Reponse && r.pris_en_compte && r.action == Action::Aucune);
     r = m.traiter(Evenement::FinDeLecture);
     VERIFIER(r.apres == Etat::Pret);
@@ -129,11 +136,12 @@ constexpr int cheminement_nominal_de_l_echange() {
 
 constexpr int l_interruption_ramene_a_pret_depuis_tout_etat_actif() {
     for (std::size_t s = 0; s < NE; ++s) {
-        if (!est_actif(etat_n(s))) continue;
+        if (!est_actif(etat_n(s)))
+            continue;
         Machine m = machine_dans(etat_n(s));
         const Resultat r = m.traiter(Evenement::AppuiEcran);
         VERIFIER(r.apres == Etat::Pret);
-        VERIFIER(r.action == Action::ToutArreter);  // coupe requêtes, capture et lecture
+        VERIFIER(r.action == Action::ToutArreter); // coupe requêtes, capture et lecture
         VERIFIER(r.pris_en_compte);
     }
     return 0;
@@ -170,7 +178,8 @@ constexpr int une_erreur_revient_a_pret_apres_son_delai() {
             for (std::size_t s = 0; s < NE; ++s) {
                 Machine m = machine_dans(etat_n(s));
                 const Resultat r = m.traiter(ev, static_cast<Cause>(c));
-                if (!r.pris_en_compte) continue;
+                if (!r.pris_en_compte)
+                    continue;
                 VERIFIER(m.cause() == static_cast<Cause>(c));
                 const Resultat fin = m.traiter(Evenement::DelaiDepasse);
                 VERIFIER(fin.apres == Etat::Pret && fin.action == Action::Aucune);
@@ -205,9 +214,10 @@ constexpr int quelle_erreur_dans_quel_etat() {
 constexpr int un_evenement_ignore_en_erreur_garde_la_cause_affichee() {
     Machine m = machine_dans(Etat::Transcription);
     m.traiter(Evenement::ErreurStt, Cause::CleRefusee);
-    for (Evenement ev : {Evenement::FinDeParole, Evenement::TexteReconnu, Evenement::RienReconnu, Evenement::MorceauReponse,
-                         Evenement::FinDeLecture, Evenement::ErreurStt, Evenement::ErreurLlm, Evenement::ErreurTts}) {
-        const Resultat r = m.traiter(ev, Cause::Limite);  // réponse tardive d'une requête annulée
+    for (Evenement ev :
+         {Evenement::FinDeParole, Evenement::TexteReconnu, Evenement::RienReconnu, Evenement::MorceauReponse,
+          Evenement::FinDeLecture, Evenement::ErreurStt, Evenement::ErreurLlm, Evenement::ErreurTts}) {
+        const Resultat r = m.traiter(ev, Cause::Limite); // réponse tardive d'une requête annulée
         VERIFIER(!r.pris_en_compte && r.apres == Etat::Erreur && r.action == Action::Aucune);
         VERIFIER(m.cause() == Cause::CleRefusee && m.service_en_erreur() == Service::Stt);
     }
@@ -219,7 +229,7 @@ constexpr int cause_par_defaut_quand_l_appelant_n_en_donne_pas() {
     m.traiter(Evenement::ErreurStt);
     VERIFIER(m.cause() == Cause::NeRepondPas);
     m = machine_dans(Etat::Reflexion);
-    m.traiter(Evenement::FinDeLecture);  // flux terminé sans un seul morceau
+    m.traiter(Evenement::FinDeLecture); // flux terminé sans un seul morceau
     VERIFIER(m.etat() == Etat::Erreur && m.service_en_erreur() == Service::Llm);
     VERIFIER(m.cause() == Cause::ReponseInattendue);
     m = machine_dans(Etat::Reponse);
@@ -229,14 +239,15 @@ constexpr int cause_par_defaut_quand_l_appelant_n_en_donne_pas() {
 }
 
 constexpr int les_delais_font_sortir_de_tout_etat_actif() {
-    VERIFIER(delai_ms(Etat::Pret) == 0);  // « prêt » attend le mot d'activation sans fin : c'est voulu
+    VERIFIER(delai_ms(Etat::Pret) == 0); // « prêt » attend le mot d'activation sans fin : c'est voulu
     for (std::size_t s = 0; s < NE; ++s) {
         const Etat e = etat_n(s);
-        if (e == Etat::Pret) continue;
-        VERIFIER(delai_ms(e) >= 1000 && delai_ms(e) <= 300000);  // un état sans minuteur pourrait bloquer
-        const Transition& t = transition(e, Evenement::DelaiDepasse);
-        VERIFIER(t.pris);                         // le délai est traité partout
-        VERIFIER(t.suivant != e);                 // et fait bouger
+        if (e == Etat::Pret)
+            continue;
+        VERIFIER(delai_ms(e) >= 1000 && delai_ms(e) <= 300000); // un état sans minuteur pourrait bloquer
+        const Transition &t = transition(e, Evenement::DelaiDepasse);
+        VERIFIER(t.pris);         // le délai est traité partout
+        VERIFIER(t.suivant != e); // et fait bouger
         VERIFIER(t.suivant == Etat::Pret || t.suivant == Etat::Erreur);
     }
     return 0;
@@ -261,18 +272,20 @@ constexpr int tous_les_etats_sont_atteignables_depuis_pret() {
     vu[0] = true;
     for (std::size_t tour = 0; tour < NE; ++tour) {
         for (std::size_t s = 0; s < NE; ++s) {
-            if (!vu[s]) continue;
-            for (std::size_t e = 0; e < NV; ++e) vu[static_cast<std::size_t>(transition(etat_n(s), ev_n(e)).suivant)] = true;
+            if (!vu[s])
+                continue;
+            for (std::size_t e = 0; e < NV; ++e)
+                vu[static_cast<std::size_t>(transition(etat_n(s), ev_n(e)).suivant)] = true;
         }
     }
-    for (std::size_t s = 0; s < NE; ++s) VERIFIER(vu[s]);
+    for (std::size_t s = 0; s < NE; ++s)
+        VERIFIER(vu[s]);
     return 0;
 }
 
 // Le compilateur plafonne le nombre de pas d'une évaluation constexpr (clang : 1 048 576) : les 11^4 suites sont
 // réparties en 16 tranches, chacune évaluée à part.
-template <std::size_t K>
-constexpr int toute_suite_d_evenements_de_longueur_4_retombe_a_pret() {
+template <std::size_t K> constexpr int toute_suite_d_evenements_de_longueur_4_retombe_a_pret() {
     // Exhaustif : 11^4 = 14641 suites depuis « prêt » ; quel que soit l'état atteint, des délais ramènent à « prêt »
     // en 2 pas au plus, et l'appui sur l'écran le fait en 1 pas depuis un état actif.
     constexpr std::size_t TOTAL = NV * NV * NV * NV;
@@ -301,7 +314,7 @@ constexpr int toute_suite_d_evenements_de_longueur_4_retombe_a_pret() {
 
 constexpr int pret_n_est_reveille_que_par_le_mot_d_activation() {
     for (std::size_t e = 0; e < NV; ++e) {
-        const Transition& t = transition(Etat::Pret, ev_n(e));
+        const Transition &t = transition(Etat::Pret, ev_n(e));
         if (ev_n(e) == Evenement::MotActivation) {
             VERIFIER(t.pris && t.suivant == Etat::Ecoute && t.action == Action::DemarrerCapture);
         } else {
@@ -334,15 +347,17 @@ constexpr int mot_d_activation_en_erreur_relance_l_ecoute() {
 }
 
 constexpr int textes_courts_francais_avec_accents_et_sans_code() {
-    constexpr std::string_view ATTENDUS[] = {"Prêt", "Je vous écoute…", "Je transcris…", "Je réfléchis…", "Je réponds…",
-                                             "Un problème est survenu."};
+    constexpr std::string_view ATTENDUS[] = {"Prêt",          "Je vous écoute…", "Je transcris…",
+                                             "Je réfléchis…", "Je réponds…",     "Un problème est survenu."};
     for (std::size_t s = 0; s < NE; ++s) {
         const std::string_view t = texte(etat_n(s));
         VERIFIER(egal(t, ATTENDUS[s]));
-        VERIFIER(caracteres(t) <= 30);                    // une ligne d'écran
-        VERIFIER(t.front() >= 'A' && t.front() <= 'Z');   // majuscule
-        for (char c : t) VERIFIER(!(c >= '0' && c <= '9'));
-        for (std::size_t j = s + 1; j < NE; ++j) VERIFIER(!egal(t, texte(etat_n(j))));
+        VERIFIER(caracteres(t) <= 30);                  // une ligne d'écran
+        VERIFIER(t.front() >= 'A' && t.front() <= 'Z'); // majuscule
+        for (char c : t)
+            VERIFIER(!(c >= '0' && c <= '9'));
+        for (std::size_t j = s + 1; j < NE; ++j)
+            VERIFIER(!egal(t, texte(etat_n(j))));
     }
     VERIFIER(a_un_non_ascii(texte(Etat::Pret)) && a_un_non_ascii(texte(Etat::Ecoute)));
     VERIFIER(a_un_non_ascii(texte(Etat::Reflexion)) && a_un_non_ascii(texte(Etat::Reponse)));
@@ -371,7 +386,8 @@ constexpr int phrases_d_erreur_exactes_de_l_api_paragraphe_8() {
     for (std::size_t i = 0; i < NB_CAUSES - 1; ++i) {
         VERIFIER(egal(texte_erreur(ATTENDUS[i].cause), ATTENDUS[i].phrase));
         VERIFIER(ATTENDUS[i].cause == static_cast<Cause>(i + 1));
-        for (std::size_t j = i + 1; j < NB_CAUSES - 1; ++j) VERIFIER(!egal(ATTENDUS[i].phrase, ATTENDUS[j].phrase));
+        for (std::size_t j = i + 1; j < NB_CAUSES - 1; ++j)
+            VERIFIER(!egal(ATTENDUS[i].phrase, ATTENDUS[j].phrase));
         // jamais un code HTTP brut : pas trois chiffres de suite
         int suite = 0;
         for (char c : ATTENDUS[i].phrase) {
@@ -407,7 +423,7 @@ constexpr int statut_http_vers_cause() {
     VERIFIER(cause_depuis_http(401) == Cause::CleRefusee);
     VERIFIER(cause_depuis_http(403) == Cause::CleRefusee);
     VERIFIER(cause_depuis_http(404) == Cause::MauvaiseAdresse);
-    VERIFIER(cause_depuis_http(404, false) == Cause::ReponseInattendue);  // /models : pas une erreur de route
+    VERIFIER(cause_depuis_http(404, false) == Cause::ReponseInattendue); // /models : pas une erreur de route
     VERIFIER(cause_depuis_http(404, true, true) == Cause::ModeleInconnu);
     VERIFIER(cause_depuis_http(400, true, true) == Cause::ModeleInconnu);
     VERIFIER(cause_depuis_http(400) == Cause::ReponseInattendue);
@@ -432,9 +448,10 @@ constexpr int delais_de_depart_documentes() {
     return 0;
 }
 
-}  // namespace
+} // namespace
 
-#define LISTE(X)                                                        \
+// clang-format off
+#define LISTE(X) \
     X(le_jeu_d_etats_et_d_evenements_est_celui_attendu)                 \
     X(aucune_transition_vers_un_etat_inconnu)                           \
     X(la_machine_suit_la_table_pour_toutes_les_paires)                  \
@@ -449,10 +466,22 @@ constexpr int delais_de_depart_documentes() {
     X(les_delais_font_sortir_de_tout_etat_actif)                        \
     X(pas_de_blocage_possible_pret_atteignable_depuis_tout_etat)        \
     X(tous_les_etats_sont_atteignables_depuis_pret)                     \
-    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<0>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<1>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<2>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<3>) \
-    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<4>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<5>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<6>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<7>) \
-    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<8>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<9>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<10>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<11>) \
-    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<12>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<13>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<14>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<15>) \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<0>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<1>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<2>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<3>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<4>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<5>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<6>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<7>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<8>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<9>)         \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<10>)        \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<11>)        \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<12>)        \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<13>)        \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<14>)        \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<15>)        \
     X(pret_n_est_reveille_que_par_le_mot_d_activation)                  \
     X(delai_en_ecoute_est_un_retour_silencieux_pas_une_panne)           \
     X(texte_vide_reconnu_ramene_a_pret_sans_erreur)                     \
@@ -463,6 +492,7 @@ constexpr int delais_de_depart_documentes() {
     X(titres_des_services_comme_dans_la_page_de_reglages)               \
     X(statut_http_vers_cause)                                           \
     X(delais_de_depart_documentes)
+// clang-format on
 
 TESTS_A_LA_COMPILATION(LISTE)
 

@@ -9,8 +9,7 @@ namespace {
 
 constexpr bool egal(std::string_view a, std::string_view b) { return a == b; }
 
-template <std::size_t N>
-struct Sortie {
+template <std::size_t N> struct Sortie {
     char t[N] = {};
     Tampon tp{t, N};
     constexpr std::string_view vue() const { return tp.vue(); }
@@ -48,7 +47,7 @@ constexpr int assemblage_adresse_et_route() {
          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"},
         {"http://h", "", "http://h"},
     };
-    for (const Cas& c : CAS_URL) {
+    for (const Cas &c : CAS_URL) {
         Sortie<256> s;
         VERIFIER(assembler_url(s.tp, c.base, c.route));
         VERIFIER(egal(s.vue(), c.attendu));
@@ -57,16 +56,16 @@ constexpr int assemblage_adresse_et_route() {
 }
 
 constexpr int adresses_refusees() {
-    for (std::string_view base : {std::string_view(""), std::string_view("ftp://h/v1"), std::string_view("h/v1"),
-                                  std::string_view("//h/v1"), std::string_view("localhost:1234/v1"),
-                                  std::string_view("http://h/ v1"), std::string_view("http://h/v1?api-version=1"),
-                                  std::string_view("http://h/v1#x"), std::string_view("http://h\n/v1"),
-                                  std::string_view("https://h/v1\t")}) {
+    for (std::string_view base :
+         {std::string_view(""), std::string_view("ftp://h/v1"), std::string_view("h/v1"), std::string_view("//h/v1"),
+          std::string_view("localhost:1234/v1"), std::string_view("http://h/ v1"),
+          std::string_view("http://h/v1?api-version=1"), std::string_view("http://h/v1#x"),
+          std::string_view("http://h\n/v1"), std::string_view("https://h/v1\t")}) {
         Sortie<256> s;
         VERIFIER(!assembler_url(s.tp, base, "chat/completions"));
     }
     Sortie<256> s;
-    VERIFIER(!assembler_url(s.tp, "http://h/v1", "chat completions"));  // espace dans la route
+    VERIFIER(!assembler_url(s.tp, "http://h/v1", "chat completions")); // espace dans la route
     return 0;
 }
 
@@ -74,7 +73,7 @@ constexpr int adresse_trop_longue_pour_le_tampon_deborde_sans_rien_couper_en_sil
     Sortie<20> s;
     VERIFIER(!assembler_url(s.tp, "https://api.openai.com/v1", "chat/completions"));
     VERIFIER(s.tp.deborde());
-    Sortie<41> pile;  // « https://api.openai.com/v1/chat/completions » = 42 octets : un de trop
+    Sortie<41> pile; // « https://api.openai.com/v1/chat/completions » = 42 octets : un de trop
     VERIFIER(!assembler_url(pile.tp, "https://api.openai.com/v1", "chat/completions"));
     Sortie<42> ok;
     VERIFIER(assembler_url(ok.tp, "https://api.openai.com/v1", "chat/completions"));
@@ -96,8 +95,8 @@ constexpr int la_base_a_t_elle_une_version() {
     VERIFIER(!base_a_une_version("http://h/1"));
     VERIFIER(!base_a_une_version("http://h/V1"));
     VERIFIER(!base_a_une_version("http://h/v1.5"));
-    VERIFIER(!base_a_une_version("pc:1234/v1"));  // pas d'adresse complète
-    VERIFIER(!base_a_une_version("http://v1"));   // « v1 » est l'hôte, pas un segment du chemin
+    VERIFIER(!base_a_une_version("pc:1234/v1")); // pas d'adresse complète
+    VERIFIER(!base_a_une_version("http://v1"));  // « v1 » est l'hôte, pas un segment du chemin
     return 0;
 }
 
@@ -114,7 +113,7 @@ constexpr int routes_documentees() {
 constexpr int json_texte_simple_et_caracteres_speciaux() {
     Sortie<128> a;
     VERIFIER(json_chaine(a.tp, "abc 123 /"));
-    VERIFIER(egal(a.vue(), "\"abc 123 /\""));  // la barre oblique n'est pas échappée
+    VERIFIER(egal(a.vue(), "\"abc 123 /\"")); // la barre oblique n'est pas échappée
     Sortie<128> b;
     VERIFIER(json_chaine(b.tp, "a\"b\\c\nd\re\tf\bg\fh"));
     VERIFIER(egal(b.vue(), "\"a\\\"b\\\\c\\nd\\re\\tf\\bg\\fh\""));
@@ -128,12 +127,13 @@ constexpr int json_caracteres_de_controle_en_u00xx() {
     constexpr char CTRL[] = {'\x01', '\x1f', '\x00', '\x0b', 'x', '\x7f'};
     Sortie<128> s;
     VERIFIER(json_chaine(s.tp, std::string_view(CTRL, sizeof(CTRL))));
-    VERIFIER(egal(s.vue(), "\"\\u0001\\u001f\\u0000\\u000bx\x7f\""));  // DEL est valide tel quel en JSON
-    for (int c = 0; c < 0x20; ++c) {  // aucun octet < 0x20 ne reste brut dans la sortie
+    VERIFIER(egal(s.vue(), "\"\\u0001\\u001f\\u0000\\u000bx\x7f\"")); // DEL est valide tel quel en JSON
+    for (int c = 0; c < 0x20; ++c) {                                  // aucun octet < 0x20 ne reste brut dans la sortie
         const char un = static_cast<char>(c);
         Sortie<32> t;
         VERIFIER(json_chaine(t.tp, std::string_view(&un, 1)));
-        for (char o : t.vue()) VERIFIER(static_cast<unsigned char>(o) >= 0x20U);
+        for (char o : t.vue())
+            VERIFIER(static_cast<unsigned char>(o) >= 0x20U);
     }
     return 0;
 }
@@ -156,17 +156,20 @@ constexpr int json_octets_invalides_remplaces_par_u_fffd() {
     };
     constexpr Cas CAS_J[] = {
         {"\xFF", "\"\xEF\xBF\xBD\""},
-        {"a\xC3", "\"a\xEF\xBF\xBD\""},                                   // é coupé : octet de tête seul
-        {"\xC3(", "\"\xEF\xBF\xBD(\""},                                    // continuation attendue, « ( » reçu
-        {"\xE2\x82", "\"\xEF\xBF\xBD\xEF\xBF\xBD\""},                      // € coupé : un U+FFFD par octet
-        {"\xC0\x80", "\"\xEF\xBF\xBD\xEF\xBF\xBD\""},                      // forme sur-longue de NUL
-        {"\xED\xA0\x80", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\""},      // surrogate U+D800 encodé
-        {"\xF4\x90\x80\x80", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\""},  // > U+10FFFF
-        {"\x80", "\"\xEF\xBF\xBD\""},                                      // continuation isolée
-        {"é\xFF" "é", "\"é\xEF\xBF\xBD" "é\""},                          // le texte valide autour est conservé
+        {"a\xC3", "\"a\xEF\xBF\xBD\""},                               // é coupé : octet de tête seul
+        {"\xC3(", "\"\xEF\xBF\xBD(\""},                               // continuation attendue, « ( » reçu
+        {"\xE2\x82", "\"\xEF\xBF\xBD\xEF\xBF\xBD\""},                 // € coupé : un U+FFFD par octet
+        {"\xC0\x80", "\"\xEF\xBF\xBD\xEF\xBF\xBD\""},                 // forme sur-longue de NUL
+        {"\xED\xA0\x80", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\""}, // surrogate U+D800 encodé
+        {"\xF4\x90\x80\x80", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\""}, // > U+10FFFF
+        {"\x80", "\"\xEF\xBF\xBD\""},                                                 // continuation isolée
+        {"é\xFF"
+         "é",
+         "\"é\xEF\xBF\xBD"
+         "é\""}, // le texte valide autour est conservé
     };
     VERIFIER(F.size() == 3);
-    for (const Cas& c : CAS_J) {
+    for (const Cas &c : CAS_J) {
         Sortie<64> s;
         VERIFIER(json_chaine(s.tp, c.entree));
         VERIFIER(egal(s.vue(), c.attendu));
@@ -179,7 +182,7 @@ constexpr int json_debordement_est_signale() {
     Sortie<5> s;
     VERIFIER(!json_chaine(s.tp, "abcdef"));
     VERIFIER(s.tp.deborde());
-    Sortie<8> pile;  // "abcdef" = 8 octets avec les guillemets
+    Sortie<8> pile; // "abcdef" = 8 octets avec les guillemets
     VERIFIER(json_chaine(pile.tp, "abcdef"));
     Sortie<7> trop_court;
     VERIFIER(!json_chaine(trop_court.tp, "abcdef"));
@@ -233,7 +236,7 @@ constexpr int corps_chat_echappe_les_contenus() {
 constexpr int corps_chat_refuse_l_absence_de_message_et_le_debordement() {
     OptionsChat o;
     Sortie<512> s;
-    VERIFIER(!corps_chat(s.tp, o));  // aucun message
+    VERIFIER(!corps_chat(s.tp, o)); // aucun message
     constexpr Message H[] = {{Role::Utilisateur, "Bonjour"}};
     o.historique = H;
     o.nombre = 1;
@@ -243,28 +246,34 @@ constexpr int corps_chat_refuse_l_absence_de_message_et_le_debordement() {
 }
 
 constexpr int fenetre_d_historique_bornee_en_octets() {
-    constexpr Message M[] = {{Role::Utilisateur, "aaaa"}, {Role::Assistant, "bbbb"}, {Role::Utilisateur, "cccc"},
-                             {Role::Assistant, "dddd"},  {Role::Utilisateur, "eeee"}};
+    constexpr Message M[] = {{Role::Utilisateur, "aaaa"},
+                             {Role::Assistant, "bbbb"},
+                             {Role::Utilisateur, "cccc"},
+                             {Role::Assistant, "dddd"},
+                             {Role::Utilisateur, "eeee"}};
     VERIFIER(premier_message_retenu(M, 5, 100) == 0);
-    VERIFIER(premier_message_retenu(M, 5, 20) == 0);  // pile le budget : tout tient
-    VERIFIER(premier_message_retenu(M, 5, 19) == 2);  // « bbbb » sort, et la réponse orpheline avec la question « aaaa »
+    VERIFIER(premier_message_retenu(M, 5, 20) == 0); // pile le budget : tout tient
+    VERIFIER(premier_message_retenu(M, 5, 19) == 2); // « bbbb » sort, et la réponse orpheline avec la question « aaaa »
     VERIFIER(premier_message_retenu(M, 5, 16) == 2);
-    VERIFIER(premier_message_retenu(M, 5, 12) == 2);  // c, d, e = 12 octets
-    VERIFIER(premier_message_retenu(M, 5, 11) == 4);  // « cccc » ne tient plus : reste « eeee » (d orphelin écarté)
+    VERIFIER(premier_message_retenu(M, 5, 12) == 2); // c, d, e = 12 octets
+    VERIFIER(premier_message_retenu(M, 5, 11) == 4); // « cccc » ne tient plus : reste « eeee » (d orphelin écarté)
     VERIFIER(premier_message_retenu(M, 5, 8) == 4);
     VERIFIER(premier_message_retenu(M, 5, 4) == 4);
-    VERIFIER(premier_message_retenu(M, 5, 0) == 4);   // la dernière question est toujours envoyée
+    VERIFIER(premier_message_retenu(M, 5, 0) == 4); // la dernière question est toujours envoyée
     VERIFIER(premier_message_retenu(M, 1, 0) == 0);
     VERIFIER(premier_message_retenu(M, 0, 100) == 0);
     VERIFIER(premier_message_retenu(nullptr, 3, 100) == 0);
     constexpr Message GROS[] = {{Role::Utilisateur, "a"}, {Role::Utilisateur, "zzzzzzzzzz"}};
-    VERIFIER(premier_message_retenu(GROS, 2, 5) == 1);  // un dernier message plus gros que le budget reste seul
+    VERIFIER(premier_message_retenu(GROS, 2, 5) == 1); // un dernier message plus gros que le budget reste seul
     return 0;
 }
 
 constexpr int le_corps_ne_contient_que_la_fenetre() {
-    constexpr Message M[] = {{Role::Utilisateur, "aaaa"}, {Role::Assistant, "bbbb"}, {Role::Utilisateur, "cccc"},
-                             {Role::Assistant, "dddd"},  {Role::Utilisateur, "eeee"}};
+    constexpr Message M[] = {{Role::Utilisateur, "aaaa"},
+                             {Role::Assistant, "bbbb"},
+                             {Role::Utilisateur, "cccc"},
+                             {Role::Assistant, "dddd"},
+                             {Role::Utilisateur, "eeee"}};
     OptionsChat o;
     o.prompt_systeme = "S";
     o.historique = M;
@@ -272,10 +281,9 @@ constexpr int le_corps_ne_contient_que_la_fenetre() {
     o.budget_octets = 12;
     Sortie<512> s;
     VERIFIER(corps_chat(s.tp, o));
-    VERIFIER(egal(s.vue(),
-                  "{\"stream\":true,\"messages\":[{\"role\":\"system\",\"content\":\"S\"},"
-                  "{\"role\":\"user\",\"content\":\"cccc\"},{\"role\":\"assistant\",\"content\":\"dddd\"},"
-                  "{\"role\":\"user\",\"content\":\"eeee\"}]}"));
+    VERIFIER(egal(s.vue(), "{\"stream\":true,\"messages\":[{\"role\":\"system\",\"content\":\"S\"},"
+                           "{\"role\":\"user\",\"content\":\"cccc\"},{\"role\":\"assistant\",\"content\":\"dddd\"},"
+                           "{\"role\":\"user\",\"content\":\"eeee\"}]}"));
     return 0;
 }
 
@@ -330,7 +338,8 @@ constexpr int corps_tts_echappe_le_texte_a_dire() {
     o.texte = "Ça va ? « Oui », dit-il.\nFin \"ok\" \\ 5 €";
     Sortie<256> s;
     VERIFIER(corps_tts(s.tp, o));
-    VERIFIER(egal(s.vue(), "{\"input\":\"Ça va ? « Oui », dit-il.\\nFin \\\"ok\\\" \\\\ 5 €\",\"response_format\":\"pcm\"}"));
+    VERIFIER(egal(s.vue(),
+                  "{\"input\":\"Ça va ? « Oui », dit-il.\\nFin \\\"ok\\\" \\\\ 5 €\",\"response_format\":\"pcm\"}"));
     return 0;
 }
 
@@ -392,12 +401,11 @@ constexpr int cadre_multipart_exact_avant_et_apres_l_audio() {
     o.langue = "fr";
     Sortie<512> d;
     VERIFIER(debut_multipart(d.tp, FRONTIERE, o));
-    VERIFIER(egal(d.vue(),
-                  "--" B "\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nm\r\n"
-                  "--" B "\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\nfr\r\n"
-                  "--" B "\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n"
-                  "--" B "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n"
-                  "Content-Type: audio/wav\r\n\r\n"));
+    VERIFIER(egal(d.vue(), "--" B "\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nm\r\n"
+                           "--" B "\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\nfr\r\n"
+                           "--" B "\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n"
+                           "--" B "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n"
+                           "Content-Type: audio/wav\r\n\r\n"));
     Sortie<64> f;
     VERIFIER(fin_multipart(f.tp, FRONTIERE));
     VERIFIER(egal(f.vue(), "\r\n--" B "--\r\n"));
@@ -410,17 +418,16 @@ constexpr int cadre_multipart_omet_modele_et_langue_vides() {
     o.type_mime = "audio/mpeg";
     Sortie<512> d;
     VERIFIER(debut_multipart(d.tp, FRONTIERE, o));
-    VERIFIER(egal(d.vue(),
-                  "--" B "\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n"
-                  "--" B "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voix.mp3\"\r\n"
-                  "Content-Type: audio/mpeg\r\n\r\n"));
+    VERIFIER(egal(d.vue(), "--" B "\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n"
+                           "--" B "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voix.mp3\"\r\n"
+                           "Content-Type: audio/mpeg\r\n\r\n"));
     return 0;
 }
 
 constexpr int multipart_refuse_les_valeurs_dangereuses() {
     Sortie<512> s;
     OptionsStt o;
-    o.modele = "m\r\n--" B "--";  // tente d'imiter la frontière
+    o.modele = "m\r\n--" B "--"; // tente d'imiter la frontière
     VERIFIER(!debut_multipart(s.tp, FRONTIERE, o));
     o.modele = "m\"x";
     VERIFIER(!debut_multipart(s.tp, FRONTIERE, o));
@@ -435,8 +442,8 @@ constexpr int multipart_refuse_les_valeurs_dangereuses() {
     o.nom_fichier = "a\".wav";
     VERIFIER(!debut_multipart(s.tp, FRONTIERE, o));
     o.nom_fichier = "../x.wav";
-    VERIFIER(!debut_multipart(s.tp, FRONTIERE, o));  // pas de « / » dans un nom de fichier
-    VERIFIER(s.tp.taille() == 0);                     // et rien n'a été écrit
+    VERIFIER(!debut_multipart(s.tp, FRONTIERE, o)); // pas de « / » dans un nom de fichier
+    VERIFIER(s.tp.taille() == 0);                   // et rien n'a été écrit
     return 0;
 }
 
@@ -462,37 +469,37 @@ constexpr int multipart_refuse_nom_de_fichier_type_et_frontiere_invalides() {
     return 0;
 }
 
-}  // namespace
+} // namespace
 
-#define LISTE(X)                                                                         \
-    X(assemblage_adresse_et_route)                                                       \
-    X(adresses_refusees)                                                                 \
-    X(adresse_trop_longue_pour_le_tampon_deborde_sans_rien_couper_en_silence)            \
-    X(la_base_a_t_elle_une_version)                                                      \
-    X(routes_documentees)                                                                \
-    X(json_texte_simple_et_caracteres_speciaux)                                          \
-    X(json_caracteres_de_controle_en_u00xx)                                              \
-    X(json_accents_euro_emoji_restent_en_utf8)                                           \
-    X(json_octets_invalides_remplaces_par_u_fffd)                                        \
-    X(json_debordement_est_signale)                                                      \
-    X(corps_chat_exact_avec_modele_et_prompt)                                            \
-    X(corps_chat_sans_modele_ni_prompt)                                                  \
-    X(corps_chat_echappe_les_contenus)                                                   \
-    X(corps_chat_refuse_l_absence_de_message_et_le_debordement)                          \
-    X(fenetre_d_historique_bornee_en_octets)                                             \
-    X(le_corps_ne_contient_que_la_fenetre)                                               \
-    X(le_prompt_systeme_ne_compte_pas_dans_le_budget)                                    \
-    X(noms_des_roles)                                                                    \
-    X(corps_tts_exact)                                                                   \
-    X(corps_tts_omet_les_champs_vides_et_choisit_le_format)                              \
-    X(corps_tts_echappe_le_texte_a_dire)                                                 \
-    X(corps_tts_refuse_texte_vide_et_debordement)                                        \
-    X(frontiere_depuis_une_graine)                                                       \
-    X(frontieres_admissibles_et_refusees)                                                \
-    X(en_tete_content_type)                                                              \
-    X(cadre_multipart_exact_avant_et_apres_l_audio)                                      \
-    X(cadre_multipart_omet_modele_et_langue_vides)                                       \
-    X(multipart_refuse_les_valeurs_dangereuses)                                          \
+#define LISTE(X)                                                                                                       \
+    X(assemblage_adresse_et_route)                                                                                     \
+    X(adresses_refusees)                                                                                               \
+    X(adresse_trop_longue_pour_le_tampon_deborde_sans_rien_couper_en_silence)                                          \
+    X(la_base_a_t_elle_une_version)                                                                                    \
+    X(routes_documentees)                                                                                              \
+    X(json_texte_simple_et_caracteres_speciaux)                                                                        \
+    X(json_caracteres_de_controle_en_u00xx)                                                                            \
+    X(json_accents_euro_emoji_restent_en_utf8)                                                                         \
+    X(json_octets_invalides_remplaces_par_u_fffd)                                                                      \
+    X(json_debordement_est_signale)                                                                                    \
+    X(corps_chat_exact_avec_modele_et_prompt)                                                                          \
+    X(corps_chat_sans_modele_ni_prompt)                                                                                \
+    X(corps_chat_echappe_les_contenus)                                                                                 \
+    X(corps_chat_refuse_l_absence_de_message_et_le_debordement)                                                        \
+    X(fenetre_d_historique_bornee_en_octets)                                                                           \
+    X(le_corps_ne_contient_que_la_fenetre)                                                                             \
+    X(le_prompt_systeme_ne_compte_pas_dans_le_budget)                                                                  \
+    X(noms_des_roles)                                                                                                  \
+    X(corps_tts_exact)                                                                                                 \
+    X(corps_tts_omet_les_champs_vides_et_choisit_le_format)                                                            \
+    X(corps_tts_echappe_le_texte_a_dire)                                                                               \
+    X(corps_tts_refuse_texte_vide_et_debordement)                                                                      \
+    X(frontiere_depuis_une_graine)                                                                                     \
+    X(frontieres_admissibles_et_refusees)                                                                              \
+    X(en_tete_content_type)                                                                                            \
+    X(cadre_multipart_exact_avant_et_apres_l_audio)                                                                    \
+    X(cadre_multipart_omet_modele_et_langue_vides)                                                                     \
+    X(multipart_refuse_les_valeurs_dangereuses)                                                                        \
     X(multipart_refuse_nom_de_fichier_type_et_frontiere_invalides)
 
 TESTS_A_LA_COMPILATION(LISTE)

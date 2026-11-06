@@ -28,28 +28,28 @@
 namespace ecran::assistant {
 
 struct EvenementSse {
-    std::string_view type;     // champ « event: » ; vide = « message » (cas des services OpenAI)
-    std::string_view donnees;  // valeurs de « data: », jointes par '\n' ; vide si `trop_long`
-    bool fin;                  // `donnees` vaut exactement « [DONE] »
-    bool trop_long;            // l'événement dépassait la capacité du décodeur
+    std::string_view type;    // champ « event: » ; vide = « message » (cas des services OpenAI)
+    std::string_view donnees; // valeurs de « data: », jointes par '\n' ; vide si `trop_long`
+    bool fin;                 // `donnees` vaut exactement « [DONE] »
+    bool trop_long;           // l'événement dépassait la capacité du décodeur
 };
 
 // Les vues de `EvenementSse` ne valent que pendant l'appel de `sur_evenement`.
-template <std::size_t CAPACITE_DONNEES, std::size_t CAPACITE_TYPE = 32>
-class DecodeurSse {
+template <std::size_t CAPACITE_DONNEES, std::size_t CAPACITE_TYPE = 32> class DecodeurSse {
     static_assert(CAPACITE_DONNEES >= 16, "capacité trop petite pour un événement utile");
 
-public:
+  public:
     // Alimente le décodeur avec un morceau d'octets (taille quelconque, même 1 octet, même vide). Appelle
     // `sur_evenement(const EvenementSse&)` pour chaque événement complet. Rend le nombre d'événements expédiés.
-    template <class F>
-    constexpr std::size_t alimenter(std::string_view morceau, F&& sur_evenement) {
+    template <class F> constexpr std::size_t alimenter(std::string_view morceau, F &&sur_evenement) {
         std::size_t expedies = 0;
         for (char c : morceau) {
-            if (termine_) break;
+            if (termine_)
+                break;
             if (saute_lf_) {
                 saute_lf_ = false;
-                if (c == '\n') continue;  // le LF d'un CRLF dont le CR était dans le morceau précédent
+                if (c == '\n')
+                    continue; // le LF d'un CRLF dont le CR était dans le morceau précédent
             }
             if (c == '\r' || c == '\n') {
                 saute_lf_ = (c == '\r');
@@ -82,7 +82,7 @@ public:
         vider_evenement();
     }
 
-private:
+  private:
     enum class Etat { DebutLigne, Nom, AvantValeur, Valeur, Commentaire };
     enum class Champ { Aucun, Data, Event };
 
@@ -94,20 +94,25 @@ private:
     }
 
     constexpr Champ champ_du_nom() const noexcept {
-        if (nom_trop_long_) return Champ::Aucun;
+        if (nom_trop_long_)
+            return Champ::Aucun;
         const std::string_view nom(nom_, nom_n_);
-        if (nom == "data") return Champ::Data;
-        if (nom == "event") return Champ::Event;
+        if (nom == "data")
+            return Champ::Data;
+        if (nom == "event")
+            return Champ::Event;
         return Champ::Aucun;
     }
 
     constexpr void debut_ligne_data() noexcept {
-        if (a_donnees_) ecrire_donnee('\n');
+        if (a_donnees_)
+            ecrire_donnee('\n');
         a_donnees_ = true;
     }
 
     constexpr void ecrire_donnee(char c) noexcept {
-        if (trop_long_) return;
+        if (trop_long_)
+            return;
         if (data_n_ >= CAPACITE_DONNEES) {
             trop_long_ = true;
             return;
@@ -118,32 +123,38 @@ private:
     // Octet ordinaire (ni CR ni LF).
     constexpr void octet(char c) noexcept {
         switch (etat_) {
-            case Etat::DebutLigne:
-                if (c == ':') {
-                    etat_ = Etat::Commentaire;
-                } else {
-                    nom_n_ = 0;
-                    nom_trop_long_ = false;
-                    etat_ = Etat::Nom;
-                    ajouter_au_nom(c);
-                }
-                break;
-            case Etat::Nom:
-                if (c == ':') {
-                    champ_ = champ_du_nom();
-                    if (champ_ == Champ::Data) debut_ligne_data();
-                    if (champ_ == Champ::Event) type_n_ = 0;
-                    etat_ = Etat::AvantValeur;
-                } else {
-                    ajouter_au_nom(c);
-                }
-                break;
-            case Etat::AvantValeur:
-                etat_ = Etat::Valeur;
-                if (c != ' ') valeur(c);  // un seul espace est retiré après les deux-points
-                break;
-            case Etat::Valeur: valeur(c); break;
-            case Etat::Commentaire: break;
+        case Etat::DebutLigne:
+            if (c == ':') {
+                etat_ = Etat::Commentaire;
+            } else {
+                nom_n_ = 0;
+                nom_trop_long_ = false;
+                etat_ = Etat::Nom;
+                ajouter_au_nom(c);
+            }
+            break;
+        case Etat::Nom:
+            if (c == ':') {
+                champ_ = champ_du_nom();
+                if (champ_ == Champ::Data)
+                    debut_ligne_data();
+                if (champ_ == Champ::Event)
+                    type_n_ = 0;
+                etat_ = Etat::AvantValeur;
+            } else {
+                ajouter_au_nom(c);
+            }
+            break;
+        case Etat::AvantValeur:
+            etat_ = Etat::Valeur;
+            if (c != ' ')
+                valeur(c); // un seul espace est retiré après les deux-points
+            break;
+        case Etat::Valeur:
+            valeur(c);
+            break;
+        case Etat::Commentaire:
+            break;
         }
     }
 
@@ -166,27 +177,33 @@ private:
     // Fin de ligne ; rend vrai si la ligne vide demande d'expédier l'événement.
     constexpr bool fin_de_ligne() noexcept {
         switch (etat_) {
-            case Etat::DebutLigne:  // ligne vide : expédier ; sans aucune ligne « data », rien à expédier et le type est oublié
-                if (!a_donnees_) type_n_ = 0;
-                return a_donnees_;
-            case Etat::Nom:  // champ sans deux-points : nom seul, valeur vide
-                champ_ = champ_du_nom();
-                if (champ_ == Champ::Data) debut_ligne_data();
-                if (champ_ == Champ::Event) type_n_ = 0;
-                break;
-            case Etat::AvantValeur:
-            case Etat::Valeur:
-            case Etat::Commentaire: break;
+        case Etat::DebutLigne: // ligne vide : expédier ; sans aucune ligne « data », rien à expédier et le type est
+                               // oublié
+            if (!a_donnees_)
+                type_n_ = 0;
+            return a_donnees_;
+        case Etat::Nom: // champ sans deux-points : nom seul, valeur vide
+            champ_ = champ_du_nom();
+            if (champ_ == Champ::Data)
+                debut_ligne_data();
+            if (champ_ == Champ::Event)
+                type_n_ = 0;
+            break;
+        case Etat::AvantValeur:
+        case Etat::Valeur:
+        case Etat::Commentaire:
+            break;
         }
         etat_ = Etat::DebutLigne;
         return false;
     }
 
-    template <class F>
-    constexpr void expedier(F& sur_evenement) {
+    template <class F> constexpr void expedier(F &sur_evenement) {
         const std::string_view donnees = trop_long_ ? std::string_view() : std::string_view(data_, data_n_);
-        const EvenementSse ev{std::string_view(type_, type_n_), donnees, !trop_long_ && donnees == "[DONE]", trop_long_};
-        if (ev.fin) termine_ = true;
+        const EvenementSse ev{std::string_view(type_, type_n_), donnees, !trop_long_ && donnees == "[DONE]",
+                              trop_long_};
+        if (ev.fin)
+            termine_ = true;
         sur_evenement(ev);
         vider_evenement();
     }
@@ -206,4 +223,4 @@ private:
     bool termine_ = false;
 };
 
-}  // namespace ecran::assistant
+} // namespace ecran::assistant
