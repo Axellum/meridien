@@ -288,7 +288,8 @@ def construire_scene(nom: str, sources: list, lvgl: Path, archive: Path, jobs: i
     compiler_en_parallele(taches, jobs)
 
     exe = dossier / f"rendu_{nom}.exe"
-    resultat = lancer([clangxx, *map(str, objets), str(police_o), str(archive), "-o", str(exe)])
+    # -static : sans lui l'exécutable cherche libc++.dll dans le PATH et refuse de démarrer hors d'une session env_hote.ps1.
+    resultat = lancer([clangxx, "-static", *map(str, objets), str(police_o), str(archive), "-o", str(exe)])
     if resultat.returncode != 0:
         print(resultat.stdout + resultat.stderr, file=sys.stderr)
         erreur(f"édition de liens de la scène {nom}")
@@ -363,6 +364,7 @@ def main() -> None:
         print("config LVGL : non comparée au sdkconfig du firmware (aucun sdkconfig ici ; copie du 06/11/2026 utilisée)")
 
     lvgl = chercher_lvgl()
+    print(f"sources de LVGL : {lvgl}")
     verrouillee = version_verrouillee()
     if verrouillee and verrouillee != version_lvgl(lvgl):
         erreur(f"LVGL {version_lvgl(lvgl)} dans {lvgl} mais dependencies.lock verrouille {verrouillee}")
