@@ -1,12 +1,12 @@
 # Verifications du depot en une commande (PowerShell 5.1 ou 7 ; ASCII seulement a dessein : pas de BOM).
 #
 #   .\tools\verifier.ps1             verification complete : secrets, tests du noyau (executes, avec detecteurs),
-#                                    mutations, ruff, mise en forme (avertissement)
+#                                    mutations, ruff, mise en forme C/C++ (clang-format)
 #   .\tools\verifier.ps1 -Web        + parcours Playwright de la page de reglages (demande le reseau)
 #   .\tools\verifier.ps1 -Rapide     seulement ce qui est dans l'index git (appele par .githooks/pre-commit)
 #
-# Code de sortie non nul = au moins un controle a ECHOUE. La mise en forme n'est qu'un AVERTISSEMENT tant que le code
-# existant n'a pas ete reformate d'un coup. Outils : H:\AuxFilsDesIdees\_outils (voir docs/outils.md).
+# Code de sortie non nul = au moins un controle a ECHOUE, la mise en forme comprise (bloquante depuis le reformatage
+# d'un seul coup du code). Outils : H:\AuxFilsDesIdees\_outils (voir docs/outils.md).
 param(
     [switch]$Rapide,
     [switch]$Web
@@ -36,6 +36,7 @@ if ($Rapide) {
     $fichiers = @(& git ls-files)
 }
 $fichiers = $fichiers | Where-Object { $_ -and (Test-Path $_) }
+# Memes exclusions que .clang-format-ignore (fichiers generes), pour que le compte affiche soit juste.
 $cpp = @($fichiers | Where-Object { $_ -match '\.(c|cc|cpp|h|hpp|inc)$' -and $_ -notmatch '(^|/)(managed_components|build|\.cache)/' -and $_ -notmatch 'fuseaux_donnees\.inc$' -and $_ -notmatch 'test/host/donnees/' })
 $py = @($fichiers | Where-Object { $_ -match '\.py$' })
 $noyauTouche = (-not $Rapide) -or @($fichiers | Where-Object { $_ -match '^(components/core/|test/host/)' }).Count -gt 0
@@ -84,15 +85,20 @@ if ($py.Count -gt 0) {
     Ajouter 'Python (ruff)' 'SAUTE' 'aucun fichier Python'
 }
 
-# --- 4. mise en forme C/C++ (avertissement seulement) ----------------------------------------------------------
+# --- 4. mise en forme C/C++ (bloquante) -------------------------------------------------------------------------
+# .clang-format est la regle, .clang-format-ignore exclut les fichiers generes (clang-format n'y touche pas).
 if ($cpp.Count -gt 0) {
     $ecarts = 0
+    $fautifs = @()
     foreach ($f in $cpp) {
-        $o = & clang-format --style=file --dry-run $f 2>&1 | Select-String 'warning:'
-        $ecarts += @($o).Count
+        $n = @(& clang-format --style=file --dry-run $f 2>&1 | Select-String 'warning:').Count
+        if ($n -gt 0) { $ecarts += $n; $fautifs += "$f ($n)" }
     }
     if ($ecarts -eq 0) { Ajouter 'mise en forme (clang-format)' 'OK' "$($cpp.Count) fichier(s) conformes" }
-    else { Ajouter 'mise en forme (clang-format)' 'AVERT' "$ecarts ecart(s) dans $($cpp.Count) fichier(s) ; non bloquant (.clang-format est la cible)" }
+    else {
+        $detail = "$ecarts ecart(s) dans $($fautifs.Count) fichier(s) ; corriger avec : clang-format -i --style=file <fichier>`n" + ($fautifs -join "`n")
+        Ajouter 'mise en forme (clang-format)' 'ECHEC' $detail
+    }
 } else {
     Ajouter 'mise en forme (clang-format)' 'SAUTE' 'aucun fichier C/C++'
 }
