@@ -130,6 +130,12 @@ MUTATIONS = [
      "recherche_vide_ou_sans_resultat_ou_sans_place", "la saisie vide renvoie tout"),
 ]
 
+# Mutations de la piste « météo et heure » (json_mini, meteo_openmeteo, heure_fr) : fichier à part.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
+
+MUTATIONS += MUTATIONS_METEO_HEURE
+
 
 def mutations(cxx, mode):
     """Pour chaque mutation : copie du noyau, une seule modification, le test visé DOIT échouer à la compilation
