@@ -1,0 +1,160 @@
+// Scène « réglages » : la liste des six sections et chaque page de réglages (main/ui_reglages.cpp, ui_clavier.cpp, ui_commun.cpp),
+// compilées telles quelles, avec un hôte en mémoire vive (main/hote_memoire.cpp) à la place de la mémoire permanente, du Wi-Fi et
+// de la météo. L'installation guidée a sa propre scène (scene_installation.cpp) ; les gestes rejoués sont dans scene_parcours.cpp.
+//
+// Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
+// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
+// rendu-langues: toutes
+// rendu-langues-defaut: fr de tr
+// rendu-tailles: 1280x720 720x1280 1024x600
+// rendu-sequence: reglages
+//
+// Fixtures (inventées, pas des mesures) : appareil déjà en service sur « Maison_5G » (192.168.1.52), ville Lyon, météo « nuageux,
+// 12 °C », services de l'assistant réglés à la main (Ollama sur un PC du réseau, clé factice déjà enregistrée), version « banc de
+// rendu PC ». Les clés ne s'affichent jamais : la page « clé » montre un champ masqué rempli d'un texte factice.
+#include "parcours_outils.h"
+
+namespace {
+
+using namespace parcours;
+
+void en_service(const banc::Contexte &ctx) {
+    preparer(ctx, "reglages", Interface::Reglages);
+    g_hote.simuler_connecte("Maison_5G", "192.168.1.52");
+    g_hote.definir_texte("wifi.mot_de_passe", "bonmotdepasse");
+    g_hote.definir_texte("lieu.ville", "Lyon, Auvergne-Rhône-Alpes, France");
+    std::snprintf(g_hote.info.version, sizeof g_hote.info.version, "%s", "banc de rendu PC");
+}
+
+void assistant_regle() {
+    g_hote.definir_nombre("stt.preset", 1); // Ollama (mon PC)
+    g_hote.definir_texte("stt.url", "http://192.168.1.20:11434/v1");
+    g_hote.definir_texte("stt.modele", "whisper-small");
+    g_hote.definir_nombre("llm.preset", 3); // Ollama (mon PC)
+    g_hote.definir_texte("llm.url", "http://192.168.1.20:11434/v1");
+    g_hote.definir_texte("llm.modele", "mistral-small");
+    g_hote.definir_texte("llm.cle", "cle-factice-pour-le-rendu");
+    g_hote.definir_nombre("tts.preset", 2); // Kokoro (mon PC)
+    g_hote.definir_texte("tts.url", "http://192.168.1.20:8880/v1");
+    g_hote.definir_texte("tts.voix", "ff_siwis");
+}
+
+void aller(const char *chemin) {
+    ecran::ui_aller(chemin);
+    tourner();
+}
+
+// ---- les variantes, dans l'ordre de la séquence -------------------------------------------------------------------------
+
+void liste(const banc::Contexte &ctx) {
+    en_service(ctx);
+    assistant_regle();
+    aller("liste");
+}
+
+void liste_neuve(const banc::Contexte &ctx) {
+    preparer(ctx, "liste-neuve", Interface::Reglages);
+    aller("liste");
+}
+
+void reseau(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:0");
+}
+
+void reseau_hors_ligne(const banc::Contexte &ctx) {
+    preparer(ctx, "reseau-hors-ligne", Interface::Reglages);
+    aller("section:0");
+}
+
+void wifi_liste(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:0/wifi");
+}
+
+void lieu(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:1");
+}
+
+void lieu_vide(const banc::Contexte &ctx) {
+    preparer(ctx, "lieu-vide", Interface::Reglages);
+    aller("section:1");
+}
+
+void langue(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:2");
+}
+
+void affichage(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:3");
+}
+
+void assistant_stt(const banc::Contexte &ctx) {
+    en_service(ctx);
+    assistant_regle();
+    aller("section:4:0");
+}
+
+void assistant_llm(const banc::Contexte &ctx) {
+    en_service(ctx);
+    assistant_regle();
+    aller("section:4:1");
+}
+
+void assistant_tts(const banc::Contexte &ctx) {
+    en_service(ctx);
+    assistant_regle();
+    aller("section:4:2");
+}
+
+void assistant_neuf(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:4:1");
+}
+
+void cle_saisie(const banc::Contexte &ctx) {
+    en_service(ctx);
+    assistant_regle();
+    aller("section:4:1/editeur:llm.cle");
+    ecran::ui_simuler_saisie("cle-factice-pour-le-rendu");
+}
+
+void adresse_saisie(const banc::Contexte &ctx) {
+    en_service(ctx);
+    assistant_regle();
+    aller("section:4:1/editeur:llm.url");
+}
+
+void appareil(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:5");
+}
+
+} // namespace
+
+namespace banc {
+
+const Scene kScenes[] = {
+    {"liste", "Liste des réglages (appareil en service)", liste},
+    {"liste-neuve", "Liste des réglages (appareil neuf : rien de réglé)", liste_neuve},
+    {"reseau", "Réseau : connecté", reseau},
+    {"reseau-hors-ligne", "Réseau : pas de réseau enregistré", reseau_hors_ligne},
+    {"wifi-liste", "Réseau : choix d'un réseau", wifi_liste},
+    {"lieu", "Lieu et météo : ville choisie", lieu},
+    {"lieu-vide", "Lieu et météo : pas de ville", lieu_vide},
+    {"langue", "Langue de l'écran et de l'assistant", langue},
+    {"affichage", "Affichage : thème et luminosité", affichage},
+    {"assistant-stt", "Assistant : reconnaissance de la voix", assistant_stt},
+    {"assistant-llm", "Assistant : modèle de langage", assistant_llm},
+    {"assistant-tts", "Assistant : synthèse vocale", assistant_tts},
+    {"assistant-neuf", "Assistant : rien de réglé", assistant_neuf},
+    {"cle-saisie", "Assistant : saisie d'une clé (masquée)", cle_saisie},
+    {"adresse-saisie", "Assistant : saisie d'une adresse", adresse_saisie},
+    {"appareil", "Appareil : version, page sur téléphone, réinitialisation", appareil},
+};
+const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
+
+} // namespace banc
