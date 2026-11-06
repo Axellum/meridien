@@ -80,7 +80,7 @@ The board is a bottleneck (one unit, one flash at a time), so the interface can 
 
 Output, in `docs/captures/ecran/`: `<scene>-<variant>[-<language>]-<width>x<height>.png` (no suffix for French), for example [`bonjour-connecte-720x1280.png`](captures/ecran/bonjour-connecte-720x1280.png) (the screen the board runs today), and for a sheet `planche-<sequence>[-<language>]-<width>x<height>.png`. Two renders of the same code give the same bytes. The script refuses to start if `ninja` or `esphome` is running (one heavy build at a time on this PC; `-Forcer` overrides) and fails, rather than report success, when nothing was rendered.
 
-**A scene is one file**, `tools/rendu/scenes/scene_<name>.cpp`, found by itself: adding one touches neither the bench nor the script. It holds directives in comments, read by `rendre.py`, and the table `kScenes[]`: for each variant its name (the PNG file name), its French caption, and the function that builds the screen with its sample data. `scene_temoin.cpp` is the shortest model; `scene_bonjour.cpp` compiles the real firmware screen.
+**A scene is one file**, `tools/rendu/scenes/scene_<name>.cpp`, found by itself: adding one touches neither the bench nor the script. It holds directives in comments, read by `rendre.py`, and the table `kScenes[]`: for each variant its name (the PNG file name), its French caption, and the function that builds the screen with its sample data. `scene_temoin.cpp` is the shortest model; `scene_bonjour.cpp` and `scene_principal.cpp` compile the real firmware screens.
 
 | Directive | Meaning |
 |---|---|
@@ -89,6 +89,8 @@ Output, in `docs/captures/ecran/`: `<scene>-<variant>[-<language>]-<width>x<heig
 | `// rendu-langues-defaut: fr de tr` | those rendered without `-Langue` (default: all it can show) |
 | `// rendu-tailles: 1280x720` | default sizes (default `720x1280 1280x720`); `-Taille` overrides with any size |
 | `// rendu-sequence: installation 3` | sequence and rank, for sheets (default: the scene name, rank 0). Order in a sheet: rank, scene file name, then order in `kScenes[]` |
+
+**The main screen.** `scene_principal.cpp` (sequence `principal`, 1280x720 by default: the screen is drawn for landscape) compiles `main/ui_principal.cpp` unchanged, in six variants: day, rain, night with a negative temperature, stale weather, no weather received, time not yet received from the network. The weather labels come from the real pure core (`meteo_wmo.hpp`, then `tr()`) and the time and date from the real Europe/Paris zone; the temperatures are invented. The « Exemple » mention, shown when the weather comes from the stand-in of the weather contract, is not rendered. While `main/ui_principal.cpp` is not in the tree (it is on the branch `claude/ecran-principal-f0f722` until that branch is merged) the scene is skipped with a notice; likewise `main/bouchons/meteo_etat.h` (the stand-in of the weather contract) is added to the include path only while the real `main/meteo_etat.h` does not exist. Asked in another size, the screen shows its limits: at 1024x600 the hour is cut at the right edge ([`principal-jour-1024x600.png`](captures/ecran/principal-jour-1024x600.png)); from the constants of `ui_principal.cpp` the block left for the clock is 480 px wide there (736 px in 1280x720). PC render, not tried on the 7B.
 
 **Language.** `-Langue` sets the current language of the pure core (`ecran::i18n::definir_langue`) before the scene is built: interface code that calls `tr("texte français")` shows the text of the table (`i18n/*.yaml`, ADR-0006) with the same fallbacks as on the board (language, then English, then the French key). The scene also receives it in `banc::Contexte`, with the size and the display. `bonjour` is French only (it does not use `tr()` yet).
 
@@ -115,14 +117,14 @@ LVGL sources are found in `managed_components/lvgl__lvgl` of the repository (aft
 - **Colours as the panel shows them**: the bench widens the 5-6-5 bits to 8 bits by repeating the high bits; the real panel's gamma, white point and internal processing are not simulated, and not compared with a photo of the board (not verified).
 - **Tearing, DSI timings, DMA2D copy, PPA, refresh rate, speed and memory use**: nothing is measured here (x86-64, not the RISC-V).
 - **Touch, backlight, brightness.**
-- **Invented data**: boot number 42, 612 ms, Wi-Fi states: fixtures, not measurements. The weather fixtures will be added with the weather screen.
+- **Invented data**: boot number 42, 612 ms, Wi-Fi states, temperatures and ranges of the main screen: fixtures, not measurements.
 - **1280x720**: a simulated size of the display. The board native size is 720x1280 and the landscape orientation is being developed on another branch; the current « Bonjour » screen was drawn for 720x1280 and overflows at the bottom in 1280x720 (seen in `bonjour-*-1280x720.png`).
 - **A pixel-by-pixel comparison with the board**: not done. The same font file, the same LVGL version and configuration make the same layout expected, not proved.
 - **Translations**: the sheets show what `tr()` returns; the German and Turkish texts were written by an AI and not reviewed (see [`i18n/README.md`](../i18n/README.md)). Whether a long German text fits a button on the real panel is shown by the render, not proved on the board.
 
 **What the witness scene `temoin` showed** (`temoin-langues-*.png`, 1280x720 on the PC render): `-Langue de` and `-Langue tr` reach `tr()` (« Helligkeit », « Yeniden başlat », « Parlaklık »), and the test line of special characters (French `àâäçéèêëîïôöùûüÿœæ`, German `äöüß`, Dutch `ëï`, Spanish `áéíóúñ¿¡`, Italian `àèéìòù`, Turkish `çğıöşü ÇĞİÖŞÜ`) is drawn with no missing glyph by Roboto Bold through TinyTTF (seen by eye on the PC render; on the board: not tried).
 
-Measured on 06/11/2026 (`-Nettoyer` then every scene, 7 PNG): 11.1 s from scratch (463 LVGL files compiled with 4 jobs); 1.7 s on the next run. Seen on: the PC (Windows, clang 23.1.5 llvm-mingw, LVGL 9.5.0), no board, commits `a1b67be`, `2345297` and `e00f791`.
+Measured on 06/11/2026 (`-Nettoyer` then every scene, 7 PNG): 11.1 s from scratch (463 LVGL files compiled with 4 jobs); 1.7 s on the next run. Seen on: the PC (Windows, clang 23.1.5 llvm-mingw, LVGL 9.5.0), no board, commits `a1b67be`, `2345297` and `e00f791`. Main screen (`principal-*.png`, `planche-principal-1280x720.png`): `ui_principal` at commit `8282fcc` of `claude/ecran-principal-f0f722`, built from a copy of that commit's files with the bench of commit `f50d3a6`, 06/11/2026; this branch does not contain `ui_principal`, so these PNG are not rebuilt here until it is merged.
 
 ### Not installed (on purpose)
 
@@ -214,7 +216,7 @@ La carte est un goulot (un exemplaire, un flash à la fois) : l'interface peut d
 
 Sortie, dans `docs/captures/ecran/` : `<scène>-<variante>[-<langue>]-<largeur>x<hauteur>.png` (sans suffixe pour le français), par exemple [`bonjour-connecte-720x1280.png`](captures/ecran/bonjour-connecte-720x1280.png) (l'écran que la carte fait tourner aujourd'hui), et pour une planche `planche-<séquence>[-<langue>]-<largeur>x<hauteur>.png`. Deux rendus du même code donnent les mêmes octets. Le script refuse de démarrer si `ninja` ou `esphome` tourne (une seule compilation lourde à la fois sur ce PC ; `-Forcer` passe outre) et échoue, au lieu d'annoncer un succès, quand rien n'a été rendu.
 
-**Une scène est un seul fichier**, `tools/rendu/scenes/scene_<nom>.cpp`, découvert tout seul : en ajouter une ne touche ni au banc ni au script. Il contient des directives en commentaire, lues par `rendre.py`, et le tableau `kScenes[]` : pour chaque variante son nom (celui du fichier PNG), sa légende française et la fonction qui construit l'écran avec ses données d'exemple. `scene_temoin.cpp` est le modèle le plus court ; `scene_bonjour.cpp` compile le vrai écran du firmware.
+**Une scène est un seul fichier**, `tools/rendu/scenes/scene_<nom>.cpp`, découvert tout seul : en ajouter une ne touche ni au banc ni au script. Il contient des directives en commentaire, lues par `rendre.py`, et le tableau `kScenes[]` : pour chaque variante son nom (celui du fichier PNG), sa légende française et la fonction qui construit l'écran avec ses données d'exemple. `scene_temoin.cpp` est le modèle le plus court ; `scene_bonjour.cpp` et `scene_principal.cpp` compilent les vrais écrans du firmware.
 
 | Directive | Sens |
 |---|---|
@@ -223,6 +225,8 @@ Sortie, dans `docs/captures/ecran/` : `<scène>-<variante>[-<langue>]-<largeur>x
 | `// rendu-langues-defaut: fr de tr` | celles rendues sans `-Langue` (défaut : toutes celles qu'elle sait afficher) |
 | `// rendu-tailles: 1280x720` | tailles par défaut (défaut `720x1280 1280x720`) ; `-Taille` impose n'importe quelle taille |
 | `// rendu-sequence: installation 3` | séquence et rang, pour les planches (défaut : le nom de la scène, rang 0). Ordre dans une planche : rang, nom du fichier de scène, puis ordre dans `kScenes[]` |
+
+**L'écran principal.** `scene_principal.cpp` (séquence `principal`, 1280x720 par défaut : l'écran est dessiné pour le paysage) compile `main/ui_principal.cpp` sans modification, en six variantes : jour, pluie, nuit à température négative, météo périmée, aucune météo reçue, heure du réseau pas encore reçue. Les libellés météo viennent du vrai noyau pur (`meteo_wmo.hpp`, puis `tr()`), l'heure et la date du vrai fuseau Europe/Paris ; les températures sont inventées. La mention « Exemple », affichée quand la météo vient du bouchon du contrat météo, n'est pas rendue. Tant que `main/ui_principal.cpp` n'est pas dans l'arbre (il est sur la branche `claude/ecran-principal-f0f722` jusqu'à sa fusion), la scène est ignorée avec un avis ; de même `main/bouchons/meteo_etat.h` (le bouchon du contrat météo) n'est ajouté aux chemins d'inclusion que tant que le vrai `main/meteo_etat.h` n'existe pas. Demandé dans une autre taille, l'écran montre ses limites : en 1024x600 l'heure est coupée au bord droit ([`principal-jour-1024x600.png`](captures/ecran/principal-jour-1024x600.png)) ; d'après les constantes de `ui_principal.cpp`, le bloc laissé à l'horloge y fait 480 px de large (736 px en 1280x720). Rendu PC, non essayé sur la 7B.
 
 **Langue.** `-Langue` pose la langue courante du noyau pur (`ecran::i18n::definir_langue`) avant la construction de la scène : le code d'interface qui appelle `tr("texte français")` affiche le texte de la table (`i18n/*.yaml`, ADR-0006), avec les mêmes replis que sur la carte (la langue, puis l'anglais, puis la clé française). La scène la reçoit aussi dans `banc::Contexte`, avec la taille et l'affichage. `bonjour` n'existe qu'en français (il n'utilise pas encore `tr()`).
 
@@ -249,14 +253,14 @@ Les sources de LVGL sont cherchées dans `managed_components/lvgl__lvgl` du dép
 - **Les couleurs telles que la dalle les montre** : le banc élargit les 5-6-5 bits à 8 bits en répétant les bits de poids fort ; le gamma, le point blanc et le traitement interne de la vraie dalle ne sont pas simulés, ni comparés à une photo de la carte (non vérifié).
 - **La déchirure, les temps du DSI, la copie DMA2D, le PPA, la cadence, la vitesse et la mémoire** : rien n'est mesuré ici (x86-64, pas le RISC-V).
 - **Le tactile, le rétroéclairage, la luminosité.**
-- **Les données inventées** : démarrage n° 42, 612 ms, états du Wi-Fi : des fixtures, pas des mesures. Les fixtures météo viendront avec l'écran météo.
+- **Les données inventées** : démarrage n° 42, 612 ms, états du Wi-Fi, températures et plages de l'écran principal : des fixtures, pas des mesures.
 - **1280x720** : une taille simulée de l'affichage. La taille native de la carte est 720x1280 et l'orientation paysage se développe sur une autre branche ; l'écran « Bonjour » actuel a été dessiné pour 720x1280 et déborde en bas en 1280x720 (visible dans `bonjour-*-1280x720.png`).
 - **Une comparaison pixel à pixel avec la carte** : non faite. Même fichier de police, même version et même configuration de LVGL : la même mise en page est attendue, pas prouvée.
 - **Les traductions** : les planches montrent ce que `tr()` rend ; les textes allemands et turcs ont été écrits par une IA et ne sont pas relus (voir [`i18n/README.md`](../i18n/README.md)). Qu'un long texte allemand tienne dans un bouton de la vraie dalle, le rendu le montre, il ne le prouve pas sur la carte.
 
 **Ce qu'a montré la scène témoin `temoin`** (`temoin-langues-*.png`, 1280x720, rendu PC) : `-Langue de` et `-Langue tr` arrivent bien dans `tr()` (« Helligkeit », « Yeniden başlat », « Parlaklık »), et la ligne de caractères spéciaux (français `àâäçéèêëîïôöùûüÿœæ`, allemand `äöüß`, néerlandais `ëï`, espagnol `áéíóúñ¿¡`, italien `àèéìòù`, turc `çğıöşü ÇĞİÖŞÜ`) est dessinée sans glyphe manquant par Roboto Bold via TinyTTF (vu à l'œil sur le rendu PC ; sur la carte : non essayé).
 
-Mesuré le 06/11/2026 (`-Nettoyer` puis toutes les scènes, 7 PNG) : 11,1 s depuis zéro (463 fichiers de LVGL compilés à 4 en parallèle) ; 1,7 s au lancement suivant. Vu sur : le PC (Windows, clang 23.1.5 llvm-mingw, LVGL 9.5.0), aucune carte, commits `a1b67be`, `2345297` et `e00f791`.
+Mesuré le 06/11/2026 (`-Nettoyer` puis toutes les scènes, 7 PNG) : 11,1 s depuis zéro (463 fichiers de LVGL compilés à 4 en parallèle) ; 1,7 s au lancement suivant. Vu sur : le PC (Windows, clang 23.1.5 llvm-mingw, LVGL 9.5.0), aucune carte, commits `a1b67be`, `2345297` et `e00f791`. Écran principal (`principal-*.png`, `planche-principal-1280x720.png`) : `ui_principal` au commit `8282fcc` de `claude/ecran-principal-f0f722`, construit depuis une copie des fichiers de ce commit avec le banc du commit `f50d3a6`, le 06/11/2026 ; cette branche ne contient pas `ui_principal` : ces PNG n'y sont pas reconstruits tant qu'il n'est pas fusionné.
 
 ### Ce qui n'est pas installé (volontairement)
 
