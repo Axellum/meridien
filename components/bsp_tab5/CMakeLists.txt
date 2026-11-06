@@ -16,3 +16,10 @@ idf_component_register(
 if(TAB5_AUTOTEST_TACTILE)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE TAB5_AUTOTEST_TACTILE=1)
 endif()
+
+# Binaire d'ESSAI de la reprise sur l'expandeur (tab5_io.c) : fait echouer les N premiers essais de l'expandeur 0x43 a chaque
+# demarrage (99 = tous : redemarrages de reprise puis arret). Usage : .\tools\idf.ps1 "-DTAB5_AUTOTEST_EXPANDEUR=2" build ;
+# revenir au binaire normal avec "-DTAB5_AUTOTEST_EXPANDEUR=0" (le cache de CMake garde la valeur).
+if(TAB5_AUTOTEST_EXPANDEUR)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE TAB5_AUTOTEST_EXPANDEUR=${TAB5_AUTOTEST_EXPANDEUR})
+endif()
