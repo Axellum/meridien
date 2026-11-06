@@ -1,5 +1,6 @@
 #include "ui_principal.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -27,6 +28,12 @@ namespace {
 
 const Palette &kCouleurs = kPaletteSombre;
 
+// Toutes les cotes ci-dessous sont dessinées pour un écran de référence de 1280 x 720 (le Tab5 en paysage). Une autre taille
+// logique (1024 x 600 de la Waveshare 7B) les réduit dans le même rapport (voir ui_principal_creer) : sans cela l'heure de
+// 270 px, large d'environ 670 px, est coupée sur 1024 px.
+constexpr int32_t kLargeurReference = 1280;
+constexpr int32_t kHauteurReference = 720;
+
 // Tailles de police en pixels. Roboto Bold : chiffres de 0,55 em environ, donc « 11:40 » fait ~2,5 em de large (≈ 670 px à 270).
 constexpr int32_t kPoliceHeure = 270;
 constexpr int32_t kPoliceDate = 52;
@@ -38,7 +45,10 @@ constexpr int32_t kMarge = 48;         // marge de l'écran
 constexpr int32_t kLargeurCarte = 400; // bloc météo
 constexpr int32_t kRemplissageCarte = 28;
 constexpr int32_t kRayonCarte = 32;
+constexpr int32_t kEspaceHorloge = 8;   // entre l'heure et la date
+constexpr int32_t kEspaceCarte = 6;     // entre les lignes du bloc météo
 constexpr int32_t kDiametreAnneau = 88; // retour tactile : anneau sous le doigt
+constexpr int32_t kEpaisseurAnneau = 6;
 
 struct Vue {
     lv_obj_t *heure = nullptr;
@@ -49,6 +59,7 @@ struct Vue {
     lv_obj_t *min_max = nullptr;
     lv_obj_t *perimee = nullptr;
     lv_obj_t *anneau = nullptr;
+    int32_t diametre_anneau = kDiametreAnneau; // mis à l'échelle de l'écran
     void (*appui_long)() = nullptr;
     bool appui_long_fait = false; // l'appui long a déclenché le rappel ; ignorer le doigt jusqu'au relâchement
 };
@@ -107,7 +118,7 @@ void sur_toucher(lv_event_t *evenement) {
         }
         lv_point_t p;
         lv_indev_get_point(indev, &p);
-        lv_obj_set_pos(g.anneau, p.x - kDiametreAnneau / 2, p.y - kDiametreAnneau / 2);
+        lv_obj_set_pos(g.anneau, p.x - g.diametre_anneau / 2, p.y - g.diametre_anneau / 2);
         montrer(g.anneau, true);
         break;
     }
@@ -135,11 +146,25 @@ void sur_toucher(lv_event_t *evenement) {
 } // namespace
 
 bool ui_principal_creer(lv_obj_t *ecran, const uint8_t *ttf, std::size_t ttf_taille, int32_t largeur, int32_t hauteur) {
-    lv_font_t *police_heure = lv_tiny_ttf_create_data(ttf, ttf_taille, kPoliceHeure);
-    lv_font_t *police_date = lv_tiny_ttf_create_data(ttf, ttf_taille, kPoliceDate);
-    lv_font_t *police_temperature = lv_tiny_ttf_create_data(ttf, ttf_taille, kPoliceTemperature);
-    lv_font_t *police_libelle = lv_tiny_ttf_create_data(ttf, ttf_taille, kPoliceLibelle);
-    lv_font_t *police_petite = lv_tiny_ttf_create_data(ttf, ttf_taille, kPolicePetite);
+    if (largeur <= 0 || hauteur <= 0) {
+        return false;
+    }
+    // Échelle de l'écran par rapport à la référence 1280 x 720 : la plus petite des deux, pour que rien ne déborde.
+    const float echelle = std::min(static_cast<float>(largeur) / static_cast<float>(kLargeurReference),
+                                   static_cast<float>(hauteur) / static_cast<float>(kHauteurReference));
+    const auto px = [echelle](int32_t reference) {
+        return std::max<int32_t>(1, static_cast<int32_t>(std::lround(static_cast<float>(reference) * echelle)));
+    };
+    const int32_t marge = px(kMarge);
+    const int32_t largeur_carte = px(kLargeurCarte);
+    const int32_t remplissage_carte = px(kRemplissageCarte);
+    g.diametre_anneau = px(kDiametreAnneau);
+
+    lv_font_t *police_heure = lv_tiny_ttf_create_data(ttf, ttf_taille, px(kPoliceHeure));
+    lv_font_t *police_date = lv_tiny_ttf_create_data(ttf, ttf_taille, px(kPoliceDate));
+    lv_font_t *police_temperature = lv_tiny_ttf_create_data(ttf, ttf_taille, px(kPoliceTemperature));
+    lv_font_t *police_libelle = lv_tiny_ttf_create_data(ttf, ttf_taille, px(kPoliceLibelle));
+    lv_font_t *police_petite = lv_tiny_ttf_create_data(ttf, ttf_taille, px(kPolicePetite));
     if (police_heure == nullptr || police_date == nullptr || police_temperature == nullptr ||
         police_libelle == nullptr || police_petite == nullptr) {
         return false;
@@ -152,7 +177,7 @@ bool ui_principal_creer(lv_obj_t *ecran, const uint8_t *ttf, std::size_t ttf_tai
     lv_obj_add_event_cb(ecran, sur_toucher, LV_EVENT_ALL, nullptr);
 
     // --- Horloge et date : à gauche, centrées dans l'espace laissé par le bloc météo ---
-    const int32_t largeur_horloge = largeur - 3 * kMarge - kLargeurCarte;
+    const int32_t largeur_horloge = largeur - 3 * marge - largeur_carte;
     lv_obj_t *zone = lv_obj_create(ecran);
     lv_obj_remove_style_all(zone);
     lv_obj_remove_flag(zone, LV_OBJ_FLAG_CLICKABLE);
@@ -160,8 +185,8 @@ bool ui_principal_creer(lv_obj_t *ecran, const uint8_t *ttf, std::size_t ttf_tai
     lv_obj_set_size(zone, largeur_horloge, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(zone, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(zone, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(zone, 8, 0);
-    lv_obj_align(zone, LV_ALIGN_LEFT_MID, kMarge, 0);
+    lv_obj_set_style_pad_row(zone, px(kEspaceHorloge), 0);
+    lv_obj_align(zone, LV_ALIGN_LEFT_MID, marge, 0);
 
     g.heure = creer_etiquette(zone, police_heure, kCouleurs.accent);
     lv_obj_set_width(g.heure, largeur_horloge);
@@ -176,17 +201,17 @@ bool ui_principal_creer(lv_obj_t *ecran, const uint8_t *ttf, std::size_t ttf_tai
     lv_obj_remove_style_all(carte);
     lv_obj_remove_flag(carte, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(carte, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(carte, kLargeurCarte, LV_SIZE_CONTENT);
+    lv_obj_set_size(carte, largeur_carte, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_color(carte, couleur(kCouleurs.surface), 0);
     lv_obj_set_style_bg_opa(carte, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(carte, kRayonCarte, 0);
-    lv_obj_set_style_pad_all(carte, kRemplissageCarte, 0);
-    lv_obj_set_style_pad_row(carte, 6, 0);
+    lv_obj_set_style_radius(carte, px(kRayonCarte), 0);
+    lv_obj_set_style_pad_all(carte, remplissage_carte, 0);
+    lv_obj_set_style_pad_row(carte, px(kEspaceCarte), 0);
     lv_obj_set_flex_flow(carte, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(carte, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_align(carte, LV_ALIGN_RIGHT_MID, -kMarge, 0);
+    lv_obj_align(carte, LV_ALIGN_RIGHT_MID, -marge, 0);
 
-    const int32_t largeur_utile = kLargeurCarte - 2 * kRemplissageCarte;
+    const int32_t largeur_utile = largeur_carte - 2 * remplissage_carte;
     g.exemple = creer_etiquette(carte, police_petite, kCouleurs.avertissement);
     lv_obj_set_width(g.exemple, largeur_utile);
     lv_label_set_text(g.exemple, texte_principal::kExemple);
@@ -219,13 +244,12 @@ bool ui_principal_creer(lv_obj_t *ecran, const uint8_t *ttf, std::size_t ttf_tai
     lv_obj_remove_style_all(g.anneau);
     lv_obj_remove_flag(g.anneau, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(g.anneau, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(g.anneau, kDiametreAnneau, kDiametreAnneau);
+    lv_obj_set_size(g.anneau, g.diametre_anneau, g.diametre_anneau);
     lv_obj_set_style_radius(g.anneau, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(g.anneau, 6, 0);
+    lv_obj_set_style_border_width(g.anneau, px(kEpaisseurAnneau), 0);
     lv_obj_set_style_border_color(g.anneau, couleur(kCouleurs.accent), 0);
     lv_obj_add_flag(g.anneau, LV_OBJ_FLAG_HIDDEN);
 
-    (void)hauteur; // la mise en page se cale au centre vertical : seule la largeur est utilisée
     return true;
 }
 
@@ -265,7 +289,9 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
         montrer(g.temperature, false);
     }
 
-    changer_texte(g.libelle, m.libelle[0] != '\0' ? m.libelle : texte_principal::kMeteoIndisponible);
+    // Le contrat veut un libellé terminé par un zéro ; un champ rempli jusqu'au bout (non terminé) ne doit pas être lu au-delà.
+    const bool libelle_ok = m.libelle[0] != '\0' && std::memchr(m.libelle, '\0', sizeof m.libelle) != nullptr;
+    changer_texte(g.libelle, libelle_ok ? m.libelle : texte_principal::kMeteoIndisponible);
     lv_obj_set_style_text_color(g.libelle, couleur(kCouleurs.texte), 0);
 
     int mini = 0;
