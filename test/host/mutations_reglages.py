@@ -14,6 +14,8 @@ JSON = "api_json.hpp"
 VAL = "reglages_valeurs.hpp"
 APP = "appairage.hpp"
 API = "api_reglages.hpp"
+HTTP = "http_requete.hpp"
+T_HTTP = "test_http_requete.cpp"
 T_JSON = "test_reglages_valeurs.cpp"  # l'écriture JSON et la validation des valeurs sont testées dans le même fichier
 T_VAL = "test_reglages_valeurs.cpp"
 T_APP = "test_appairage.cpp"
@@ -111,6 +113,30 @@ MUTATIONS_REGLAGES = [
     (APP, "bool trouve = false;\n        for (const Session &s : sessions_) {\n            if (s.ouverte && egal_temps_constant",
      "bool trouve = false;\n        for (const Session &s : sessions_) {\n            if (egal_temps_constant", T_APP,
      "jeton_inconnu_vide_ou_modifie_est_refuse", "une session fermée accepte un jeton fait de zéros"),
+    # --- http_requete.hpp ---
+    (HTTP, "if (entete[p] != ' ')", "if (false)", T_HTTP, "jeton_bearer_refuse_le_reste",
+     "« Bearerabc123 » (sans espace) est lu comme un jeton"),
+    (HTTP, "if (c <= 0x20 || c >= 0x7F)", "if (c < 0x20 || c >= 0x7F)", T_HTTP, "jeton_bearer_refuse_le_reste",
+     "un jeton qui contient une espace est accepté"),
+    (HTTP, "if (c <= 0x20 || c >= 0x7F)", "if (c <= 0x20)", T_HTTP, "jeton_bearer_refuse_le_reste",
+     "un jeton avec un octet de contrôle 0x7F ou au-delà de 127 est accepté"),
+    (HTTP, "jeton.empty() || jeton.size() > JETON_MAX", "jeton.empty() || jeton.size() >= JETON_MAX", T_HTTP,
+     "jeton_bearer_longueur_limitee", "un jeton de 128 caractères est refusé"),
+    (HTTP, "inline constexpr std::size_t JETON_MAX = 128;", "inline constexpr std::size_t JETON_MAX = 256;", T_HTTP,
+     "jeton_bearer_longueur_limitee", "un jeton de 129 caractères est accepté"),
+    (HTTP, "detail::minuscule(entete[i]) != schema[i]", "entete[i] != schema[i]", T_HTTP, "jeton_bearer_bien_forme",
+     "« bearer » en minuscules n'est plus reconnu"),
+    (HTTP, 'default:\n        return "500 Internal Server Error";', 'default:\n        return "200 OK";', T_HTTP, "lignes_d_etat",
+     "un code imprévu est annoncé comme un succès"),
+    (HTTP, 'return "429 Too Many Requests";', 'return "403 Forbidden";', T_HTTP, "lignes_d_etat", "le verrou répond « 403 »"),
+    (HTTP, "if (element == \"*\")\n            return true;", "if (element == \"*\")\n            return false;", T_HTTP, "etiquette_de_cache",
+     "« If-None-Match: * » n'est plus reconnu"),
+    (HTTP, "if (!element.empty() && element == etag)", "if (!element.empty())", T_HTTP, "etiquette_de_cache",
+     "n'importe quelle étiquette vaut « inchangé » (la page ne se mettrait jamais à jour)"),
+    (HTTP, "if (point == std::string_view::npos)\n        return {uri, {}};", "if (point == std::string_view::npos)\n        return {uri, uri};",
+     T_HTTP, "uri_coupee_en_chemin_et_requete", "une adresse sans « ? » prend son chemin pour sa requête"),
+    (HTTP, "uri = uri.substr(0, diese);", "(void)diese;", T_HTTP, "uri_coupee_en_chemin_et_requete",
+     "le fragment « # » reste dans le chemin"),
     # --- api_reglages.hpp ---
     (API, "if (rq.corps.size() > CORPS_MAX)", "if (rq.corps.size() >= CORPS_MAX)", T_API, "corps_de_plus_de_4_ko_refuse_en_413",
      "un corps de 4096 octets est refusé"),
