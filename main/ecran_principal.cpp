@@ -94,6 +94,8 @@ void ecran_principal_creer(const BootInfo &boot) {
     if (!ui_principal_creer(g_ecran_principal, roboto_700_start, static_cast<size_t>(roboto_700_end - roboto_700_start),
                             carte->width, carte->height)) {
         ESP_LOGE(TAG, "écran principal non créé (police TrueType) : l'écran de diagnostic reste affiché");
+        lv_obj_delete(g_ecran_principal);
+        g_ecran_principal = nullptr; // l'appui long de l'écran de diagnostic ne charge alors rien
         return;
     }
     ui_principal_sur_appui_long(vers_diagnostic);
