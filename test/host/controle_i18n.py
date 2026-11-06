@@ -5,6 +5,9 @@
 2. Les textes français que l'écran « Bonjour » affiche (main/ui_bonjour.cpp, main/boot_info.cpp) sont exactement la section
    « Écran : « Bonjour » » de i18n/en.yaml, et la copie de cette liste dans test_i18n.cpp (BONJOUR[]) est la même. Si
    quelqu'un change un texte de ces deux fichiers sans toucher la table, le contrôle échoue ici (main/ n'est pas modifié).
+3. `web/tests/controle_langues.py` : web/app/app.js n'écrit aucun texte français (tout passe par un identifiant de
+   i18n/page.yaml) et chaque texte que le faux appareil (web/faux-serveur/serveur.mjs) passe à T() est une clé des
+   fichiers de langue.
 
 Code de sortie non nul = un contrôle a échoué. Utilisable seul : python test/host/controle_i18n.py
 """
@@ -17,6 +20,7 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[2]
 GENERATEUR = RACINE / "components" / "core" / "outils" / "generer_i18n.py"
+CONTROLE_WEB = RACINE / "web" / "tests" / "controle_langues.py"
 UI_BONJOUR = RACINE / "main" / "ui_bonjour.cpp"
 BOOT_INFO = RACINE / "main" / "boot_info.cpp"
 TEST_I18N = RACINE / "test" / "host" / "test_i18n.cpp"
@@ -68,6 +72,13 @@ def controle_i18n():
     else:
         print("  ECHEC   generer_i18n.py --verifier :\n" + (r.stdout + r.stderr).strip())
         return 1
+
+    r = subprocess.run([sys.executable, str(CONTROLE_WEB)], capture_output=True, text=True, encoding="utf-8")
+    if r.returncode == 0:
+        print("  ok      " + r.stdout.strip())
+    else:
+        print("  ECHEC   controle_langues.py :\n" + (r.stdout + r.stderr).strip())
+        echecs += 1
 
     if not UI_BONJOUR.exists() or not BOOT_INFO.exists():
         print("  saute   main/ui_bonjour.cpp ou main/boot_info.cpp absent : textes de l'écran « Bonjour » non comparés")
