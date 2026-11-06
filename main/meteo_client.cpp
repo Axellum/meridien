@@ -280,8 +280,7 @@ void relire_cache() {
     char t[12];
     meteo::ecrire_dixiemes(lu.releve.temperature_dixiemes, t, sizeof(t));
     const std::string_view libelle = meteo::decrire(lu.releve.code_wmo, lu.releve.jour).libelle;
-    ESP_LOGI(TAG,
-             "cache relu : %s °C, %.*s, reçu à l'instant UNIX %lld (marqué périmé tant que l'heure du réseau manque)",
+    ESP_LOGI(TAG, "cache relu : %s °C, %.*s, reçu à l'instant UNIX %lld (fraîcheur : voir la ligne contrat suivante)",
              t, static_cast<int>(libelle.size()), libelle.data(), static_cast<long long>(lu.releve.recu_a_s));
 }
 
