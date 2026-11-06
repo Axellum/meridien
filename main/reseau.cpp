@@ -18,8 +18,8 @@
 #include "freertos/task.h"
 #include "sdkconfig.h"
 
-#include "diagnostic_sntp.h"
 #include "horloge.h"
+#include "sntp_rapide.h"
 // Généré par CMake depuis reglages_locaux.cmake (hors git, voir main/CMakeLists.txt) : MERIDIEN_WIFI_SSID et
 // MERIDIEN_WIFI_MOT_DE_PASSE. Sans ce fichier de réglages locaux, ce sont des chaînes vides.
 #include "identifiants_wifi.h"
@@ -100,7 +100,8 @@ void sur_evenement_wifi(void *, esp_event_base_t, int32_t id, void *donnees) {
     }
 }
 
-void sur_heure_recue(struct timeval *) {
+// Première heure reçue, par l'acquisition rapide (sntp_rapide) ou par le SNTP de lwIP : la première des deux compte.
+void marquer_heure_recue() {
     const int32_t ms = maintenant_ms();
     modifier([ms](EtatReseau &e) {
         e.heure_synchronisee = true;
@@ -112,6 +113,8 @@ void sur_heure_recue(struct timeval *) {
         xEventGroupSetBits(g_evenements, kEvenementHeure);
     }
 }
+
+void sur_heure_recue(struct timeval *) { marquer_heure_recue(); }
 
 void demarrer_sntp() {
     if (g_sntp_demarre) {
@@ -157,7 +160,7 @@ void sur_evenement_ip(void *, esp_event_base_t, int32_t id, void *donnees) {
     });
     ESP_LOGI(TAG, "adresse IP obtenue : %s à %d ms", ip, static_cast<int>(ms));
     demarrer_sntp();
-    diagnostic_sntp_demarrer(); // temporaire (jalon 1b) : mesure DNS, perte UDP et état du SNTP de lwIP
+    sntp_rapide_demarrer(marquer_heure_recue); // l'heure arrive sans attendre la relance de 15 s de lwIP
 }
 
 // Initialise la pile IP et le Wi-Fi (routé vers le coprocesseur par esp_wifi_remote) et lance la connexion.

@@ -20,7 +20,7 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     configure_file("${CMAKE_CURRENT_LIST_DIR}/identifiants_wifi.h.in" "${CMAKE_CURRENT_BINARY_DIR}/identifiants_wifi.h" @ONLY)
 endif()
 
-idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp" "diagnostic_sntp.cpp" "commande_serie.cpp" "ui_bonjour.cpp"
+idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp" "sntp_rapide.cpp" "commande_serie.cpp" "ui_bonjour.cpp"
                        INCLUDE_DIRS "."
                        PRIV_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
                        REQUIRES board_api core esp_event esp_netif esp_rom esp_system esp_timer esp_wifi freertos lwip nvs_flash
