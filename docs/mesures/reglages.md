@@ -25,13 +25,14 @@ Textes du bandeau : `main/textes_reglages.h`, **en français seulement et hors d
 
 ## 2. Constaté sur le PC et à la compilation
 
-**Vu sur** : PC de compilation (Windows 11), aucune carte, commits `3c864c4` (noyau) et `933b628` (appareil), 06/11/2026.
+**Vu sur** : PC de compilation (Windows 11), aucune carte, commits `3c864c4` (noyau) et `986ce13` (appareil), 06/11/2026.
 
 | Constat | Résultat |
 | --- | --- |
 | Tests du noyau sur le PC (clang++ avec AddressSanitizer + UBSan, mode « complet » : compilé **et** exécuté) | 380 tests exécutés, tous réussis (hook de commit) |
 | Mutations des modules de la page (appairage, validations, HTTP, API ; `lancer.py --mutations --seulement …`) | 75 mutations, toutes détectées, 0 problème |
 | Compilation du firmware (`idf.py build`, ESP-IDF 5.5.5, `espressif/mdns` 1.13.1 téléchargé et compilé) | code de sortie 0 ; `meridien.bin` = 1 811 888 octets sur une partition d'application de 4 Mo |
+| Binaire compilé depuis un arbre propre au commit `986ce13` | SHA-256 `7c79fb863b258fd623465c571770685e35dc66a4407dd3ebc5e64cdf4372e917` ; version attendue sur l'appareil (ligne `app_init` du démarrage) : `jalon-1a-tab5-st7121-59-g986ce13`. Écart avec le binaire flashé par la piste météo (`55644aa`) : uniquement les ajouts de ce jalon (diff des sources lu) |
 | Poids de la page embarquée | 30 327 octets gzip pour 91 473 octets bruts (9 fichiers) ≤ budget de 30 720 |
 | `web/tests/parcours.py` contre le **faux** appareil, après la modification du script | 119 vérifications sur 119 réussies (comportement d'origine inchangé) |
 
