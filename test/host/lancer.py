@@ -137,6 +137,7 @@ MUTATIONS = [
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
+from mutations_materiel_tab5 import MUTATIONS_MATERIEL_TAB5  # noqa: E402  (matériel du Tab5 : luminosité, veille, RTC, volume…)
 from mutations_meteo_appareil import MUTATIONS_METEO_APPAREIL  # noqa: E402  (météo sur l'appareil : requête, zone, cache)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
 from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (page de réglages : JSON, valeurs, appairage, API)
@@ -147,6 +148,7 @@ MUTATIONS += MUTATIONS_METEO_APPAREIL
 MUTATIONS += MUTATIONS_ASSISTANT
 MUTATIONS += MUTATIONS_I18N
 MUTATIONS += MUTATIONS_REGLAGES
+MUTATIONS += MUTATIONS_MATERIEL_TAB5
 
 
 def mutations(cxx, mode):
