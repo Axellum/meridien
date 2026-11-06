@@ -86,6 +86,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Orage violent": "Temporale violento"
 "Orage avec forte grêle": "Temporale con grandine forte"
 "Météo inconnue": "Meteo sconosciuto"
+"Choisissez une ville dans la page de réglages.": "Scegli una città nella pagina delle impostazioni."
 
 # --- Écran : « Bonjour » (main/ui_bonjour.cpp, main/boot_info.cpp ; phase 1a) ---
 "Bonjour": "Buongiorno"
@@ -109,7 +110,6 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "réinitialisation par l'USB": "reset tramite USB"
 "broche de réinitialisation": "pin di reset"
 "cause inconnue": "causa sconosciuta"
-"Choisissez une ville dans la page de réglages.": "Scegli una città nella pagina delle impostazioni."
 
 # --- Page de réglages : généralités et appairage ---
 "Mon écran": "Il mio schermo"

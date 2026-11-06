@@ -82,6 +82,9 @@ def lancer(cxx, mode):
                 echecs += p.returncode != 0
             else:
                 print(f"\n{t.name} : compilation OK (tests évalués par static_assert)")
+    from controle_i18n import controle_i18n  # noqa: PLC0415  (contrôles croisés de la traduction, sans compilation)
+
+    echecs += controle_i18n()
     print("\nRÉSULTAT :", "tout passe" if echecs == 0 else f"{echecs} fichier(s) en échec")
     return 1 if echecs else 0
 
@@ -133,10 +136,12 @@ MUTATIONS = [
 # Mutations des pistes « météo et heure » (json_mini, meteo_openmeteo, heure_fr) et « assistant vocal » : un fichier chacune.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
+from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
 
 MUTATIONS += MUTATIONS_METEO_HEURE
 MUTATIONS += MUTATIONS_ASSISTANT
+MUTATIONS += MUTATIONS_I18N
 
 
 def mutations(cxx, mode):

@@ -86,6 +86,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Orage violent": "Şiddetli fırtına"
 "Orage avec forte grêle": "Şiddetli dolulu fırtına"
 "Météo inconnue": "Hava durumu bilinmiyor"
+"Choisissez une ville dans la page de réglages.": "Ayarlar sayfasından bir şehir seç."
 
 # --- Écran : « Bonjour » (main/ui_bonjour.cpp, main/boot_info.cpp ; phase 1a) ---
 "Bonjour": "Merhaba"
@@ -109,7 +110,6 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "réinitialisation par l'USB": "USB ile sıfırlama"
 "broche de réinitialisation": "sıfırlama pini"
 "cause inconnue": "neden bilinmiyor"
-"Choisissez une ville dans la page de réglages.": "Ayarlar sayfasından bir şehir seç."
 
 # --- Page de réglages : généralités et appairage ---
 "Mon écran": "Ekranım"

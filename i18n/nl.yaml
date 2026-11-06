@@ -86,6 +86,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Orage violent": "Zwaar onweer"
 "Orage avec forte grêle": "Onweer met zware hagel"
 "Météo inconnue": "Weer onbekend"
+"Choisissez une ville dans la page de réglages.": "Kies een stad op de instellingenpagina."
 
 # --- Écran : « Bonjour » (main/ui_bonjour.cpp, main/boot_info.cpp ; phase 1a) ---
 "Bonjour": "Goedendag"
@@ -109,7 +110,6 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "réinitialisation par l'USB": "reset via USB"
 "broche de réinitialisation": "reset-pin"
 "cause inconnue": "oorzaak onbekend"
-"Choisissez une ville dans la page de réglages.": "Kies een stad op de instellingenpagina."
 
 # --- Page de réglages : généralités et appairage ---
 "Mon écran": "Mijn scherm"
