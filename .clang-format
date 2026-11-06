@@ -5,3 +5,6 @@
 BasedOnStyle: LLVM
 IndentWidth: 4
 ColumnLimit: 120
+# Les commentaires ne sont pas recoupes : les paragraphes et listes francais ecrits a la main se retrouvaient avec des
+# mots orphelins sur une ligne a eux. La limite de 120 colonnes ne vaut que pour le code.
+ReflowComments: Never
