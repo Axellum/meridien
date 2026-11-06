@@ -64,6 +64,8 @@ lv_obj_t *g_libelle_date = nullptr;
 lv_obj_t *g_libelle_wifi = nullptr;
 lv_obj_t *g_libelle_source = nullptr;
 int g_compteur_appui = 0;
+void (*g_appui_long)() = nullptr;
+bool g_appui_long_fait = false;
 int32_t g_x_min = INT32_MAX, g_x_max = INT32_MIN, g_y_min = INT32_MAX, g_y_max = INT32_MIN;
 int g_compteur_rafraichissement = 0;
 bool g_heure_deja_journalisee = false;
@@ -104,6 +106,17 @@ void placer_point(int32_t x, int32_t y) { lv_obj_set_pos(g_point, x - kDiametreP
 
 void sur_toucher(lv_event_t *evenement) {
     const lv_event_code_t code = lv_event_get_code(evenement);
+    if (code == LV_EVENT_LONG_PRESSED) {
+        // Appui long sur le fond de l'écran : retour à l'écran principal (si l'application l'a demandé). Le doigt est encore posé
+        // et LVGL continue de lui envoyer les événements après le changement d'écran : le point (couche supérieure, donc
+        // visible sur l'autre écran) est caché et ignoré jusqu'au relâchement.
+        if (g_appui_long != nullptr) {
+            g_appui_long_fait = true;
+            lv_obj_add_flag(g_point, LV_OBJ_FLAG_HIDDEN);
+            g_appui_long();
+        }
+        return;
+    }
     if (code != LV_EVENT_PRESSED && code != LV_EVENT_PRESSING && code != LV_EVENT_RELEASED) {
         return;
     }
@@ -113,8 +126,15 @@ void sur_toucher(lv_event_t *evenement) {
     }
     lv_point_t p;
     lv_indev_get_point(indev, &p);
+    if (code == LV_EVENT_PRESSED) {
+        g_appui_long_fait = false;
+    }
+    if (g_appui_long_fait && code != LV_EVENT_RELEASED) {
+        return;
+    }
 
     if (code == LV_EVENT_RELEASED) {
+        g_appui_long_fait = false;
         // Le point reste là où le doigt s'est levé, en couleur "relâché".
         lv_obj_set_style_bg_color(g_point, couleur(kCouleurs.accent_relache), 0);
         ESP_LOGI(TAG, "tactile : relâché en (%d, %d) ; course x [%d..%d], y [%d..%d]", (int)p.x, (int)p.y, (int)g_x_min,
@@ -288,5 +308,7 @@ void ui_bonjour_creer(const BootInfo &boot) {
 
     lv_timer_create(rafraichir, kPeriodeRafraichissementMs, nullptr);
 }
+
+void ui_bonjour_sur_appui_long(void (*rappel)()) { g_appui_long = rappel; }
 
 } // namespace ecran

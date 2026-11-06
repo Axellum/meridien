@@ -10,4 +10,8 @@ namespace ecran {
 // Construit l'écran sur l'affichage de la carte. À appeler après board_init().
 void ui_bonjour_creer(const BootInfo &boot);
 
+// Rappel appelé (dans la tâche LVGL, verrou pris) sur un appui long du fond de l'écran. Sert à revenir à l'écran principal
+// quand « Bonjour » est devenu l'écran de diagnostic. Sans rappel, l'appui long ne fait rien.
+void ui_bonjour_sur_appui_long(void (*rappel)());
+
 } // namespace ecran

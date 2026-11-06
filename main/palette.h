@@ -15,6 +15,7 @@ struct Palette {
     uint32_t accent;         // point tactile pendant l'appui, titres
     uint32_t accent_relache; // point tactile après le relâchement
     uint32_t bouton_texte;   // texte sur un bouton
+    uint32_t avertissement;  // mention « Exemple » et « Données périmées » (écran principal)
 };
 
 inline constexpr Palette kPaletteSombre = {
@@ -25,6 +26,7 @@ inline constexpr Palette kPaletteSombre = {
     .accent = 0x3DDC97,
     .accent_relache = 0x4D6B88,
     .bouton_texte = 0xF2F5F7,
+    .avertissement = 0xF2B84B,
 };
 
 } // namespace ecran

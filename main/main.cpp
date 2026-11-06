@@ -9,8 +9,8 @@
 
 #include "boot_info.h"
 #include "commande_serie.h"
+#include "ecran_principal.h"
 #include "reseau.h"
-#include "ui_bonjour.h"
 
 static const char *TAG = "ecran";
 
@@ -32,7 +32,9 @@ extern "C" void app_main(void) {
     }
 
     if (board_display_lock(0)) {
-        ecran::ui_bonjour_creer(boot);
+        // Écran principal (heure, date, météo) chargé ; l'écran « Bonjour » des phases 1a/1b devient l'écran de diagnostic
+        // (appui long sur le fond pour passer de l'un à l'autre).
+        ecran::ecran_principal_creer(boot);
         lv_refr_now(board_get_display()); // première image dessinée avant d'allumer le rétroéclairage
         board_display_unlock();
     }

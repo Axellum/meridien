@@ -25,3 +25,14 @@ idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp
                        PRIV_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
                        REQUIRES board_api core esp_event esp_netif esp_rom esp_system esp_timer esp_wifi freertos lwip nvs_flash
                        EMBED_FILES "assets/roboto_700.ttf")
+
+# Ecran principal (session ecran-principal). Ajoute par target_sources() apres l'enregistrement, et non dans la liste SRCS
+# ci-dessus, pour ne pas toucher a la ligne que les autres sessions (meteo, reglages) modifient aussi : un merge sans conflit.
+target_sources(${COMPONENT_LIB} PRIVATE "ecran_principal.cpp" "ui_principal.cpp")
+# Contrat n 1 (main/meteo_etat.h), propriete de la session meteo-appareil. Tant que ce fichier n'existe pas, un BOUCHON
+# (main/bouchons/, valeurs d'exemple marquees "Exemple" a l'ecran) permet de compiler. Des que le vrai fichier est la, le
+# bouchon n'est plus ni compile ni dans le chemin d'inclusion : le dossier main/bouchons/ est alors a supprimer.
+if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/meteo_etat.h")
+    target_sources(${COMPONENT_LIB} PRIVATE "bouchons/meteo_etat_bouchon.cpp")
+    target_include_directories(${COMPONENT_LIB} PRIVATE "bouchons")
+endif()
