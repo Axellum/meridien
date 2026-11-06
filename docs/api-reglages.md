@@ -123,9 +123,10 @@ Trois services **indépendants** (ADR-0002), identifiés par `stt`, `llm`, `tts`
 
 `GET /api/presets` → `{"stt": [Preset…], "llm": […], "tts": […]}` avec
 ```json
-{"id": "lmstudio", "nom": "LM Studio (sur mon PC)", "url": "http://<adresse>:<port>/v1",
+{"id": "lmstudio", "nom": "LM Studio (sur mon PC)", "url": "http://localhost:1234/v1", "local": true,
  "cle_requise": false, "modele": "", "aide": "Lancez le serveur local de LM Studio sur le PC."}
 ```
+`local: true` marque un service qui tourne sur le PC de l'utilisateur : la page rappelle alors de remplacer `localhost` par l'adresse du PC (rien n'est bloqué, c'est un conseil).
 `id` ∈ `openai`, `google`, `lmstudio`, `ollama`, `kokoro`, `personnalise` (ADR-0002 + `kokoro`) ; **un préréglage n'existe que pour les services que son fournisseur documente** :
 
 | Préréglage | Adresse de base | Services | Source (lue le 06/11/2026) |
@@ -182,7 +183,7 @@ Réponse : le service relu (même forme que `GET`), donc **sans** `cle`. Changer
 | nom d'hôte introuvable | « Cette adresse est introuvable. » |
 | certificat TLS refusé | « Le certificat de ce service n'est pas reconnu. » |
 | `401`, `403` | « Le service refuse la clé. Vérifiez-la. » |
-| `404` sur la route d'essai | « Cette adresse ne ressemble pas à un service compatible. Il manque peut-être « /v1 ». » |
+| `404` sur la route de l'**essai réel** (étape 2 du test, §7 : `chat/completions`, `audio/speech` ou `audio/transcriptions`) ; un `404`/`405` sur `…/models` (étape 1) n'est **pas** une erreur | « Cette adresse ne ressemble pas à un service compatible. Il manque peut-être « /v1 ». » |
 | `404`/`400` mentionnant le modèle | « Ce modèle n'existe pas sur ce service. » |
 | `429` | « Le service limite les appels. Réessayez dans un instant. » |
 | `5xx` | « Le service a un problème de son côté. » |
