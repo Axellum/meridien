@@ -25,6 +25,8 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parents[2]
 TESTS = sorted((RACINE / "test" / "host").glob("test_*.cpp"))
 INCLUDE_NOYAU = RACINE / "components" / "core" / "include"
+# Parties pures des couches carte (components/bsp_<carte>/include/ : aucun include ESP-IDF, testables sur le PC).
+INCLUDES_CARTES = sorted((RACINE / "components").glob("bsp_*/include"))
 DRAPEAUX = ["-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic"]
 
 
@@ -57,6 +59,8 @@ def trouver_compilateur(force=None):
 
 def compiler(cxx, mode, source, include_noyau, sortie_exe=None):
     cmd = [cxx, *DRAPEAUX, *drapeaux_constexpr(cxx), "-I", str(include_noyau), "-I", str(RACINE / "test" / "host")]
+    for dossier in INCLUDES_CARTES:
+        cmd += ["-I", str(dossier)]
     if mode == "syntaxe":
         cmd += ["-fsyntax-only", str(source)]
     else:
@@ -85,6 +89,9 @@ def lancer(cxx, mode):
     from controle_i18n import controle_i18n  # noqa: PLC0415  (contrôles croisés de la traduction, sans compilation)
 
     echecs += controle_i18n()
+    from controle_cartes import controle_cartes  # noqa: PLC0415  (cartes : partitions, broches du C6, hygiène des fichiers de la 7B)
+
+    echecs += controle_cartes()
     print("\nRÉSULTAT :", "tout passe" if echecs == 0 else f"{echecs} fichier(s) en échec")
     return 1 if echecs else 0
 
@@ -199,7 +206,14 @@ def main():
     if not cxx:
         print("Aucun compilateur C++ trouvé (ni g++, ni clang++, ni le g++ croisé d'ESP-IDF).", file=sys.stderr)
         return 2
-    return mutations(cxx, mode) if a.mutations else lancer(cxx, mode)
+    if a.mutations:
+        resultat = mutations(cxx, mode)
+        if any(t.name == "test_carte_7b.cpp" for t in TESTS):  # mutations de la couche carte 7B (leur propre dossier include/)
+            from mutations_carte_7b import mutations_carte_7b  # noqa: PLC0415
+
+            resultat |= mutations_carte_7b(cxx, mode, RACINE, [*DRAPEAUX, *drapeaux_constexpr(cxx)], INCLUDE_NOYAU)
+        return resultat
+    return lancer(cxx, mode)
 
 
 if __name__ == "__main__":
