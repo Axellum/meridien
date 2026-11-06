@@ -12,6 +12,7 @@ Firmware natif ESP-IDF + LVGL 9 pour ESP32-P4 : heure/date, météo, assistant v
 2. [docs/decisions/](docs/decisions/) — pourquoi les choix non évidents ont été faits (avant de « corriger » quelque chose qui a l'air faux).
 3. [docs/recherche/](docs/recherche/) — faits sourcés et leurs « non vérifié ». Un fait « non vérifié » reste à vérifier avant de s'y appuyer.
 4. [docs/recherche/04-audit-depot-tab5.md](docs/recherche/04-audit-depot-tab5.md) — broches, puces et pièges payés sur le firmware ESPHome (écran noir au boot, bus I2S, reset C6…).
+5. [CONTRIBUTING.md](CONTRIBUTING.md) — proposer un changement : tests, crochet de commit, journal des changements, ce qui ne va pas dans le dépôt.
 
 ## Compiler
 
