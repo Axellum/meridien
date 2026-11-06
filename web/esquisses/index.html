@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trois esquisses de la page de réglages</title>
+<style>
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:#dde3e9;color:#14202b;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+h1,h2,p{margin:0}
+.i{width:22px;height:22px;flex:none}
+
+/* ---- planche (fond neutre, identique en clair et en sombre) ---- */
+.planche{max-width:980px;margin:0 auto;padding:28px 16px 72px}
+.planche>header h1{font-size:28px;line-height:1.2}
+.intro{margin:8px 0 18px;color:#3a4856;max-width:62ch}
+.choix{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.choix article{background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.choix h2{font-size:17px;margin-bottom:4px}
+.choix p{font-size:15px;color:#3a4856}
+.choix .pc{margin-top:6px}
+.lot{margin-top:44px}
+.lot>h2{font-size:22px;margin-bottom:2px}
+.lot>p{color:#3a4856;margin-bottom:16px;max-width:64ch}
+.duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:22px;align-items:start}
+.etiq{font-size:14px;font-weight:600;color:#3a4856;margin:0 0 8px 4px}
+.pied{margin-top:48px;color:#3a4856;font-size:15px}
+
+/* ---- téléphone ---- */
+.tel{background:var(--fond);color:var(--texte);border-radius:28px;overflow:hidden;max-width:410px;width:100%;margin:0 auto;
+  box-shadow:0 10px 32px rgba(10,20,30,.22);border:1px solid rgba(0,0,0,.1)}
+.tel[data-theme=clair]{--fond:#f2f5f8;--carte:#ffffff;--texte:#14202b;--doux:#4f5d6b;--trait:#d3dbe3;--champ:#ffffff;
+  --ok:#14733a;--okbg:#e2f4e9;--err:#b3261e;--errbg:#fbe9e7;--ombre:0 1px 2px rgba(20,32,43,.08)}
+.tel[data-theme=sombre]{--fond:#0d1218;--carte:#161e27;--texte:#e9eff5;--doux:#a3b3c3;--trait:#2a3846;--champ:#0f161d;
+  --ok:#62d48c;--okbg:#12301f;--err:#ff8f86;--errbg:#3a1714;--ombre:none;color-scheme:dark}
+.sk-a[data-theme=clair]{--ac:#0b6e69;--sur:#ffffff;--soft:#dcf2f0}
+.sk-a[data-theme=sombre]{--ac:#52d6c9;--sur:#04211f;--soft:#12332f}
+.sk-b[data-theme=clair]{--ac:#2754d0;--sur:#ffffff;--soft:#e2e9fb}
+.sk-b[data-theme=sombre]{--ac:#8fb2ff;--sur:#0a1a40;--soft:#18284d}
+.sk-c[data-theme=clair]{--ac:#a8470f;--sur:#ffffff;--soft:#fbe8dc}
+.sk-c[data-theme=sombre]{--ac:#ffb083;--sur:#3a1500;--soft:#3d2315}
+.url{display:flex;justify-content:center;padding:10px 14px;background:var(--carte);border-bottom:1px solid var(--trait)}
+.url span{font-size:13px;color:var(--doux);background:var(--fond);border-radius:10px;padding:5px 14px}
+.app{padding:16px 16px 26px}
+small{display:block;font-size:14px;line-height:1.35;color:var(--doux)}
+b{font-weight:650}
+
+/* ---- éléments communs ---- */
+.top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.top b{font-size:18px}
+.logo{width:42px;height:42px;border-radius:12px;background:var(--ac);color:var(--sur);display:grid;place-items:center}
+.aide{font-size:14px;color:var(--doux);margin-top:6px}
+.aide.gros{font-size:16px;margin:2px 0 14px}
+.f{margin-top:14px}
+.lab{display:block;font-size:15px;font-weight:600;margin-bottom:6px}
+.lab .r{float:right;color:var(--doux)}
+.champ{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 14px;background:var(--champ);
+  border:1.5px solid var(--trait);border-radius:14px;color:var(--doux)}
+.champ .val{flex:1;min-width:0;color:var(--texte);overflow-wrap:anywhere;font-size:16px}
+.champ .val.ph{color:var(--doux)}
+.champ.foc{border-color:var(--ac);box-shadow:0 0 0 3px var(--soft)}
+.champ.off{opacity:.65}
+.caret{display:inline-block;width:2px;height:20px;background:var(--ac);vertical-align:-4px;margin-left:1px}
+.lien{color:var(--ac);font-weight:650;font-size:15px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;margin-top:18px;border-radius:14px;
+  background:var(--ac);color:var(--sur);font-weight:650;font-size:16px;padding:0 18px}
+.btn.sec{background:transparent;color:var(--ac);border:1.5px solid var(--ac);margin-top:0}
+.btn.petit{min-height:44px;display:inline-flex}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:999px;border:1.5px solid var(--trait);
+  background:var(--champ);font-size:15px}
+.chip .i{width:18px;height:18px}
+.chip.on{border-color:var(--ac);background:var(--soft);color:var(--texte);font-weight:600}
+.testbar{margin-top:14px}
+.res{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:10px 12px;border-radius:12px;font-size:15px;line-height:1.35}
+.res .i{width:20px;height:20px;margin-top:1px}
+.res.ok{background:var(--okbg);color:var(--ok)}
+.res.err{background:var(--errbg);color:var(--err)}
+.resultats{list-style:none;margin:10px 0 0;padding:0;background:var(--carte);border:1px solid var(--trait);border-radius:14px;overflow:hidden}
+.resultats li{display:flex;align-items:center;gap:12px;min-height:58px;padding:8px 14px}
+.resultats li+li{border-top:1px solid var(--trait)}
+.resultats li.sel{background:var(--soft)}
+.resultats b{display:block}
+.resultats .i{color:var(--ac)}
+.radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--trait);flex:none;background:var(--champ)}
+.radio.on{border:7px solid var(--ac);background:var(--sur)}
+.confirme{display:flex;gap:12px;align-items:center;margin-top:14px;padding:12px 14px;border-radius:14px;background:var(--soft)}
+.confirme .i{color:var(--ac)}
+.apercu{display:flex;gap:12px;align-items:center;margin-top:10px;padding:12px 14px;border-radius:14px;border:1px solid var(--trait);background:var(--carte)}
+.apercu .i{color:var(--ac)}
+.svc-t{display:flex;gap:12px;align-items:center;margin:2px 0 4px}
+.svc-t .i{color:var(--ac)}
+.svc-t b{font-size:17px}
+.pill{font-size:13px;font-weight:650;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--okbg);color:var(--ok)}
+.pill.err{background:var(--errbg);color:var(--err)}
+.seg{display:flex;border:1.5px solid var(--trait);border-radius:14px;overflow:hidden;background:var(--champ)}
+.seg span{flex:1;text-align:center;padding:12px 4px;font-size:15px;color:var(--doux)}
+.seg span.on{background:var(--ac);color:var(--sur);font-weight:650}
+.gliss{position:relative;height:8px;border-radius:99px;background:var(--trait);margin:20px 10px 10px 0}
+.gliss i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--ac)}
+.gliss u{position:absolute;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:var(--ac);border:3px solid var(--carte);box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.toast{position:sticky;bottom:12px;margin:14px auto 0;width:max-content;max-width:100%;display:flex;gap:8px;align-items:center;
+  background:var(--texte);color:var(--fond);padding:10px 16px;border-radius:999px;font-size:15px}
+.note-planche{margin-top:18px;font-size:13px;color:var(--doux);text-align:center}
+
+/* ---- A : pas à pas ---- */
+.prog{display:flex;gap:6px}
+.prog i{flex:1;height:6px;border-radius:99px;background:var(--trait)}
+.prog i.on{background:var(--ac)}
+.nb-etape{font-size:14px;color:var(--doux);margin:8px 0 12px}
+.etape{background:var(--carte);border:1px solid var(--trait);border-radius:20px;padding:16px;margin-bottom:12px;box-shadow:var(--ombre)}
+.etape.on{border-color:var(--ac);border-width:2px;padding:15px}
+.etape.suite{opacity:1}
+.etape-t{display:flex;align-items:center;gap:12px}
+.etape-t h2{flex:1;font-size:20px;line-height:1.25}
+.etape-t .i{color:var(--doux)}
+.num{width:34px;height:34px;border-radius:50%;background:var(--ac);color:var(--sur);display:grid;place-items:center;font-weight:700;flex:none}
+.etape:not(.on) .num{background:var(--trait);color:var(--texte)}
+.num.p{width:28px;height:28px;font-size:14px;flex:none}
+.resume{font-size:14px;color:var(--doux);margin:4px 0 0 46px}
+.sous{position:relative;margin-top:14px;padding:14px 12px 16px 12px;border:1px solid var(--trait);border-radius:16px;background:var(--fond)}
+.sous>.num.p{position:absolute;top:-14px;left:12px}
+.sous .svc-t{margin-top:6px}
+
+/* ---- B : cartes ---- */
+.top.sticky{position:sticky;top:0;background:var(--fond);z-index:2;padding-bottom:6px;margin-bottom:0}
+.ancres{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:6px -16px 12px;padding:0 16px}
+.ancres span{flex:none;padding:8px 14px;border-radius:999px;border:1.5px solid var(--trait);font-size:15px;background:var(--carte)}
+.ancres span.on{background:var(--ac);color:var(--sur);border-color:var(--ac);font-weight:650}
+.carte{background:var(--carte);border:1px solid var(--trait);border-radius:20px;padding:16px;margin-bottom:14px;box-shadow:var(--ombre)}
+.carte>h2{display:flex;gap:10px;align-items:center;font-size:19px;margin-bottom:10px}
+.carte>h2 .i{color:var(--ac)}
+.hero{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;padding:16px;border-radius:16px;
+  background:var(--ac);color:var(--sur)}
+.hero small{color:inherit;opacity:.9}
+.hero .ville{display:block;font-size:30px;line-height:1.1}
+.hero .temp{text-align:right}
+.hero .temp b{font-size:32px;line-height:1.1}
+.rang{display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 2px;border-top:1px solid var(--trait)}
+.rang>div{flex:1;min-width:0}
+.rang>.i:first-child{color:var(--ac)}
+.rang>.i:last-child{color:var(--doux)}
+.rang.ouvert{background:var(--soft);border-radius:14px;padding:8px 10px;border-top:none;margin:6px -8px 0}
+.detail{padding:2px 2px 14px}
+
+/* ---- C : application ---- */
+.ecran{margin-bottom:22px}
+.ecran:last-child{margin-bottom:0}
+.legende-e{font-size:13px;font-weight:600;color:var(--doux);padding:12px 16px 0}
+.app.c{padding-bottom:12px}
+.titre-e{font-size:28px;line-height:1.2;margin:6px 0 4px}
+.hero.grand{flex-direction:column;align-items:flex-start;gap:2px;padding:22px 20px;border-radius:24px}
+.hero.grand .deg{font-size:56px;line-height:1.05;font-weight:700}
+.hero.grand span{font-size:18px}
+.feuille{margin:-10px -4px 0;padding:10px 16px 20px;background:var(--carte);border:1px solid var(--trait);border-radius:24px 24px 0 0;box-shadow:0 -6px 18px rgba(0,0,0,.12);position:relative}
+.feuille h2{font-size:20px;margin:4px 0 12px}
+.poignee{display:block;width:44px;height:5px;border-radius:99px;background:var(--trait);margin:0 auto}
+.liste{background:var(--carte);border:1px solid var(--trait);border-radius:20px;margin-top:14px;overflow:hidden}
+.ligne{display:flex;align-items:center;gap:14px;min-height:72px;padding:10px 14px}
+.ligne+.ligne{border-top:1px solid var(--trait)}
+.ligne>div{flex:1;min-width:0}
+.ligne>.i:last-child{color:var(--doux)}
+.pastille{width:42px;height:42px;border-radius:12px;background:var(--soft);color:var(--ac);display:grid;place-items:center;flex:none}
+.point{width:12px;height:12px;border-radius:50%;flex:none}
+.point.ok{background:var(--ok)}
+.point.err{background:var(--err)}
+.petit-haut{margin-top:12px}
+.retour{display:flex;align-items:center;gap:2px;color:var(--ac);font-weight:600;margin-bottom:2px}
+.onglets{display:flex;justify-content:space-around;border-top:1px solid var(--trait);background:var(--carte);padding:8px 4px 12px}
+.onglets span{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:68px;color:var(--doux)}
+.onglets small{font-size:12px;color:inherit}
+.onglets span.on{color:var(--ac);font-weight:650}
+
+/* ---- téléphone réel : les cadres prennent toute la largeur ---- */
+@media (max-width:440px){
+  .planche{padding:20px 0 56px}
+  .planche>header,.choix,.lot>h2,.lot>p,.pied,.etiq{margin-left:16px;margin-right:16px}
+  .choix{margin-left:16px;margin-right:16px}
+  .tel{border-radius:0;max-width:none;border-left:0;border-right:0}
+  .duo{gap:26px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol><symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol><symbol id="i-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16.2a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></symbol><symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol><symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></symbol><symbol id="i-speaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h4l5 4v-13l-5 4z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"/></symbol><symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol><symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol><symbol id="i-cross" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol><symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol><symbol id="i-chevd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol><symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></symbol><symbol id="i-tablet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M10 18h4"/></symbol><symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol><symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5M7 9l5-5 5 5M5 20h14"/></symbol><symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.5v13l11-6.5z"/></symbol><symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/></symbol><symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H5z"/></symbol><symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol></defs></svg>
+<main class="planche">
+<header>
+<h1>Trois esquisses de la page de réglages</h1>
+<p class="intro">Dites-moi A, B ou C (et ce que vous changeriez). Chaque esquisse existe en clair et en sombre, à la largeur d'un téléphone. Ce sont des maquettes : les villes, les températures et les adresses sont des exemples, rien n'est branché. Dans chacune, la ville vient d'abord, puis la voix et l'assistant, puis l'écran, le Wi-Fi et la mise à jour.</p>
+</header>
+<div class="choix"><article><h2>A · Pas à pas</h2><p>Un assistant&nbsp;: une étape à la fois (ville, puis voix, puis écran, puis réseau), avec «&nbsp;Continuer&nbsp;».</p><p class="pc">Pour&nbsp;: le plus simple la première fois, rien n'est oublié.<br>Contre&nbsp;: plus long pour changer un seul réglage.</p></article><article><h2>B · Une page, des cartes</h2><p>Tout sur une seule page&nbsp;: une carte par sujet, un menu en haut pour sauter à la bonne, enregistrement automatique.</p><p class="pc">Pour&nbsp;: rapide à retoucher, on voit tout d'un coup d'œil.<br>Contre&nbsp;: une longue page à faire défiler.</p></article><article><h2>C · Application</h2><p>Comme une application&nbsp;: onglets en bas (Accueil, Assistant, Écran, Appareil), listes, et un écran par réglage.</p><p class="pc">Pour&nbsp;: le plus proche d'une appli de téléphone, très lisible.<br>Contre&nbsp;: plus d'écrans à construire, réglages cachés derrière un toucher.</p></article></div>
+<section class="lot" id="esquisse-a"><h2>Esquisse A · Pas à pas</h2><p>Une étape ouverte à la fois, grand texte d'aide, boutons « Enregistrer et continuer ».</p><div class="duo"><div><p class="etiq">Clair</p><figure class="tel sk-a" data-theme="clair" style="margin-top:0;margin-bottom:0"><div class="url"><span>ecran-8e87.local</span></div>
+<div class="app">
+  <header class="top"><span class="logo"><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg></span><div><b>Mon écran</b><small>ecran-8e87 · connecté à «&nbsp;Maison&nbsp;»</small></div></header>
+  <div class="prog" role="img" aria-label="Étape 1 sur 4"><i class="on"></i><i></i><i></i><i></i></div>
+  <p class="nb-etape">Étape 1 sur 4</p>
+
+  <section class="etape on">
+    <div class="etape-t"><span class="num">1</span><h2>Où êtes-vous&nbsp;?</h2></div>
+    <p class="aide gros">Choisissez votre ville. L'écran en déduit la météo et l'heure.</p>
+    <div class="f"><span class="lab">Votre ville</span><div class="champ foc"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><span class="val">Lyo<span class="caret"></span></span></div></div>
+    <ul class="resultats" aria-label="Lieux trouvés"><li class="sel"><span class="radio on"></span><div><b>Lyon</b><small>Auvergne-Rhône-Alpes · France</small></div></li><li class=""><span class="radio"></span><div><b>Lyon</b><small>Mississippi · États-Unis</small></div></li><li class=""><span class="radio"></span><div><b>Lyons</b><small>Illinois · États-Unis</small></div></li></ul>
+    <div class="confirme"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon, France</b><small>Fuseau horaire&nbsp;: Europe/Paris · il est 14&nbsp;h&nbsp;32</small></div></div>
+    <div class="apercu"><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg><div><b>14&nbsp;°C · Partiellement nuageux</b><small>Météo actuelle à Lyon</small></div></div>
+    <span class="btn">Enregistrer et continuer</span>
+  </section>
+
+  <section class="etape on suite">
+    <div class="etape-t"><span class="num">2</span><h2>Votre assistant vocal</h2></div>
+    <p class="aide gros">Il utilise trois services&nbsp;: un pour comprendre votre voix, un pour réfléchir, un pour parler. Chacun peut tourner sur votre PC ou sur Internet.</p>
+    <div class="sous"><span class="num p">a</span><div class="svc-t"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><div><b>Comprendre ma voix</b><small>Voix vers texte (STT)</small></div></div><div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>OpenAI</span><span class="chip">Ollama</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">https://api.openai.com/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ cle"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val">Clé enregistrée</span><span class="lien">Remplacer</span></div><p class="aide">Une fois enregistrée, la clé ne s'affiche plus nulle part.</p></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res ok" role="status"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Le service répond en 0,4 s.</span></p></div>
+    <div class="sous"><span class="num p">b</span><div class="svc-t"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg><div><b>Réfléchir</b><small>Assistant (LLM)</small></div></div><div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip">OpenAI</span><span class="chip">Google</span><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Mon PC · LM Studio</span><span class="chip">Ollama</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">http://192.168.0.20:1234/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ off"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val ph">Pas nécessaire pour ce service</span></div></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res ok" role="status"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Le service répond en 0,4 s. 3 modèles trouvés.</span></p></div>
+    <div class="sous"><span class="num p">c</span><div class="svc-t"><svg class="i" aria-hidden="true"><use href="#i-speaker"/></svg><div><b>Parler</b><small>Texte vers voix (TTS)</small></div></div><div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip">OpenAI</span><span class="chip">Ollama</span><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Kokoro (mon PC)</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">http://192.168.0.20:8880/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ off"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val ph">Pas nécessaire pour ce service</span></div></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res err" role="status"><svg class="i" aria-hidden="true"><use href="#i-cross"/></svg><span>Le service ne répond pas. Est-il lancé et sur le même réseau&nbsp;?</span></p></div>
+    <span class="btn">Enregistrer et continuer</span>
+  </section>
+  <section class="etape"><div class="etape-t"><span class="num">3</span><h2>L'écran</h2><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div><p class="resume">Langue, thème, luminosité</p></section><section class="etape"><div class="etape-t"><span class="num">4</span><h2>Réseau et mise à jour</h2><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div><p class="resume">Wi-Fi «&nbsp;Maison&nbsp;» · version 0.1.0</p></section>
+  <p class="note-planche">La planche montre deux étapes ouvertes pour tout voir ; dans la vraie page, une seule l'est à la fois.</p>
+</div></figure></div><div><p class="etiq">Sombre</p><figure class="tel sk-a" data-theme="sombre" style="margin-top:0;margin-bottom:0"><div class="url"><span>ecran-8e87.local</span></div>
+<div class="app">
+  <header class="top"><span class="logo"><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg></span><div><b>Mon écran</b><small>ecran-8e87 · connecté à «&nbsp;Maison&nbsp;»</small></div></header>
+  <div class="prog" role="img" aria-label="Étape 1 sur 4"><i class="on"></i><i></i><i></i><i></i></div>
+  <p class="nb-etape">Étape 1 sur 4</p>
+
+  <section class="etape on">
+    <div class="etape-t"><span class="num">1</span><h2>Où êtes-vous&nbsp;?</h2></div>
+    <p class="aide gros">Choisissez votre ville. L'écran en déduit la météo et l'heure.</p>
+    <div class="f"><span class="lab">Votre ville</span><div class="champ foc"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><span class="val">Lyo<span class="caret"></span></span></div></div>
+    <ul class="resultats" aria-label="Lieux trouvés"><li class="sel"><span class="radio on"></span><div><b>Lyon</b><small>Auvergne-Rhône-Alpes · France</small></div></li><li class=""><span class="radio"></span><div><b>Lyon</b><small>Mississippi · États-Unis</small></div></li><li class=""><span class="radio"></span><div><b>Lyons</b><small>Illinois · États-Unis</small></div></li></ul>
+    <div class="confirme"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon, France</b><small>Fuseau horaire&nbsp;: Europe/Paris · il est 14&nbsp;h&nbsp;32</small></div></div>
+    <div class="apercu"><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg><div><b>14&nbsp;°C · Partiellement nuageux</b><small>Météo actuelle à Lyon</small></div></div>
+    <span class="btn">Enregistrer et continuer</span>
+  </section>
+
+  <section class="etape on suite">
+    <div class="etape-t"><span class="num">2</span><h2>Votre assistant vocal</h2></div>
+    <p class="aide gros">Il utilise trois services&nbsp;: un pour comprendre votre voix, un pour réfléchir, un pour parler. Chacun peut tourner sur votre PC ou sur Internet.</p>
+    <div class="sous"><span class="num p">a</span><div class="svc-t"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><div><b>Comprendre ma voix</b><small>Voix vers texte (STT)</small></div></div><div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>OpenAI</span><span class="chip">Ollama</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">https://api.openai.com/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ cle"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val">Clé enregistrée</span><span class="lien">Remplacer</span></div><p class="aide">Une fois enregistrée, la clé ne s'affiche plus nulle part.</p></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res ok" role="status"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Le service répond en 0,4 s.</span></p></div>
+    <div class="sous"><span class="num p">b</span><div class="svc-t"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg><div><b>Réfléchir</b><small>Assistant (LLM)</small></div></div><div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip">OpenAI</span><span class="chip">Google</span><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Mon PC · LM Studio</span><span class="chip">Ollama</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">http://192.168.0.20:1234/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ off"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val ph">Pas nécessaire pour ce service</span></div></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res ok" role="status"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Le service répond en 0,4 s. 3 modèles trouvés.</span></p></div>
+    <div class="sous"><span class="num p">c</span><div class="svc-t"><svg class="i" aria-hidden="true"><use href="#i-speaker"/></svg><div><b>Parler</b><small>Texte vers voix (TTS)</small></div></div><div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip">OpenAI</span><span class="chip">Ollama</span><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Kokoro (mon PC)</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">http://192.168.0.20:8880/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ off"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val ph">Pas nécessaire pour ce service</span></div></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res err" role="status"><svg class="i" aria-hidden="true"><use href="#i-cross"/></svg><span>Le service ne répond pas. Est-il lancé et sur le même réseau&nbsp;?</span></p></div>
+    <span class="btn">Enregistrer et continuer</span>
+  </section>
+  <section class="etape"><div class="etape-t"><span class="num">3</span><h2>L'écran</h2><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div><p class="resume">Langue, thème, luminosité</p></section><section class="etape"><div class="etape-t"><span class="num">4</span><h2>Réseau et mise à jour</h2><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div><p class="resume">Wi-Fi «&nbsp;Maison&nbsp;» · version 0.1.0</p></section>
+  <p class="note-planche">La planche montre deux étapes ouvertes pour tout voir ; dans la vraie page, une seule l'est à la fois.</p>
+</div></figure></div></div></section><section class="lot" id="esquisse-b"><h2>Esquisse B · Une page, des cartes</h2><p>Menu en haut qui saute à la bonne carte ; une carte par sujet ; l'enregistrement se fait tout seul.</p><div class="duo"><div><p class="etiq">Clair</p><figure class="tel sk-b" data-theme="clair" style="margin-top:0;margin-bottom:0"><div class="url"><span>ecran-8e87.local</span></div>
+<div class="app b">
+  <header class="top sticky"><span class="logo"><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg></span><div><b>Mon écran</b><small>ecran-8e87 · connecté</small></div></header>
+  <nav class="ancres" aria-label="Sections"><span class="on">Météo</span><span>Assistant</span><span>Écran</span><span>Wi-Fi</span><span>Appareil</span></nav>
+
+  <section class="carte">
+    <h2><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg>Ma ville</h2>
+    <div class="hero">
+      <div><small>Météo à</small><b class="ville">Lyon</b><small>Auvergne-Rhône-Alpes · France</small></div>
+      <div class="temp"><b>14&nbsp;°C</b><small>Partiellement nuageux</small></div>
+    </div>
+    <p class="aide">Fuseau horaire&nbsp;: Europe/Paris · il est 14&nbsp;h&nbsp;32</p>
+    <div class="f"><span class="lab">Changer de ville</span><div class="champ foc"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><span class="val">Lyo<span class="caret"></span></span></div></div>
+    <ul class="resultats" aria-label="Lieux trouvés"><li class="sel"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon</b><small>Auvergne-Rhône-Alpes · France</small></div></li><li class=""><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon</b><small>Mississippi · États-Unis</small></div></li><li class=""><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyons</b><small>Illinois · États-Unis</small></div></li></ul>
+  </section>
+
+  <section class="carte">
+    <h2><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg>Assistant vocal</h2>
+    <p class="aide">Trois services&nbsp;: comprendre votre voix, réfléchir, parler. Touchez-en un pour le régler.</p>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><div><b>Comprendre ma voix</b><small>OpenAI · clé enregistrée</small></div><span class="pill ok">Prêt</span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+    <div class="rang ouvert"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg><div><b>Réfléchir</b><small>Mon PC · LM Studio · sans clé</small></div><span class="pill ok">Prêt</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div>
+    <div class="detail"><div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip">OpenAI</span><span class="chip">Google</span><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Mon PC · LM Studio</span><span class="chip">Ollama</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">http://192.168.0.20:1234/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ off"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val ph">Pas nécessaire pour ce service</span></div></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res ok" role="status"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Le service répond en 0,4 s. 3 modèles trouvés.</span></p></div>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-speaker"/></svg><div><b>Parler</b><small>Kokoro · ne répond pas</small></div><span class="pill err">À vérifier</span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+  </section>
+
+  <section class="carte">
+    <h2><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg>Écran</h2>
+    <div class="f"><span class="lab">Langue</span><div class="champ"><span class="val">Français</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div>
+    <div class="f"><span class="lab">Thème</span><div class="seg"><span>Auto</span><span class="on">Clair</span><span>Sombre</span></div></div>
+    <div class="f"><span class="lab">Luminosité <b class="r">80&nbsp;%</b></span><div class="gliss"><i style="width:80%"></i><u style="left:80%"></u></div></div>
+  </section>
+
+  <section class="carte">
+    <h2><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg>Wi-Fi et appareil</h2>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><div><b>«&nbsp;Maison&nbsp;»</b><small>Connecté · signal bon</small></div><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg><div><b>Version 0.1.0</b><small>Mettre à jour · revenir à la 0.0.9</small></div><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg><div><b>Sauvegarder mes réglages</b><small>Sans les clés d'accès</small></div><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+  </section>
+  <div class="toast"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Enregistré automatiquement</div>
+</div></figure></div><div><p class="etiq">Sombre</p><figure class="tel sk-b" data-theme="sombre" style="margin-top:0;margin-bottom:0"><div class="url"><span>ecran-8e87.local</span></div>
+<div class="app b">
+  <header class="top sticky"><span class="logo"><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg></span><div><b>Mon écran</b><small>ecran-8e87 · connecté</small></div></header>
+  <nav class="ancres" aria-label="Sections"><span class="on">Météo</span><span>Assistant</span><span>Écran</span><span>Wi-Fi</span><span>Appareil</span></nav>
+
+  <section class="carte">
+    <h2><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg>Ma ville</h2>
+    <div class="hero">
+      <div><small>Météo à</small><b class="ville">Lyon</b><small>Auvergne-Rhône-Alpes · France</small></div>
+      <div class="temp"><b>14&nbsp;°C</b><small>Partiellement nuageux</small></div>
+    </div>
+    <p class="aide">Fuseau horaire&nbsp;: Europe/Paris · il est 14&nbsp;h&nbsp;32</p>
+    <div class="f"><span class="lab">Changer de ville</span><div class="champ foc"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><span class="val">Lyo<span class="caret"></span></span></div></div>
+    <ul class="resultats" aria-label="Lieux trouvés"><li class="sel"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon</b><small>Auvergne-Rhône-Alpes · France</small></div></li><li class=""><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon</b><small>Mississippi · États-Unis</small></div></li><li class=""><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyons</b><small>Illinois · États-Unis</small></div></li></ul>
+  </section>
+
+  <section class="carte">
+    <h2><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg>Assistant vocal</h2>
+    <p class="aide">Trois services&nbsp;: comprendre votre voix, réfléchir, parler. Touchez-en un pour le régler.</p>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><div><b>Comprendre ma voix</b><small>OpenAI · clé enregistrée</small></div><span class="pill ok">Prêt</span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+    <div class="rang ouvert"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg><div><b>Réfléchir</b><small>Mon PC · LM Studio · sans clé</small></div><span class="pill ok">Prêt</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div>
+    <div class="detail"><div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip">OpenAI</span><span class="chip">Google</span><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Mon PC · LM Studio</span><span class="chip">Ollama</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">http://192.168.0.20:1234/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ off"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val ph">Pas nécessaire pour ce service</span></div></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res ok" role="status"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Le service répond en 0,4 s. 3 modèles trouvés.</span></p></div>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-speaker"/></svg><div><b>Parler</b><small>Kokoro · ne répond pas</small></div><span class="pill err">À vérifier</span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+  </section>
+
+  <section class="carte">
+    <h2><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg>Écran</h2>
+    <div class="f"><span class="lab">Langue</span><div class="champ"><span class="val">Français</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div>
+    <div class="f"><span class="lab">Thème</span><div class="seg"><span>Auto</span><span class="on">Clair</span><span>Sombre</span></div></div>
+    <div class="f"><span class="lab">Luminosité <b class="r">80&nbsp;%</b></span><div class="gliss"><i style="width:80%"></i><u style="left:80%"></u></div></div>
+  </section>
+
+  <section class="carte">
+    <h2><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg>Wi-Fi et appareil</h2>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><div><b>«&nbsp;Maison&nbsp;»</b><small>Connecté · signal bon</small></div><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg><div><b>Version 0.1.0</b><small>Mettre à jour · revenir à la 0.0.9</small></div><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+    <div class="rang"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg><div><b>Sauvegarder mes réglages</b><small>Sans les clés d'accès</small></div><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div>
+  </section>
+  <div class="toast"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Enregistré automatiquement</div>
+</div></figure></div></div></section><section class="lot" id="esquisse-c"><h2>Esquisse C · Application</h2><p>Onglets en bas ; l'accueil montre la ville et la météo ; chaque réglage a son écran.</p><div class="duo"><div><p class="etiq">Clair</p><figure class="tel sk-c" data-theme="clair" style="margin-top:0;margin-bottom:0"><div class="url"><span>ecran-8e87.local</span></div>
+<div class="ecran">
+  <p class="legende-e">Écran 1 · Accueil</p>
+  <div class="app c">
+    <div class="hero grand">
+      <small>Lyon · France</small>
+      <b class="deg">14&nbsp;°C</b>
+      <span>Partiellement nuageux</span>
+      <small>Il est 14&nbsp;h&nbsp;32 · Europe/Paris</small>
+    </div>
+    <div class="feuille">
+      <i class="poignee"></i>
+      <h2>Choisir ma ville</h2>
+      <div class="f"><div class="champ foc"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><span class="val">Lyo<span class="caret"></span></span></div></div>
+      <ul class="resultats" aria-label="Lieux trouvés"><li class="sel"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon</b><small>Auvergne-Rhône-Alpes · France</small></div></li><li class=""><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon</b><small>Mississippi · États-Unis</small></div></li><li class=""><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyons</b><small>Illinois · États-Unis</small></div></li></ul>
+      <span class="btn">Choisir Lyon</span>
+    </div>
+  </div>
+  <nav class="onglets" aria-label="Onglets"><span class="on"><svg class="i" aria-hidden="true"><use href="#i-home"/></svg><small>Accueil</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><small>Assistant</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg><small>Écran</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg><small>Appareil</small></span></nav>
+</div>
+<div class="ecran">
+  <p class="legende-e">Écran 2 · Assistant</p>
+  <div class="app c">
+    <h1 class="titre-e">Assistant vocal</h1>
+    <p class="aide">Trois services travaillent ensemble. Touchez-en un pour le régler.</p>
+    <div class="liste"><div class="ligne"><span class="pastille"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg></span><div><b>Comprendre ma voix</b><small>OpenAI · clé enregistrée</small></div><span class="point ok" title="Prêt"></span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div><div class="ligne"><span class="pastille"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg></span><div><b>Réfléchir</b><small>Mon PC · LM Studio · sans clé</small></div><span class="point ok" title="Prêt"></span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div><div class="ligne"><span class="pastille"><svg class="i" aria-hidden="true"><use href="#i-speaker"/></svg></span><div><b>Parler</b><small>Kokoro · ne répond pas</small></div><span class="point err" title="À vérifier"></span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div></div>
+    <p class="aide petit-haut">Les services peuvent tourner sur votre PC ou sur Internet.</p>
+  </div>
+  <nav class="onglets" aria-label="Onglets"><span class=""><svg class="i" aria-hidden="true"><use href="#i-home"/></svg><small>Accueil</small></span><span class="on"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><small>Assistant</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg><small>Écran</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg><small>Appareil</small></span></nav>
+</div>
+<div class="ecran">
+  <p class="legende-e">Écran 3 · Réfléchir (après un toucher sur la ligne)</p>
+  <div class="app c">
+    <p class="retour"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg>Assistant</p>
+    <h1 class="titre-e">Réfléchir</h1>
+    <p class="aide">Assistant (LLM)</p>
+    <div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip">OpenAI</span><span class="chip">Google</span><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Mon PC · LM Studio</span><span class="chip">Ollama</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">http://192.168.0.20:1234/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ off"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val ph">Pas nécessaire pour ce service</span></div></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res ok" role="status"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Le service répond en 0,4 s. 3 modèles trouvés.</span></p>
+    <span class="btn">Enregistrer</span>
+  </div>
+  <nav class="onglets" aria-label="Onglets"><span class=""><svg class="i" aria-hidden="true"><use href="#i-home"/></svg><small>Accueil</small></span><span class="on"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><small>Assistant</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg><small>Écran</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg><small>Appareil</small></span></nav>
+</div></figure></div><div><p class="etiq">Sombre</p><figure class="tel sk-c" data-theme="sombre" style="margin-top:0;margin-bottom:0"><div class="url"><span>ecran-8e87.local</span></div>
+<div class="ecran">
+  <p class="legende-e">Écran 1 · Accueil</p>
+  <div class="app c">
+    <div class="hero grand">
+      <small>Lyon · France</small>
+      <b class="deg">14&nbsp;°C</b>
+      <span>Partiellement nuageux</span>
+      <small>Il est 14&nbsp;h&nbsp;32 · Europe/Paris</small>
+    </div>
+    <div class="feuille">
+      <i class="poignee"></i>
+      <h2>Choisir ma ville</h2>
+      <div class="f"><div class="champ foc"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><span class="val">Lyo<span class="caret"></span></span></div></div>
+      <ul class="resultats" aria-label="Lieux trouvés"><li class="sel"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon</b><small>Auvergne-Rhône-Alpes · France</small></div></li><li class=""><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyon</b><small>Mississippi · États-Unis</small></div></li><li class=""><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><div><b>Lyons</b><small>Illinois · États-Unis</small></div></li></ul>
+      <span class="btn">Choisir Lyon</span>
+    </div>
+  </div>
+  <nav class="onglets" aria-label="Onglets"><span class="on"><svg class="i" aria-hidden="true"><use href="#i-home"/></svg><small>Accueil</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><small>Assistant</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg><small>Écran</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg><small>Appareil</small></span></nav>
+</div>
+<div class="ecran">
+  <p class="legende-e">Écran 2 · Assistant</p>
+  <div class="app c">
+    <h1 class="titre-e">Assistant vocal</h1>
+    <p class="aide">Trois services travaillent ensemble. Touchez-en un pour le régler.</p>
+    <div class="liste"><div class="ligne"><span class="pastille"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg></span><div><b>Comprendre ma voix</b><small>OpenAI · clé enregistrée</small></div><span class="point ok" title="Prêt"></span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div><div class="ligne"><span class="pastille"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg></span><div><b>Réfléchir</b><small>Mon PC · LM Studio · sans clé</small></div><span class="point ok" title="Prêt"></span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div><div class="ligne"><span class="pastille"><svg class="i" aria-hidden="true"><use href="#i-speaker"/></svg></span><div><b>Parler</b><small>Kokoro · ne répond pas</small></div><span class="point err" title="À vérifier"></span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></div></div>
+    <p class="aide petit-haut">Les services peuvent tourner sur votre PC ou sur Internet.</p>
+  </div>
+  <nav class="onglets" aria-label="Onglets"><span class=""><svg class="i" aria-hidden="true"><use href="#i-home"/></svg><small>Accueil</small></span><span class="on"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><small>Assistant</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg><small>Écran</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg><small>Appareil</small></span></nav>
+</div>
+<div class="ecran">
+  <p class="legende-e">Écran 3 · Réfléchir (après un toucher sur la ligne)</p>
+  <div class="app c">
+    <p class="retour"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg>Assistant</p>
+    <h1 class="titre-e">Réfléchir</h1>
+    <p class="aide">Assistant (LLM)</p>
+    <div class="f"><span class="lab">Où tourne-t-il&nbsp;?</span><div class="chips"><span class="chip">OpenAI</span><span class="chip">Google</span><span class="chip on"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Mon PC · LM Studio</span><span class="chip">Ollama</span><span class="chip">Autre</span></div></div><div class="f"><span class="lab">Adresse du service</span><div class="champ"><svg class="i" aria-hidden="true"><use href="#i-wifi"/></svg><span class="val">http://192.168.0.20:1234/v1</span></div></div><div class="f"><span class="lab">Modèle</span><div class="champ"><span class="val ph">Choisir dans la liste du service</span><svg class="i" aria-hidden="true"><use href="#i-chevd"/></svg></div></div><div class="f"><span class="lab">Clé d'accès</span><div class="champ off"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg><span class="val ph">Pas nécessaire pour ce service</span></div></div><div class="testbar"><span class="btn sec petit"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Tester</span></div><p class="res ok" role="status"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Le service répond en 0,4 s. 3 modèles trouvés.</span></p>
+    <span class="btn">Enregistrer</span>
+  </div>
+  <nav class="onglets" aria-label="Onglets"><span class=""><svg class="i" aria-hidden="true"><use href="#i-home"/></svg><small>Accueil</small></span><span class="on"><svg class="i" aria-hidden="true"><use href="#i-mic"/></svg><small>Assistant</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-sun"/></svg><small>Écran</small></span><span class=""><svg class="i" aria-hidden="true"><use href="#i-tablet"/></svg><small>Appareil</small></span></nav>
+</div></figure></div></div></section>
+<p class="pied">Après votre choix, je construis la page complète contre un faux appareil, avec la vraie recherche de villes d'Open-Meteo.</p>
+</main>
+</body>
+</html>
