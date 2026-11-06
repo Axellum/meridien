@@ -1,5 +1,6 @@
 #include "meteo_client.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -20,6 +21,7 @@
 #include "ecran/meteo_requete.hpp"
 #include "ecran/meteo_synthese.hpp"
 #include "horloge.h"
+#include "meteo_etat.h"
 #include "meteo_interne.h"
 #include "reseau.h"
 
@@ -316,6 +318,27 @@ void journaliser_releve(const ZoneMeteo &zone, const Essai &e) {
         static_cast<unsigned>(r.nb_jours), static_cast<unsigned>(e.octets), e.duree_ms);
 }
 
+// Relit la météo PAR LE CONTRAT (meteo_etat_lire), exactement comme le fera l'interface, et la met au journal : c'est la preuve
+// sur la carte que ce que l'écran recevra est la météo réelle, avec son indicateur « périmé » et son libellé.
+void journaliser_contrat(const char *quand) {
+    MeteoEtat e = {};
+    if (!meteo_etat_lire(&e)) {
+        ESP_LOGI(TAG_RESULTAT, "contrat (%s) : meteo_etat_lire -> valide=0 (aucune météo connue pour la zone actuelle)",
+                 quand);
+        return;
+    }
+    char temp[12], mini[12], maxi[12];
+    meteo::ecrire_dixiemes(std::lroundf(e.temperature_c * 10.0F), temp, sizeof(temp));
+    meteo::ecrire_dixiemes(std::lroundf(e.min_c * 10.0F), mini, sizeof(mini));
+    meteo::ecrire_dixiemes(std::lroundf(e.max_c * 10.0F), maxi, sizeof(maxi));
+    ESP_LOGI(TAG_RESULTAT,
+             "contrat (%s) : meteo_etat_lire -> valide=%d perime=%d maj=UNIX %lld temperature=%s °C min=%s max=%s (%s) "
+             "code=%d "
+             "jour=%d libellé=« %s »",
+             quand, e.valide ? 1 : 0, e.perime ? 1 : 0, static_cast<long long>(e.maj_epoch_s), temp, mini, maxi,
+             e.minmax_connus ? "du jour" : "prévision du jour absente", e.code_wmo, e.jour ? 1 : 0, e.libelle);
+}
+
 const char *nom_issue(Issue i) {
     switch (i) {
     case Issue::Ok:
@@ -346,6 +369,29 @@ bool reseau_et_heure_pretes() {
     return r.ip_obtenue && r.heure_synchronisee && static_cast<int64_t>(std::time(nullptr)) > kInstantMin;
 }
 
+// Attend `delai_s` secondes, en tranches de 30 s pour signaler au journal le moment où la météo devient périmée. Rend vrai si un
+// changement de zone a réveillé la tâche avant la fin.
+bool attendre(int64_t delai_s) {
+    constexpr int64_t kTrancheS = 30;
+    const int64_t fin_s = esp_timer_get_time() / 1000000 + delai_s;
+    MeteoEtat e = {};
+    bool dernier_perime = meteo_etat_lire(&e) && e.perime;
+    for (;;) {
+        const int64_t reste_s = fin_s - esp_timer_get_time() / 1000000;
+        if (reste_s <= 0) {
+            return false;
+        }
+        const int64_t tranche_s = reste_s < kTrancheS ? reste_s : kTrancheS;
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(static_cast<uint32_t>(tranche_s) * 1000U)) != 0) {
+            return true;
+        }
+        if (meteo_etat_lire(&e) && e.perime != dernier_perime) {
+            dernier_perime = e.perime;
+            journaliser_contrat(e.perime ? "elle vient de devenir périmée" : "elle n'est plus périmée");
+        }
+    }
+}
+
 void tache_meteo(void *) {
     bool trop_de_requetes = false;
     for (;;) {
@@ -354,6 +400,7 @@ void tache_meteo(void *) {
                              pdMS_TO_TICKS(kPasAttenteMs)); // un changement de zone réveille aussi, sans importance ici
         }
 
+        journaliser_contrat("réseau et heure prêts, avant la requête");
         ZoneMeteo zone = {};
         PositionE5 position = {};
         zone_lire_e5(&zone, &position);
@@ -371,6 +418,7 @@ void tache_meteo(void *) {
                 meteo_etat_publier(e.releve);
                 enregistrer_cache(e.releve, position);
                 journaliser_releve(zone, e);
+                journaliser_contrat("après la réponse");
                 trop_de_requetes = false;
             }
         } else {
@@ -385,8 +433,7 @@ void tache_meteo(void *) {
                                                                static_cast<uint8_t>(esp_random() & 0xFFU));
             ESP_LOGI(TAG, "prochain essai dans %lld s (ou tout de suite si la zone change)",
                      static_cast<long long>(delai_s));
-            // Le délai le plus long (15 min + 10 %) tient largement dans un uint32 de millisecondes.
-            if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(static_cast<uint32_t>(delai_s) * 1000U)) == 0) {
+            if (!attendre(delai_s)) {
                 continue; // le délai est écoulé
             }
         }
@@ -407,6 +454,7 @@ void meteo_client_zone_changee() {
 
 void meteo_client_demarrer() {
     relire_cache();
+    journaliser_contrat("au démarrage, depuis le cache");
     if (xTaskCreate(tache_meteo, "meteo", kPileOctets, nullptr, 3, &g_tache) != pdPASS) {
         ESP_LOGE(TAG, "tâche météo non créée");
     }
