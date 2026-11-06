@@ -1,8 +1,10 @@
-// Bus I2C, expandeur PI4IOE5V6408 (0x43), retroeclairage, reset de l'ecran et du tactile.
+// Bus I2C, expandeurs PI4IOE5V6408 (0x43 : ecran et tactile ; 0x44 : alimentation du coprocesseur Wi-Fi), retroeclairage, reset
+// de l'ecran et du tactile.
 #include "driver/ledc.h"
 #include "esp_check.h"
 #include "esp_io_expander_pi4ioe5v6408.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -18,7 +20,8 @@ static const char *TAG = "tab5_io";
 #define BACKLIGHT_LEDC_HZ 1000
 
 static i2c_master_bus_handle_t s_bus;
-static esp_io_expander_handle_t s_expander;
+static esp_io_expander_handle_t s_expander;       // 0x43 : resets de l'ecran et du tactile
+static esp_io_expander_handle_t s_expander_power; // 0x44 : alimentation du coprocesseur Wi-Fi (bit 0 seulement)
 
 i2c_master_bus_handle_t tab5_i2c_bus(void) { return s_bus; }
 
@@ -75,7 +78,39 @@ esp_err_t tab5_io_init(void) {
     ESP_RETURN_ON_ERROR(
         esp_io_expander_new_i2c_pi4ioe5v6408(s_bus, ESP_IO_EXPANDER_I2C_PI4IOE5V6408_ADDRESS_LOW, &s_expander), TAG,
         "expandeur 0x43");
+
+    // Alimentation du coprocesseur Wi-Fi. Une erreur ici ne doit pas empecher l'ecran de demarrer : on la journalise et
+    // l'application affichera "Wi-Fi absent". Creer ce pilote remet aussi l'expandeur 0x44 a ses valeurs par defaut ; le seul
+    // bit ensuite piloté est WIFI_EN (les autres sorties restent en haute impedance, comme apres une mise sous tension).
+    esp_err_t err =
+        esp_io_expander_new_i2c_pi4ioe5v6408(s_bus, ESP_IO_EXPANDER_I2C_PI4IOE5V6408_ADDRESS_HIGH, &s_expander_power);
+    if (err == ESP_OK) {
+        err = tab5_wifi_power_set(true);
+    }
+    if (err == ESP_OK) {
+        tab5_wifi_note_power_on_ms((int32_t)(esp_timer_get_time() / 1000));
+        ESP_LOGI(TAG, "alimentation du coprocesseur Wi-Fi allumée (expandeur 0x44, bit 0)");
+    } else {
+        s_expander_power = NULL;
+        ESP_LOGE(TAG, "alimentation du coprocesseur Wi-Fi non allumée : %s", esp_err_to_name(err));
+    }
     return ESP_OK;
+}
+
+bool tab5_wifi_power_available(void) { return s_expander_power != NULL; }
+
+// WIFI_EN (expandeur 0x44, bit 0). Allumer : niveau haut ecrit AVANT de piloter la broche (elle sort de la haute impedance deja
+// a l'etat haut, sans impulsion basse). Eteindre : niveau bas, broche toujours pilotee.
+esp_err_t tab5_wifi_power_set(bool on) {
+    esp_io_expander_handle_t expander = s_expander_power;
+    if (expander == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(expander, TAB5_EXPANDER_POWER_WIFI_EN, IO_EXPANDER_OUTPUT), TAG,
+                        "dir 0x44");
+    ESP_RETURN_ON_ERROR(esp_io_expander_set_level(expander, TAB5_EXPANDER_POWER_WIFI_EN, on ? 1 : 0), TAG,
+                        "niveau 0x44");
+    return esp_io_expander_set_output_mode(expander, TAB5_EXPANDER_POWER_WIFI_EN, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL);
 }
 
 // Reset de la dalle. La ligne LCD_RST est tenue a bas en push-pull, puis rendue en ENTREE a pull-up (drain ouvert) pour la

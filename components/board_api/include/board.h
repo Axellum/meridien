@@ -50,6 +50,29 @@ void board_display_unlock(void);
 
 esp_err_t board_set_backlight_percent(int percent);
 
+// --- Wi-Fi par le coprocesseur radio (ADR-0005) ---
+// Sur le Tab5 la radio est un ESP32-C6 relie en SDIO (esp_hosted, version epinglee par la couche carte). board_init() n'allume
+// que l'alimentation du coprocesseur. board_wifi_link_up() etablit le lien (remise a zero du coprocesseur, SDIO) et lit sa
+// version ; ensuite le code applicatif utilise l'API esp_wifi / esp_netif standard (esp_wifi_remote la route vers le
+// coprocesseur). Cette couche ne connait ni SSID ni mot de passe. Le firmware du coprocesseur n'est jamais ecrit (decision
+// d'Axel du 16/10/2026) : lecture de sa version seulement.
+typedef struct {
+    bool link_up;                 // transport actif entre le P4 et le coprocesseur
+    bool version_known;           // version du coprocesseur lue (RPC) ; false si elle n'a pas repondu
+    char coprocessor_version[24]; // "1.4.1" ; vide si inconnue
+    char host_version[24];        // pilote esp_hosted cote P4, par exemple "2.12.12"
+    int32_t power_on_ms; // alimentation du coprocesseur allumee (ms depuis le lancement de l'application), -1 si non
+    int32_t link_up_ms;  // lien etabli (meme origine), -1 tant qu'il ne l'est pas
+    int32_t attempts;    // 1 = lien au premier essai ; >1 = l'alimentation du coprocesseur a du etre coupee puis rendue
+    uint32_t transport_failures; // evenements ESP_HOSTED_EVENT_TRANSPORT_FAILURE vus depuis le demarrage
+} board_wifi_info_t;
+
+// Etablit le lien avec le coprocesseur. Bloque jusqu'a timeout_ms au plus (ESP_ERR_TIMEOUT sinon). Un premier echec provoque
+// une coupure puis une remise de l'alimentation du coprocesseur et un second essai ; board_wifi_get_info()->attempts le dit.
+// A appeler avant esp_wifi_init(). Une panne du transport en marche (TRANSPORT_FAILURE) redemarre la carte par board_restart().
+esp_err_t board_wifi_link_up(uint32_t timeout_ms);
+void board_wifi_get_info(board_wifi_info_t *info);
+
 // Redemarrage logiciel. Sur ESP32-P4, esp_restart() ne remet a zero que les coeurs (boucle du lien C6 vue sur la 7B) :
 // la seule forme autorisee dans ce projet est la remise a zero du systeme par la ROM.
 static inline void __attribute__((noreturn)) board_restart(void) {

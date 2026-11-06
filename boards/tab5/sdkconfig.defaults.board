@@ -25,3 +25,27 @@ CONFIG_SPIRAM_SPEED_200M=y
 # Console sur l'USB-Serial/JTAG du P4 : c'est la prise USB-C du Tab5 (le firmware ESPHome journalise de meme,
 # hardware_uart: USB_SERIAL_JTAG). Sans cela, aucun journal ne sort sur le port serie.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Wi-Fi : coprocesseur ESP32-C6 relie en SDIO (esp_hosted), jalon 1b. Valeurs du firmware ESPHome en service sur le Tab5
+# (Tab5/paquets/tab5-hardware.yaml, bloc esp32_hosted) ; docs/mesures/1b.md dit lesquelles ont ete constatees sur la carte.
+CONFIG_SLAVE_IDF_TARGET_ESP32C6=y
+CONFIG_ESP_HOSTED_SDIO_SLOT_1=y
+CONFIG_ESP_HOSTED_SDIO_4_BIT_BUS=y
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_CLK_SLOT_1=12
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_CMD_SLOT_1=13
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D0_SLOT_1=11
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D1_4BIT_BUS_SLOT_1=10
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D2_4BIT_BUS_SLOT_1=9
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D3_4BIT_BUS_SLOT_1=8
+CONFIG_ESP_HOSTED_SDIO_CLOCK_FREQ_KHZ=20000
+# Remise a zero du C6 : GPIO15. Polarite "active_high: true" comme ESPHome (le preset Kconfig du Tab5 dit l'inverse : a n'essayer
+# que si le lien ne s'etablit pas).
+CONFIG_ESP_HOSTED_SDIO_RESET_ACTIVE_HIGH=y
+CONFIG_ESP_HOSTED_SDIO_GPIO_RESET_SLAVE=15
+# Tampons du transport en PSRAM (use_psram: true dans le firmware ESPHome : evite un crash du mempool et libere la SRAM).
+CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
+# Une panne du transport ne doit pas appeler esp_restart() (qui sur P4 ne remet a zero que les coeurs) : bsp_tab5 recoit
+# l'evenement ESP_HOSTED_EVENT_TRANSPORT_FAILURE et redemarre par board_restart().
+# CONFIG_ESP_HOSTED_TRANSPORT_RESTART_ON_FAILURE is not set
+# Pas de commandes de console esp_hosted (aucune console interactive dans ce projet).
+# CONFIG_ESP_HOSTED_CLI_ENABLED is not set

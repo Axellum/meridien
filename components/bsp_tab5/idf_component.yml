@@ -8,3 +8,10 @@ dependencies:
   espressif/esp_lcd_st7121: "1.0.1"
   espressif/esp_lcd_touch_st7123: "1.0.2"
   espressif/esp_lvgl_port: "2.9.0"
+  # Wi-Fi par l'ESP32-C6 (jalon 1b). Versions epinglees = le couple deja en service sur cette tablette sous ESPHome 2026.9.1
+  # (lues dans son dependencies.lock le 06/11/2026) : esp_hosted 2.12.12 cote P4 pour le C6 en ESP-Hosted 1.4.1. Ne pas changer
+  # une version sans l'essayer sur la carte ; ne JAMAIS mettre a jour le C6 (decision d'Axel du 16/10/2026).
+  espressif/esp_hosted: "2.12.12"
+  espressif/esp_wifi_remote: "1.6.3"
+  espressif/wifi_remote_over_eppp: "0.3.3"
+  espressif/eppp_link: "1.1.5"
