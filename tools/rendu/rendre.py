@@ -339,6 +339,14 @@ def construire_scenes(scenes: list, lvgl: Path, archive: Path, jobs: int) -> dic
     if resultat.returncode != 0:
         erreur("police : " + resultat.stderr)
 
+    # Contrat météo (main/meteo_etat.h, session meteo-appareil) : tant que le vrai fichier n'est pas dans l'arbre, main/bouchons/
+    # (s'il existe) donne la même forme, comme le fait main/CMakeLists.txt. Dès que le vrai fichier est là, le bouchon est ignoré.
+    bouchons_firmware = RACINE / "main" / "bouchons"
+    repli_meteo = (
+        [f"-I{bouchons_firmware}"]
+        if (bouchons_firmware / "meteo_etat.h").exists() and not (RACINE / "main" / "meteo_etat.h").exists()
+        else []
+    )
     drapeaux = [
         "-std=gnu++23",
         "-O1",
@@ -348,6 +356,7 @@ def construire_scenes(scenes: list, lvgl: Path, archive: Path, jobs: int) -> dic
         f"-I{BANC}",
         f"-I{BANC / 'bouchons'}",
         f"-I{RACINE / 'main'}",
+        *repli_meteo,
         f"-I{RACINE / 'components' / 'board_api' / 'include'}",
         f"-I{RACINE / 'components' / 'core' / 'include'}",
         f"-I{lvgl}",
