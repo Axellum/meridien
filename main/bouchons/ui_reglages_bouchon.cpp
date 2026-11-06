@@ -1,6 +1,6 @@
 // BOUCHON — corps provisoire de ui_reglages_ouvrir() : un bandeau « Réglages : bientôt » posé deux secondes sur la couche
-// supérieure, puis retiré. À supprimer avec ce dossier quand `reglages-ecran` livre le vrai main/ui_reglages.cpp (voir
-// bouchons/ui_reglages.h). LVGL pur, comme les autres fichiers d'interface.
+// supérieure, puis retiré. Compilé tant que `main/ui_reglages_ouvrir.cpp` (la colle de `reglages-ecran`) n'existe pas ; à
+// supprimer avec ce dossier ensuite (voir bouchons/ui_reglages.h). LVGL pur, comme les autres fichiers d'interface.
 #include "ui_reglages.h"
 
 #include <cstdint>
