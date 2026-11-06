@@ -6,8 +6,6 @@ using namespace ecran::assistant;
 
 namespace {
 
-constexpr bool egal(std::string_view a, std::string_view b) { return a == b; }
-
 constexpr bool delta_est(std::string_view json, Lecture lecture, std::string_view texte = std::string_view(),
                          std::size_t capacite = 256) {
     char b[256] = {};

@@ -295,11 +295,21 @@ constexpr int morceaux_de_tailles_variees() {
     return 0;
 }
 
-// Les coupures sont réparties en deux moitiés : le compilateur plafonne le nombre d'opérations d'une évaluation.
-constexpr int coupures_en_deux_limite_200_debut() { return coupures_en_deux_morceaux<200>(0, 95); }
-constexpr int coupures_en_deux_limite_200_fin() { return coupures_en_deux_morceaux<200>(96, COMPOSITE.size()); }
-constexpr int coupures_en_deux_limite_40_debut() { return coupures_en_deux_morceaux<40>(0, 95); }
-constexpr int coupures_en_deux_limite_40_fin() { return coupures_en_deux_morceaux<40>(96, COMPOSITE.size()); }
+// Les coupures sont réparties en tranches de 31 positions : le compilateur plafonne le nombre de pas d'une
+// évaluation constexpr (clang : 1 048 576). 8 tranches couvrent les positions 0 à COMPOSITE.size() (vérifié ci-dessous).
+constexpr std::size_t LARGEUR_TRANCHE = 31;
+constexpr std::size_t NB_TRANCHES = 8;
+static_assert(NB_TRANCHES * LARGEUR_TRANCHE > COMPOSITE.size(), "les tranches doivent couvrir toutes les positions de coupure");
+
+template <std::size_t L, std::size_t K>
+constexpr int coupures_en_deux_tranche() {
+    constexpr std::size_t fin = (K + 1) * LARGEUR_TRANCHE - 1;
+    return coupures_en_deux_morceaux<L>(K * LARGEUR_TRANCHE, fin < COMPOSITE.size() ? fin : COMPOSITE.size());
+}
+template <std::size_t K>
+constexpr int coupures_en_deux_limite_200() { return coupures_en_deux_tranche<200, K>(); }
+template <std::size_t K>
+constexpr int coupures_en_deux_limite_40() { return coupures_en_deux_tranche<40, K>(); }
 constexpr int morceaux_varies_avec_la_limite_par_defaut() { return morceaux_de_tailles_variees<200>(); }
 constexpr int morceaux_varies_avec_une_petite_limite() { return morceaux_de_tailles_variees<40>(); }
 
@@ -345,8 +355,12 @@ constexpr int a_du_contenu_ponctuation_et_lettres() {
     X(coupe_forcee_ignore_les_separateurs_de_la_premiere_moitie)            \
     X(coupe_forcee_sans_espace_au_dernier_caractere_entier)                 \
     X(jamais_plus_de_limite_octets_en_attente)                              \
-    X(coupures_en_deux_limite_200_debut) X(coupures_en_deux_limite_200_fin) X(morceaux_varies_avec_la_limite_par_defaut)                       \
-    X(coupures_en_deux_limite_40_debut) X(coupures_en_deux_limite_40_fin) X(morceaux_varies_avec_une_petite_limite)                          \
+    X(coupures_en_deux_limite_200<0>) X(coupures_en_deux_limite_200<1>) X(coupures_en_deux_limite_200<2>) X(coupures_en_deux_limite_200<3>) \
+    X(coupures_en_deux_limite_200<4>) X(coupures_en_deux_limite_200<5>) X(coupures_en_deux_limite_200<6>) X(coupures_en_deux_limite_200<7>) \
+    X(morceaux_varies_avec_la_limite_par_defaut) \
+    X(coupures_en_deux_limite_40<0>) X(coupures_en_deux_limite_40<1>) X(coupures_en_deux_limite_40<2>) X(coupures_en_deux_limite_40<3>) \
+    X(coupures_en_deux_limite_40<4>) X(coupures_en_deux_limite_40<5>) X(coupures_en_deux_limite_40<6>) X(coupures_en_deux_limite_40<7>) \
+    X(morceaux_varies_avec_une_petite_limite) \
     X(le_texte_composite_donne_les_phrases_attendues)                       \
     X(a_du_contenu_ponctuation_et_lettres)
 

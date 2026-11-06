@@ -269,11 +269,15 @@ constexpr int tous_les_etats_sont_atteignables_depuis_pret() {
     return 0;
 }
 
+// Le compilateur plafonne le nombre de pas d'une évaluation constexpr (clang : 1 048 576) : les 11^4 suites sont
+// réparties en 16 tranches, chacune évaluée à part.
+template <std::size_t K>
 constexpr int toute_suite_d_evenements_de_longueur_4_retombe_a_pret() {
     // Exhaustif : 11^4 = 14641 suites depuis « prêt » ; quel que soit l'état atteint, des délais ramènent à « prêt »
     // en 2 pas au plus, et l'appui sur l'écran le fait en 1 pas depuis un état actif.
     constexpr std::size_t TOTAL = NV * NV * NV * NV;
-    for (std::size_t n = 0; n < TOTAL; ++n) {
+    constexpr std::size_t TRANCHES = 16;
+    for (std::size_t n = K * TOTAL / TRANCHES; n < (K + 1) * TOTAL / TRANCHES; ++n) {
         Machine m;
         std::size_t reste = n;
         for (int k = 0; k < 4; ++k) {
@@ -445,7 +449,10 @@ constexpr int delais_de_depart_documentes() {
     X(les_delais_font_sortir_de_tout_etat_actif)                        \
     X(pas_de_blocage_possible_pret_atteignable_depuis_tout_etat)        \
     X(tous_les_etats_sont_atteignables_depuis_pret)                     \
-    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret)            \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<0>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<1>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<2>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<3>) \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<4>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<5>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<6>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<7>) \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<8>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<9>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<10>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<11>) \
+    X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<12>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<13>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<14>) X(toute_suite_d_evenements_de_longueur_4_retombe_a_pret<15>) \
     X(pret_n_est_reveille_que_par_le_mot_d_activation)                  \
     X(delai_en_ecoute_est_un_retour_silencieux_pas_une_panne)           \
     X(texte_vide_reconnu_ramene_a_pret_sans_erreur)                     \

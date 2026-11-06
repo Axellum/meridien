@@ -38,8 +38,6 @@ struct Enregistreur {
 
 using Decodeur = DecodeurSse<256>;
 
-constexpr std::string_view RS = "\x1e";
-
 // Flux d'essai qui couvre : JSON à la façon d'OpenAI avec accents/euro/émoji (octets multiples), CRLF, commentaire,
 // data sur plusieurs lignes, type d'événement, ligne vide multiple et [DONE].
 constexpr std::string_view FLUX =
@@ -317,9 +315,53 @@ constexpr int morceaux_vides_sont_sans_effet() {
     return 0;
 }
 
+// Octet par octet : un événement est livré à l'octet qui termine sa ligne vide, ni avant ni après. Le flux est
+// découpé en segments dont on connaît, par construction, le nombre cumulé d'événements livrés à leur dernier octet
+// (attente écrite à la main, indépendante du décodeur) ; le décodeur est nourri d'UN octet à la fois.
+constexpr int chaque_evenement_est_livre_des_son_dernier_octet() {
+    struct Segment {
+        std::string_view octets;
+        std::size_t evenements_apres;
+    };
+    constexpr Segment SEGMENTS[] = {
+        // CRLF : la ligne vide se termine dès son CR (WHATWG), l'événement part à cet octet-là, sans attendre le LF ;
+        // données de 2, 3 et 4 octets par caractère
+        {"data: {\"c\":\"é€😀\"}\r\n\r", 1},
+        {"\n", 1},                    // ce LF se rattache au CR précédent : pas de nouvel événement
+        {": pause\n", 1},             // un commentaire ne livre rien
+        {"data: B\n\n", 2},           // LF seul
+        {"data: C\r\r", 3},           // CR seul : livré au 2e CR, sans attendre un LF éventuel
+        {"\n", 3},                    // le LF d'un CRLF dont le CR vient d'être lu
+        {"data: [DONE]\r\n\r", 4},    // fin du flux
+        {"\n", 4},                    // ignoré : le flux est fini
+    };
+    Decodeur d;
+    Enregistreur rec;
+    std::size_t avant = 0;
+    for (const Segment& s : SEGMENTS) {
+        for (std::size_t i = 0; i < s.octets.size(); ++i) {
+            d.alimenter(s.octets.substr(i, 1), rec);
+            const bool dernier = i + 1 == s.octets.size();
+            VERIFIER(rec.nb == (dernier ? s.evenements_apres : avant));
+        }
+        avant = s.evenements_apres;
+    }
+    VERIFIER(d.termine() && rec.utf8_valide);  // jamais un caractère coupé livré à l'appelant
+    VERIFIER(egal(rec.vue(),
+                  "\x1f{\"c\":\"é€😀\"}\x1f--\x1e"
+                  "\x1f"
+                  "B\x1f--\x1e"
+                  "\x1f"
+                  "C\x1f--\x1e"
+                  "\x1f[DONE]\x1f"
+                  "F-\x1e"));
+    return 0;
+}
+
 }  // namespace
 
 #define LISTE(X)                                                            \
+    X(chaque_evenement_est_livre_des_son_dernier_octet)                     \
     X(flux_d_openai_avec_done)                                              \
     X(data_sur_plusieurs_lignes_est_joint_par_un_retour_a_la_ligne)         \
     X(les_trois_fins_de_ligne_sont_equivalentes)                            \

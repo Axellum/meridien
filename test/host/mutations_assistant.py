@@ -88,6 +88,8 @@ MUTATIONS_ASSISTANT = [
     ("flux_sse.hpp", r'''constexpr std::size_t alimenter(''', r'''constexpr std::size_t alimenter_absente(''', S, None, "la méthode alimenter n'existe pas"),
     ("flux_sse.hpp", r'''if (c == '\n') continue;  // le LF d'un CRLF dont le CR était dans le morceau précédent''', r'''if (false) continue;''', S,
      "cr_et_lf_dans_deux_morceaux_ne_font_qu_une_fin_de_ligne", "le LF d'un CRLF coupé compte pour une ligne vide"),
+    ("flux_sse.hpp", r'''if (fin_de_ligne()) {''', r'''if (c == '\n' && fin_de_ligne()) {''', S, "chaque_evenement_est_livre_des_son_dernier_octet",
+     "une ligne vide terminée par un CR seul ne livre plus l'événement avant le LF suivant"),
     ("flux_sse.hpp", r'''saute_lf_ = (c == '\r');''', r'''saute_lf_ = false;''', S, "les_trois_fins_de_ligne_sont_equivalentes",
      "un CRLF compte pour deux fins de ligne"),
     ("flux_sse.hpp", r'''etat_ = Etat::Commentaire;''', r'''etat_ = Etat::Valeur;''', S, "commentaires_et_champs_inconnus_sont_ignores",
