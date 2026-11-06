@@ -1,0 +1,197 @@
+# Intégration continue de Meridien. Les noms des jobs (champ `name`) sont stables : ce sont eux que la protection de
+# `main` doit rendre obligatoires (liste et explications dans docs/outils.md).
+#
+# Chaque action est épinglée par le SHA du commit de son tag (lu dans son dépôt, tag en commentaire), les outils
+# installés par pip ou téléchargés le sont à la version exacte utilisée sur le PC d'Axel.
+#
+# Dépôt privé : les minutes sont facturables. Les jobs lourds ne tournent donc que quand il le faut :
+#   - pull_request : tests-noyau, ruff, clang-format, gitleaks, firmware-tab5 ;
+#   - push sur main et lancement manuel : en plus mutations-noyau (longue) et parcours-web (réseau).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.13"
+  CLANG_FORMAT_VERSION: "23.1.5"
+  RUFF_VERSION: "0.16.10"
+  PLAYWRIGHT_VERSION: "1.63.0"
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb" # gitleaks_8.30.1_linux_x64.tar.gz
+
+jobs:
+  # Le noyau pur (components/core) compilé ET exécuté avec g++ et les détecteurs d'erreurs mémoire (AddressSanitizer) et
+  # de comportements indéfinis (UBSan). Mêmes options que clang++-san.cmd sur le PC d'Axel.
+  tests-noyau:
+    name: tests-noyau
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Compilateur g++-14 avec ASan et UBSan
+        run: |
+          g++-14 --version | head -n 1
+          sudo tee /usr/local/bin/g++-san > /dev/null <<'EOF'
+          #!/bin/sh
+          exec g++-14 -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer "$@"
+          EOF
+          sudo chmod +x /usr/local/bin/g++-san
+      - name: Tests du noyau (compilés et exécutés)
+        run: |
+          set -o pipefail
+          python test/host/lancer.py --cxx /usr/local/bin/g++-san | tee noyau.log
+          # Le lanceur retombe en « syntaxe » (rien d'exécuté) sans bon compilateur : on exige le mode complet.
+          grep -q 'mode        : complet' noyau.log
+
+  # Chaque mutation du noyau doit faire échouer le test qui la vise. Compilation seule : pas besoin des détecteurs.
+  mutations-noyau:
+    name: mutations-noyau
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Mutations du noyau
+        run: |
+          g++-14 --version | head -n 1
+          python test/host/lancer.py --mutations --cxx "$(command -v g++-14)"
+
+  ruff:
+    name: ruff
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: ruff (configuration dans ruff.toml)
+        run: |
+          python -m pip install "ruff==${RUFF_VERSION}"
+          ruff --version
+          git ls-files '*.py' | xargs ruff check --no-cache
+
+  clang-format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: clang-format (règle dans .clang-format, exclusions dans .clang-format-ignore)
+        run: |
+          python -m pip install "clang-format==${CLANG_FORMAT_VERSION}"
+          clang-format --version
+          git ls-files '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' '*.inc' > fichiers.txt
+          echo "$(wc -l < fichiers.txt) fichier(s) C/C++ suivis (les fichiers générés sont ignorés par clang-format)"
+          xargs clang-format --style=file --dry-run -Werror < fichiers.txt
+
+  # Recherche de secrets dans tout l'historique. CLI épinglée plutôt que gitleaks-action : l'action est gratuite pour un
+  # compte personnel mais demande une clé de licence dès que le dépôt appartient à une organisation (README de l'action).
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Installer gitleaks (archive vérifiée par SHA-256)
+        run: |
+          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check -
+          mkdir "${RUNNER_TEMP}/gitleaks"
+          tar -xzf "${RUNNER_TEMP}/gitleaks.tar.gz" -C "${RUNNER_TEMP}/gitleaks" gitleaks
+          "${RUNNER_TEMP}/gitleaks/gitleaks" version
+      - name: Rechercher des secrets dans l'historique
+        run: |
+          git log --oneline | wc -l
+          "${RUNNER_TEMP}/gitleaks/gitleaks" git --redact --no-banner
+
+  # Parcours de la page de réglages (web/) dans Chromium contre le faux appareil. Demande Internet : la recherche de lieu
+  # et la météo appellent vraiment Open-Meteo. Informatif (une panne du service ferait échouer le job) : à ne pas rendre
+  # obligatoire, d'où son absence des pull requests.
+  parcours-web:
+    name: parcours-web
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Parcours Playwright
+        run: |
+          python -m pip install "playwright==${PLAYWRIGHT_VERSION}"
+          python -m playwright install --with-deps chromium
+          node --version
+          python web/tests/parcours.py
+
+  # Compile VRAIMENT le projet : conteneur officiel espressif/idf (ESP-IDF 5.5.5, image figée par son empreinte), sdkconfig
+  # neuf, composants gérés téléchargés selon dependencies.lock. Ne prouve ni l'affichage ni le tactile : rien n'est flashé.
+  # La 7B s'ajoutera ici (même commande avec -DBOARD=...) quand sa couche carte existera.
+  firmware-tab5:
+    name: firmware-tab5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compiler le Tab5 (ESP-IDF 5.5.5, esp32p4)
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
+        with:
+          esp_idf_version: v5.5.5@sha256:a9231d0697ab8f7517cc072e93b7c83e04907bfbfba80b6440d7dbbf90665cf2
+          target: esp32p4
+          command: idf.py set-target esp32p4 && idf.py build && idf.py size
+      - name: Preuves que le projet a été compilé
+        run: |
+          set -eu
+          echo "--- binaire"
+          ls -l build/meridien.bin
+          sha256sum build/meridien.bin
+          test ! -e build/ecran_autonome.bin
+          echo "--- description du projet"
+          python3 - <<'EOF'
+          import json
+          d = json.load(open("build/project_description.json"))
+          print({k: d[k] for k in ("project_name", "target", "idf_ver", "build_dir") if k in d})
+          assert d["project_name"] == "meridien" and d["target"] == "esp32p4", d["project_name"]
+          EOF
+          echo "--- composants gérés téléchargés"
+          ls managed_components
+          test -d managed_components/lvgl__lvgl
+          echo "--- dependencies.lock inchangé par la compilation"
+          git diff --exit-code -- dependencies.lock
