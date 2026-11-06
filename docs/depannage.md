@@ -145,7 +145,7 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 **Solution.** Delete `sdkconfig`, then run `set-target` again with `"-DBOARD=<board>"` ([commands](carte-7b.md#build)). The root CMake excludes the component of the board that is not selected (`EXCLUDE_COMPONENTS`, so the component manager does not see it) and each board other than the Tab5 has its own lock file (`boards/<board>/dependencies.lock`; the Tab5 keeps the one at the root).
 
-**Seen on** the PC, no board, commit `52f6372`, 07/11/2026. **Evidence**: the 7B configures and builds (1,837,760 bytes); the root `dependencies.lock` was not modified by a Tab5 build (checked in this session before the last edits of the 7B layer, which a Tab5 build does not contain). **Status**: resolved (build side only).
+**Seen on** the PC, no board, commit `52f6372`, 07/11/2026. **Evidence**: the 7B configures and builds (1,837,760 bytes); the Tab5 builds too (commit `093ac94`, separate build directory) and the root `dependencies.lock` was not modified by it. **Status**: resolved (build side only).
 
 ---
 
@@ -451,7 +451,7 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 
 **Solution.** Supprimer `sdkconfig`, puis relancer `set-target` avec `"-DBOARD=<carte>"` ([commandes](carte-7b.md#compiler)). Le CMake de la racine exclut le composant de la carte non choisie (`EXCLUDE_COMPONENTS`, donc le gestionnaire de composants ne le voit pas) et chaque carte autre que le Tab5 a son propre verrou (`boards/<carte>/dependencies.lock` ; le Tab5 garde celui de la racine).
 
-**Vu sur** le PC, aucune carte, commit `52f6372`, 07/11/2026. **Preuve** : la 7B se configure et se compile (1 837 760 octets) ; le `dependencies.lock` de la racine n'a pas été modifié par une compilation du Tab5 (vérifié dans cette session avant les dernières retouches de la couche 7B, que la compilation du Tab5 ne contient pas). **Statut** : résolu (côté compilation seulement).
+**Vu sur** le PC, aucune carte, commit `52f6372`, 07/11/2026. **Preuve** : la 7B se configure et se compile (1 837 760 octets) ; le Tab5 se compile aussi (commit `093ac94`, dossier de compilation à part) et le `dependencies.lock` de la racine n'a pas été modifié. **Statut** : résolu (côté compilation seulement).
 
 ---
 
