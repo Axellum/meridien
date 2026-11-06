@@ -32,7 +32,17 @@ target_sources(${COMPONENT_LIB} PRIVATE "ecran_principal.cpp" "ui_principal.cpp"
 # Contrat n 1 (main/meteo_etat.h), propriete de la session meteo-appareil. Tant que ce fichier n'existe pas, un BOUCHON
 # (main/bouchons/, valeurs d'exemple marquees "Exemple" a l'ecran) permet de compiler. Des que le vrai fichier est la, le
 # bouchon n'est plus ni compile ni dans le chemin d'inclusion : le dossier main/bouchons/ est alors a supprimer.
+set(_meridien_bouchons FALSE)
 if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/meteo_etat.h")
     target_sources(${COMPONENT_LIB} PRIVATE "bouchons/meteo_etat_bouchon.cpp")
+    set(_meridien_bouchons TRUE)
+endif()
+# Meme principe pour main/ui_reglages.h (ADR-0007), ecrit par la session reglages-ecran : le bouton "Reglages" de l'ecran
+# principal appelle ui_reglages_ouvrir() ; le bouchon affiche "Reglages : bientot" deux secondes.
+if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/ui_reglages.h")
+    target_sources(${COMPONENT_LIB} PRIVATE "bouchons/ui_reglages_bouchon.cpp")
+    set(_meridien_bouchons TRUE)
+endif()
+if(_meridien_bouchons)
     target_include_directories(${COMPONENT_LIB} PRIVATE "bouchons")
 endif()

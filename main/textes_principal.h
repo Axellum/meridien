@@ -14,5 +14,7 @@ inline constexpr const char *kMeteoIndisponible = "Météo indisponible";
 inline constexpr const char *kPerimee = "Données périmées";
 inline constexpr const char *kExemple = "Exemple";
 inline constexpr const char *kMinMax = "min %s · max %s"; // %s : « 8° », « 14° » (formater_degre)
+inline constexpr const char *kReglages =
+    "Réglages"; // bouton de l'écran principal (ADR-0007) ; la table n'a pas cette clé seule
 
 } // namespace ecran::texte_principal

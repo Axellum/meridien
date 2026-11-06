@@ -15,6 +15,7 @@
 #include "textes_principal.h"
 #include "ui_bonjour.h"
 #include "ui_principal.h"
+#include "ui_reglages.h"
 
 // Police Roboto Bold embarquée (main/assets/roboto_700.ttf, EMBED_FILES de main/CMakeLists.txt).
 extern const uint8_t roboto_700_start[] asm("_binary_roboto_700_ttf_start");
@@ -99,6 +100,8 @@ void ecran_principal_creer(const BootInfo &boot) {
         return;
     }
     ui_principal_sur_appui_long(vers_diagnostic);
+    ui_principal_sur_reglages(
+        ui_reglages_ouvrir); // ADR-0007 : les réglages restent atteignables depuis l'écran principal
 
     // Une première mise à jour avant d'afficher : jamais d'écran vide, même une demi-seconde.
     rafraichir(nullptr);

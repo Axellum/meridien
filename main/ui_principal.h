@@ -18,7 +18,7 @@ namespace ecran {
 struct EntreesPrincipal {
     bool heure_connue;        // faux : « --:-- » et la date est remplacée par `date_attente`
     char heure[8];            // « 11:40 » (24 h, deux chiffres)
-    const char *date;         // « jeudi 6 novembre 2026 » (utilisée seulement si heure_connue)
+    const char *date;         // « vendredi 6 novembre 2026 » (utilisée seulement si heure_connue)
     const char *date_attente; // phrase d'attente quand l'heure du réseau n'est pas encore là
     MeteoEtat meteo;          // copie de meteo_etat_lire()
     bool meteo_exemple;       // vrai : les valeurs météo sont un exemple (bouchon), le bloc le dit
@@ -33,5 +33,9 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees);
 
 // Appui long (400 ms) sur l'écran : `rappel` est appelé dans la tâche LVGL. nullptr : rien. Sert à ouvrir l'écran de diagnostic.
 void ui_principal_sur_appui_long(void (*rappel)());
+
+// Bouton « Réglages » (ADR-0007), discret, en bas à droite : `rappel` est appelé dans la tâche LVGL sur un appui court. nullptr :
+// le bouton est dessiné mais ne fait rien. Le branchement sur ui_reglages_ouvrir() est dans ecran_principal.cpp.
+void ui_principal_sur_reglages(void (*rappel)());
 
 } // namespace ecran

@@ -14,7 +14,7 @@
 //   +--------------------------------------------+------------------+
 //   |                                            |  [Exemple]       |
 //   |            11:40                           |  12 °C           |
-//   |            jeudi 6 novembre 2026           |  Partiellement   |
+//   |            vendredi 6 novembre 2026        |  Partiellement   |
 //   |                                            |  nuageux         |
 //   |                                            |  min 8° · max 14°|
 //   +--------------------------------------------+------------------+
@@ -50,6 +50,13 @@ constexpr int32_t kEspaceCarte = 6;     // entre les lignes du bloc météo
 constexpr int32_t kDiametreAnneau = 88; // retour tactile : anneau sous le doigt
 constexpr int32_t kEpaisseurAnneau = 6;
 
+// Bouton « Réglages » : dessin discret (petit), zone tactile généreuse (le dessin + kZoneSupplementaire de chaque côté).
+constexpr int32_t kLargeurBoutonReglages = 240;
+constexpr int32_t kHauteurBoutonReglages = 76;
+constexpr int32_t kRayonBoutonReglages = 24;
+constexpr int32_t kMargeBasBoutonReglages = 32;
+constexpr int32_t kZoneSupplementaire = 28;
+
 struct Vue {
     lv_obj_t *heure = nullptr;
     lv_obj_t *date = nullptr;
@@ -61,6 +68,7 @@ struct Vue {
     lv_obj_t *anneau = nullptr;
     int32_t diametre_anneau = kDiametreAnneau; // mis à l'échelle de l'écran
     void (*appui_long)() = nullptr;
+    void (*ouvrir_reglages)() = nullptr;
     bool appui_long_fait = false; // l'appui long a déclenché le rappel ; ignorer le doigt jusqu'au relâchement
 };
 
@@ -149,6 +157,12 @@ void sur_toucher(lv_event_t *evenement) {
         break;
     default:
         break;
+    }
+}
+
+void sur_bouton_reglages(lv_event_t *evenement) {
+    if (lv_event_get_code(evenement) == LV_EVENT_CLICKED && g.ouvrir_reglages != nullptr) {
+        g.ouvrir_reglages();
     }
 }
 
@@ -247,6 +261,25 @@ bool ui_principal_creer(lv_obj_t *ecran, const uint8_t *ttf, std::size_t ttf_tai
     lv_label_set_text(g.perimee, texte_principal::kPerimee);
     lv_obj_add_flag(g.perimee, LV_OBJ_FLAG_HIDDEN);
 
+    // --- Bouton « Réglages » (ADR-0007) : en bas à droite, sous le bloc météo. Dessin discret (fond de carte, texte discret),
+    //     zone tactile élargie ; le visuel est provisoire et sera refait. Un appui long sur le bouton ne bascule pas l'écran :
+    //     les événements d'un bouton ne remontent pas à l'écran. ---
+    lv_obj_t *bouton = lv_button_create(ecran);
+    lv_obj_remove_style_all(bouton);
+    lv_obj_set_size(bouton, px(kLargeurBoutonReglages), px(kHauteurBoutonReglages));
+    lv_obj_set_style_bg_color(bouton, couleur(kCouleurs.surface), 0);
+    lv_obj_set_style_bg_opa(bouton, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(bouton, couleur(kCouleurs.accent_relache), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(bouton, px(kRayonBoutonReglages), 0);
+    lv_obj_set_ext_click_area(bouton, px(kZoneSupplementaire));
+    lv_obj_align(bouton, LV_ALIGN_BOTTOM_RIGHT, -marge, -px(kMargeBasBoutonReglages));
+    lv_obj_add_event_cb(bouton, sur_bouton_reglages, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *texte_bouton = lv_label_create(bouton);
+    lv_label_set_text(texte_bouton, texte_principal::kReglages);
+    lv_obj_set_style_text_font(texte_bouton, police_petite, 0);
+    lv_obj_set_style_text_color(texte_bouton, couleur(kCouleurs.texte_discret), 0);
+    lv_obj_center(texte_bouton);
+
     // --- Retour tactile : un anneau sous le doigt, sur la couche supérieure (coordonnées d'écran exactes) ---
     lv_obj_t *couche = lv_display_get_layer_top(lv_obj_get_display(ecran));
     g.anneau = lv_obj_create(couche);
@@ -323,5 +356,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
 }
 
 void ui_principal_sur_appui_long(void (*rappel)()) { g.appui_long = rappel; }
+
+void ui_principal_sur_reglages(void (*rappel)()) { g.ouvrir_reglages = rappel; }
 
 } // namespace ecran
