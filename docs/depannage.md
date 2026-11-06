@@ -72,6 +72,22 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 **Solution.** Delete `sdkconfig`, run `.\tools\idf.ps1 set-target esp32p4` again, then check the value in the generated `sdkconfig` (not in the defaults file). **Seen on** Tab5 ST7121, 06/11/2026. **Status**: resolved.
 
+#### In a git worktree, CMake fails: `grabRef.cmake` “file failed to open head-ref”
+
+**Symptom.** In a worktree created by `git worktree add` (one per session), `idf.py set-target` or the first build stops in `grabRef.cmake` (`file failed to open head-ref`), while the main checkout builds.
+
+**Cause.** ESP-IDF reads the branch reference as a file `<git dir>/refs/heads/<branch>`; a branch that exists only in `packed-refs` (no loose file) has none. The version string (`git describe`) then cannot be computed.
+
+**Solution.** Create the loose reference with the same commit: write the commit hash into the file `<git dir of the worktree's repository>/refs/heads/<branch>` (a `git update-ref` alone did not create it). Also: a binary built from a tree with modified tracked files carries `-dirty` in its version (`project_version` in `build/project_description.json`): commit first, then build the binary that is handed over.
+
+**Seen on** the author's PC, worktree `claude/ecran-principal-f0f722`, 06/11/2026. **Evidence**: the build failed with that message, then succeeded after the file was created (version `jalon-1a-tab5-st7121-49-g6a0e6cc`, no `-dirty`). **Status**: worked around (cause read in the CMake script, not explored further).
+
+#### The build stops on `-Werror=format-truncation` in the interface
+
+**Cause.** The ESP-IDF build compiles with `-Werror=all`: an `snprintf` into a buffer the compiler cannot prove large enough (here 40 bytes for “min %s · max %s” with two 15-byte texts) is an error, not a warning.
+
+**Solution.** A buffer sized for the worst case of the format (48 bytes there). **Seen on** ESP-IDF 5.5.5, 06/11/2026. **Status**: resolved.
+
 #### A PowerShell script is refused: a deletion aimed at the ESP-IDF folder
 
 The safeguard of the author's AI session tool refuses any command containing a `Remove-Item` aimed at the ESP-IDF folder owned by ESPHome, even inside a script written elsewhere. Do not delete in scripts; move or ignore. **Status**: worked around.
@@ -144,6 +160,16 @@ Its macros describe a 720 × 1560 panel, not the Tab5's. The init table of the T
 **Solution.** Point on the top layer (no padding), non-scrollable screen, and a test pattern (“mire”: a frame on the edges + five targets at the corners and the centre) to measure the remaining offset between touch and image from the presses in the serial log.
 
 **Seen on** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Evidence**: the author's observation (the point is under the finger) and five presses on known targets: mean error (−6, −4) px, from −12 to +10 px on four targets and −26 px in x on the fifth (top right), with no calibration applied (details in [mesures/1a.md](mesures/1a.md)). **Status**: resolved; accuracy of the order of a finger.
+
+#### Landscape: the touch ring is “completely shifted from the finger”
+
+**Symptom.** First landscape trial on the Tab5: the image is upright (“Yes, it's straight”), but the green ring does not appear under the finger (“not at the right place, completely shifted”).
+
+**Cause.** The touch point was rotated **twice**: once by `esp_lcd_touch` (mirror Y + swap X/Y requested in `tab5_touch.c`), once by LVGL itself (`lv_indev.c`, `indev_pointer_proc` → `lv_display_rotate_point`, which for a 90° rotation gives `x = ver_res − Y − 1`, `y = X`). The original comment wrongly claimed that LVGL does not rotate the touch. A finger at logical `(x, y)` gave a ring at `(1279 − y, x)`, off-screen as soon as `x > 719`.
+
+**Solution.** No mirror or swap in `tab5_touch.c`: the chip returns the native frame and LVGL rotates it alone. One log line per press (`appui : brut (X, Y) … -> logique (x, y) …`, `tab5_orientation.c`) gives the proof without relying on what is seen.
+
+**Seen on** Tab5 ST7121, binary of commit `102077b`, 06/11/2026 (the author's observation; cause read in the LVGL 9.5 sources). **Status**: fixed in the code, **to be observed on the board** (see [mesures/orientation.md](mesures/orientation.md) for what follows).
 
 #### No log over USB, or a build error on a `|` between two LVGL flags
 
@@ -292,6 +318,22 @@ La recette de remise en état (trois écritures : début de flash, application, 
 
 **Solution.** Supprimer `sdkconfig`, relancer `.\tools\idf.ps1 set-target esp32p4`, puis vérifier la valeur dans le `sdkconfig` généré (pas dans le fichier de défauts). **Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : résolu.
 
+#### Dans un worktree git, CMake échoue : `grabRef.cmake` « file failed to open head-ref »
+
+**Symptôme.** Dans un worktree créé par `git worktree add` (un par session), `idf.py set-target` ou la première compilation s'arrête dans `grabRef.cmake` (`file failed to open head-ref`), alors que le dépôt principal se compile.
+
+**Cause.** ESP-IDF lit la référence de la branche comme un fichier `<dossier git>/refs/heads/<branche>` ; une branche qui n'existe que dans `packed-refs` (pas de fichier) n'en a pas. La version (`git describe`) ne peut alors pas être calculée.
+
+**Solution.** Créer la référence en fichier avec le même commit : écrire l'empreinte du commit dans le fichier `<dossier git du dépôt du worktree>/refs/heads/<branche>` (un `git update-ref` seul ne l'a pas créé). Autre point : un binaire compilé avec des fichiers suivis modifiés porte `-dirty` dans sa version (`project_version` de `build/project_description.json`) : commiter d'abord, puis compiler le binaire que l'on remet.
+
+**Vu sur** PC de l'auteur, worktree `claude/ecran-principal-f0f722`, 06/11/2026. **Preuve** : la compilation échouait avec ce message, puis réussissait après la création du fichier (version `jalon-1a-tab5-st7121-49-g6a0e6cc`, sans `-dirty`). **Statut** : contourné (cause lue dans le script CMake, pas creusée davantage).
+
+#### La compilation s'arrête sur `-Werror=format-truncation` dans l'interface
+
+**Cause.** La compilation d'ESP-IDF utilise `-Werror=all` : un `snprintf` dans un tampon que le compilateur ne peut pas prouver assez grand (ici 40 octets pour « min %s · max %s » avec deux textes de 15 octets) est une erreur, pas un avertissement.
+
+**Solution.** Un tampon dimensionné pour le pire cas du format (48 octets ici). **Vu sur** ESP-IDF 5.5.5, 06/11/2026. **Statut** : résolu.
+
 #### Un script PowerShell est refusé : suppression visant le dossier d'ESP-IDF
 
 Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenant un `Remove-Item` visant le dossier de l'ESP-IDF d'ESPHome, même dans un script écrit ailleurs. Ne pas supprimer dans les scripts ; déplacer ou ignorer. **Statut** : contourné.
@@ -364,6 +406,16 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 **Solution.** Point sur la couche supérieure (sans remplissage), écran non défilable, et une **mire** (cadre sur les bords + cinq cibles aux coins et au centre) pour mesurer le décalage restant entre le tactile et l'image à partir des appuis du journal série.
 
 **Vu sur** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Preuve** : constat de l'auteur (le point est sous son doigt) et cinq appuis sur des cibles connues : écart moyen (−6, −4) px, de −12 à +10 px sur quatre cibles et −26 px en x sur la cinquième (haut droit), sans étalonnage appliqué (détail dans [mesures/1a.md](mesures/1a.md)). **Statut** : résolu ; précision de l'ordre d'un doigt.
+
+#### Paysage : l'anneau tactile est « totalement décalé par rapport au doigt »
+
+**Symptôme.** Premier essai du paysage sur le Tab5 : l'image est droite (« Oui, c'est droit »), mais l'anneau vert n'apparaît pas sous le doigt (« pas au bon endroit, totalement décalé »).
+
+**Cause.** Le point tactile était tourné **deux fois** : une fois par `esp_lcd_touch` (miroir Y + échange X/Y demandés dans `tab5_touch.c`), une fois par LVGL lui-même (`lv_indev.c`, `indev_pointer_proc` → `lv_display_rotate_point`, qui pour une rotation de 90° donne `x = ver_res − Y − 1`, `y = X`). Le commentaire d'origine affirmait à tort que LVGL ne tourne pas le tactile. Un doigt en `(x, y)` logique donnait un anneau en `(1279 − y, x)`, hors écran dès que `x > 719`.
+
+**Solution.** Aucun miroir ni échange dans `tab5_touch.c` : la puce rend le repère natif et LVGL le tourne seul. Une ligne de journal par appui (`appui : brut (X, Y) … -> logique (x, y) …`, `tab5_orientation.c`) donne la preuve sans dépendre de ce que l'on voit.
+
+**Vu sur** Tab5 ST7121, binaire du commit `102077b`, 06/11/2026 (constat d'Axel ; cause lue dans les sources de LVGL 9.5). **Statut** : corrigé dans le code, **à constater sur la carte** (voir [mesures/orientation.md](mesures/orientation.md) pour la suite).
 
 #### Aucun journal par l'USB, ou une erreur de compilation sur un `|` entre deux drapeaux LVGL
 

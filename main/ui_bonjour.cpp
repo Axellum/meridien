@@ -46,14 +46,14 @@ constexpr const char *kRedemarrer = "Redémarrer";
 } // namespace texte
 
 constexpr int32_t kDiametrePoint = 96;
-constexpr int32_t kLargeurTexte = 640;
+constexpr int32_t kLargeurTexte = 580; // une colonne : deux colonnes de 600 px dans les 1280 px du paysage
+constexpr int32_t kLargeurColonne = 600;
 constexpr int kJournalToutesLesN = 20;
 constexpr uint32_t kPeriodeRafraichissementMs = 500;
 constexpr int kJournalHorlogeToutesLesN = 120; // une minute à 500 ms
 
-// La mire de la phase 1a (cadre et cinq cibles) a servi à mesurer le décalage tactile : mesuré, elle est cachée en 1b. Le point
-// qui suit le doigt reste, pour voir que le tactile répond encore. À retirer avant la phase 2.
-constexpr bool kAfficherMire = false;
+// La mire de la phase 1a (cadre et cinq cibles) a servi à mesurer le décalage tactile ; retirée avec le passage en paysage
+// (elle était cachée depuis 1b). Le point qui suit le doigt reste, pour voir que le tactile répond.
 
 const char *TAG_HORLOGE = "horloge";
 
@@ -64,11 +64,25 @@ lv_obj_t *g_libelle_date = nullptr;
 lv_obj_t *g_libelle_wifi = nullptr;
 lv_obj_t *g_libelle_source = nullptr;
 int g_compteur_appui = 0;
+void (*g_appui_long)() = nullptr;
+bool g_appui_long_fait = false;
 int32_t g_x_min = INT32_MAX, g_x_max = INT32_MIN, g_y_min = INT32_MAX, g_y_max = INT32_MIN;
 int g_compteur_rafraichissement = 0;
 bool g_heure_deja_journalisee = false;
 
 lv_color_t couleur(uint32_t rgb) { return lv_color_hex(rgb); }
+
+lv_obj_t *creer_colonne(lv_obj_t *parent) {
+    lv_obj_t *colonne = lv_obj_create(parent);
+    lv_obj_remove_style_all(colonne);
+    lv_obj_remove_flag(colonne, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(colonne, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(colonne, kLargeurColonne, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(colonne, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(colonne, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(colonne, 10, 0);
+    return colonne;
+}
 
 lv_obj_t *creer_libelle(lv_obj_t *parent, const lv_font_t *police, uint32_t couleur_rgb) {
     lv_obj_t *libelle = lv_label_create(parent);
@@ -88,60 +102,21 @@ void changer_texte(lv_obj_t *libelle, const char *texte_neuf) {
     }
 }
 
-// Mire de mesure du décalage entre le tactile et l'image (phase 1a) : un cadre sur les bords de l'écran (il montre si l'image
-// est coupée ou décalée) et cinq cibles à des positions connues (coins, centre) dont on compare le centre aux appuis du journal.
-constexpr int32_t kCoteCible = 64;
-constexpr int32_t kEpaisseurTrait = 2;
-constexpr int32_t kMargeCible = 60;
-constexpr int32_t kEpaisseurCadre = 4;
-
-lv_obj_t *creer_trait(lv_obj_t *parent, int32_t x, int32_t y, int32_t largeur, int32_t hauteur, uint32_t couleur_rgb) {
-    lv_obj_t *trait = lv_obj_create(parent);
-    lv_obj_remove_style_all(trait);
-    lv_obj_remove_flag(trait, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(trait, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_pos(trait, x, y);
-    lv_obj_set_size(trait, largeur, hauteur);
-    lv_obj_set_style_bg_opa(trait, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(trait, couleur(couleur_rgb), 0);
-    return trait;
-}
-
-void creer_cible(lv_obj_t *parent, int32_t centre_x, int32_t centre_y) {
-    lv_obj_t *cible = lv_obj_create(parent);
-    lv_obj_remove_style_all(cible);
-    lv_obj_remove_flag(cible, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(cible, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(cible, kCoteCible, kCoteCible);
-    lv_obj_set_pos(cible, centre_x - kCoteCible / 2, centre_y - kCoteCible / 2);
-    lv_obj_set_style_radius(cible, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_outline_width(cible, kEpaisseurTrait, 0);
-    lv_obj_set_style_outline_color(cible, couleur(kCouleurs.accent), 0);
-    creer_trait(cible, 0, kCoteCible / 2 - 1, kCoteCible, kEpaisseurTrait, kCouleurs.texte);
-    creer_trait(cible, kCoteCible / 2 - 1, 0, kEpaisseurTrait, kCoteCible, kCouleurs.texte);
-}
-
-void creer_mire(lv_obj_t *couche, int32_t largeur, int32_t hauteur) {
-    lv_obj_t *cadre = lv_obj_create(couche);
-    lv_obj_remove_style_all(cadre);
-    lv_obj_remove_flag(cadre, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(cadre, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_pos(cadre, 0, 0);
-    lv_obj_set_size(cadre, largeur, hauteur);
-    lv_obj_set_style_border_width(cadre, kEpaisseurCadre, 0);
-    lv_obj_set_style_border_color(cadre, couleur(kCouleurs.accent), 0);
-
-    creer_cible(couche, kMargeCible, kMargeCible);
-    creer_cible(couche, largeur - kMargeCible, kMargeCible);
-    creer_cible(couche, largeur / 2, hauteur / 2);
-    creer_cible(couche, kMargeCible, hauteur - kMargeCible);
-    creer_cible(couche, largeur - kMargeCible, hauteur - kMargeCible);
-}
-
 void placer_point(int32_t x, int32_t y) { lv_obj_set_pos(g_point, x - kDiametrePoint / 2, y - kDiametrePoint / 2); }
 
 void sur_toucher(lv_event_t *evenement) {
     const lv_event_code_t code = lv_event_get_code(evenement);
+    if (code == LV_EVENT_LONG_PRESSED) {
+        // Appui long sur le fond de l'écran : retour à l'écran principal (si l'application l'a demandé). Le doigt est encore posé
+        // et LVGL continue de lui envoyer les événements après le changement d'écran : le point (couche supérieure, donc
+        // visible sur l'autre écran) est caché et ignoré jusqu'au relâchement.
+        if (g_appui_long != nullptr) {
+            g_appui_long_fait = true;
+            lv_obj_add_flag(g_point, LV_OBJ_FLAG_HIDDEN);
+            g_appui_long();
+        }
+        return;
+    }
     if (code != LV_EVENT_PRESSED && code != LV_EVENT_PRESSING && code != LV_EVENT_RELEASED) {
         return;
     }
@@ -151,8 +126,15 @@ void sur_toucher(lv_event_t *evenement) {
     }
     lv_point_t p;
     lv_indev_get_point(indev, &p);
+    if (code == LV_EVENT_PRESSED) {
+        g_appui_long_fait = false;
+    }
+    if (g_appui_long_fait && code != LV_EVENT_RELEASED) {
+        return;
+    }
 
     if (code == LV_EVENT_RELEASED) {
+        g_appui_long_fait = false;
         // Le point reste là où le doigt s'est levé, en couleur "relâché".
         lv_obj_set_style_bg_color(g_point, couleur(kCouleurs.accent_relache), 0);
         ESP_LOGI(TAG, "tactile : relâché en (%d, %d) ; course x [%d..%d], y [%d..%d]", (int)p.x, (int)p.y, (int)g_x_min,
@@ -252,49 +234,52 @@ void ui_bonjour_creer(const BootInfo &boot) {
     lv_obj_set_style_bg_opa(ecran, LV_OPA_COVER, 0);
     lv_obj_add_flag(ecran, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(ecran, LV_OBJ_FLAG_SCROLLABLE); // un glissement ne doit pas faire défiler l'écran
-    lv_obj_set_flex_flow(ecran, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(ecran, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_top(ecran, 40, 0);
-    lv_obj_set_style_pad_row(ecran, 12, 0);
+    // Paysage (1280 x 720) : deux colonnes côte à côte. À gauche l'heure, la date et le réseau ; à droite l'identité de la
+    // carte, le démarrage et le tactile.
+    lv_obj_set_flex_flow(ecran, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(ecran, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_top(ecran, 24, 0);
     lv_obj_add_event_cb(ecran, sur_toucher, LV_EVENT_ALL, nullptr);
+    lv_obj_t *colonne_gauche = creer_colonne(ecran);
+    lv_obj_t *colonne_droite = creer_colonne(ecran);
 
-    lv_label_set_text(creer_libelle(ecran, police_titre, kCouleurs.accent), texte::kBonjour);
-    lv_label_set_text(creer_libelle(ecran, police_texte, kCouleurs.texte_discret), texte::kSousTitre);
+    lv_label_set_text(creer_libelle(colonne_gauche, police_titre, kCouleurs.accent), texte::kBonjour);
+    lv_label_set_text(creer_libelle(colonne_gauche, police_texte, kCouleurs.texte_discret), texte::kSousTitre);
 
     // Phase 1b : l'heure et la date locales (reçues du réseau), puis l'état du Wi-Fi. Rafraîchis par le minuteur de fin de fonction.
-    g_libelle_heure = creer_libelle(ecran, police_heure, kCouleurs.accent);
+    g_libelle_heure = creer_libelle(colonne_gauche, police_heure, kCouleurs.accent);
     lv_obj_set_style_pad_top(g_libelle_heure, 20, 0);
     lv_label_set_text(g_libelle_heure, texte_1b::kHeureAbsente);
-    g_libelle_date = creer_libelle(ecran, police_date, kCouleurs.texte);
+    g_libelle_date = creer_libelle(colonne_gauche, police_date, kCouleurs.texte);
     lv_label_set_text(g_libelle_date, texte_1b::kDateAbsente);
-    g_libelle_wifi = creer_libelle(ecran, police_petite, kCouleurs.texte_discret);
+    g_libelle_wifi = creer_libelle(colonne_gauche, police_petite, kCouleurs.texte_discret);
     lv_label_set_text(g_libelle_wifi, texte_1b::kWifiCoprocesseurDemarre);
-    g_libelle_source = creer_libelle(ecran, police_petite, kCouleurs.texte_discret);
+    g_libelle_source = creer_libelle(colonne_gauche, police_petite, kCouleurs.texte_discret);
     lv_label_set_text(g_libelle_source, texte_1b::kHeureEnAttente);
 
-    lv_obj_t *libelle = creer_libelle(ecran, police_texte, kCouleurs.texte);
+    lv_obj_t *libelle = creer_libelle(colonne_droite, police_texte, kCouleurs.texte);
     lv_obj_set_style_pad_top(libelle, 30, 0);
     lv_label_set_text_fmt(libelle, texte::kControleur, carte->display_controller);
 
-    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kTactile,
+    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), texte::kTactile,
                           carte->touch_controller);
-    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kCarte,
+    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), texte::kCarte,
                           carte->board_name, (int)carte->width, (int)carte->height);
 
-    libelle = creer_libelle(ecran, police_texte, kCouleurs.texte);
+    libelle = creer_libelle(colonne_droite, police_texte, kCouleurs.texte);
     lv_obj_set_style_pad_top(libelle, 30, 0);
     lv_label_set_text_fmt(libelle, boot.counter_persistent ? texte::kDemarrage : texte::kDemarrageNonGarde,
                           static_cast<unsigned>(boot.boot_count));
-    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kCause,
+    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), texte::kCause,
                           boot.reset_reason);
-    lv_label_set_text_fmt(creer_libelle(ecran, police_petite, kCouleurs.texte_discret), texte::kDuree,
+    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), texte::kDuree,
                           (int)jalons->lvgl_ready_ms);
 
-    g_libelle_toucher = creer_libelle(ecran, police_texte, kCouleurs.texte);
+    g_libelle_toucher = creer_libelle(colonne_droite, police_texte, kCouleurs.texte);
     lv_obj_set_style_pad_top(g_libelle_toucher, 40, 0);
     lv_label_set_text(g_libelle_toucher, texte::kToucherAucun);
 
-    lv_obj_t *bouton = lv_button_create(ecran);
+    lv_obj_t *bouton = lv_button_create(colonne_droite);
     lv_obj_set_size(bouton, 420, 110);
     lv_obj_set_style_bg_color(bouton, couleur(kCouleurs.surface), 0);
     lv_obj_set_style_radius(bouton, 24, 0);
@@ -308,10 +293,6 @@ void ui_bonjour_creer(const BootInfo &boot) {
     // Couche supérieure de l'affichage : sans remplissage ni mise en page, son origine est le coin de l'écran. Le point et la
     // mire y sont posés en coordonnées d'écran exactes (sur l'écran lui-même, le remplissage haut de 90 px décalait le point).
     lv_obj_t *couche = lv_display_get_layer_top(board_get_display());
-    if (kAfficherMire) {
-        creer_mire(couche, carte->width, carte->height);
-    }
-
     // Le point suit le doigt, à moitié transparent pour laisser voir la cible dessous ; jamais cliquable (les appuis passent
     // à l'écran).
     g_point = lv_obj_create(couche);
@@ -327,5 +308,7 @@ void ui_bonjour_creer(const BootInfo &boot) {
 
     lv_timer_create(rafraichir, kPeriodeRafraichissementMs, nullptr);
 }
+
+void ui_bonjour_sur_appui_long(void (*rappel)()) { g_appui_long = rappel; }
 
 } // namespace ecran

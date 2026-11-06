@@ -19,15 +19,20 @@ static const char *TAG = "tab5";
 // plus tard seulement si un essai le permet, jamais a l'oeil.
 #define EXPANDER_SETTLE_MS 1000
 
-// Tampon de dessin LVGL : bande de 50 lignes en RAM interne (DMA), en double tampon (valeurs du BSP d'Espressif).
+// Tampon de dessin LVGL : 50 lignes de la LARGEUR NATIVE de la dalle, soit 36 000 pixels (72 Ko), en RAM interne (DMA) et en double
+// tampon (valeurs du BSP d'Espressif). Apres la rotation, LVGL rend des bandes de 1280 px de large : 28 lignes par bande, donc
+// 26 bandes pour un ecran entier. Le tampon de sortie du PPA (meme taille) est cree par esp_lvgl_port.
 #define LVGL_DRAW_BUF_LINES 50
 
 static board_info_t s_info = {
     .board_name = "M5Stack Tab5",
     .display_controller = "inconnu",
     .touch_controller = "inconnu",
-    .width = TAB5_LCD_H_RES,
-    .height = TAB5_LCD_V_RES,
+    .width = TAB5_UI_WIDTH, // taille logique, apres la rotation (voir tab5_orientation.c)
+    .height = TAB5_UI_HEIGHT,
+    .panel_width = TAB5_LCD_H_RES,
+    .panel_height = TAB5_LCD_V_RES,
+    .rotation_degrees = TAB5_UI_ROTATION_DEGREES,
 };
 static board_boot_timeline_t s_timeline;
 static lv_display_t *s_display;
@@ -59,13 +64,13 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
         .hres = TAB5_LCD_H_RES,
         .vres = TAB5_LCD_V_RES,
         .monochrome = false,
-        .rotation = {.swap_xy = false, .mirror_x = false, .mirror_y = false}, // orientation native fixe
+        .rotation = {.swap_xy = false, .mirror_x = false, .mirror_y = false}, // sans objet : la rotation est logicielle
         .color_format = LV_COLOR_FORMAT_RGB565,
         .flags =
             {
                 .buff_dma = true,
                 .buff_spiram = false,
-                .sw_rotate = false, // aucune rotation logicielle
+                .sw_rotate = true, // rotation LOGICIELLE, par le PPA du P4 (CONFIG_LVGL_PORT_ENABLE_PPA, boards/tab5/)
                 .swap_bytes = false,
                 .full_refresh = false,
                 .direct_mode = false,
@@ -74,6 +79,15 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
     const lvgl_port_display_dsi_cfg_t dsi_cfg = {.flags = {.avoid_tearing = false}};
     s_display = lvgl_port_add_disp_dsi(&disp_cfg, &dsi_cfg);
     ESP_RETURN_ON_FALSE(s_display, ESP_FAIL, TAG, "lvgl_port_add_disp_dsi");
+    // Paysage : LVGL tourne l'image de 90 degres (convention LVGL ; = `rotation: 270` d'ESPHome). La taille logique devient
+    // 1280 x 720 ; le tactile est tourne dans le meme sens par tab5_touch_create().
+    lvgl_port_lock(0);
+    tab5_orientation_apply(s_display);
+    s_info.width = lv_display_get_horizontal_resolution(s_display);
+    s_info.height = lv_display_get_vertical_resolution(s_display);
+    lvgl_port_unlock();
+    ESP_RETURN_ON_FALSE(s_info.width == TAB5_UI_WIDTH && s_info.height == TAB5_UI_HEIGHT, ESP_FAIL, TAG,
+                        "taille logique inattendue apres rotation : %d x %d", (int)s_info.width, (int)s_info.height);
 
     const lvgl_port_touch_cfg_t touch_port_cfg = {.disp = s_display, .handle = touch};
     lv_indev_t *indev = lvgl_port_add_touch(&touch_port_cfg);
@@ -82,6 +96,7 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
     // "evenement seul" un relachement dont l'interruption serait perdue laisserait le doigt "appuye" indefiniment.
     lvgl_port_lock(0);
     lv_indev_set_mode(indev, LV_INDEV_MODE_TIMER);
+    tab5_orientation_trace_tactile(indev);
     lvgl_port_unlock();
     return ESP_OK;
 }
@@ -131,12 +146,14 @@ esp_err_t board_init(void) {
     ESP_RETURN_ON_ERROR(tab5_touch_create(&touch), TAG, "tactile");
     ESP_RETURN_ON_ERROR(lvgl_attach(panel, io, touch), TAG, "LVGL");
     s_timeline.lvgl_ready_ms = now_ms();
+    tab5_orientation_bench(); // mesure unique (hors jalons du demarrage), voir tab5_orientation.c
 
-    ESP_LOGI(TAG,
-             "Carte prête : %s, écran %s %dx%d (orientation native), jalons ms : attente expandeur %d, détection %d, "
-             "dalle %d, LVGL %d",
-             s_info.board_name, s_info.display_controller, (int)s_info.width, (int)s_info.height,
-             (int)s_timeline.expander_ready_ms, (int)s_timeline.controller_detected_ms, (int)s_timeline.panel_ready_ms,
-             (int)s_timeline.lvgl_ready_ms);
+    ESP_LOGI(
+        TAG,
+        "Carte prête : %s, écran %s, interface %dx%d (dalle %dx%d tournée de %d°), jalons ms : attente expandeur %d, "
+        "détection %d, dalle %d, LVGL %d",
+        s_info.board_name, s_info.display_controller, (int)s_info.width, (int)s_info.height, (int)s_info.panel_width,
+        (int)s_info.panel_height, (int)s_info.rotation_degrees, (int)s_timeline.expander_ready_ms,
+        (int)s_timeline.controller_detected_ms, (int)s_timeline.panel_ready_ms, (int)s_timeline.lvgl_ready_ms);
     return ESP_OK;
 }

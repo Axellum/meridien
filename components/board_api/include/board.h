@@ -1,8 +1,11 @@
 // Interface commune des cartes (ADR-0005). Le code applicatif n'inclut que ce fichier : il ne sait pas sur quelle carte il
 // tourne. Chaque carte (components/bsp_<carte>) fournit ces fonctions ; boards/<carte>/ porte ses reglages de construction.
 //
-// Convention : orientation native fixe (pas de rotation logicielle, risque de dechirure sur P4) ; l'interface se dessine a
-// partir de board_get_info()->width / height, jamais en coordonnees absolues.
+// Convention : l'interface se dessine a partir de board_get_info()->width / height, jamais en coordonnees absolues. Ces deux
+// valeurs sont la taille LOGIQUE, celle que LVGL voit APRES la rotation que la carte applique pour que l'image soit droite
+// dans le sens voulu (paysage). La taille NATIVE de la dalle est a part (panel_width / panel_height). Une carte dont la dalle
+// est deja en paysage (la 7B, 1024 x 600) rend rotation_degrees = 0 et width / height = panel_width / panel_height ; le tactile
+// est alors livre a LVGL dans les memes coordonnees logiques (c'est la couche carte qui s'en charge, jamais l'application).
 #pragma once
 
 #include <stdbool.h>
@@ -21,8 +24,12 @@ typedef struct {
     const char
         *display_controller;      // detecte a l'execution, avant d'initialiser le DSI : "ST7121", "ST7123", "ILI9881C"
     const char *touch_controller; // puce tactile lue, avec sa version : "Sitronix (version 1)"
-    int32_t width;                // pixels, orientation native
-    int32_t height;
+    int32_t width;                // pixels, taille LOGIQUE de l'interface (apres rotation) : 1280 sur le Tab5
+    int32_t height;               // 720 sur le Tab5
+    int32_t panel_width;          // pixels, taille NATIVE de la dalle (avant rotation) : 720 sur le Tab5
+    int32_t panel_height;         // 1280 sur le Tab5
+    int32_t rotation_degrees; // rotation que LVGL applique (0, 90, 180, 270), convention de lv_display_set_rotation() :
+    // 90 sur le Tab5, equivalent du `rotation: 270` d'ESPHome (voir docs/mesures/orientation.md)
 } board_info_t;
 
 // Jalons du demarrage, en millisecondes depuis le lancement de l'application (esp_timer), pour mesurer avant de sacrifier.

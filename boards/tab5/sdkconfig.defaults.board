@@ -22,6 +22,11 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_HEX=y
 CONFIG_SPIRAM_SPEED_200M=y
 
+# Interface en paysage : rotation LOGICIELLE de LVGL (la rotation materielle de la dalle ne marche pas sur ST7121), faite par
+# l'accelerateur PPA du P4 dans le flush d'esp_lvgl_port, comme ESPHome (`rotation: 270`). Sans cette option le port tourne les
+# zones avec le processeur (plus lent). Choix et mesures : docs/mesures/orientation.md.
+CONFIG_LVGL_PORT_ENABLE_PPA=y
+
 # Console sur l'USB-Serial/JTAG du P4 : c'est la prise USB-C du Tab5 (le firmware ESPHome journalise de meme,
 # hardware_uart: USB_SERIAL_JTAG). Sans cela, aucun journal ne sort sur le port serie.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

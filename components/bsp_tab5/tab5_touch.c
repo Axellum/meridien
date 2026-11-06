@@ -11,12 +11,18 @@
 static const char *TAG = "tab5_touch";
 
 esp_err_t tab5_touch_create(esp_lcd_touch_handle_t *touch) {
-    // Orientation native de la dalle (portrait) : ni echange ni miroir. Le reset est fait par l'expandeur
-    // (tab5_touch_reset_pulse) : le pilote ne gere donc aucune broche de reset.
+    // La puce donne des coordonnees dans l'orientation NATIVE de la dalle (portrait 720 x 1280). On les laisse telles quelles :
+    // AUCUN miroir ni echange ici. C'est LVGL qui les tourne, comme l'image, dans lv_indev.c (indev_pointer_proc appelle
+    // lv_display_rotate_point avec la rotation de l'affichage ; pour 90 degres : x_logique = ver_res - y_brut - 1 = 1279 - y_brut,
+    // y_logique = x_brut, soit la formule d'ESPHome pour `rotation: 270`). La premiere version de ce fichier appliquait AUSSI
+    // un miroir Y et un echange X/Y a cet endroit : le point etait tourne deux fois (anneau « totalement decale par rapport au
+    // doigt », constate par Axel sur le Tab5 le 06/11/2026 avec le binaire 102077b). Le journal « appui : brut ... -> logique »
+    // (tab5_orientation.c) donne la preuve par appui.
     esp_lcd_touch_config_t touch_cfg = {0};
-    touch_cfg.x_max = TAB5_LCD_H_RES;
-    touch_cfg.y_max = TAB5_LCD_V_RES;
-    touch_cfg.rst_gpio_num = GPIO_NUM_NC;
+    touch_cfg.x_max = TAB5_LCD_H_RES - 1;
+    touch_cfg.y_max = TAB5_LCD_V_RES - 1;
+    touch_cfg.rst_gpio_num =
+        GPIO_NUM_NC; // reset fait par l'expandeur (tab5_touch_reset_pulse) : aucune broche de reset
     touch_cfg.int_gpio_num = TAB5_PIN_TOUCH_INT;
     touch_cfg.levels.reset = 0;
     touch_cfg.levels.interrupt = 0; // front descendant (comme le BSP d'Espressif)
