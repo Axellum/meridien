@@ -1,0 +1,66 @@
+# Journal série du Tab5 ST7121 pendant l'essai météo du 2026-11-06 (extrait des lignes utiles).
+# Binaire : commit 55644aa (version lue sur la carte : jalon-1a-tab5-st7121-53-g55644a), application seule flashée.
+# Heure devant chaque ligne = heure du PC (Paris, UTC+1) ; (nombre) = millisecondes depuis le démarrage de la carte.
+# Les lignes « horloge: affichage » (une par minute), le bruit de démarrage et le Wi-Fi sont retirés.
+
+## Démarrage n° 1 après le flash : pas de cache, première réponse (reset matériel par RTS)
+# capture 2026-11-06T22:04:02 sur COM11, reset=True
+22:04:02.873 rst:0x17 (CHIP_USB_UART_RESET),boot:0x20c (SPI_FAST_FLASH_BOOT)
+22:04:04.083 I (1399) app_init: App version:      jalon-1a-tab5-st7121-53-g55644a
+22:04:04.083 I (1409) boot_info: cause du redémarrage : réinitialisation par l'USB (code 11)
+22:04:05.293 I (2582) tab5: Contrôleur d'écran détecté : ST7121 (tactile : Sitronix (version 1) ; détection en 30 ms)
+22:04:05.901 I (3216) meteo: pas de cache météo (NVS : ESP_ERR_NVS_NOT_FOUND)
+22:04:05.901 I (3216) METEO: contrat (au démarrage, depuis le cache) : meteo_etat_lire -> valide=0 (aucune météo connue pour la zone actuelle)
+22:04:15.530 I (12819) reseau: adresse IP obtenue : 192.168.0.52 à 11416 ms
+22:04:15.530 I (12820) reseau: SNTP démarré (deux serveurs du pool, premier : fr.pool.ntp.org)
+22:04:16.760 I (13991) BOOT: BOOT 56 cause=11 rom=0x17 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3509 wifi_ms=8294 ip_ms=11416 ntp_ms=12583 coupures=0 echecs_transport=0 rssi=-44 utc=1793999056 local="vendredi 6 novembre 2026, 22 h 04"
+22:04:17.986 I (15217) METEO: contrat (réseau et heure prêts, avant la requête) : meteo_etat_lire -> valide=0 (aucune météo connue pour la zone actuelle)
+22:04:17.986 I (15217) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+22:04:17.986 I (15218) meteo: mémoire libre avant la requête : interne 192043 o (plus grand bloc 63488 o, minimum depuis le démarrage 146312 o), PSRAM 31616956 o (plus grand bloc 31457280 o)
+22:04:19.038 I (16410) esp-x509-crt-bundle: Certificate validated
+22:04:19.442 I (16719) meteo: mémoire libre une fois la connexion TLS établie : interne 159423 o (plus grand bloc 63488 o, minimum depuis le démarrage 108044 o), PSRAM 31599032 o (plus grand bloc 31457280 o)
+22:04:19.442 I (16722) meteo: mémoire libre après la requête : interne 195555 o (plus grand bloc 63488 o, minimum depuis le démarrage 108044 o), PSRAM 31615420 o (plus grand bloc 31457280 o)
+22:04:19.442 I (16722) meteo: écart de mémoire libre sur la requête : interne +3512 o, PSRAM -1536 o
+22:04:19.442 I (16725) meteo: cache écrit en NVS (204 octets)
+22:04:19.442 I (16726) METEO: METEO Lyon : 9,4 °C (ressentie 8,6), Plutôt dégagé, nuit ; min 7,6 / max 13,0 du jour ; vent 2,3 km/h, direction 321° ; pression 1024,2 hPa ; humidité 93 % ; pluie 0 % ; mesure UNIX 1793998800, reçue UNIX 1793999059 (vendredi 6 novembre 2026, 22 h 04) ; 7 jours ; 2836 octets en 1497 ms
+22:04:19.442 I (16727) METEO: contrat (après la réponse) : meteo_etat_lire -> valide=1 perime=0 maj=UNIX 1793999059 temperature=9,4 °C min=7,6 max=13,0 (du jour) code=1 jour=0 libellé=« Plutôt dégagé »
+22:04:19.442 I (16728) meteo: prochain essai dans 989 s (ou tout de suite si la zone change)
+
+## Démarrage n° 2 : commande « redemarrer » (redémarrage logiciel), cache relu, nouvelle réponse
+# capture 2026-11-06T22:06:43 sur COM11, reset=False
+22:06:46.384 # ENVOI de la commande « redemarrer »
+22:06:46.586 W (163817) commande_serie: redémarrage logiciel demandé sur la console (esp_rom_software_reset_system)
+22:06:46.800 rst:0x3 (SW_SYS_RESET),boot:0x20c (SPI_FAST_FLASH_BOOT)
+22:06:48.014 I (1401) app_init: App version:      jalon-1a-tab5-st7121-53-g55644a
+22:06:48.015 I (1411) boot_info: cause du redémarrage : redémarrage logiciel (code 3)
+22:06:49.235 I (2584) tab5: Contrôleur d'écran détecté : ST7121 (tactile : Sitronix (version 1) ; détection en 30 ms)
+22:06:49.843 I (3218) meteo: cache relu : 9,4 °C, Plutôt dégagé, reçu à l'instant UNIX 1793999059 (marqué périmé tant que l'heure du réseau manque)
+22:06:49.843 I (3219) METEO: contrat (au démarrage, depuis le cache) : meteo_etat_lire -> valide=1 perime=0 maj=UNIX 1793999059 temperature=9,4 °C min=7,6 max=13,0 (du jour) code=1 jour=0 libellé=« Plutôt dégagé »
+22:06:59.404 I (12776) reseau: adresse IP obtenue : 192.168.0.52 à 11371 ms
+22:06:59.404 I (12777) reseau: SNTP démarré (deux serveurs du pool, premier : fr.pool.ntp.org)
+22:07:03.254 I (16650) BOOT: BOOT 57 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3517 wifi_ms=8312 ip_ms=11371 ntp_ms=15240 coupures=0 echecs_transport=0 rssi=-41 utc=1793999222 local="vendredi 6 novembre 2026, 22 h 07"
+22:07:03.864 I (17219) METEO: contrat (réseau et heure prêts, avant la requête) : meteo_etat_lire -> valide=1 perime=0 maj=UNIX 1793999059 temperature=9,4 °C min=7,6 max=13,0 (du jour) code=1 jour=0 libellé=« Plutôt dégagé »
+22:07:03.865 I (17219) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+22:07:03.865 I (17220) meteo: mémoire libre avant la requête : interne 195667 o (plus grand bloc 63488 o, minimum depuis le démarrage 149936 o), PSRAM 31616956 o (plus grand bloc 31457280 o)
+22:07:05.082 I (18396) esp-x509-crt-bundle: Certificate validated
+22:07:08.343 I (21581) meteo: mémoire libre une fois la connexion TLS établie : interne 158451 o (plus grand bloc 63488 o, minimum depuis le démarrage 108268 o), PSRAM 31599032 o (plus grand bloc 31457280 o)
+22:07:08.343 I (21584) meteo: mémoire libre après la requête : interne 199159 o (plus grand bloc 63488 o, minimum depuis le démarrage 108268 o), PSRAM 31615420 o (plus grand bloc 31457280 o)
+22:07:08.343 I (21584) meteo: écart de mémoire libre sur la requête : interne +3492 o, PSRAM -1536 o
+22:07:08.343 I (21588) meteo: cache écrit en NVS (204 octets)
+22:07:08.343 I (21588) METEO: METEO Lyon : 9,4 °C (ressentie 8,6), Plutôt dégagé, nuit ; min 7,6 / max 13,0 du jour ; vent 2,3 km/h, direction 321° ; pression 1024,2 hPa ; humidité 93 % ; pluie 0 % ; mesure UNIX 1793998800, reçue UNIX 1793999227 (vendredi 6 novembre 2026, 22 h 07) ; 7 jours ; 2835 octets en 4357 ms
+22:07:08.343 I (21589) METEO: contrat (après la réponse) : meteo_etat_lire -> valide=1 perime=0 maj=UNIX 1793999227 temperature=9,4 °C min=7,6 max=13,0 (du jour) code=1 jour=0 libellé=« Plutôt dégagé »
+22:07:08.343 I (21590) meteo: prochain essai dans 942 s (ou tout de suite si la zone change)
+
+## Même démarrage n° 2, 15 min plus tard : deuxième cycle périodique
+# capture 2026-11-06T22:17:55 sur COM11, reset=False
+22:22:50.274 I (963590) METEO: contrat (réseau et heure prêts, avant la requête) : meteo_etat_lire -> valide=1 perime=0 maj=UNIX 1793999227 temperature=9,4 °C min=7,6 max=13,0 (du jour) code=1 jour=0 libellé=« Plutôt dégagé »
+22:22:50.274 I (963590) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+22:22:50.274 I (963591) meteo: mémoire libre avant la requête : interne 155503 o (plus grand bloc 63488 o, minimum depuis le démarrage 108268 o), PSRAM 31615420 o (plus grand bloc 31457280 o)
+22:22:51.485 I (964808) esp-x509-crt-bundle: Certificate validated
+22:22:51.894 I (965124) meteo: mémoire libre une fois la connexion TLS établie : interne 118491 o (plus grand bloc 63488 o, minimum depuis le démarrage 104696 o), PSRAM 31599032 o (plus grand bloc 31457280 o)
+22:22:51.894 I (965128) meteo: mémoire libre après la requête : interne 155135 o (plus grand bloc 63488 o, minimum depuis le démarrage 104696 o), PSRAM 31615420 o (plus grand bloc 31457280 o)
+22:22:51.894 I (965128) meteo: écart de mémoire libre sur la requête : interne -368 o, PSRAM +0 o
+22:22:51.894 I (965132) meteo: cache écrit en NVS (204 octets)
+22:22:51.894 I (965132) METEO: METEO Lyon : 9,2 °C (ressentie 8,4), Brouillard, nuit ; min 7,6 / max 13,0 du jour ; vent 1,9 km/h, direction 338° ; pression 1024,3 hPa ; humidité 94 % ; pluie 0 % ; mesure UNIX 1793999700, reçue UNIX 1794000171 (vendredi 6 novembre 2026, 22 h 22) ; 7 jours ; 2837 octets en 1530 ms
+22:22:51.894 I (965133) METEO: contrat (après la réponse) : meteo_etat_lire -> valide=1 perime=0 maj=UNIX 1794000171 temperature=9,2 °C min=7,6 max=13,0 (du jour) code=45 jour=0 libellé=« Brouillard »
+22:22:51.894 I (965134) meteo: prochain essai dans 961 s (ou tout de suite si la zone change)
