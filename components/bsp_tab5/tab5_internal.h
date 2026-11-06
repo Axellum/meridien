@@ -87,3 +87,5 @@ esp_err_t tab5_touch_create(esp_lcd_touch_handle_t *touch);
 // tab5_orientation_apply : verrou de LVGL pris par l'appelant, a appeler une fois l'affichage cree.
 void tab5_orientation_apply(lv_display_t *disp);
 void tab5_orientation_bench(void); // une seule fois, au demarrage (mesure, retire quand le choix est consigne)
+// Journal d'une ligne par appui : point brut de la puce et point final apres la rotation de LVGL. Verrou de LVGL pris.
+void tab5_orientation_trace_tactile(lv_indev_t *indev);

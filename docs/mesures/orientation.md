@@ -37,7 +37,9 @@ Notation : `(x, y)` repère logique 1280 × 720 de LVGL ; `(X, Y)` repère natif
 | --- | --- | --- | --- |
 | Zone envoyée à la dalle | `X1 = y1`, `Y1 = 1280 − x1 − largeur` | `lcd_ppa.c` : `X1 = y1`, `Y2 = hres_logique − x1 − 1` | oui (mêmes pixels) |
 | Rotation des pixels | PPA `ANGLE_90` (anti-horaire) | `rotation` = valeur LVGL 90 = `PPA_SRM_ROTATION_ANGLE_90` | oui |
-| Tactile | `x = 1279 − Y`, `y = X` | miroir Y (`Y' = 1279 − Y`) puis échange X/Y de `esp_lcd_touch` : `x = 1279 − Y`, `y = X` | oui |
+| Tactile | `x = 1279 − Y`, `y = X` (fait par ESPHome lui-même) | **fait par LVGL**, pas par `esp_lcd_touch` : `lv_indev.c` (`indev_pointer_proc`) appelle `lv_display_rotate_point`, qui pour 90° donne `x = ver_res − Y − 1 = 1279 − Y`, `y = X`. `esp_lcd_touch` doit donc rendre le repère **natif**, sans miroir ni échange | oui (source lue) ; **voir l'erreur du 06/11 ci-dessous** |
+
+**Erreur corrigée le 06/11/2026.** La première version de ce document et du firmware (commit `6a0e6cc`) disait que LVGL ne tourne pas le tactile et appliquait un miroir Y + un échange X/Y dans `esp_lcd_touch` : le point était alors tourné **deux fois**. Constaté par Axel sur le Tab5 avec le binaire du commit `102077b` : l'anneau n'était « pas au bon endroit, totalement décalé par rapport au doigt ». Calcul : un doigt en `(x, y)` logique donnait un anneau en `(1279 − y, x)`, hors écran dès que `x > 719`. La rotation du tactile n'est plus faite à l'étage `esp_lcd_touch`.
 
 Conséquence : `lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90)` dans la convention de LVGL donne le **même sens** que le `rotation: 270` d'ESPHome. Le haut de l'image logique est le bord **gauche** natif de la dalle ; pour qui tient la tablette en paysage, c'est la tablette tournée d'un quart de tour dans le sens horaire depuis sa position portrait. **Le sens reste à constater sur la carte** (rien n'a encore tourné) : si l'image apparaît à l'envers, il faut passer `TAB5_UI_ROTATION_DEGREES` à 270 (un seul réglage, tactile compris).
 

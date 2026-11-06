@@ -96,6 +96,7 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
     // "evenement seul" un relachement dont l'interruption serait perdue laisserait le doigt "appuye" indefiniment.
     lvgl_port_lock(0);
     lv_indev_set_mode(indev, LV_INDEV_MODE_TIMER);
+    tab5_orientation_trace_tactile(indev);
     lvgl_port_unlock();
     return ESP_OK;
 }

@@ -161,6 +161,16 @@ Its macros describe a 720 × 1560 panel, not the Tab5's. The init table of the T
 
 **Seen on** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Evidence**: the author's observation (the point is under the finger) and five presses on known targets: mean error (−6, −4) px, from −12 to +10 px on four targets and −26 px in x on the fifth (top right), with no calibration applied (details in [mesures/1a.md](mesures/1a.md)). **Status**: resolved; accuracy of the order of a finger.
 
+#### Landscape: the touch ring is “completely shifted from the finger”
+
+**Symptom.** First landscape trial on the Tab5: the image is upright (“Yes, it's straight”), but the green ring does not appear under the finger (“not at the right place, completely shifted”).
+
+**Cause.** The touch point was rotated **twice**: once by `esp_lcd_touch` (mirror Y + swap X/Y requested in `tab5_touch.c`), once by LVGL itself (`lv_indev.c`, `indev_pointer_proc` → `lv_display_rotate_point`, which for a 90° rotation gives `x = ver_res − Y − 1`, `y = X`). The original comment wrongly claimed that LVGL does not rotate the touch. A finger at logical `(x, y)` gave a ring at `(1279 − y, x)`, off-screen as soon as `x > 719`.
+
+**Solution.** No mirror or swap in `tab5_touch.c`: the chip returns the native frame and LVGL rotates it alone. One log line per press (`appui : brut (X, Y) … -> logique (x, y) …`, `tab5_orientation.c`) gives the proof without relying on what is seen.
+
+**Seen on** Tab5 ST7121, binary of commit `102077b`, 06/11/2026 (the author's observation; cause read in the LVGL 9.5 sources). **Status**: fixed in the code, **to be observed on the board** (see [mesures/orientation.md](mesures/orientation.md) for what follows).
+
 #### No log over USB, or a build error on a `|` between two LVGL flags
 
 - **No log**: it needs `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y` (the default UART console is not wired to the Tab5's USB). Set in `boards/tab5/sdkconfig.defaults.board`.
@@ -396,6 +406,16 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 **Solution.** Point sur la couche supérieure (sans remplissage), écran non défilable, et une **mire** (cadre sur les bords + cinq cibles aux coins et au centre) pour mesurer le décalage restant entre le tactile et l'image à partir des appuis du journal série.
 
 **Vu sur** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Preuve** : constat de l'auteur (le point est sous son doigt) et cinq appuis sur des cibles connues : écart moyen (−6, −4) px, de −12 à +10 px sur quatre cibles et −26 px en x sur la cinquième (haut droit), sans étalonnage appliqué (détail dans [mesures/1a.md](mesures/1a.md)). **Statut** : résolu ; précision de l'ordre d'un doigt.
+
+#### Paysage : l'anneau tactile est « totalement décalé par rapport au doigt »
+
+**Symptôme.** Premier essai du paysage sur le Tab5 : l'image est droite (« Oui, c'est droit »), mais l'anneau vert n'apparaît pas sous le doigt (« pas au bon endroit, totalement décalé »).
+
+**Cause.** Le point tactile était tourné **deux fois** : une fois par `esp_lcd_touch` (miroir Y + échange X/Y demandés dans `tab5_touch.c`), une fois par LVGL lui-même (`lv_indev.c`, `indev_pointer_proc` → `lv_display_rotate_point`, qui pour une rotation de 90° donne `x = ver_res − Y − 1`, `y = X`). Le commentaire d'origine affirmait à tort que LVGL ne tourne pas le tactile. Un doigt en `(x, y)` logique donnait un anneau en `(1279 − y, x)`, hors écran dès que `x > 719`.
+
+**Solution.** Aucun miroir ni échange dans `tab5_touch.c` : la puce rend le repère natif et LVGL le tourne seul. Une ligne de journal par appui (`appui : brut (X, Y) … -> logique (x, y) …`, `tab5_orientation.c`) donne la preuve sans dépendre de ce que l'on voit.
+
+**Vu sur** Tab5 ST7121, binaire du commit `102077b`, 06/11/2026 (constat d'Axel ; cause lue dans les sources de LVGL 9.5). **Statut** : corrigé dans le code, **à constater sur la carte** (voir [mesures/orientation.md](mesures/orientation.md) pour la suite).
 
 #### Aucun journal par l'USB, ou une erreur de compilation sur un `|` entre deux drapeaux LVGL
 

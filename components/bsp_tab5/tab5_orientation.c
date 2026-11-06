@@ -192,6 +192,41 @@ static void banc_rotation(void) {
     heap_caps_free(dst);
 }
 
+// --- Trace du tactile : une ligne par appui, avec le point BRUT (tel que rendu par esp_lcd_touch, repere natif de la dalle) et
+// le point FINAL (apres la rotation de LVGL, repere de l'interface). Donne la preuve de la transformation sans dependre de ce
+// que l'on voit : on touche un coin connu et on lit les deux points dans le journal serie.
+static lv_indev_read_cb_t s_lecture_origine = NULL;
+static bool s_appuye = false;
+static lv_point_t s_brut = {0, 0};
+
+static void lecture_tracee(lv_indev_t *indev, lv_indev_data_t *data) {
+    s_lecture_origine(indev, data);
+    const bool appuye = data->state == LV_INDEV_STATE_PRESSED;
+    if (appuye && !s_appuye) {
+        s_brut = data->point; // premier point de l'appui, avant que LVGL ne le tourne
+    }
+    s_appuye = appuye;
+}
+
+static void sur_appui(lv_event_t *e) {
+    lv_point_t logique = {0, 0};
+    lv_indev_get_point(lv_event_get_indev(e), &logique);
+    lv_display_t *disp = lv_indev_get_display(lv_event_get_indev(e));
+    ESP_LOGI(TAG, "appui : brut (%d, %d) sur la dalle %d x %d -> logique (%d, %d) sur l'interface %d x %d",
+             (int)s_brut.x, (int)s_brut.y, TAB5_LCD_H_RES, TAB5_LCD_V_RES, (int)logique.x, (int)logique.y,
+             (int)lv_display_get_horizontal_resolution(disp), (int)lv_display_get_vertical_resolution(disp));
+}
+
+// Appelee par board_init() apres lvgl_port_add_touch(). Le verrou de LVGL doit etre pris par l'appelant.
+void tab5_orientation_trace_tactile(lv_indev_t *indev) {
+    s_lecture_origine = lv_indev_get_read_cb(indev);
+    if (s_lecture_origine == NULL) {
+        return;
+    }
+    lv_indev_set_read_cb(indev, lecture_tracee);
+    lv_indev_add_event_cb(indev, sur_appui, LV_EVENT_PRESSED, NULL);
+}
+
 // Appelee par board_init() une fois l'affichage LVGL cree. Le verrou de LVGL doit etre pris par l'appelant.
 void tab5_orientation_apply(lv_display_t *disp) {
     lv_display_set_rotation(disp, lvgl_rotation());
