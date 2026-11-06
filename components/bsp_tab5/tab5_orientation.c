@@ -195,12 +195,80 @@ static void banc_rotation(void) {
 // --- Trace du tactile : une ligne par appui, avec le point BRUT (tel que rendu par esp_lcd_touch, repere natif de la dalle) et
 // le point FINAL (apres la rotation de LVGL, repere de l'interface). Donne la preuve de la transformation sans dependre de ce
 // que l'on voit : on touche un coin connu et on lit les deux points dans le journal serie.
+//
+// AUTOTEST (TAB5_AUTOTEST_TACTILE=1, `.\tools\idf.ps1 "-DTAB5_AUTOTEST_TACTILE=1" build` ; `"-DTAB5_AUTOTEST_TACTILE=0"` pour revenir
+// au binaire normal, le cache de CMake garde la valeur) : 10 s apres le demarrage, six appuis SIMULES passent par le meme chemin que
+// ceux du doigt (lecture tracee -> LVGL -> evenement PRESSED -> sur_appui, objets de l'ecran principal compris : anneau, bouton).
+// Chacun journalise « AUTOTEST ... OK/ECART ». Sert a exercer le code d'evenement SANS doigt, avant de demander quoi que ce soit a
+// Axel (le plantage de sur_appui du 06/11/2026 etait passe inapercu parce que ce chemin n'avait jamais ete execute).
+#ifndef TAB5_AUTOTEST_TACTILE
+#define TAB5_AUTOTEST_TACTILE 0
+#endif
+
 static lv_indev_read_cb_t s_lecture_origine = NULL;
 static bool s_appuye = false;
 static lv_point_t s_brut = {0, 0};
 
+#if TAB5_AUTOTEST_TACTILE
+#define AUTOTEST_NB 6
+#define AUTOTEST_DEBUT_TICKS 100   // 100 ms par tick : 10 s apres l'installation de la trace
+#define AUTOTEST_TICKS_PAR_APPUI 8 // 3 ticks appuye (300 ms, sous l'appui long de 400 ms) puis 5 relache
+static const lv_point_t s_cibles[AUTOTEST_NB] = {
+    {0, 0},      // coin haut gauche
+    {1279, 0},   // coin haut droit
+    {0, 719},    // coin bas gauche
+    {1279, 719}, // coin bas droit
+    {640, 360},  // centre
+    {1112, 650}, // centre du bouton « Reglages » (dessin x 992..1232, y 612..688)
+};
+static int s_autotest_tick = 0;
+static int s_autotest_courant = -1;   // cible en cours d'injection, -1 hors injection
+static bool s_autotest_actif = false; // vrai de la premiere a la derniere injection : le vrai tactile est alors ignore
+static bool s_autotest_appuye = false;
+static lv_point_t s_autotest_brut = {0, 0};
+
+static void autotest_pas(lv_timer_t *timer) {
+    s_autotest_tick++;
+    if (s_autotest_tick < AUTOTEST_DEBUT_TICKS) {
+        return;
+    }
+    const int rel = s_autotest_tick - AUTOTEST_DEBUT_TICKS;
+    const int k = rel / AUTOTEST_TICKS_PAR_APPUI;
+    const int phase = rel % AUTOTEST_TICKS_PAR_APPUI;
+    if (k >= AUTOTEST_NB) {
+        s_autotest_actif = false;
+        s_autotest_appuye = false;
+        s_autotest_courant = -1;
+        ESP_LOGI(TAG, "AUTOTEST tactile : fin des %d appuis simules", AUTOTEST_NB);
+        lv_timer_delete(timer);
+        return;
+    }
+    if (phase == 0) {
+        // Repere natif de la dalle correspondant au point logique voulu (formule d'ESPHome pour la rotation de 90 degres :
+        // x_logique = 1279 - Y_brut, y_logique = X_brut), que LVGL doit retrouver.
+        s_autotest_courant = k;
+        s_autotest_brut.x = s_cibles[k].y;
+        s_autotest_brut.y = 1279 - s_cibles[k].x;
+        s_autotest_actif = true;
+        s_autotest_appuye = true;
+    } else if (phase == 3) {
+        s_autotest_appuye = false;
+    }
+}
+#endif
+
 static void lecture_tracee(lv_indev_t *indev, lv_indev_data_t *data) {
+#if TAB5_AUTOTEST_TACTILE
+    if (s_autotest_actif) {
+        data->point = s_autotest_brut;
+        data->state = s_autotest_appuye ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+        data->continue_reading = false;
+    } else {
+        s_lecture_origine(indev, data);
+    }
+#else
     s_lecture_origine(indev, data);
+#endif
     const bool appuye = data->state == LV_INDEV_STATE_PRESSED;
     if (appuye && !s_appuye) {
         s_brut = data->point; // premier point de l'appui, avant que LVGL ne le tourne
@@ -219,6 +287,15 @@ static void sur_appui(lv_event_t *e) {
     ESP_LOGI(TAG, "appui : brut (%d, %d) sur la dalle %d x %d -> logique (%d, %d) sur l'interface %d x %d",
              (int)s_brut.x, (int)s_brut.y, TAB5_LCD_H_RES, TAB5_LCD_V_RES, (int)logique.x, (int)logique.y,
              (int)lv_display_get_horizontal_resolution(disp), (int)lv_display_get_vertical_resolution(disp));
+#if TAB5_AUTOTEST_TACTILE
+    if (s_autotest_actif && s_autotest_courant >= 0) {
+        const lv_point_t cible = s_cibles[s_autotest_courant];
+        const bool ok = logique.x == cible.x && logique.y == cible.y;
+        ESP_LOGI(TAG, "AUTOTEST appui %d/%d : cible logique (%d, %d), brut injecte (%d, %d), obtenu (%d, %d) : %s",
+                 s_autotest_courant + 1, AUTOTEST_NB, (int)cible.x, (int)cible.y, (int)s_brut.x, (int)s_brut.y,
+                 (int)logique.x, (int)logique.y, ok ? "OK" : "ECART");
+    }
+#endif
 }
 
 // Appelee par board_init() apres lvgl_port_add_touch(). Le verrou de LVGL doit etre pris par l'appelant.
@@ -229,6 +306,11 @@ void tab5_orientation_trace_tactile(lv_indev_t *indev) {
     }
     lv_indev_set_read_cb(indev, lecture_tracee);
     lv_indev_add_event_cb(indev, sur_appui, LV_EVENT_PRESSED, NULL);
+#if TAB5_AUTOTEST_TACTILE
+    lv_timer_create(autotest_pas, 100, NULL);
+    ESP_LOGW(TAG, "AUTOTEST tactile compile : six appuis simules 10 s apres le demarrage (binaire d'essai, pas le "
+                  "binaire normal)");
+#endif
 }
 
 // Appelee par board_init() une fois l'affichage LVGL cree. Le verrou de LVGL doit etre pris par l'appelant.
