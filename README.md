@@ -4,7 +4,7 @@
 
 ---
 
-*Name chosen on 06/11/2026: the meridian fixes the time and the place, which is what the screen shows. The GitHub repository `Axellum/meridien` is **private** for now; making it public is the author's decision. The local folder and the CMake project name are still `ecran_autonome`.*
+*Name chosen on 06/11/2026: the meridian fixes the time and the place, which is what the screen shows. The GitHub repository `Axellum/meridien` is **private** for now; making it public is the author's decision. The CMake project and the binary are called `meridien`.*
 
 A touchscreen on an ESP32-P4 meant to work **on its own**: time and date, weather from an API, a voice assistant linked to an LLM of your choice (local or cloud), and a settings web page served by the device itself. **That is the goal, and the project is only at its beginning**: what exists, and what has been seen on a real board, is in [Status](#status).
 
@@ -92,7 +92,7 @@ tools/                  build launcher and checks
 
 ---
 
-*Nom retenu le 06/11/2026 : le méridien fixe l'heure et le lieu, ce que l'écran affiche. Le dépôt GitHub `Axellum/meridien` est **privé** pour l'instant ; le passer en public est une décision de l'auteur. Le dossier local et le nom du projet CMake s'appellent encore `ecran_autonome`.*
+*Nom retenu le 06/11/2026 : le méridien fixe l'heure et le lieu, ce que l'écran affiche. Le dépôt GitHub `Axellum/meridien` est **privé** pour l'instant ; le passer en public est une décision de l'auteur. Le projet CMake et le binaire s'appellent `meridien`.*
 
 Un écran tactile ESP32-P4 conçu pour fonctionner **seul** : heure et date, météo par API, assistant vocal relié à un LLM au choix (local ou cloud), et une page web de réglages servie par l'appareil lui-même. **C'est l'objectif, et le projet n'en est qu'au début** : ce qui existe, et ce qui a été vu sur une vraie carte, est dans l'[État](#état).
 

@@ -82,7 +82,7 @@ Décidé par Axel le 06/11/2026. À faire **après la fusion des branches de ses
 4. **Écran et page en 7 langues** : [ADR-0006](decisions/0006-ecran-en-sept-langues.md) ; les textes de la page de réglages sortent de `app.js`.
 5. **Mise en forme** : un seul commit de reformatage C/C++ (`.clang-format`), puis le contrôle devient bloquant ; `.editorconfig`.
 6. **Intégration continue (GitHub Actions)** : tests du noyau sous Linux avec g++ + AddressSanitizer/UBSan (le vrai compilateur hôte de la CI, sans dépendre des outils Windows d'Axel), ruff, gitleaks, compilation ESP-IDF du Tab5 (action `espressif/esp-idf-ci-action`, à vérifier), 7B quand sa couche carte existe. Contrôles obligatoires nommés dans la protection de `main`.
-7. **Nom** : le projet CMake et le binaire s'appellent encore `ecran_autonome` : renommer en `meridien` (le dossier local peut rester).
+7. **Nom** : fait le 06/11/2026 — le projet CMake et le binaire s'appellent `meridien` (`build/meridien.bin`).
 8. **Fichiers du dépôt public** : gabarit de pull request, fragments de journal des changements comme `changelog.d/` du dépôt Tab5, `CONTRIBUTING` court, ton modeste (« partagé au cas où », fait avec l'IA) ; Axel relit tout en français avant la publication.
 9. **Passage en public** : seulement sur le go explicite d'Axel, après `gitleaks` sur tout l'historique, relecture de ce qui sort, et vérification que le dépôt se compile et se teste depuis un clone neuf.
 
