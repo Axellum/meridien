@@ -1,0 +1,27 @@
+# M5Stack Tab5 (ESP32-P4 revision 1.3, flash 16 Mo, PSRAM hexadecimale 32 Mo). ADR-0005.
+# Faits : docs/recherche/04-audit-depot-tab5.md ; mesures et ecarts : docs/mesures/1a.md.
+
+# Revision de puce. ESP-IDF 5.5.5 exige par defaut une puce v3.1 et REFUSE de demarrer sur une v1.x
+# (le Tab5 est en v1.3 : docs du depot Tab5, hardware.md). Les revisions <3.0 et >=3.0 s'excluent.
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+# 360 MHz sur une puce 1.x (400 MHz demande une v3.x) : c'est deja la valeur par defaut ici, explicite pour la lisibilite.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+
+# Flash 16 Mo et table de partitions propre a la carte (voir partitions.csv : elle laisse intacte la NVS
+# du firmware ESPHome, donc le retour a ESPHome ne perd pas les reglages).
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/tab5/partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="boards/tab5/partitions.csv"
+
+# PSRAM hexadecimale a 200 MHz : le balayage DSI lit le tampon d'image dedans (sur la 7B, sans 200 MHz :
+# environ 30 "dsi underrun" par seconde, audit du depot Tab5).
+CONFIG_IDF_EXPERIMENTAL_FEATURES=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_HEX=y
+CONFIG_SPIRAM_SPEED_200M=y
+
+# Console sur l'USB-Serial/JTAG du P4 : c'est la prise USB-C du Tab5 (le firmware ESPHome journalise de meme,
+# hardware_uart: USB_SERIAL_JTAG). Sans cela, aucun journal ne sort sur le port serie.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

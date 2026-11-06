@@ -1,3 +1,19 @@
-# Reglages communs aux deux cartes. Ce qui depend de la carte (flash, PSRAM, frequence CPU, revision de
-# puce) ira dans boards/<carte>/sdkconfig.defaults.board en phase 1, une fois mesure sur l'appareil.
+# Reglages communs a toutes les cartes. Ce qui depend de la carte (flash, PSRAM, revision de puce,
+# console, table de partitions) est dans boards/<carte>/sdkconfig.defaults.board (ADR-0005).
 CONFIG_IDF_TARGET="esp32p4"
+
+# La tache principale construit l'interface (TinyTTF, formats) : la pile par defaut (3584 octets) est trop juste.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# LVGL 9 configure par Kconfig (pas de lv_conf.h). Allocation, chaines et formats : ceux de la libc d'IDF,
+# comme le BSP d'Espressif (m5stack_tab5/examples).
+CONFIG_LV_CONF_SKIP=y
+CONFIG_LV_BUILD_EXAMPLES=n
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_USE_CLIB_SPRINTF=y
+CONFIG_LV_USE_CLIB_STRING=y
+
+# Polices TrueType rendues a la volee (Latin-1 complet : accents et degre). Les polices integrees de LVGL
+# s'arretent a l'ASCII ; une police sans le "e accent aigu" afficherait un rectangle vide.
+CONFIG_LV_USE_TINY_TTF=y
+CONFIG_LV_TINY_TTF_FILE_SUPPORT=n
