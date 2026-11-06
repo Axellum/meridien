@@ -11,15 +11,36 @@
 static const char *TAG = "tab5_touch";
 
 esp_err_t tab5_touch_create(esp_lcd_touch_handle_t *touch) {
-    // Orientation native de la dalle (portrait) : ni echange ni miroir. Le reset est fait par l'expandeur
-    // (tab5_touch_reset_pulse) : le pilote ne gere donc aucune broche de reset.
+    // La puce donne des coordonnees dans l'orientation NATIVE de la dalle (portrait 720 x 1280). LVGL travaille dans le repere
+    // LOGIQUE (paysage, apres sa rotation) et ne transforme pas le tactile lui-meme (lv_indev.c n'a aucun code de rotation) :
+    // la transformation est faite ici, par le gestionnaire esp_lcd_touch, a la lecture. Le pilote ST7123 n'a ni echange ni miroir
+    // materiel : esp_lcd_touch applique donc sa version logicielle (miroir X, miroir Y, puis echange X/Y, dans cet ordre).
+    // x_max / y_max sont les derniers pixels natifs (719 et 1279) : un miroir rend alors exactement l'intervalle 0..max.
+    //
+    // Rotation LVGL de 90 degres (comme `rotation: 270` d'ESPHome, dont LVTouchListener::rotate_coordinates donne
+    // x_logique = 1279 - y_brut, y_logique = x_brut) : miroir Y puis echange.
     esp_lcd_touch_config_t touch_cfg = {0};
-    touch_cfg.x_max = TAB5_LCD_H_RES;
-    touch_cfg.y_max = TAB5_LCD_V_RES;
-    touch_cfg.rst_gpio_num = GPIO_NUM_NC;
+    touch_cfg.x_max = TAB5_LCD_H_RES - 1;
+    touch_cfg.y_max = TAB5_LCD_V_RES - 1;
+    touch_cfg.rst_gpio_num =
+        GPIO_NUM_NC; // reset fait par l'expandeur (tab5_touch_reset_pulse) : aucune broche de reset
     touch_cfg.int_gpio_num = TAB5_PIN_TOUCH_INT;
     touch_cfg.levels.reset = 0;
     touch_cfg.levels.interrupt = 0; // front descendant (comme le BSP d'Espressif)
+#if TAB5_UI_ROTATION_DEGREES == 0
+    // rien : repere natif
+#elif TAB5_UI_ROTATION_DEGREES == 90
+    touch_cfg.flags.mirror_y = 1;
+    touch_cfg.flags.swap_xy = 1;
+#elif TAB5_UI_ROTATION_DEGREES == 180
+    touch_cfg.flags.mirror_x = 1;
+    touch_cfg.flags.mirror_y = 1;
+#elif TAB5_UI_ROTATION_DEGREES == 270
+    touch_cfg.flags.mirror_x = 1;
+    touch_cfg.flags.swap_xy = 1;
+#else
+#error "TAB5_UI_ROTATION_DEGREES doit valoir 0, 90, 180 ou 270"
+#endif
 
     const esp_lcd_panel_io_i2c_config_t io_cfg = ESP_LCD_TOUCH_IO_I2C_ST7123_CONFIG();
     esp_lcd_panel_io_handle_t io = NULL;

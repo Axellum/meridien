@@ -12,6 +12,7 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_touch.h"
+#include "lvgl.h"
 
 // --- Broches (les memes sur les trois revisions d'ecran) ---
 #define TAB5_PIN_I2C_SDA GPIO_NUM_31
@@ -30,8 +31,16 @@
 #define TAB5_EXPANDER_POWER_WIFI_EN IO_EXPANDER_PIN_NUM_0
 // Reset du coprocesseur : GPIO15, impulsion generee par esp_hosted (reglages de boards/tab5/sdkconfig.defaults.board).
 
+// Dalle NATIVE : portrait 720 x 1280 (le DSI et le tampon d'image sont dans cette orientation).
 #define TAB5_LCD_H_RES 720
 #define TAB5_LCD_V_RES 1280
+// Orientation de l'interface : paysage, comme le firmware ESPHome du Tab5 (`carte_rotation: "270"`, geometrie-tab5.yaml).
+// 90 est la meme rotation exprimee dans la convention de LVGL / d'esp_lvgl_port (lv_display_set_rotation) : memes formules
+// de zone et de tactile que ESPHome, voir docs/mesures/orientation.md. La rotation materielle de la dalle ne marche pas sur
+// ST7121 (espp) : elle est logicielle, par l'accelerateur PPA du P4.
+#define TAB5_UI_ROTATION_DEGREES 90
+#define TAB5_UI_WIDTH TAB5_LCD_V_RES  // largeur logique apres rotation
+#define TAB5_UI_HEIGHT TAB5_LCD_H_RES // hauteur logique apres rotation
 #define TAB5_DSI_LANES 2
 // Alimentation de la PHY DSI : canal 3 du regulateur interne, 2,5 V.
 #define TAB5_DSI_PHY_LDO_CHANNEL 3
@@ -73,3 +82,8 @@ esp_err_t tab5_display_create(tab5_display_controller_t controller, esp_lcd_pane
 
 // tab5_touch.c : tactile Sitronix (pilote ST7123, valable pour le ST7121 aussi, voir tab5_touch.c).
 esp_err_t tab5_touch_create(esp_lcd_touch_handle_t *touch);
+
+// tab5_orientation.c : rotation logicielle de LVGL (paysage), mesures de l'affichage, banc PPA contre processeur.
+// tab5_orientation_apply : verrou de LVGL pris par l'appelant, a appeler une fois l'affichage cree.
+void tab5_orientation_apply(lv_display_t *disp);
+void tab5_orientation_bench(void); // une seule fois, au demarrage (mesure, retire quand le choix est consigne)
