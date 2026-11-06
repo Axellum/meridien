@@ -80,6 +80,8 @@ def lancer(cxx, mode):
                 p = subprocess.run([str(exe)], capture_output=True, text=True, encoding="utf-8", errors="replace")
                 print(f"\n{t.name} :\n{p.stdout}", end="")
                 echecs += p.returncode != 0
+            elif executee_seulement(t.name):
+                print(f"\n{t.name} : compilation OK, MAIS NON EXÉCUTÉ (aucun static_assert : lancer en mode complet)")
             else:
                 print(f"\n{t.name} : compilation OK (tests évalués par static_assert)")
     from controle_i18n import controle_i18n  # noqa: PLC0415  (contrôles croisés de la traduction, sans compilation)
@@ -139,6 +141,7 @@ MUTATIONS = [
 # Mutations des pistes « météo et heure » (json_mini, meteo_openmeteo, heure_fr) et « assistant vocal » : un fichier chacune.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
+from mutations_hote_appareil import MUTATIONS_HOTE_APPAREIL  # noqa: E402  (hôte de l'appareil et lieux de la recherche : voir ce fichier)
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
 from mutations_meteo_appareil import MUTATIONS_METEO_APPAREIL  # noqa: E402  (météo sur l'appareil : requête, zone, cache)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
@@ -152,6 +155,13 @@ MUTATIONS += MUTATIONS_ASSISTANT
 MUTATIONS += MUTATIONS_I18N
 MUTATIONS += MUTATIONS_REGLAGES
 MUTATIONS += MUTATIONS_REGLAGES_ECRAN
+MUTATIONS += MUTATIONS_HOTE_APPAREIL
+
+
+@functools.lru_cache(maxsize=None)
+def executee_seulement(test):
+    """Vrai si le test n'a pas de static_assert (TESTS_A_LA_COMPILATION) : seul son exécution le fait échouer."""
+    return "TESTS_A_LA_COMPILATION(" not in (RACINE / "test" / "host" / test).read_text(encoding="utf-8")
 
 
 def mutations(cxx, mode):
@@ -176,6 +186,19 @@ def mutations(cxx, mode):
             cible.write_text(texte.replace(ancien, nouveau), encoding="utf-8", newline="\n")
             r = compiler(cxx, mode, RACINE / "test" / "host" / test, copie, Path(tmp) / f"m{i}.exe")
             sortie = r.stdout + r.stderr
+            if r.returncode == 0 and executee_seulement(test):
+                # Un test à méthodes virtuelles (l'hôte de l'appareil) n'est pas évaluable à la compilation : la mutation
+                # n'est vue qu'en LANÇANT le programme. En mode « syntaxe » rien ne tourne : on le dit, on ne le prétend pas.
+                if mode != "complet":
+                    print(f"[{i:2}] NON ÉVALUABLE en mode « {mode} » (test exécuté seulement) : {quoi}")
+                    mauvais += 1
+                    continue
+                r = subprocess.run([str(Path(tmp) / f"m{i}.exe")], capture_output=True, text=True, encoding="utf-8",
+                                   errors="replace")
+                # Seules les lignes « ECHEC » comptent : le nom d'un test qui PASSE figure aussi dans la sortie (« ok ... »).
+                echecs_vus = [ligne for ligne in (r.stdout + r.stderr).splitlines() if ligne.lstrip().startswith("ECHEC")]
+                sortie = chr(10).join(echecs_vus)
+                sortie = sortie or "(aucun test en échec : arrêt anormal du programme)"
             if r.returncode == 0:
                 print(f"[{i:2}] NON DÉTECTÉE : {quoi}  ({test})")
                 mauvais += 1
