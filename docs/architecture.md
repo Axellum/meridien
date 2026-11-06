@@ -21,7 +21,7 @@ Updated on 06/11/2026, after the merge of the four tracks of the first day. What
  │ board interface (components/board_api/include/board.h, pure C)      │  on main
  ├──────────────────────────────┬──────────────────────────────────────┤
  │ bsp_tab5  (boards/tab5/)     │ bsp_waveshare_7b (boards/…)          │  Tab5: on main
- │ display, touch, expander     │ EK79007, GT911, ES8311/ES7210        │  7B: planned
+ │ display, touch, expander     │ EK79007, GT911, ES8311/ES7210        │  7B: written, not tested
  └──────────────────────────────┴──────────────────────────────────────┘
         ESP-IDF 5.5.5 · LVGL 9.5 + esp_lvgl_port · ESP32-P4 (+ C6 for Wi-Fi)
 ```
@@ -82,7 +82,7 @@ Mis à jour le 06/11/2026, après la fusion des quatre pistes de la première jo
  │ interface de carte (components/board_api/include/board.h, C pur)    │  sur main
  ├──────────────────────────────┬──────────────────────────────────────┤
  │ bsp_tab5  (boards/tab5/)     │ bsp_waveshare_7b (boards/…)          │  Tab5 : sur main
- │ écran, tactile, expandeur    │ EK79007, GT911, ES8311/ES7210        │  7B : prévu
+ │ écran, tactile, expandeur    │ EK79007, GT911, ES8311/ES7210        │  7B : écrit, non testé
  └──────────────────────────────┴──────────────────────────────────────┘
         ESP-IDF 5.5.5 · LVGL 9.5 + esp_lvgl_port · ESP32-P4 (+ C6 pour le Wi-Fi)
 ```
