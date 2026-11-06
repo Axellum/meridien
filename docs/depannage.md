@@ -171,7 +171,10 @@ Its macros describe a 720 × 1560 panel, not the Tab5's. The init table of the T
 
 **Solution.** No mirror or swap in `tab5_touch.c`: the chip returns the native frame and LVGL rotates it alone. One log line per press (`appui : brut (X, Y) … -> logique (x, y) …`, `tab5_orientation.c`) gives the proof without relying on what is seen.
 
-**Seen on** Tab5 ST7121, binary of commit `102077b`, 06/11/2026 (the author's observation; cause read in the LVGL 9.5 sources). **Status**: fixed in the code, **to be observed on the board** (see [mesures/orientation.md](mesures/orientation.md) for what follows).
+**Seen on** Tab5 ST7121, symptom on the binary of commit `102077b`, fix checked on `3b68f42` (test build with the touch self-test) and `9f82623`, 06/11/2026. **Evidence**: the self-test injects six presses in raw panel coordinates (four corners, centre, Settings button) and the log gives “AUTOTEST appui n/6 … OK” six times; 27 real presses are logged and the formula `x = 1279 − Y`, `y = X` holds on every line; the author: “the fingers were right”. **Status**: resolved (details in [mesures/orientation.md](mesures/orientation.md) § 5).
+
+#### Every press on the screen restarted the board
+**Symptom.** With the binary of commit `557eb44`, “as soon as I touch the screen it restarts” (the author, ~22:29). **Cause.** The per-press log callback called `lv_event_get_indev(e)`, but for the events of an input device LVGL passes the **device as the target** and the touched object as the parameter (`lv_indev_send_event`): the callback read an object as if it were a device. It had been compiled but never executed before the author was asked to press. **Solution.** `lv_event_get_target(e)` (commit `c1fa7f6`), then a self-test build injects six synthetic presses at start-up so that the event code runs on the board **before** anyone is asked to touch it. **Seen on** Tab5 ST7121, `557eb44` then `c1fa7f6`, 06/11/2026. **Evidence**: self-test 6/6 OK with no restart, then 27 real presses without a restart. **Status**: resolved.
 
 #### No log over USB, or a build error on a `|` between two LVGL flags
 
@@ -419,7 +422,10 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 
 **Solution.** Aucun miroir ni échange dans `tab5_touch.c` : la puce rend le repère natif et LVGL le tourne seul. Une ligne de journal par appui (`appui : brut (X, Y) … -> logique (x, y) …`, `tab5_orientation.c`) donne la preuve sans dépendre de ce que l'on voit.
 
-**Vu sur** Tab5 ST7121, binaire du commit `102077b`, 06/11/2026 (constat d'Axel ; cause lue dans les sources de LVGL 9.5). **Statut** : corrigé dans le code, **à constater sur la carte** (voir [mesures/orientation.md](mesures/orientation.md) pour la suite).
+**Vu sur** Tab5 ST7121, symptôme sur le binaire du commit `102077b`, correctif vérifié sur `3b68f42` (version d'essai avec l'autotest du tactile) et `9f82623`, 06/11/2026. **Preuve** : l'autotest injecte six appuis en coordonnées brutes de la dalle (quatre coins, centre, bouton Réglages) et le journal affiche six fois « AUTOTEST appui n/6 … OK » ; 27 appuis réels sont journalisés et la formule `x = 1279 − Y`, `y = X` se vérifie sur chaque ligne ; Axel : « les doigts étaient bons ». **Statut** : résolu (détail dans [mesures/orientation.md](mesures/orientation.md) § 5).
+
+#### Chaque appui sur l'écran redémarrait la carte
+**Symptôme.** Avec le binaire du commit `557eb44`, « dès que je touche l'écran il redémarre » (Axel, ~22:29). **Cause.** Le rappel du journal par appui appelait `lv_event_get_indev(e)`, or pour les événements d'un périphérique d'entrée LVGL passe le **périphérique comme cible** et l'objet touché comme paramètre (`lv_indev_send_event`) : le rappel lisait un objet comme si c'était un périphérique. Il avait été compilé mais jamais exécuté avant de demander à Axel d'appuyer. **Solution.** `lv_event_get_target(e)` (commit `c1fa7f6`), puis une version d'essai injecte six appuis simulés au démarrage pour que le code d'événement tourne sur la carte **avant** qu'on demande à quelqu'un de toucher. **Vu sur** Tab5 ST7121, `557eb44` puis `c1fa7f6`, 06/11/2026. **Preuve** : autotest 6/6 OK sans redémarrage, puis 27 appuis réels sans redémarrage. **Statut** : résolu.
 
 #### Aucun journal par l'USB, ou une erreur de compilation sur un `|` entre deux drapeaux LVGL
 
