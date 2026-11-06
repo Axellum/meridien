@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "board.h"
+#include "ecran/i18n.hpp"
 #include "lvgl.h"
 
 namespace {
@@ -72,6 +73,16 @@ bool ecrire_ppm(const char *chemin) {
     return true;
 }
 
+// Identité de la carte selon la taille de l'écran demandée : les chaînes viennent de docs/compatibilite.md (7B) et de
+// components/bsp_tab5 (Tab5). Une taille inconnue garde l'identité du Tab5 : seule la géométrie compte alors.
+void choisir_carte_selon_taille() {
+    if (g_largeur == 1024 && g_hauteur == 600) {
+        g_carte.board_name = "Waveshare ESP32-P4 7B";
+        g_carte.display_controller = "EK79007";
+        g_carte.touch_controller = "GT911";
+    }
+}
+
 bool lire_taille(const char *texte, int32_t &largeur, int32_t &hauteur) {
     int l = 0, h = 0;
     if (std::sscanf(texte, "%dx%d", &l, &h) != 2 || l < 16 || h < 16 || l > 4096 || h > 4096) {
@@ -126,6 +137,7 @@ int main(int argc, char **argv) {
     const char *variante = nullptr;
     const char *sortie = nullptr;
     bool lister = false;
+    ecran::i18n::Langue langue = ecran::i18n::Langue::Fr;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--lister") == 0) {
             lister = true;
@@ -136,6 +148,13 @@ int main(int argc, char **argv) {
                 std::fprintf(stderr, "banc : taille invalide (attendu LxH)\n");
                 return 2;
             }
+        } else if (std::strcmp(argv[i], "--langue") == 0 && i + 1 < argc) {
+            const auto trouvee = ecran::i18n::langue_depuis_code(argv[++i]);
+            if (!trouvee) {
+                std::fprintf(stderr, "banc : langue inconnue : %s (fr en de nl es it tr)\n", argv[i]);
+                return 2;
+            }
+            langue = *trouvee;
         } else if (std::strcmp(argv[i], "--instant") == 0 && i + 1 < argc) {
             g_instant = std::strtoll(argv[++i], nullptr, 10);
         } else if (std::strcmp(argv[i], "--sortie") == 0 && i + 1 < argc) {
@@ -148,7 +167,7 @@ int main(int argc, char **argv) {
 
     if (lister) {
         for (std::size_t i = 0; i < banc::kNombreScenes; ++i) {
-            std::printf("%s\n", banc::kScenes[i].variante);
+            std::printf("%s\t%s\n", banc::kScenes[i].variante, banc::kScenes[i].legende);
         }
         return 0;
     }
@@ -159,13 +178,16 @@ int main(int argc, char **argv) {
         }
     }
     if (scene == nullptr || sortie == nullptr || g_largeur == 0) {
-        std::fprintf(stderr,
-                     "banc : usage : --variante X --taille LxH --instant EPOCH --sortie fichier.ppm | --lister\n");
+        std::fprintf(
+            stderr,
+            "banc : usage : --variante X --taille LxH [--langue fr] --instant EPOCH --sortie fichier.ppm | --lister\n");
         return 2;
     }
 
     g_carte.width = g_largeur;
     g_carte.height = g_hauteur;
+    choisir_carte_selon_taille();
+    ecran::i18n::definir_langue(langue);
     g_image.assign(static_cast<size_t>(g_largeur) * g_hauteur, 0);
 
     lv_init();
@@ -177,7 +199,7 @@ int main(int argc, char **argv) {
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(g_affichage, sur_flush);
 
-    const banc::Contexte contexte = {g_largeur, g_hauteur, g_instant, g_affichage};
+    const banc::Contexte contexte = {g_largeur, g_hauteur, g_instant, g_affichage, langue};
     scene->construire(contexte);
 
     for (int pas = 0; pas < kNombrePas; ++pas) {
