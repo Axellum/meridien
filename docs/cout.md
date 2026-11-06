@@ -1,5 +1,12 @@
 # Coût : temps, sessions, tokens
 
+> **Summary (EN)** — Cost estimate (time, sessions, tokens) dated 2026-11-06. A working document in French. It is an estimate by analogy, ± 50 %; only the rows marked "mesuré" (measured) are findings.
+> - Reference figures come from the maintainer's own AI-session history (all projects): 158 Claude Code sessions between 16 and 30 Oct 2026; for the Tab5 sessions (76 % of them) about 135,000 output tokens per session; about 57 M tokens re-read from the cache per session (9.0 G / 158). Cache re-reading is the main consumer of quota, so cost depends more on the number of calls × context size than on output tokens.
+> - Version 1 (phases 1 to 6): 22–33 sessions, 3.9–6.4 M output tokens, 16–26 days in sequence, about 7–10 h of the owner's time (mostly looking at the screen and testing). With the calendar (phase 7): 24–36 sessions, 4.2–6.9 M output tokens.
+> - Calendar time: about 3 weeks (2 to 4) with two parallel sessions and quick physical tests, up to 6 weeks if echo cancellation or the captive portal resist. The real bottleneck is waiting for the owner at the board and the 5-hour usage window, not producing code.
+> - Money: Claude runs on a flat-rate subscription (no marginal cost per token; the API price was not re-read). No purchase identified except a useful 5 V / 2 A charger for the Tab5. Running the product on cloud services: about 4.7 to 24 USD/month for ~50 exchanges a day depending on the offer (price lists read 2026-11-06); no API cost locally; weather 0 (Open-Meteo, non-commercial).
+> - Drift factors that could double the figure: duplex echo cancellation not working on the Tab5, the captive portal misbehaving through the C6, the pinned `esp_hosted` being incompatible, two screen revisions that each need an init sequence, sessions that grow too long.
+
 Chiffrage du 06/11/2026. **Estimation par analogie, pas une mesure** : ± 50 %. Seules les lignes marquées « mesuré » sont des constats.
 
 ## Ce qui sert de repère (mesuré)

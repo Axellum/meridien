@@ -1,5 +1,13 @@
 # Plan — écran autonome
 
+> **Summary (EN)** — Plan for Meridien, a native ESP-IDF + LVGL 9 screen firmware for the ESP32-P4 (developed on the M5Stack Tab5), written on 2026-11-06. A working document in French.
+> - Phases run from the riskiest to the least risky. Phase 0 (preparation) is done: the build chain was proved with an empty skeleton compiled for the ESP32-P4 (not flashed). Phase 1 then proves the hardware on the Tab5 (1a screen, touch and LVGL; 1b Wi-Fi through the ESP32-C6; 1c duplex audio with echo cancellation; 1d captive portal), then 2 main screen (clock, date, weather), 3 settings web page, 4 voice assistant, 5 polish and quality, 6 Waveshare 7B compatibility, 7 calendar (version 2).
+> - A criterion is "done" only when observed on the device (screen, serial log, version read from the board, reboot included) or, for pure logic, by a host test that fails without the fix. "Build OK" and "flash OK" do not count.
+> - Recorded result of 1a (Tab5 ST7121, 2026-11-06): the display controller is identified, an LVGL image shows after a software restart, touch works, 12 minutes on USB without restart. Not fully closed: the image after a full power cut is seen with a reservation (one unexplained first start without display), the flash backup is partial and restoring ESPHome was never played. No result is recorded for 1b to 1d.
+> - Two parallel tracks were decided: one on the hardware, one without hardware (settings page against a fake server, pure core tested on a PC), which moves parts of phases 2 and 3 ahead of the end of phase 1.
+> - A "clean repository" batch lists the work before any move to a public repository; making it public remains the owner's decision.
+> - Risks, by severity: duplex echo cancellation on the Tab5, captive portal through the C6, C6 link, a single valid Tab5 already in service, scope drift, licences (WakeNet limited to Espressif products, Open-Meteo non-commercial, weather icon pack unverified), usage quotas. The decisions left to the owner end the file.
+
 Rédigé le 06/11/2026. Les phases sont ordonnées **du plus risqué au moins risqué** : on prouve d'abord ce qui peut tout faire échouer (duplex audio avec AEC, portail captif par le C6, Wi-Fi avec le C6 non mis à jour), pas l'interface. Chiffrage : [cout.md](cout.md). Choix techniques : [decisions/](decisions/).
 
 **Règle de « fait » (toutes phases)** : un critère n'est rempli que s'il a été **constaté** sur l'appareil (écran, journal série, version et heure de compilation lues sur la carte, redémarrage compris) ou, pour la logique pure, par un test hôte qui échoue sans le correctif. « Build OK » et « flash OK » ne comptent pas.
