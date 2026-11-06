@@ -18,6 +18,7 @@
 #include "freertos/task.h"
 #include "sdkconfig.h"
 
+#include "commande_serie.h"
 #include "horloge.h"
 #include "sntp_rapide.h"
 // Généré par CMake depuis reglages_locaux.cmake (hors git, voir main/CMakeLists.txt) : MERIDIEN_WIFI_SSID et
@@ -275,6 +276,7 @@ void tache_reseau(void *) {
         e.lien_ms = carte.link_up_ms;
         std::memcpy(e.version_coprocesseur, carte.coprocessor_version, sizeof(e.version_coprocesseur));
     });
+    memoire_jalon("après le lien avec le C6 (esp_hosted, SDIO)");
     if (lien != ESP_OK) {
         ESP_LOGE(TAG, "lien avec le coprocesseur impossible : %s (essais : %d)", esp_err_to_name(lien),
                  static_cast<int>(carte.attempts));
@@ -297,12 +299,14 @@ void tache_reseau(void *) {
         return;
     }
 
+    memoire_jalon("après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)");
     // Attendre la première réponse SNTP, au plus kDelaiHeureMs après le début de l'attente.
     const EventBits_t bits =
         xEventGroupWaitBits(g_evenements, kEvenementHeure, pdFALSE, pdTRUE, pdMS_TO_TICKS(kDelaiHeureMs));
     if ((bits & kEvenementHeure) == 0) {
         ESP_LOGW(TAG, "heure du réseau non reçue après %d s", static_cast<int>(kDelaiHeureMs / 1000));
     }
+    memoire_jalon("heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route");
     journal_demarrage();
     vTaskDelete(nullptr);
 }

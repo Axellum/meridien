@@ -25,8 +25,10 @@ extern "C" void app_main(void) {
     ESP_LOGI(TAG, "écran autonome, phase 1b ; ESP-IDF %s ; application démarrée à %d ms", esp_get_idf_version(),
              static_cast<int>(esp_timer_get_time() / 1000));
 
+    ecran::memoire_jalon("début de app_main");
     const ecran::BootInfo boot = ecran::boot_info_load();
     ecran::reglages_demarrer(); // après la NVS : langue de l'écran et luminosité réglées par la page
+    ecran::memoire_jalon("après la NVS et les réglages");
 
     const esp_err_t err = board_init();
     if (err != ESP_OK) {
@@ -34,6 +36,7 @@ extern "C" void app_main(void) {
         ESP_LOGE(TAG, "carte non initialisée : %s ; arrêt (l'écran reste éteint)", esp_err_to_name(err));
         return;
     }
+    ecran::memoire_jalon("après board_init (écran, tactile, LVGL, tampons)");
 
     if (board_display_lock(0)) {
         // Écran principal (heure, date, météo) chargé ; l'écran « Bonjour » des phases 1a/1b devient l'écran de diagnostic
@@ -42,6 +45,7 @@ extern "C" void app_main(void) {
         lv_refr_now(board_get_display()); // première image dessinée avant d'allumer le rétroéclairage
         board_display_unlock();
     }
+    ecran::memoire_jalon("après l'écran principal (objets, police, première image)");
     vTaskDelay(pdMS_TO_TICKS(100)); // laisser finir le transfert DMA de la dernière bande
     const int luminosite = ecran::reglages_affichage().luminosite;
     board_set_backlight_percent(luminosite);
@@ -51,8 +55,12 @@ extern "C" void app_main(void) {
     // Le réseau démarre après la première image : l'écran garde le temps de démarrage mesuré en 1a (docs/mesures/1b.md dit
     // si le Wi-Fi l'a changé).
     ecran::reseau_demarrer(boot);
+    ecran::memoire_jalon("après le lancement de la tâche réseau (pile 8 Ko)");
     ecran::
         meteo_client_demarrer(); // météo Open-Meteo : cache NVS lu tout de suite, requêtes dès que le Wi-Fi et l'heure sont là
+    ecran::memoire_jalon("après le lancement de la tâche météo (pile 12 Ko, cache NVS)");
     ecran::serveur_web_demarrer(); // page de réglages sur le port 80 dès que l'adresse IP est obtenue
+    ecran::memoire_jalon("après le lancement de la tâche du serveur web");
     ecran::commande_serie_demarrer();
+    ecran::memoire_jalon("fin de app_main (commande série lancée)");
 }
