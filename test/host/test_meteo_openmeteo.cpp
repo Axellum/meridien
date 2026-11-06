@@ -368,6 +368,7 @@ constexpr int valeurs_invraisemblables_et_bornes() {
     VERIFIER(accepte(R"("utc_offset_seconds":3600,)", R"("utc_offset_seconds":-43200,)"));
     VERIFIER(refuse(R"("utc_offset_seconds":3600,)", R"("utc_offset_seconds":50401,)", Erreur::HorsPlage, "utc_offset_seconds"));
     VERIFIER(refuse(R"("utc_offset_seconds":3600,)", R"("utc_offset_seconds":-43201,)", Erreur::HorsPlage, "utc_offset_seconds"));
+    VERIFIER(refuse(R"("utc_offset_seconds":3600,)", R"("utc_offset_seconds":4294970896,)", Erreur::HorsPlage, "utc_offset_seconds"));  // 2^32 + 3600
     VERIFIER(refuse(R"("time":1793966400,)", R"("time":946684799,)", Erreur::HorsPlage, "current.time"));
     VERIFIER(refuse(R"("time":1793966400,)", R"("time":4102444801,)", Erreur::HorsPlage, "current.time"));
     return 0;
@@ -687,12 +688,23 @@ constexpr int cache_de_bonne_somme_mais_autre_version_ou_valeurs_folles() {
         recalculer_crc(t, n);
         VERIFIER(deserialiser(t, n).diag.erreur == Erreur::Corrompu);
     }
-    {   // longueur du nom de fuseau = 48
+    for (std::size_t longueur : {std::size_t{47}, std::size_t{48}}) {
+        // nom de fuseau rallongé avec des « a » (le reste du cache est décalé, la somme est refaite) :
+        // 47 octets = le maximum, accepté ; 48 = pas de place pour le zéro, refusé comme corrompu
         std::uint8_t t[TAILLE_CACHE_MAX] = {};
-        for (std::size_t k = 0; k < n; ++k) t[k] = ref[k];
-        t[3 + 12] = 48;
-        recalculer_crc(t, n);
-        VERIFIER(deserialiser(t, n).diag.erreur == Erreur::Corrompu);
+        constexpr std::size_t FIN_NOM = 3 + 12 + 1 + 12;   // « Europe/Paris » finit ici
+        const std::size_t en_plus = longueur - 12;
+        for (std::size_t k = 0; k < FIN_NOM; ++k) t[k] = ref[k];
+        for (std::size_t k = 0; k < en_plus; ++k) t[FIN_NOM + k] = 'a';
+        for (std::size_t k = FIN_NOM; k < n; ++k) t[k + en_plus] = ref[k];
+        t[3 + 12] = static_cast<std::uint8_t>(longueur);
+        recalculer_crc(t, n + en_plus);
+        const Lecture l = deserialiser(t, n + en_plus);
+        if (longueur == 47) {
+            VERIFIER(l.ok() && sv(l.releve.fuseau).size() == 47 && l.releve.temperature_dixiemes == 116);
+        } else {
+            VERIFIER(!l.ok() && l.diag.erreur == Erreur::Corrompu && l.diag.champ == "cache.fuseau");
+        }
     }
     return 0;
 }

@@ -267,7 +267,12 @@ constexpr Analyse analyser(std::string_view texte, std::int64_t recu_a_s) noexce
     detail::Lecteur l;
     Releve& r = a.releve;
     r.recu_a_s = recu_a_s;
-    r.decalage_utc_s = static_cast<std::int32_t>(l.entier(racine.champ("utc_offset_seconds"), "utc_offset_seconds"));
+    const std::int64_t decalage = l.entier(racine.champ("utc_offset_seconds"), "utc_offset_seconds");
+    if (decalage < INT32_MIN || decalage > INT32_MAX) {  // avant de rétrécir : 2^32 + 3600 ne doit pas devenir 3600
+        l.rater(Erreur::HorsPlage, "utc_offset_seconds");
+    } else {
+        r.decalage_utc_s = static_cast<std::int32_t>(decalage);
+    }
 
     const json::Valeur tz = racine.champ("timezone");
     if (tz.existe() && !tz.est_nul()) {
