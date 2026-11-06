@@ -1,4 +1,6 @@
-# Écran autonome (nom provisoire)
+# Meridien
+
+*Nom retenu par Axel le 06/11/2026 : le méridien fixe l'heure et le lieu, ce que l'écran affiche. Dépôt GitHub **privé** `Axellum/meridien`. Le dossier local et le nom du projet CMake s'appellent encore `ecran_autonome`.*
 
 Un écran tactile ESP32-P4 qui fonctionne **seul** : heure et date, météo par API, assistant vocal relié à un LLM au choix (local ou cloud), et une page web de réglages servie par l'appareil lui-même.
 
