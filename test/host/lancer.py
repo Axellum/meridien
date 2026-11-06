@@ -118,6 +118,10 @@ MUTATIONS = [
      "recherche_vide_ou_sans_resultat_ou_sans_place", "la saisie vide renvoie tout"),
 ]
 
+from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
+
+MUTATIONS += MUTATIONS_ASSISTANT
+
 
 def mutations(cxx, mode):
     """Pour chaque mutation : copie du noyau, une seule modification, le test visé DOIT échouer à la compilation
