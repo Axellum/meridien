@@ -245,11 +245,132 @@ void service_essai(const banc::Contexte &ctx) {
            "le résultat apparaît tout seul");
 }
 
+void dire_zones(const char *quoi) {
+    std::fprintf(
+        stderr, // la sortie standard est jetée par rendre.py quand le rendu réussit ; l'erreur standard est affichée
+        "zones tactiles (%s) : %d boutons ou curseurs vérifiés, le plus petit mesure %d px ; %d clavier(s), touche la "
+        "plus basse "
+        "%d px ; %d contenu(s) qui dépasse(nt), tous avec leur barre de défilement ; minimum voulu %d px\n",
+        quoi, g_tactile.zones, static_cast<int>(g_tactile.plus_petite), g_tactile.claviers,
+        static_cast<int>(g_tactile.plus_petite_touche), g_tactile.defilements,
+        static_cast<int>(ecran::ui::S(ecran::ui::kToucheMinPx)));
+}
+
+// Tout ce qui répond au doigt, sur chaque page des réglages, a au moins la zone tactile minimale ; un contenu qui dépasse montre sa barre.
+void zones_tactiles_reglages(const banc::Contexte &ctx) {
+    preparer(ctx, "zones-tactiles-reglages", Interface::Reglages);
+    g_hote.simuler_connecte("Maison_5G", "192.168.1.52");
+    g_hote.definir_texte("lieu.ville", "Lyon, Auvergne-Rhône-Alpes, France");
+    g_hote.definir_nombre("llm.preset", 3);
+    g_hote.definir_texte("llm.url", "http://192.168.1.20:11434/v1");
+    g_hote.definir_texte("llm.modele", "mistral-small");
+    g_hote.definir_texte("llm.cle", "cle-factice"); // une clé enregistrée : le bouton « Effacer » apparaît
+    const char *const chemins[] = {"liste",
+                                   "section:0",
+                                   "section:0/wifi",
+                                   "section:0/wifi-mdp:Maison_5G",
+                                   "section:0/connexion:Freebox-A1B2C3:fautedefrappe",
+                                   "section:1",
+                                   "section:1/ville",
+                                   "section:2",
+                                   "section:3",
+                                   "section:4:0",
+                                   "section:4:1",
+                                   "section:4:2",
+                                   "section:4:1/editeur:llm.cle",
+                                   "section:4:1/editeur:llm.url",
+                                   "section:5"};
+    for (const char *chemin : chemins) {
+        ecran::ui_aller(chemin);
+        tourner();
+        verifier_zones_tactiles(chemin);
+    }
+    ecran::ui_aller("section:5");
+    tourner();
+    exiger(toucher("Réinitialiser l’appareil"), "armer la réinitialisation");
+    verifier_zones_tactiles("section:5, réinitialisation armée"); // le bouton « Annuler » apparaît
+    exiger(toucher("Annuler"), "désarmer la réinitialisation");
+    exiger(toucher("Refaire l’installation guidée"), "refaire l'installation");
+    exiger(existe("Quitter l’installation"), "la sortie est proposée en mode « refaire »");
+    verifier_zones_tactiles(
+        "installation refaite depuis les réglages"); // le bouton « Quitter l'installation » apparaît
+    exiger(g_tactile.zones > 0, "aucun bouton trouvé : la vérification ne regarde rien");
+    exiger(g_tactile.defilements > 0 || ctx.langue != ecran::i18n::Langue::De || ctx.largeur != 1280,
+           "en allemand à 1280x720 au moins une page des réglages dépasse : la barre de défilement doit être mesurée");
+    dire_zones("réglages");
+}
+
+// Idem pour les sept étapes de l'installation guidée.
+void zones_tactiles_installation(const banc::Contexte &ctx) {
+    preparer(ctx, "zones-tactiles-installation", Interface::Installation);
+    ecran::ui_simuler_langue_choisie();
+    g_hote.simuler_connecte("Maison_5G", "192.168.1.52");
+    g_hote.definir_texte("lieu.ville", "Lyon, Auvergne-Rhône-Alpes, France");
+    const char *const chemins[] = {"etape:1",
+                                   "etape:2",
+                                   "etape:2/wifi",
+                                   "etape:2/wifi-mdp:Maison_5G",
+                                   "etape:2/connexion:Freebox-A1B2C3:fautedefrappe",
+                                   "etape:3",
+                                   "etape:3/ville",
+                                   "etape:4",
+                                   "etape:5",
+                                   "etape:6",
+                                   "etape:7"};
+    for (const char *chemin : chemins) {
+        ecran::ui_aller(chemin);
+        tourner();
+        verifier_zones_tactiles(chemin);
+    }
+    exiger(g_tactile.zones > 0, "aucun bouton trouvé : la vérification ne regarde rien");
+    dire_zones("installation");
+}
+
+// Le curseur de luminosité se saisit au doigt sur toute sa zone tactile (pas seulement sur la barre fine ni sur le rond), et un vrai
+// appui à côté de la barre fixe la valeur au relâchement.
+void curseur_au_doigt(const banc::Contexte &ctx) {
+    preparer(ctx, "curseur-au-doigt", Interface::Reglages);
+    ecran::ui_aller("section:3");
+    tourner();
+    lv_obj_update_layout(lv_screen_active());
+    lv_obj_t *s = chercher(est_curseur, nullptr);
+    exiger(s != nullptr, "pas de curseur sur la page Affichage");
+    lv_area_t z;
+    lv_obj_get_coords(s, &z);
+    const int32_t centre_y = (z.y1 + z.y2) / 2;
+    const int32_t demi = ecran::ui::S(ecran::ui::kToucheMinPx) / 2;
+    const int32_t xs[] = {z.x1 + 10, (z.x1 + z.x2) / 2, z.x2 - 10};
+    const int32_t dys[] = {-(demi - 2), -demi / 2, 0, demi / 2, demi - 2};
+    for (const int32_t x : xs) {
+        for (const int32_t dy : dys) {
+            exiger(objet_sous_le_doigt(x, centre_y + dy) == s,
+                   "un toucher dans la zone tactile minimale du curseur doit l'atteindre");
+        }
+        exiger(objet_sous_le_doigt(x, centre_y - demi - ecran::ui::S(14)) != s,
+               "au-dessus de la zone tactile, le curseur ne doit plus répondre");
+        exiger(objet_sous_le_doigt(x, centre_y + demi + ecran::ui::S(14)) != s,
+               "au-dessous de la zone tactile, le curseur ne doit plus répondre");
+    }
+    exiger(g_hote.nombre("affichage.luminosite") == 75, "la luminosité de départ est 75 %");
+    const int32_t x_visee = z.x1 + lv_area_get_width(&z) / 4;
+    toucher_point(x_visee,
+                  centre_y - demi + ecran::ui::S(6)); // près du bord haut de la zone, bien à côté de la barre fine
+    const int32_t mini = lv_slider_get_min_value(s);
+    const int32_t maxi = lv_slider_get_max_value(s);
+    const int32_t attendu = mini + (maxi - mini) / 4;
+    const int32_t obtenu = g_hote.nombre("affichage.luminosite");
+    exiger(obtenu != 75 && obtenu >= attendu - (maxi - mini) / 15 && obtenu <= attendu + (maxi - mini) / 15,
+           "un appui à côté de la barre, dans la zone tactile, fixe la valeur au quart de la course");
+}
+
 } // namespace
 
 namespace banc {
 
 const Scene kScenes[] = {
+    {"zones-tactiles-reglages", "Parcours : zones tactiles des réglages", zones_tactiles_reglages},
+    {"zones-tactiles-installation", "Parcours : zones tactiles de l'installation", zones_tactiles_installation},
+    {"curseur-au-doigt", "Parcours : curseur saisi au doigt", curseur_au_doigt},
     {"installation-complete", "Parcours : installation de bout en bout", installation_complete},
     {"reprise-apres-redemarrage", "Parcours : reprise de l'installation à l'étape 3", reprise_apres_redemarrage},
     {"wifi-retour-arriere", "Parcours : Wi-Fi qui ne répond pas, ancien réseau gardé", wifi_retour_arriere},
