@@ -17,6 +17,8 @@ Firmware natif ESP-IDF + LVGL 9 pour ESP32-P4 : heure/date, météo, assistant v
 
 PowerShell, jamais Git Bash. `.\tools\idf.ps1 build` utilise l'ESP-IDF 5.5.5 de `H:\idf` (propriété d'ESPHome : ne jamais le modifier). `CMAKE_BUILD_PARALLEL_LEVEL=4` (le PC a planté à 6). Une seule compilation à la fois sur le PC : vérifier qu'aucune autre session ne compile (`ninja`, `esphome`). Un `.\tools\idf.ps1 build` qui réussit ne prouve pas que ça marche : voir « Fait ».
 
+**Tests du noyau sur le PC** : `. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers` puis `python test/host/lancer.py` (et `--mutations`). Le lanceur doit afficher le mode « complet (compilé + exécuté) » ; en mode « syntaxe » rien n'a été exécuté. Outils installés, emplacement, ce qui manque : [docs/outils.md](docs/outils.md).
+
 ## Règles de code
 
 1. **Noyau pur** (`components/core/`) : C++ sans include ESP-IDF, testable sur PC. Pilotes, interface et carte sont derrière des interfaces.

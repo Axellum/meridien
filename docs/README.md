@@ -10,6 +10,7 @@ Cette documentation est tenue **en même temps que le code** : chaque résultat 
 | savoir **sur quelle carte ça tourne** et ce qui est testé où (Tab5 ST7121, ST7123, ILI9881C, Waveshare 7B) | [Compatibilité et versions](compatibilite.md) |
 | comprendre comment c'est construit | [Architecture](architecture.md), puis les [décisions](decisions/README.md) |
 | compiler, flasher, retrouver la tablette | [README du dépôt](../README.md#compiler), [AGENTS.md](../AGENTS.md) |
+| installer ou retrouver les outils (compilateur du PC, détecteurs d'erreurs, mise en forme) | [Outils de développement](outils.md) |
 | corriger un symptôme déjà vu (écran noir, port série, compilation…) | [Dépannage](depannage.md) : symptôme → cause → solution |
 | savoir où en est le projet, les critères de « fait » et les risques | [Plan](plan.md) |
 | connaître le coût en temps, sessions et tokens | [Coût](cout.md) |
