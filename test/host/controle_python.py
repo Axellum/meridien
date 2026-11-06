@@ -244,7 +244,8 @@ def main():
     for nom, texte in sorties.items():
         chemin = DONNEES / nom
         if a.verifier:
-            if not chemin.exists() or chemin.read_bytes() != texte.encode("utf-8"):
+            # git peut convertir les fins de ligne (core.autocrlf) : on compare sans tenir compte de CRLF/LF
+            if not chemin.exists() or chemin.read_bytes().replace(b"\r\n", b"\n") != texte.encode("utf-8"):
                 print("PAS À JOUR :", nom)
                 ok = False
         else:
