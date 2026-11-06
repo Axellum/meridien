@@ -6,9 +6,10 @@
 // cache : le navigateur ne retélécharge que ce qui a changé.
 //
 // Un seul fil de traitement (celui d'esp_http_server) : les tampons ci-dessous ne sont donc jamais utilisés à deux endroits à la
-// fois. Le géocodage (recherche d'une ville) bloque ce fil le temps de la requête HTTPS vers Open-Meteo (quelques secondes au
-// plus, délai de 8 s) : une seconde requête de la page attend. Rien d'ici n'écrit le code d'appairage, un jeton, l'SSID ou le mot
-// de passe Wi-Fi au journal.
+// fois. Le géocodage (recherche d'une ville) met ce fil en attente le temps de la requête HTTPS vers Open-Meteo (délai de 8 s,
+// plus l'attente éventuelle du verrou TLS commun, 30 s au plus) : une seconde requête de la page attend. Le téléchargement lui-même
+// se fait dans la tâche de main/geocodage.cpp. Rien d'ici n'écrit le code d'appairage, un jeton, l'SSID ou le mot de passe Wi-Fi
+// au journal.
 #include "serveur_web.h"
 
 #include <cstdint>
@@ -20,9 +21,7 @@
 
 #include "board.h"
 #include "esp_app_desc.h"
-#include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
-#include "esp_http_client.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -37,6 +36,7 @@
 #include "appairage.h"
 #include "ecran/api_reglages.hpp"
 #include "ecran/http_requete.hpp"
+#include "geocodage.h"
 #include "meteo_etat.h"
 #include "meteo_zone.h"
 #include "reglages.h"
@@ -53,9 +53,9 @@ const char *TAG = "serveur_web";
 constexpr uint16_t kPort = 80;
 constexpr size_t kTailleSortie = 8192;   // une réponse JSON (huit lieux ≈ 3 Ko)
 constexpr size_t kTailleTravail = 16384; // réponse brute d'Open-Meteo (≈ 5 Ko pour huit lieux)
-constexpr int kDelaiGeocodageMs = 8000;
-// La prise de contact TLS du géocodage s'exécute dans ce fil (≈ 10 Ko de pile pour mbedtls, plus ≈ 4 Ko de tampons locaux de
-// l'API et de l'adresse) : 20 Ko, pour ne pas planter la première recherche de ville.
+// Pile du fil du serveur. Elle a été portée à 20 Ko quand la prise de contact TLS du géocodage s'y exécutait (≈ 10 Ko pour mbedtls,
+// plus ≈ 4 Ko de tampons locaux de l'API). Ce TLS est maintenant dans la tâche de main/geocodage.cpp : la marge peut être réduite
+// (RAM interne rare), mais seulement après avoir mesuré la plus basse marge réelle de ce fil sur la carte, non faite ici.
 constexpr uint32_t kPileServeur = 20480;
 constexpr uint32_t kPileTache = 12288; // la tâche qui démarre le serveur crée aussi les polices du bandeau (TinyTTF)
 constexpr UBaseType_t kPrioriteServeur = 3;
@@ -147,75 +147,16 @@ class HoteAppareil {
         return w;
     }
 
+    // Le téléchargement du géocodage (HTTPS, verrou TLS commun, seule l'adresse d'Open-Meteo autorisée) se fait dans la tâche du
+    // module main/geocodage.cpp, à la priorité d'arrière-plan ; ce fil-ci attend la réponse sans calculer.
     api::Telechargement telecharger(std::string_view url, char *tampon, std::size_t capacite, std::size_t &taille) {
-        taille = 0;
-        // Seul le géocodage d'Open-Meteo est joignable d'ici : aucune adresse venue de la page ne passe par cette fonction.
-        constexpr std::string_view kAutorise = "https://geocoding-api.open-meteo.com/";
-        char adresse[api::ADRESSE_GEOCODAGE_MAX + 1] = {};
-        if (url.substr(0, kAutorise.size()) != kAutorise || url.size() >= sizeof(adresse)) {
-            return api::Telechargement::Echec;
-        }
-        std::memcpy(adresse, url.data(), url.size());
-        if (!reseau_etat().ip_obtenue) {
-            return api::Telechargement::SansInternet;
-        }
-
-        Reception rec = {tampon, capacite, 0, false};
-        esp_http_client_config_t config = {};
-        config.url = adresse;
-        config.method = HTTP_METHOD_GET;
-        config.timeout_ms = kDelaiGeocodageMs;
-        config.event_handler = sur_evenement_http;
-        config.user_data = &rec;
-        config.crt_bundle_attach = esp_crt_bundle_attach; // le serveur est vérifié (certificats racine d'ESP-IDF)
-        config.buffer_size = 2048;
-        config.buffer_size_tx = 1536; // adresse (jusqu'à 1 Ko avec 80 caractères accentués) + en-têtes
-        config.keep_alive_enable = false;
-        esp_http_client_handle_t client = esp_http_client_init(&config);
-        if (client == nullptr) {
-            return api::Telechargement::Echec;
-        }
-        esp_http_client_set_header(client, "Accept", "application/json");
-        const esp_err_t err = esp_http_client_perform(client);
-        const int statut = esp_http_client_get_status_code(client);
-        esp_http_client_cleanup(client);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "géocodage : requête échouée (%s)", esp_err_to_name(err));
-            return api::Telechargement::SansInternet;
-        }
-        if (statut != 200 || rec.trop) {
-            ESP_LOGW(TAG, "géocodage : réponse refusée (HTTP %d%s)", statut, rec.trop ? ", trop grande" : "");
-            return api::Telechargement::Echec;
-        }
-        taille = rec.n;
-        return api::Telechargement::Ok;
+        return geocodage_telecharger(url, tampon, capacite, taille);
     }
 
     std::int64_t maintenant_ms() { return esp_timer_get_time() / 1000; }
     void aleatoire(std::uint8_t *sortie, std::size_t n) { esp_fill_random(sortie, n); }
 
   private:
-    struct Reception {
-        char *donnees;
-        size_t capacite;
-        size_t n;
-        bool trop;
-    };
-
-    static esp_err_t sur_evenement_http(esp_http_client_event_t *evt) {
-        auto *rec = static_cast<Reception *>(evt->user_data);
-        if (rec != nullptr && evt->event_id == HTTP_EVENT_ON_DATA && evt->data_len > 0 && evt->data != nullptr) {
-            const size_t len = static_cast<size_t>(evt->data_len);
-            if (rec->n + len > rec->capacite) {
-                rec->trop = true; // plus grand que prévu : on ne lit pas une réponse à moitié
-            } else {
-                std::memcpy(rec->donnees + rec->n, evt->data, len);
-                rec->n += len;
-            }
-        }
-        return ESP_OK;
-    }
-
     // « Nov  6 2026 » + « 11:20:00 » (__DATE__ et __TIME__ de la compilation) -> « 2026-11-06T11:20:00 ». C'est l'heure locale du PC
     // de compilation, sans « Z » : ce n'est pas de l'UTC.
     static bool date_iso(const char *date, const char *heure, char *sortie, size_t taille) {
