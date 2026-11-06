@@ -1,0 +1,15 @@
+# Pilotes du registre Espressif, versions epinglees. Releves le 07/11/2026 dans les sources lues (BSP Waveshare 3.0.1, composants
+# du registre) ; AUCUNE n'a encore ete verifiee sur le registre en ligne par ce fichier : un `idf.py build` qui les resout et les
+# inscrit dans dependencies.lock est la verification (voir docs/carte-7b.md).
+dependencies:
+  idf: ">=5.4"
+  espressif/esp_lcd_ek79007: "2.0.2"
+  espressif/esp_lcd_touch_gt911: "1.2.1"
+  espressif/esp_codec_dev: "1.5.11"
+  espressif/esp_lvgl_port: "2.9.0"
+  # Wi-Fi par l'ESP32-C6 : MEME couple epingle que components/bsp_tab5 (celui qui tourne sous ESPHome 2026.9.1 sur la 7B comme sur
+  # le Tab5). Ne pas changer une version sans l'essayer sur la carte ; ne JAMAIS mettre a jour le C6 (decision d'Axel du 16/10/2026).
+  espressif/esp_hosted: "2.12.12"
+  espressif/esp_wifi_remote: "1.6.3"
+  espressif/wifi_remote_over_eppp: "0.3.3"
+  espressif/eppp_link: "1.1.5"

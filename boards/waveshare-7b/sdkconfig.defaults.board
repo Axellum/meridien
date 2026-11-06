@@ -1,0 +1,55 @@
+# Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (ESP32-P4 revision 3.x, flash 32 Mo, PSRAM hexadecimale). ADR-0005.
+# Faits et leur source : docs/carte-7b.md ; broches : components/bsp_waveshare_7b/include/ws7b_pur.h. Rien de ce qui suit n'a ete
+# constate sur la carte tant que docs/mesures/7b-*.md ne le dit pas (« Vu sur »).
+
+# Revision de puce : ESP-IDF 5.5.5 exige par defaut une puce >= v3.1, ce qui est le cas d'une 7B recente (revision lue sur la
+# puce : a consigner dans docs/mesures/7b-*.md). On ne force donc rien : ni ESP32P4_SELECTS_REV_LESS_V3 (reserve aux v1.x du Tab5),
+# ni revision minimale plus basse. 400 MHz : la v3.x le permet (le Tab5 en v1.3 reste a 360 MHz).
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400=y
+
+# Flash 32 Mo (GD25Q256) en DIO 80 MHz : le QIO a ete abandonne sur cette carte (memoire d'Axel waveshare-7b-materiel-c6) ; le
+# firmware ESPHome qui tourne dessus est en DIO. Table de partitions propre a la carte (voir partitions.csv).
+CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/waveshare-7b/partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="boards/waveshare-7b/partitions.csv"
+
+# PSRAM hexadecimale a 200 MHz : le balayage DSI lit le tampon d'image dedans (sans 200 MHz : environ 30 « dsi underrun » par
+# seconde, audit 7B n 1). Meme reglage que le Tab5 et que le firmware ESPHome de cette carte.
+CONFIG_IDF_EXPERIMENTAL_FEATURES=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_HEX=y
+CONFIG_SPIRAM_SPEED_200M=y
+
+# Rotation de l'interface : logicielle, par le PPA du P4, seulement quand WS7B_ROTATION=180 (en 0 le port ne tourne rien).
+CONFIG_LVGL_PORT_ENABLE_PPA=y
+
+# Console sur l'USB-Serial/JTAG du P4 : c'est la prise USB-C « USB » de la 7B (GPIO24/25). L'autre prise (UART0, pont CH343P,
+# GPIO37/38) n'est pas utilisee par le firmware.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Wi-Fi : coprocesseur ESP32-C6 relie en SDIO (esp_hosted). Broches du schema et du firmware ESPHome en service sur cette carte :
+# fente 1 en 4 bits, CLK 18, CMD 19, D0..D3 = 14..17, remise a zero du C6 par GPIO54 (R33 0 ohm vers CHIP_PU).
+CONFIG_SLAVE_IDF_TARGET_ESP32C6=y
+CONFIG_ESP_HOSTED_SDIO_SLOT_1=y
+CONFIG_ESP_HOSTED_SDIO_4_BIT_BUS=y
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_CLK_SLOT_1=18
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_CMD_SLOT_1=19
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D0_SLOT_1=14
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D1_4BIT_BUS_SLOT_1=15
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D2_4BIT_BUS_SLOT_1=16
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D3_4BIT_BUS_SLOT_1=17
+CONFIG_ESP_HOSTED_SDIO_CLOCK_FREQ_KHZ=20000
+# Polarite de la remise a zero : « active_high: true » comme ESPHome (a ne changer que si le lien ne s'etablit pas).
+CONFIG_ESP_HOSTED_SDIO_RESET_ACTIVE_HIGH=y
+CONFIG_ESP_HOSTED_SDIO_GPIO_RESET_SLAVE=54
+# Tampons du transport en PSRAM (use_psram: true dans le firmware ESPHome : evite un crash du mempool et libere la SRAM).
+CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
+# Une panne du transport ne doit pas appeler esp_restart() (qui sur P4 ne remet a zero que les coeurs ; boucle du lien C6 vue sur
+# cette carte) : bsp_waveshare_7b recoit ESP_HOSTED_EVENT_TRANSPORT_FAILURE et redemarre par board_restart().
+# CONFIG_ESP_HOSTED_TRANSPORT_RESTART_ON_FAILURE is not set
+# CONFIG_ESP_HOSTED_CLI_ENABLED is not set
+# Tic FreeRTOS a 1 kHz : esp_hosted le recommande et ESPHome le pose pour tous ses firmwares ESP-IDF (comme sur le Tab5).
+CONFIG_FREERTOS_HZ=1000
