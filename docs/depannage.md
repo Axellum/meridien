@@ -218,6 +218,15 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 `python web/tests/parcours.py` really calls Open-Meteo (place search, weather): without Internet it fails. Replayed on 06/11/2026 by the coordination session: 49/49 checks, exit code 0. The stylesheet uses `:has()`: on an old phone, only the red outline of an invalid field would be missing (Safari iOS and Firefox: not verified).
 
+#### LVGL 9.5 screens: three pitfalls found while building the settings screens
+
+**Symptom → cause → solution.**
+- A disabled button (the "Continuer" of step 1 before a language is touched) showed the **theme's grey** instead of the palette's disabled look → the default theme styles `LV_STATE_DISABLED` on top of the object's own style → the disabled look is drawn by hand (`bouton_activer(false)`, `main/ui_commun.cpp`: own colours, clickable flag removed).
+- Testing "is it a button?" with `LV_OBJ_FLAG_CLICKABLE` also matched plain containers → `lv_obj_create()` objects are clickable by default in LVGL 9.5 → a button is recognised with `lv_obj_check_type(o, &lv_button_class)`.
+- A screen deleted from one of its own event callbacks, or a keyboard/field replaced while its `DELETE` callback still points to it, left a stale pointer → objects are hidden then deleted with `lv_obj_delete_async()`, and the `DELETE` callbacks only clear the global if the deleted object is the one it holds.
+
+**Seen on** PC rendering bench (software LVGL 9.5.0, `tools/rendre.ps1`), branch `claude/reglages-ecran-aea4e2`, 06/11/2026. **Evidence**: rendered boards (disabled button) and the scripted journeys of `tools/rendu/scenes/scene_parcours.cpp` (a disabled "Continuer" does nothing; the keyboard and fields survive a screen change). **Status**: resolved on the PC; not seen on a board.
+
 ---
 
 ## Version Française
@@ -437,3 +446,12 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 #### Le parcours web demande le réseau
 
 `python web/tests/parcours.py` appelle vraiment Open-Meteo (recherche de lieu, météo) : sans Internet il échoue. Rejoué le 06/11/2026 par la session de coordination : 49/49 vérifications, code de sortie 0. La feuille de style utilise `:has()` : sur un téléphone ancien, seul le contour rouge d'un champ invalide manquerait (Safari iOS et Firefox : non vérifié).
+
+#### Écrans LVGL 9.5 : trois pièges trouvés en construisant les écrans de réglages
+
+**Symptôme → cause → solution.**
+- Un bouton désactivé (le « Continuer » de l'étape 1 tant qu'aucune langue n'est touchée) montrait le **gris du thème** au lieu de l'aspect désactivé de la palette → le thème par défaut dessine `LV_STATE_DISABLED` par-dessus le style de l'objet → l'aspect désactivé est dessiné à la main (`bouton_activer(false)`, `main/ui_commun.cpp` : couleurs propres, drapeau cliquable retiré).
+- Tester « est-ce un bouton ? » avec `LV_OBJ_FLAG_CLICKABLE` reconnaissait aussi de simples conteneurs → les objets de `lv_obj_create()` sont cliquables par défaut dans LVGL 9.5 → un bouton se reconnaît avec `lv_obj_check_type(o, &lv_button_class)`.
+- Un écran supprimé depuis l'un de ses propres rappels d'événement, ou un clavier ou un champ remplacé alors que son rappel `DELETE` le désigne encore, laissait un pointeur périmé → les objets sont cachés puis supprimés par `lv_obj_delete_async()`, et les rappels `DELETE` ne vident la variable globale que si l'objet supprimé est celui qu'elle tient.
+
+**Vu sur** banc de rendu PC (LVGL 9.5.0 logiciel, `tools/rendre.ps1`), branche `claude/reglages-ecran-aea4e2`, 06/11/2026. **Preuve** : planches rendues (bouton désactivé) et parcours de `tools/rendu/scenes/scene_parcours.cpp` (un « Continuer » désactivé ne fait rien ; le clavier et les champs survivent à un changement d'écran). **Statut** : résolu sur le PC ; non vu sur une carte.
