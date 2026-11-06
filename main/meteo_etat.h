@@ -18,6 +18,8 @@ struct MeteoEtat {
     float min_c;         // minimum du jour, °C ; seulement si valide
     float max_c;         // maximum du jour, °C ; seulement si valide
     char libelle[40];    // libellé français court (« Partiellement nuageux »), terminé par un zéro ; vide si !valide
+    // AJOUTÉ après le premier commit des contrats (on peut ajouter, jamais retirer) :
+    bool minmax_connus; // faux : aucune prévision ne couvre ce jour ; min_c et max_c valent alors temperature_c
 };
 
 // Copie atomique de l'état courant, sûre depuis n'importe quelle tâche. Rend `valide` (donc faux tant qu'aucune météo n'est
