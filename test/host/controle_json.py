@@ -15,12 +15,11 @@ ici on fait relire les octets RÉELLEMENT produits par des analyseurs qui n'ont 
 Méthode : ce script génère un .cpp qui construit chaque cas À LA COMPILATION (constexpr) dans une section nommée,
 le compile avec le g++ croisé RISC-V d'ESP-IDF (`-c`, sans projet ESP-IDF), extrait la section avec `objcopy` et lit
 les octets. Aucun programme n'est exécuté (pas de compilateur PC) : ce sont les octets que l'évaluation
-constexpr du compilateur a fabriqués. Lecture seule sur H:\\idf. Sortie : code 0 si tout est conforme.
+constexpr du compilateur a fabriqués. Lecture seule sur l'installation ESP-IDF (racine_idf.py). Sortie : code 0 si tout est conforme.
 """
 import argparse
 import email
 import email.policy
-import glob
 import json
 import re
 import struct
@@ -30,6 +29,8 @@ import tempfile
 import urllib.parse
 from pathlib import Path
 
+from racine_idf import outil_croise
+
 RACINE = Path(__file__).resolve().parents[2]
 INCLUDE_NOYAU = RACINE / "components" / "core" / "include"
 TAILLE_DONNEES = 8192
@@ -37,10 +38,10 @@ TAILLE_SLOT = 12 + TAILLE_DONNEES  # idx, n, ok (uint32 petit-boutiste) + donné
 
 
 def outil(nom):
-    trouves = sorted(glob.glob(r"H:\idf\tools\riscv32-esp-elf\*\riscv32-esp-elf\bin\riscv32-esp-elf-" + nom + ".exe"))
-    if not trouves:
-        sys.exit("outil croisé introuvable : riscv32-esp-elf-" + nom + " (H:\\idf\\tools\\riscv32-esp-elf)")
-    return trouves[-1]
+    trouve = outil_croise(nom)
+    if not trouve:
+        sys.exit("outil croisé introuvable : riscv32-esp-elf-" + nom + " (dossier ESP-IDF : tools/local.ps1 ou MERIDIEN_IDF_RACINE)")
+    return trouve
 
 
 def lit(b):

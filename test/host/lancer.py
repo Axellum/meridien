@@ -6,15 +6,14 @@
     python test/host/lancer.py --cxx CHEMIN  # force un compilateur
 
 Compilateur : --cxx, sinon la variable CXX, sinon g++ / clang++ / c++ du PATH (mode « complet » : compile,
-lie, EXÉCUTE). À défaut, le g++ croisé RISC-V d'ESP-IDF (H:\\idf\\tools\\riscv32-esp-elf, utilisé en lecture
-seule, sans projet ESP-IDF ni IDF_PATH) avec -fsyntax-only (mode « syntaxe ») : le programme n'est pas
+lie, EXÉCUTE). À défaut, le g++ croisé RISC-V d'ESP-IDF (dossier donné par tools/local.ps1 ou MERIDIEN_IDF_RACINE,
+voir racine_idf.py ; utilisé en lecture seule, sans projet ESP-IDF ni IDF_PATH) avec -fsyntax-only (mode « syntaxe ») : le programme n'est pas
 lancé, MAIS chaque test est aussi évalué à la compilation par un static_assert (voir mini.hpp), donc une
 régression fait échouer la compilation. Le mode utilisé est affiché ; aucun test n'est déclaré « exécuté »
 quand il ne l'est pas.
 """
 import argparse
 import functools
-import glob
 import os
 import shutil
 import subprocess
@@ -49,9 +48,9 @@ def trouver_compilateur(force=None):
         chemin = shutil.which(nom)
         if chemin:
             return chemin, "complet"
-    croises = sorted(glob.glob(r"H:\idf\tools\riscv32-esp-elf\*\riscv32-esp-elf\bin\riscv32-esp-elf-g++.exe"))
-    if croises:
-        return croises[-1], "syntaxe"
+    croise = outil_croise("g++")
+    if croise:
+        return croise, "syntaxe"
     return None, None
 
 
@@ -138,6 +137,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
+from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
 MUTATIONS += MUTATIONS_ASSISTANT
