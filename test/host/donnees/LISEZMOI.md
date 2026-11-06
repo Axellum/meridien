@@ -53,12 +53,21 @@ Godthab n'a pas de date avant 2024 (sa règle a changé en 2023).
 
 - `python test/host/controle_python.py` : `paris: 2826 octets, 312 nombres, 26 chaînes, 19 conteneurs` ; `longyearbyen: 2960 octets,
   312 nombres, 26 chaînes, 19 conteneurs` ; `heure: 1093 instants, 8 zones` ; `--verifier` : « tout est à jour ».
-- `python test/host/lancer.py` : 5 fichiers de test (97 fonctions de test), tout passe, **mode « syntaxe »**.
-- `python test/host/lancer.py --mutations` : **71 mutations, 0 problème** (les 18 de départ + 53 de `mutations_meteo_heure.py` :
-  19 sur `json_mini.hpp`, 18 sur `meteo_openmeteo.hpp`, 16 sur `heure_fr.hpp`) ; chacune est détectée par le test visé.
-  Trois mutations de la première passe n'étaient pas détectées ou l'étaient par une erreur de compilation sans rapport ; les
-  tests ont été complétés (`nullx` = erreur de syntaxe, `objs[0]k`, nom de fuseau de 47/48 octets dans le cache).
+- Première passe (06/11/2026, sans compilateur hôte) : le g++ croisé RISC-V d'ESP-IDF en `-fsyntax-only` (**mode « syntaxe »**) :
+  les tests étaient seulement évalués à la compilation (`static_assert`), `main()` n'avait jamais tourné.
+- Seconde passe (06/11/2026, clang++ 23 d'llvm-mingw installé ensuite, `_outils\env_hote.ps1`) : `python test/host/lancer.py`
+  affiche **mode « complet (compilé + exécuté) »** ; 5 fichiers de test (97 fonctions de test), **0 échec**, avec le clang++ simple
+  **et** avec `-Sanitizers` (AddressSanitizer + UBSan, `-fno-sanitize-recover=undefined` : la moindre erreur ferait échouer).
+  Les détecteurs ont été vérifiés sur deux petits programmes fautifs (débordement de tas, dépassement d'entier signé) : ils signalent
+  bien l'erreur et sortent avec le code 1. Clang accepte `-fconstexpr-steps=2000000000` (ajouté par `drapeaux_constexpr` du lanceur).
+- `python test/host/lancer.py --mutations` : **71 mutations, 0 problème** avec le clang++ simple (les 18 de départ + 53 de
+  `mutations_meteo_heure.py` : 19 sur `json_mini.hpp`, 18 sur `meteo_openmeteo.hpp`, 16 sur `heure_fr.hpp`) ; chacune est détectée par
+  le test visé (ou, pour les trois sans test nommé, par une erreur de compilation). Même résultat qu'avec le g++ croisé. Trois mutations
+  de la première passe n'étaient pas détectées ou l'étaient par une erreur de compilation sans rapport ; les tests ont été complétés
+  (`nullx` = erreur de syntaxe, `objs[0]k`, nom de fuseau de 47/48 octets dans le cache).
 
-**Limite à répéter : il n'y a pas de compilateur hôte sur ce PC.** Le lanceur utilise le g++ croisé RISC-V d'ESP-IDF en
-`-fsyntax-only` : les tests sont **évalués à la compilation (`static_assert`), jamais exécutés** (`main()` n'a pas tourné).
-Aucun test n'a tourné sur une carte.
+**Limites à répéter** : (1) en `--mutations`, une mutation est « détectée » par un échec de **compilation** (`static_assert`) ; l'exécutable
+du mutant n'est pas lancé, donc les 71 mutations ne prouvent pas ce que fait `main()`. (2) Les sanitizers couvrent ce que les tests
+exécutent : la lecture des deux réponses réelles, les tables Python, les cas limites écrits à la main ; rien n'a été essayé sur d'autres
+réponses d'Open-Meteo (par exemple le jour polaire, **non observé**). (3) Compilé pour Windows x86-64, pas pour le RISC-V de l'ESP32-P4
+(`size_t` et les pointeurs y font 32 bits au lieu de 64 ; les tests passent aussi le g++ croisé en `-fsyntax-only`). Aucun test n'a tourné sur une carte.
