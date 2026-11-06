@@ -130,11 +130,13 @@ MUTATIONS = [
      "recherche_vide_ou_sans_resultat_ou_sans_place", "la saisie vide renvoie tout"),
 ]
 
-# Mutations de la piste « météo et heure » (json_mini, meteo_openmeteo, heure_fr) : fichier à part.
+# Mutations des pistes « météo et heure » (json_mini, meteo_openmeteo, heure_fr) et « assistant vocal » : un fichier chacune.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
 
 MUTATIONS += MUTATIONS_METEO_HEURE
+MUTATIONS += MUTATIONS_ASSISTANT
 
 
 def mutations(cxx, mode):
