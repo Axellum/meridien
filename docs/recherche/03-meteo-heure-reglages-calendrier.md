@@ -1,5 +1,12 @@
 # Météo, heure, page de réglages, calendrier — recherche du 06/11/2026
 
+> **Summary (EN)** — Research note of 2026-11-06 on weather, time, the embedded settings page and the calendar (three web-research agents plus three command checks marked "vérifié").
+> - Weather: Open-Meteo for forecast and geocoding, no API key. Free for non-commercial use only (rate limits listed in the note); licence CC BY 4.0 (the note did not find the wording of the required credit). The complete request measured 2,839 bytes raw (996 gzip). Refresh every 15–30 min, NVS cache, "stale" mention when offline. Both APIs answer with `access-control-allow-origin: *` (checked with curl). The Tab5 repository has no WMO code table: it must be written.
+> - Time: SNTP plus an embedded IANA-name → POSIX-string table (posix_tz_db, MIT, about 461 lines); keep the last time zone in NVS.
+> - Settings page: SoftAP + captive portal on the C6 (not shown to work on P4 + C6; ESP-IDF's captive-portal example does not list the P4), served by `esp_http_server` over local HTTP (self-signed HTTPS discouraged), stable `<name>.local` address through mDNS, secrets in encrypted NVS (the HMAC scheme consumes an eFuse block permanently), a light front end, a geocoding proxy in the firmware (a phone on the SoftAP often has no internet), OTA with rollback.
+> - Calendar (version 2): Google's device OAuth flow does not allow Calendar scopes and test-mode authorisations expire after 7 days, so the plan is the calendar's secret iCal (ICS) address (ADR-0004); freshness is 6–24 h according to third-party sources (no Google source), and an ICS parser on a microcontroller must be tried on a real calendar.
+> - Alternatives to Open-Meteo (MET Norway, OpenWeatherMap, WeatherAPI, Pirate Weather, Tomorrow.io, others) are listed with their key and free-tier limits.
+
 Sources : 3 agents de recherche web + 3 vérifications faites par commande le 06/11/2026 (marquées **vérifié**).
 
 ## 1. Météo : Open-Meteo

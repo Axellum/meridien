@@ -1,5 +1,13 @@
 # Assistant vocal et LLM — recherche du 06/11/2026
 
+> **Summary (EN)** — Research note of 2026-11-06 on the voice assistant and LLM options (one web-research agent plus facts from the Tab5 repository). Prices are USD from official price lists read that day, not converted, and subject to change.
+> - Conclusion: on the device, an ESP-SR audio layer (WakeNet wake word, VAD, echo cancellation, noise reduction); by default an HTTP cascade STT → LLM → TTS with three independent endpoints (`/v1/audio/transcriptions`, streaming `/v1/chat/completions`, `/v1/audio/speech`); speech-to-speech (OpenAI Realtime, Gemini Live) as an optional backend later (ADR-0002).
+> - "Local LLM" means three services, not one: LM Studio has no audio endpoint, Anthropic has no STT or TTS, Ollama's compatibility page lists the audio routes (which models really serve them: not tested). A local French voice option is Kokoro; reliable local Whisper or Piper options were not found (not verified).
+> - Wake word: ESP-SR lists the ESP32-P4; the only French model is "Bonjour ESP"; its licence text is MIT-style but limited to Espressif products and model licences are undocumented; microWakeWord has no official French model. Choosing the word is the owner's decision.
+> - Biggest risk: duplex audio with echo cancellation on the Tab5 (two separate codecs, a reference signal to align with the capture, no Tab5 or P4 example found). Under ESPHome a single I2S mutex forbids duplex; natively it may work, which is not yet proven. Fallback: no voice interruption, microphone muted during the answer, a tap on the screen interrupts.
+> - Starting points: `xiaozhi-esp32` (MIT, has a Tab5 board) and Espressif's `openai_demo`; Voice PE only for its state machine.
+> - Estimated cloud cost for ~50 exchanges a day: about 4.7 to 24 USD/month depending on the offer; no API cost locally (the PC must stay on). Latency and RAM/TLS needs on the P4: not verified.
+
 Source : 1 agent de recherche web + faits du dépôt Tab5. Prix en USD lus sur les grilles officielles le 06/11/2026 (non convertis en euros : taux non vérifié ; ces prix évoluent, les pages n'affichent pas de date).
 
 ## Conclusion

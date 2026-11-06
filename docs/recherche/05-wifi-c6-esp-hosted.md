@@ -1,5 +1,12 @@
 # Wi-Fi par le C6 (esp_hosted), SoftAP et portail captif — recherche du 06/11/2026 (jalons 1b et 1d)
 
+> **Summary (EN)** — Research note of 2026-11-06 for milestones 1b (Wi-Fi through the ESP32-C6) and 1d (SoftAP and captive portal). Sources are web pages summarised by agents (a quoted value must be re-read in the source before relying on it), the Tab5 repository and Home Assistant history (read-only). Nothing was run on a board.
+> - The Tab5's C6 very probably carries the factory ESP-Hosted firmware 1.4.1 (the "C6 Version" sensor reads 1.4.1; M5Stack's demo ships that binary). The pairing proven on this tablet is the ESPHome one: host `esp_hosted` 2.12.12, SDIO 20 MHz, reset on GPIO15 active high, PSRAM buffers; about fifty boots without Wi-Fi loss since 2026-09-30 according to the Tab5 repository.
+> - A host newer than the C6 is only a warning in the code; what it announces (RPC timeouts) is a risk, not a measured fact. The C6 must never be written to.
+> - SoftAP: an official example exists for P4 + C6, but no source read shows it with a C6 left on 1.4.1, nor with a captive portal; this is what 1d must measure. `espressif/dns_server` is not in the registry: the capturing DNS server has to be copied from ESP-IDF's `captive_portal` example.
+> - Most likely trap in 1b: the C6 is not powered unless the I/O expander sets `wifi_power` (bit 0 of the 0x44 expander) before `esp_hosted` starts.
+> - The note also lists known bugs and recovery after a reboot (C6 stuck after a transport failure, SDIO state errors, memory), what phones do with captive portals (third-party sources: the official Android and Apple pages could not be read), a 1b test plan including 20 consecutive reboots, and a long "not verified" list (for example SoftAP and DHCP behaviour with a C6 on 1.4.1, and the reset polarity: active high in ESPHome, active low at M5Stack).
+
 Sources : lecture du dépôt Tab5 (dossier `docs/` de `Axellum/M5-Tab5-ESPHome-LVGL`, lecture seule), historique de Home Assistant (lecture seule), registre et dépôts Espressif. **Toutes les pages web ont été lues le 06/11/2026** par des agents de recherche dont l'outil rend parfois un résumé et non le texte brut : un code ou une valeur cités ici sont à relire dans le fichier source avant d'en dépendre (colonne « Lu » : *brut* ou *résumé* quand l'agent l'a dit). **Vérifié** = vu dans une source citée. **Non vérifié** = absent des sources lues ou non confirmé. Rien n'a été exécuté sur une carte.
 
 ## Conclusion

@@ -1,5 +1,11 @@
 # Audit du dépôt Tab5 existant (ESPHome) — 06/11/2026
 
+> **Summary (EN)** — Read-only audit, dated 2026-11-06, of the existing Tab5 (ESPHome) repository `Axellum/M5-Tab5-ESPHome-LVGL`, to reuse what is useful and not pay again for known pitfalls. The `file:line` references come from the audit agents and were not re-checked one by one. That repository is MIT-licensed.
+> - A. A Tab5 versus Waveshare 7B hardware table (SoC, flash and PSRAM, display, backlight, touch, I2C, codecs, I2S, amplifier, expanders, RTC/IMU, C6 SDIO pins and reset, battery) lists what the board layer must abstract (ADR-0005). Gaps: the Tab5's MIPI-DSI timings and init sequences are not in that repository (ESPHome takes them from its own models), so they come from Espressif components; some sources contradict each other (for example the ST7121 clock frequency).
+> - B. Reuse, rewrite or drop: reuse the weather icon font (licence not verified), the text fonts (OFL), the theme tokens, the translation system and the product preferences; rewrite the weather logic, the layouts and the voice-state logic; drop what is specific to Home Assistant; port the ideas of the off-device rendering and the host tests.
+> - C. Pitfalls that remain true natively: black screen after a software reboot on the Tab5 (the screen reset goes through an I/O expander that needs about 1 s), black screen and no network after an OTA because the C6 SDIO link does not come back (cause unknown, a single documented case), 7B boot loop after `esp_restart()` (finish with `esp_rom_software_reset_system()`), watchdog resets that are normal boots, no PNG alpha on the MIPI-DSI panel, the shared I2S bus under ESPHome.
+> - D. What ESPHome or Home Assistant used to do and now has to be written: Wi-Fi provisioning, the settings page, encrypted storage of secrets, SNTP and time zones, OTA with rollback, an HTTPS client for STT/LLM/TTS, and more.
+
 Deux audits en lecture seule du dépôt Tab5 (`Axellum/M5-Tab5-ESPHome-LVGL`, public), pour reprendre ce qui sert et ne pas repayer les pièges. Chemins relatifs à ce dépôt. Les `chemin:ligne` sont ceux rendus par les agents (non revérifiés un par un). Dépôt sous **licence MIT** (`LICENSE:1`) : reprise libre du code.
 
 ## A. Matériel : Tab5 contre 7B (à abstraire dans la couche carte)
