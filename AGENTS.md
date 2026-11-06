@@ -19,6 +19,8 @@ PowerShell, jamais Git Bash. `.\tools\idf.ps1 build` utilise l'ESP-IDF 5.5.5 de 
 
 **Tests du noyau sur le PC** : `. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers` puis `python test/host/lancer.py` (et `--mutations`). Le lanceur doit afficher le mode « complet (compilé + exécuté) » ; en mode « syntaxe » rien n'a été exécuté. Outils installés, emplacement, ce qui manque : [docs/outils.md](docs/outils.md).
 
+**Avant chaque commit, un crochet** (`.githooks/pre-commit` → `tools/verifier.ps1 -Rapide`) refuse un secret, un test du noyau qui échoue ou une erreur ruff. **Jamais `--no-verify`** : corriger la cause. Dans un worktree qui n'a pas encore `.githooks`, lancer `.\tools\verifier.ps1` à la main avant de commiter. Mise en forme C/C++ : cible `.clang-format`, avertissement seulement pour l'instant.
+
 ## Règles de code
 
 1. **Noyau pur** (`components/core/`) : C++ sans include ESP-IDF, testable sur PC. Pilotes, interface et carte sont derrière des interfaces.
