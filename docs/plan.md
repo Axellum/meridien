@@ -21,6 +21,19 @@ Chaque jalon a un critère mesurable et un repli.
 
 **Barrière de décision** à la fin de la phase 1 : Axel voit les mesures et confirme ou ajuste le plan avant d'engager les phases 2 à 4.
 
+### Sessions parallèles (décidé le 06/11/2026, Axel : « si tu peux avancer en parallélisant, fais-le »)
+
+Un seul dépôt git (`ecran_autonome/`, local, sans remote, distinct du dépôt Tab5 public). **Un worktree et une branche par session**, fusion dans `main` par la session de coordination après relecture du diff. Deux pistes seulement : il n'y a qu'**un Tab5, un port USB et un PC qui plante à plus d'une compilation**, et la fenêtre de 5 h est déjà entamée.
+
+| Piste | Branche | Touche seulement | Ne touche jamais |
+|---|---|---|---|
+| **A — matériel** (chaîne 1a → 1b → 1c → 1d, une étape à la fois) | `phase1-materiel` | `boards/`, `components/bsp_*`, `main/`, `sdkconfig.defaults*`, `CMakeLists.txt` racine, `docs/mesures/` | `web/`, `components/core/`, `docs/plan.md` |
+| **B — sans matériel** (page de réglages contre un faux serveur, noyau pur testé sur le PC) | `web-et-noyau` | `web/`, `components/core/`, `test/host/`, `docs/api-reglages.md` | tout ce qui est carte/ESP-IDF ; **aucune compilation ESP-IDF**, aucun port série |
+
+Règles communes : `docs/plan.md` et `contexte_ia/04_Projets/etat_ecran_autonome.md` ne sont écrits que par la session de coordination (les pistes y rapportent dans leur message final). Verrou `tab5-st7121` : seule la piste A touche la tablette, sous le titre « Écran autonome (natif ESP-IDF) ». Premier flash natif : accord explicite d'Axel au moment du flash, avec SHA-256 du binaire.
+
+**Écart assumé par rapport à la barrière ci-dessus** : la piste B avance des éléments des phases 2 et 3 (page de réglages, tables météo/fuseaux) avant la fin de la phase 1. C'est sans risque pour le matériel (code PC, aucun firmware engagé) ; si la phase 1 change le plan (ex. portail captif impossible), seul le front est à reprendre en partie.
+
 ## Phase 2 — Écran principal : heure, date, météo
 
 Horloge et date (fuseau en NVS), client Open-Meteo (requête minimale, cache NVS, « périmé » hors ligne), table WMO → libellé français + icône jour/nuit, thèmes et polices repris du dépôt Tab5, textes via une table de traduction, extinction/veille de l'écran. **Fini =** l'écran affiche une météo qui correspond à celle de la même ville sur le site d'Open-Meteo au moment du contrôle ; coupure du Wi-Fi → la dernière météo reste avec la mention « périmée » ; redémarrage → l'écran revient seul avec la bonne heure. Jalon 7B : compile pour les deux cartes (CI) ; essai physique de la 7B.
