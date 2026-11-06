@@ -6,17 +6,30 @@ Aucun Home Assistant, aucun ESPHome : firmware natif **ESP-IDF + LVGL 9**, code 
 
 | | |
 |---|---|
-| Carte de développement | M5Stack Tab5 V2 (1280×720) |
-| Compatibilité visée | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600), testée de temps en temps |
+| Carte de développement | M5Stack Tab5, **révision d'écran ST7121** (1280×720) |
+| Compatibilité visée | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600), testée de temps en temps — **pas encore essayée** |
 | Version 1 | heure/date, météo (Open-Meteo), assistant vocal (mot d'activation → STT → LLM → TTS), page de réglages |
 | Version 2 | calendrier Google (par adresse iCal secrète, voir ADR-0004) |
 | Hors périmètre | domotique, Home Assistant, ESPHome |
 
-## État
+## État (06/11/2026)
 
-**Phase 0 (préparation) faite le 06/11/2026** : recherches, audit du dépôt Tab5, chaîne de compilation prouvée, plan et coût chiffrés. **Rien n'est encore flashé sur une carte.** Le squelette ne contient qu'un `app_main` qui journalise.
+- **Phase 0 (préparation) faite** : recherches, audit du dépôt Tab5, chaîne de compilation prouvée, plan et coût chiffrés.
+- **Phase 1 en cours** (prouver le matériel, du plus risqué au moins risqué) : l'écran, le tactile et un « Bonjour » LVGL ont été essayés sur le Tab5 ST7121 ; une réserve reste ouverte après coupure de courant ([dépannage](docs/depannage.md#ouverts)). Wi-Fi par le C6, audio et portail captif : prévus.
+- **Sans carte** : table météo, fuseaux horaires, page de réglages et son faux appareil sont écrits et vérifiés sur le PC (49 vérifications), jamais servis par l'appareil.
 
-Où lire : [docs/plan.md](docs/plan.md) (phases, critères de « fait », risques) · [docs/cout.md](docs/cout.md) (temps, sessions, tokens) · [docs/decisions/](docs/decisions/) (ADR proposées, à valider) · [docs/recherche/](docs/recherche/) (sources et faits vérifiés).
+Ce qui est testé sur quelle carte, avec quelle version : **[docs/compatibilite.md](docs/compatibilite.md)**. Rien n'y est écrit « fonctionne » sans carte, commit et date.
+
+## Où lire
+
+| | |
+|---|---|
+| [docs/README.md](docs/README.md) | l'accueil de la documentation (« je veux… → je lis… ») |
+| [docs/compatibilite.md](docs/compatibilite.md) | cartes, versions, ce qui est constaté où |
+| [docs/architecture.md](docs/architecture.md) | les couches et les dossiers |
+| [docs/depannage.md](docs/depannage.md) | symptôme → cause → solution, avec la carte sur laquelle c'est arrivé |
+| [docs/plan.md](docs/plan.md) · [docs/cout.md](docs/cout.md) | phases et critères de « fait », risques ; temps, sessions, tokens |
+| [docs/decisions/](docs/decisions/README.md) · [docs/recherche/](docs/recherche/) | décisions (ADR) ; faits sourcés et leurs « non vérifié » |
 
 ## Compiler
 
@@ -27,4 +40,4 @@ PowerShell (jamais Git Bash), ESP-IDF 5.5.5 déjà présent dans `H:\idf` :
 .\tools\idf.ps1 build
 ```
 
-Flasher une carte : seulement sur demande explicite d'Axel, après sauvegarde complète de la flash (voir [AGENTS.md](AGENTS.md)).
+Flasher une carte : seulement sur demande explicite d'Axel, après sauvegarde de la flash et vérification de la MAC (voir [AGENTS.md](AGENTS.md)).

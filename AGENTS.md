@@ -44,6 +44,14 @@ Transitions instantanées, sans fondu. Popups au pixel. Phrases courtes à l'éc
 
 **Un changement est « fait » seulement quand l'effet demandé a été constaté** : écran, journal série, version et heure de compilation lues sur l'appareil, redémarrage compris. « Build OK », « flash OK » ou un test vert ne suffisent pas ; sinon écrire « non vérifié ».
 
+## Documentation tenue avec le code
+
+- Un résultat constaté (mesure, essai, incident) porte une ligne **« Vu sur »** : carte, révision d'écran, MAC, commit, date. Sans elle il n'est pas utilisable. La 7B reste « prévue » tant qu'aucun essai physique n'a eu lieu.
+- Tout incident diagnostiqué va dans [docs/depannage.md](docs/depannage.md) (symptôme → cause → solution, preuve, statut) **dans le même commit ou la même session** que le correctif.
+- Le tableau de [docs/compatibilite.md](docs/compatibilite.md) change quand un état change ; une page par jalon dans `docs/mesures/`.
+
 ## Git
 
-Branche + PR vers `main`, jamais de push direct. Stager fichier par fichier. Un commit = un sujet. Messages multilignes : `git commit -F <fichier>`. Nouvelle décision d'architecture : un ADR dans `docs/decisions/` (numéro suivant).
+Branche + PR vers `main`, jamais de push direct (dépôt local sans remote tant qu'Axel n'a pas décidé : fusion de la branche après relecture du diff). Stager fichier par fichier. Un commit = un sujet. Messages multilignes : `git commit -F <fichier>`. Nouvelle décision d'architecture : un ADR dans `docs/decisions/` (numéro suivant).
+
+**Chaque commit qui touche une carte ou le firmware se termine par deux lignes** : `Carte:` (`tab5-st7121`, `tab5-st7123`, `tab5-ili9881c`, `waveshare-7b` ou `aucune`) et `Teste-sur:` (par exemple `tab5-st7121 le 2026-11-06`, ou `non testé sur carte`). Un jalon de phase = un tag annoté `jalon-<phase>-<carte>` qui liste le constaté et le non-constaté. Jamais « testé » dans un message sans carte, commit et date.
