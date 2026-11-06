@@ -25,7 +25,7 @@ APPEL_T = re.compile(r"\bT\(\s*(['\"`])((?:\\.|(?!\1).)*)\1")
 # Noms de champs de l'API (clés de l'import), pas des textes : ils ressemblent à un identifiant de page.
 CHAMPS_API = {"services.stt", "services.llm", "services.tts"}
 # Mot d'essai envoyé tel quel au service de synthèse vocale pour le tester (API §7) : ce n'est pas un texte d'écran.
-MOTS_D_ESSAI = {"Bonjour"}
+MOTS_D_ESSAI = {"Bonjour", "OK"}  # « OK » : réponse du faux service de langage (donnée d'essai), et aussi un bouton de l'écran
 ACCENTS = re.compile("[àâäçéèêëîïôöùûüÿœÀÂÇÉÈÊËÎÏÔÙÛÜŒ«»’]")
 # Mots français courts et fréquents qui n'existent ni en anglais ni dans un identifiant : un seul suffit à signaler.
 MOTS_FRANCAIS = re.compile(
