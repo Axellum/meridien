@@ -1,0 +1,149 @@
+"""Mutations du noyau « page de réglages » (api_json, reglages_valeurs, appairage, api_reglages), lues par lancer.py --mutations.
+
+Même format que MUTATIONS dans lancer.py : (fichier du noyau, texte exact à remplacer — il doit apparaître UNE fois —,
+remplacement, test qui doit échouer, nom de la fonction de test qui doit être citée, ce que la mutation simule).
+Une mutation « non détectée » ou « détectée par autre chose » fait échouer le lanceur.
+
+Chaque mutation simule une erreur qui laisserait entrer une valeur dangereuse depuis le réseau (luminosité nulle, jeton
+d'une session fermée, coordonnées hors plage…) ou casserait ce que la page lit (réponse JSON mal écrite, phrase non traduite).
+Non couvert : les zéros finaux de `decimal` pour les très grands nombres, l'ordre exact des champs d'une réponse (la page
+lit par nom), et tout ce qui se passe hors du noyau (serveur HTTP, NVS, Wi-Fi : main/serveur_web.cpp).
+"""
+
+JSON = "api_json.hpp"
+VAL = "reglages_valeurs.hpp"
+APP = "appairage.hpp"
+API = "api_reglages.hpp"
+T_JSON = "test_reglages_valeurs.cpp"  # l'écriture JSON et la validation des valeurs sont testées dans le même fichier
+T_VAL = "test_reglages_valeurs.cpp"
+T_APP = "test_appairage.cpp"
+T_API = "test_api_reglages.cpp"
+
+MUTATIONS_REGLAGES = [
+    # --- api_json.hpp : écriture JSON ---
+    (JSON, "constexpr void apres_valeur() noexcept { virgule_ = true; }", "constexpr void apres_valeur() noexcept { virgule_ = false; }",
+     T_JSON, "objets_tableaux_et_virgules", "plus de virgule entre deux valeurs"),
+    (JSON, '''if (c == '"') {
+                brut("\\\\\\"");''', '''if (c == '"') {
+                brut("\\"");''', T_JSON, "chaines_echappees_accents_conserves",
+     "un guillemet dans un texte n'est plus échappé (JSON cassé)"),
+    (JSON, "} else if (c < 0x20) {", "} else if (c < 0x10) {", T_JSON, "chaines_echappees_accents_conserves",
+     "les caractères de contrôle 0x10 à 0x1F ne sont plus échappés"),
+    (JSON, "if (n_ < capacite_) {", "if (n_ <= capacite_) {", T_JSON, "debordement_sans_ecriture_hors_tampon",
+     "écriture un octet après la fin du tampon"),
+    (JSON, "a * static_cast<double>(echelle) + 0.5", "a * static_cast<double>(echelle) + 0.0", T_JSON,
+     "nombres_decimaux_sans_printf", "les décimales sont tronquées au lieu d'être arrondies"),
+    (JSON, "if (negatif && s != 0)", "if (negatif)", T_JSON, "nombres_decimaux_sans_printf", "« -0 » écrit pour un petit nombre négatif"),
+    (JSON, "if (!(v == v) || v > 1e9", "if (v > 1e9", T_JSON, "nombre_invalide_ecrit_null", "un nombre non fini est écrit comme un nombre"),
+    # --- reglages_valeurs.hpp : texte ---
+    (VAL, "if (cp < minimum || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))", "if (cp < minimum || cp > 0x10FFFF)", T_VAL,
+     "utf8_mal_forme_refuse", "les substituts UTF-16 (U+D800..DFFF) sont acceptés"),
+    (VAL, "if (cp < minimum || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))", "if (cp < minimum || (cp >= 0xD800 && cp <= 0xDFFF))",
+     T_VAL, "utf8_mal_forme_refuse", "les points de code au-delà de U+10FFFF sont acceptés"),
+    (VAL, "if (i + suite >= s.size()) // il manque des octets de continuation", "if (i + suite > s.size()) // il manque des octets de continuation",
+     T_VAL, "utf8_mal_forme_refuse", "une séquence coupée à la fin est lue hors du texte"),
+    (VAL, "if ((static_cast<unsigned char>(c) & 0xC0u) != 0x80u)\n            ++n;", "if (true)\n            ++n;", T_VAL,
+     "caracteres_et_controles", "les caractères sont comptés en octets (« Zü » vaudrait 3)"),
+    (VAL, "if (c < 0x20 || c == 0x7F)", "if (c < 0x20)", T_VAL, "caracteres_et_controles", "le caractère 0x7F est accepté"),
+    (VAL, "(static_cast<unsigned char>(s[n]) & 0xC0u) == 0x80u", "false", T_VAL, "rognage_et_coupure_sur_frontiere",
+     "un texte tronqué coupe un caractère accentué en deux"),
+    (VAL, "const std::string_view r = couper_utf8(s, capacite - 1);", "const std::string_view r = couper_utf8(s, capacite);", T_VAL,
+     "rognage_et_coupure_sur_frontiere", "la copie écrit un octet après la fin du tampon"),
+    (VAL, "c = ' ';", "c = '+';", T_VAL, "parametre_simple_et_decode", "« + » n'est plus lu comme une espace dans une adresse"),
+    (VAL, "if (i + 2 >= v.size()) {", "if (i + 2 > v.size()) {", T_VAL, "parametre_mal_forme_ou_trop_long",
+     "« % » en fin de valeur lu hors du texte"),
+    (VAL, "if (r.taille + 1 >= capacite) {", "if (r.taille + 1 > capacite) {", T_VAL, "parametre_mal_forme_ou_trop_long",
+     "le paramètre décodé dépasse son tampon d'un octet"),
+    (VAL, "const bool libre = (c >= 'A' && c <= 'Z') ||", "const bool libre = (c >= 'A' && c <= 'Y') ||", T_VAL, "encodage_url",
+     "la lettre Z est encodée dans une adresse"),
+    (VAL, "c == '_' || c == '.' || c == '~';", "c == '_' || c == '.' || c == '~' || c == '&';", T_VAL, "encodage_url",
+     "« & » passe tel quel dans l'adresse du géocodage (un paramètre de plus pourrait s'y glisser)"),
+    # --- reglages_valeurs.hpp : luminosité, thème, affichage ---
+    (VAL, "inline constexpr int LUMINOSITE_MIN = 5;", "inline constexpr int LUMINOSITE_MIN = 0;", T_VAL, "luminosite_de_5_a_100",
+     "la luminosité 0 (écran noir) est acceptée"),
+    (VAL, "return v >= LUMINOSITE_MIN && v <= LUMINOSITE_MAX; }", "return v >= LUMINOSITE_MIN; }", T_VAL, "luminosite_de_5_a_100",
+     "une luminosité de 1000 % est acceptée"),
+    (VAL, "return luminosite_valide(v) ? static_cast<int>(v) : LUMINOSITE_DEFAUT;", "return luminosite_valide(v) ? static_cast<int>(v) : 0;",
+     T_VAL, "luminosite_lue_en_nvs_jamais_noire", "un NVS abîmé éteint l'écran au démarrage"),
+    (VAL, '{"auto", "clair", "sombre"}', '{"auto", "clair", "noir"}', T_VAL, "themes_connus_et_indices", "le thème sombre change de nom"),
+    (VAL, "if (!lu.en_entier(v) || !luminosite_valide(v)) {", "if (!lu.en_entier(v)) {", T_VAL, "affichage_theme_et_luminosite_refuses",
+     "la page peut envoyer n'importe quelle luminosité"),
+    (VAL, "Affichage n = actuel;", "Affichage &n = r.valeur;", T_VAL, "affichage_tout_ou_rien",
+     "une demande refusée a déjà changé une partie des réglages"),
+    (VAL, "r.erreur = ErreurAffichage::LangueAssistant;", "r.erreur = ErreurAffichage::LangueEcran;", T_VAL,
+     "affichage_langues_inconnues_refusees", "une langue d'assistant inconnue est signalée comme un défaut de la langue de l'écran"),
+    # --- reglages_valeurs.hpp : recherche et ville ---
+    (VAL, "inline constexpr std::size_t RECHERCHE_MIN = 3;", "inline constexpr std::size_t RECHERCHE_MIN = 2;", T_VAL,
+     "recherche_trois_caracteres_au_moins", "une recherche de 2 lettres est acceptée"),
+    (VAL, "inline constexpr std::size_t RECHERCHE_MAX = 80;", "inline constexpr std::size_t RECHERCHE_MAX = 81;", T_VAL,
+     "recherche_rognee_et_plafonnee", "une recherche de 81 caractères est acceptée"),
+    (VAL, "const std::size_t n = nombre_de_caracteres(q);", "const std::size_t n = q.size();", T_VAL, "recherche_trois_caracteres_au_moins",
+     "la longueur d'une recherche est comptée en octets"),
+    (VAL, "if (!utf8_valide(q) || !sans_controle(q)) {", "if (!utf8_valide(q)) {", T_VAL, "recherche_illisible",
+     "une recherche avec un retour à la ligne est acceptée"),
+    (VAL, "tronque || n.empty() || ", "tronque || ", T_VAL, "zone_nom_refuse", "une ville sans nom est acceptée"),
+    (VAL, " || nombre_de_caracteres(n) > NOM_MAX_CARACTERES", "", T_VAL, "zone_nom_refuse", "un nom de ville de 81 caractères est accepté"),
+    (VAL, "!utf8_valide(n) || !sans_controle(n) ||", "!utf8_valide(n) ||", T_VAL, "zone_nom_refuse",
+     "un nom de ville avec un caractère de contrôle est accepté"),
+    (VAL, "!(lat >= -90.0 && lat <= 90.0)", "!(lat <= 90.0)", T_VAL, "zone_coordonnees_refusees", "une latitude de -91 est acceptée"),
+    (VAL, "!(lon >= -180.0 && lon <= 180.0)", "!(lon >= -180.0)", T_VAL, "zone_coordonnees_refusees", "une longitude de 181 est acceptée"),
+    (VAL, "if (f_tronque || fuseaux::trouver(f) == nullptr) {", "if (f_tronque) {", T_VAL, "zone_fuseau_inconnu_refuse",
+     "un fuseau absent de la table embarquée est accepté"),
+    (VAL, "bool lettres = std::string_view(cp).size() <= 3;", "bool lettres = true;", T_VAL,
+     "zone_champs_d_affichage_invalides_deviennent_vides", "un code pays de 4 lettres est coupé au lieu d'être écarté"),
+    # --- appairage.hpp ---
+    (APP, "if (++echecs_ >= ESSAIS_MAX) {", "if (++echecs_ > ESSAIS_MAX) {", T_APP, "cinq_essais_rates_verrouillent_soixante_secondes",
+     "le verrou n'arrive qu'au sixième essai raté"),
+    (APP, "inline constexpr std::int64_t VERROU_MS = 60000;", "inline constexpr std::int64_t VERROU_MS = 6000;", T_APP,
+     "cinq_essais_rates_verrouillent_soixante_secondes", "le verrou ne dure que 6 secondes"),
+    (APP, "if (maintenant_ms < verrou_jusqua_ms_) {", "if (maintenant_ms <= verrou_jusqua_ms_) {", T_APP,
+     "cinq_essais_rates_verrouillent_soixante_secondes", "le verrou dure une milliseconde de trop"),
+    (APP, "        echecs_ = 0;\n        std::uint8_t octets[JETON_OCTETS] = {};", "        std::uint8_t octets[JETON_OCTETS] = {};", T_APP,
+     "un_succes_remet_le_compte_a_zero", "un code juste ne remet pas le compte des essais ratés à zéro"),
+    (APP, "unsigned diff = a.size() == b.size() ? 0u : 1u;", "unsigned diff = 0u;", T_APP, "egalite_a_temps_constant",
+     "un jeton qui n'est que le début d'un vrai jeton est accepté"),
+    (APP, "inline constexpr std::size_t SESSIONS_MAX = 4;", "inline constexpr std::size_t SESSIONS_MAX = 5;", T_APP,
+     "quatre_sessions_au_plus_la_plus_ancienne_est_fermee", "cinq sessions ouvertes en même temps"),
+    (APP, "if (s.rang < cible->rang)", "if (s.rang > cible->rang)", T_APP, "quatre_sessions_au_plus_la_plus_ancienne_est_fermee",
+     "la session la plus récente est fermée à la place de la plus ancienne"),
+    (APP, "        for (Session &s : sessions_)\n            s = Session{}; // un nouveau code ferme", "        for (Session &s : sessions_)\n            (void)s; // un nouveau code ferme",
+     T_APP, "un_nouveau_code_ferme_les_sessions", "les sessions survivent au changement de code"),
+    (APP, "bool trouve = false;\n        for (const Session &s : sessions_) {\n            if (s.ouverte && egal_temps_constant",
+     "bool trouve = false;\n        for (const Session &s : sessions_) {\n            if (egal_temps_constant", T_APP,
+     "jeton_inconnu_vide_ou_modifie_est_refuse", "une session fermée accepte un jeton fait de zéros"),
+    # --- api_reglages.hpp ---
+    (API, "if (rq.corps.size() > CORPS_MAX)", "if (rq.corps.size() >= CORPS_MAX)", T_API, "corps_de_plus_de_4_ko_refuse_en_413",
+     "un corps de 4096 octets est refusé"),
+    (API, "if (!appairage_.jeton_valide(rq.jeton))", "if (false)", T_API, "sans_jeton_valide_tout_est_refuse_en_401",
+     "toutes les routes sont ouvertes sans code"),
+    (API, 'return erreur(t, 501, "non_disponible"', 'return erreur(t, 404, "non_disponible"', T_API,
+     "fonctions_hors_perimetre_repondent_501", "une fonction absente répond 404 au lieu de 501"),
+    (API, "appairage_.fermer(rq.jeton);", "(void)rq;", T_API, "fermer_la_session_retire_l_acces", "DELETE /api/pair ne ferme rien"),
+    (API, 'e.champ("appairage", ok ? "ok" : "requis");', 'e.champ("appairage", ok ? "requis" : "ok");', T_API, "statut_public_sans_jeton",
+     "/api/status dit « ok » à une page non appairée"),
+    (API, "rep.statut = 429;", "rep.statut = 403;", T_API, "verrou_apres_cinq_essais_avec_compte_a_rebours",
+     "le verrou répond 403 au lieu de 429"),
+    (API, "if (r.reessayer_dans > 1) {", "if (r.reessayer_dans > 0) {", T_API, "verrou_apres_cinq_essais_avec_compte_a_rebours",
+     "« 1 secondes » au lieu de « 1 seconde »"),
+    (API, "if (!hote_.zone_enregistrer(v.zone))\n            return panne(t);", "hote_.zone_enregistrer(v.zone);", T_API,
+     "echec_d_ecriture_donne_500", "un échec d'écriture de la ville répond « enregistré »"),
+    (API, "{ ecrire_zone(e, relue); });", "{ ecrire_zone(e, v.zone); });", T_API, "la_reponse_montre_ce_qui_est_reellement_stocke",
+     "la réponse montre la ville envoyée, pas celle qui est stockée"),
+    (API, "if (!(v.valeur == avant) && !hote_.enregistrer_affichage(v.valeur))", "if (!hote_.enregistrer_affichage(v.valeur))", T_API,
+     "affichage_inchange_n_ecrit_rien", "chaque PUT inchangé use la mémoire flash"),
+    (API, 'return erreur(t, 422, "luminosite", "La luminosité', 'return erreur(t, 422, "lumi", "La luminosité', T_API,
+     "affichage_refuse_tout_ou_rien", "l'identifiant d'erreur de luminosité change"),
+    (API, "constexpr i18n::Langue langue() const noexcept { return hote_.affichage().langue_ecran; }",
+     "constexpr i18n::Langue langue() const noexcept { return i18n::Langue::Fr; }", T_API,
+     "chaque_message_de_l_api_est_traduit_dans_chaque_langue", "les phrases restent en français quelle que soit la langue de l'écran"),
+    (API, 'e.champ_entier("niveau", connecte ? niveau_wifi(w.force_dbm) : 0);', 'e.champ_entier("niveau", niveau_wifi(w.force_dbm));',
+     T_API, "wifi_en_lecture_seule_sans_secret", "un Wi-Fi déconnecté affiche des barres"),
+    (API, "if (dbm >= -55)\n        return 4;", "if (dbm >= -50)\n        return 4;", T_API, "niveaux_du_signal_wifi",
+     "le seuil du niveau 4 change"),
+    (API, "i < n && ecrits < RESULTATS_GEOCODAGE_MAX", "i < n", T_API, "au_plus_huit_lieux", "plus de 8 lieux renvoyés"),
+    (API, "if (nom[0] == '\\0' || fuseau[0] == '\\0' ||", "if (nom[0] == '\\0' ||", T_API, "recherche_de_lieu_convertie_pour_la_page",
+     "un lieu sans fuseau est proposé à la page (l'appareil ne saurait pas régler l'heure)"),
+    (API, "!(lat >= -90.0 && lat <= 90.0) ||\n            !(lon >= -180.0 && lon <= 180.0)) {\n            continue;",
+     "!(lon >= -180.0 && lon <= 180.0)) {\n            continue;", T_API, "recherche_de_lieu_convertie_pour_la_page",
+     "un lieu de latitude 95 est proposé à la page"),
+]
