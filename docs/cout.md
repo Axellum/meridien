@@ -6,7 +6,7 @@ Chiffrage du 06/11/2026. **Estimation par analogie, pas une mesure** : ± 50 %. 
 
 | Repère | Valeur | Source |
 |---|---|---|
-| Claude Code du 16 au 30/10/2026, tous projets | 158 sessions, 23,6 M tokens de sortie, 9,0 G tokens relus depuis le cache | `contexte_ia/audits_systeme/audit_historique_llm_2026-10-30.md` §1-2 |
+| Claude Code du 16 au 30/10/2026, tous projets | 158 sessions, 23,6 M tokens de sortie, 9,0 G tokens relus depuis le cache | audit de l'historique des sessions (notes privées d'Axel, hors dépôt) §1-2 |
 | Dont le Tab5 | 76 % des sessions, 16,2 M tokens de sortie → ≈ 135 000 tokens de sortie par session | idem |
 | Relecture du contexte | ≈ 280 000 tokens relus par appel → ≈ 57 M tokens relus par session (9,0 G / 158) | idem |
 | Sessions lourdes | 1,0 à 1,2 M tokens de sortie, sur 3 à 6 jours | idem |

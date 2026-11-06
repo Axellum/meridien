@@ -1,10 +1,10 @@
 # Audit du dépôt Tab5 existant (ESPHome) — 06/11/2026
 
-Deux audits en lecture seule du dépôt `H:\AuxFilsDesIdees\00ProjetTab`, pour reprendre ce qui sert et ne pas repayer les pièges. Chemins relatifs à ce dépôt. Les `chemin:ligne` sont ceux rendus par les agents (non revérifiés un par un). Dépôt sous **licence MIT** (`LICENSE:1`) : reprise libre du code.
+Deux audits en lecture seule du dépôt Tab5 (`Axellum/M5-Tab5-ESPHome-LVGL`, public), pour reprendre ce qui sert et ne pas repayer les pièges. Chemins relatifs à ce dépôt. Les `chemin:ligne` sont ceux rendus par les agents (non revérifiés un par un). Dépôt sous **licence MIT** (`LICENSE:1`) : reprise libre du code.
 
 ## A. Matériel : Tab5 contre 7B (à abstraire dans la couche carte)
 
-Sources : `Tab5/paquets/tab5-hardware.yaml` (TH), `Tab5/paquets/carte-waveshare-7b.yaml` (7B), audit 7B n°1 (`contexte_ia/audits_systeme/audit_7b_2026-10-16_1_materiel.md`, A1), `docs/hardware.md` (HW).
+Sources : `Tab5/paquets/tab5-hardware.yaml` (TH), `Tab5/paquets/carte-waveshare-7b.yaml` (7B), audit 7B n°1 (notes privées d'Axel, hors dépôt, A1), `docs/hardware.md` (HW).
 
 | Fonction | Tab5 | 7B |
 |---|---|---|
@@ -29,7 +29,7 @@ Sources : `Tab5/paquets/tab5-hardware.yaml` (TH), `Tab5/paquets/carte-waveshare-
 
 **Manque dans le dépôt** : timings MIPI-DSI du Tab5 et séquences d'initialisation (ESPHome les tire de ses modèles `M5STACK-TAB5-ST7123/-ST7121` et `WAVESHARE-ESP32-P4-WIFI6-TOUCH-LCD-7B`) → les prendre dans les composants Espressif (`esp_lcd_st7123`, `esp_lcd_st7121`, `esp_lcd_ek79007`) ou le BSP Waveshare.
 
-**Contradictions / incertitudes relevées** : fréquence du Tab5 ST7121 (400 MHz dans `contexte_ia/02_Hardware/02_MATERIEL_ET_ECRANS.md:78`, 360 MHz forcé par le firmware TH:52-53) ; commentaires périmés dans `carte-waveshare-7b.yaml` (« pas de batterie », reset C6 « à confirmer ») ; la ST7121 « n'a jamais été testée » selon `ecran-st7121.yaml:9-14` alors qu'Axel en a une en service depuis le 21/10 ; reset ES8388 : contournement du registre DACPOWER (0x04 → 0x00) à confirmer avant d'écrire le pilote ; ILI9881C compilée en CI, jamais lancée sur tablette ; tension batterie 7B non testée ; sens RS-485 de la 7B à essayer.
+**Contradictions / incertitudes relevées** : fréquence du Tab5 ST7121 (400 MHz dans les notes privées d'Axel (hors dépôt), 360 MHz forcé par le firmware TH:52-53) ; commentaires périmés dans `carte-waveshare-7b.yaml` (« pas de batterie », reset C6 « à confirmer ») ; la ST7121 « n'a jamais été testée » selon `ecran-st7121.yaml:9-14` alors qu'Axel en a une en service depuis le 21/10 ; reset ES8388 : contournement du registre DACPOWER (0x04 → 0x00) à confirmer avant d'écrire le pilote ; ILI9881C compilée en CI, jamais lancée sur tablette ; tension batterie 7B non testée ; sens RS-485 de la 7B à essayer.
 
 À lire en entier avant d'écrire un pilote : `Tab5/paquets/tab5-hardware.yaml` (ses commentaires portent les pièges), `carte-waveshare-7b.yaml`, l'audit 7B n°1, `Tab5/paquets/tab5-sensors-diagnostics.yaml` (rôle des broches d'expandeur, séquence de charge), `tab5-sensors-domotique.yaml` (ampli et casque), `docs/hardware.md`, `Tab5/ecran/tab5_dalle.cpp` (commandes DCS d'extinction), `Tab5/ecran/tab5_lien_c6.cpp` (reset CORE du lien SDIO), `docs/troubleshooting.md`, `docs/waveshare-7b.md`.
 

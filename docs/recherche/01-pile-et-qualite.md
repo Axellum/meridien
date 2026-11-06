@@ -11,7 +11,7 @@ ESP-IDF natif + composants du registre Espressif + LVGL 9 via `esp_lvgl_port` + 
 | Élément | Version | Source |
 |---|---|---|
 | ESP-IDF | 6.1 « Latest » (27/08) ; 6.0.3 (02/09) ; 5.5.6 (16/10) | github.com/espressif/esp-idf/releases |
-| ESP-IDF sur le PC | **5.5.5, vérifié** (`idf.py --version`, GCC RISC-V 14.2.0, CMake 3.30.2, Ninja 1.12.1) dans `H:\idf`, installé par ESPHome | `tools/idf.ps1` |
+| ESP-IDF sur le PC | **5.5.5, vérifié** (`idf.py --version`, GCC RISC-V 14.2.0, CMake 3.30.2, Ninja 1.12.1) dans le dossier ESP-IDF installé par ESPHome sur le PC d'Axel | `tools/idf.ps1` |
 | LVGL | 9.6.0 (16/09) | github.com/lvgl/lvgl/releases |
 | `esp_lvgl_port` | 2.9.0 (LVGL 8 et 9) ; `esp_lvgl_adapter` (IDF ≥ 5.5, gère tearing et rotation) | components.espressif.com |
 | `esp_hosted` / `esp_wifi_remote` | 3.1.0 / 1.6.5 | components.espressif.com |

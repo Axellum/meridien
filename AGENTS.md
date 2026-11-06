@@ -15,9 +15,9 @@ Firmware natif ESP-IDF + LVGL 9 pour ESP32-P4 : heure/date, météo, assistant v
 
 ## Compiler
 
-PowerShell, jamais Git Bash. `.\tools\idf.ps1 build` utilise l'ESP-IDF 5.5.5 de `H:\idf` (propriété d'ESPHome : ne jamais le modifier). `CMAKE_BUILD_PARALLEL_LEVEL=4` (le PC a planté à 6). Une seule compilation à la fois sur le PC : vérifier qu'aucune autre session ne compile (`ninja`, `esphome`). Un `.\tools\idf.ps1 build` qui réussit ne prouve pas que ça marche : voir « Fait ».
+PowerShell, jamais Git Bash. `.\tools\idf.ps1 build` utilise l'ESP-IDF 5.5.5 dont le dossier est donné dans `tools/local.ps1` (copie de `tools/local.example.ps1`, non suivie par git) ; chez Axel c'est l'installation d'ESPHome : ne jamais la modifier. `CMAKE_BUILD_PARALLEL_LEVEL=4` (le PC a planté à 6). Une seule compilation à la fois sur le PC : vérifier qu'aucune autre session ne compile (`ninja`, `esphome`). Un `.\tools\idf.ps1 build` qui réussit ne prouve pas que ça marche : voir « Fait ».
 
-**Tests du noyau sur le PC** : `. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers` puis `python test/host/lancer.py` (et `--mutations`). Le lanceur doit afficher le mode « complet (compilé + exécuté) » ; en mode « syntaxe » rien n'a été exécuté. Outils installés, emplacement, ce qui manque : [docs/outils.md](docs/outils.md).
+**Tests du noyau sur le PC** : `. <dossier des outils hôte>\env_hote.ps1 -Sanitizers` puis `python test/host/lancer.py` (et `--mutations`). Le lanceur doit afficher le mode « complet (compilé + exécuté) » ; en mode « syntaxe » rien n'a été exécuté. Outils installés, emplacement, ce qui manque : [docs/outils.md](docs/outils.md).
 
 **Avant chaque commit, un crochet** (`.githooks/pre-commit` → `tools/verifier.ps1 -Rapide`) refuse un secret, un test du noyau qui échoue ou une erreur ruff. **Jamais `--no-verify`** : corriger la cause. Dans un worktree qui n'a pas encore `.githooks`, lancer `.\tools\verifier.ps1` à la main avant de commiter. Mise en forme C/C++ : cible `.clang-format`, avertissement seulement pour l'instant.
 
@@ -35,7 +35,7 @@ PowerShell, jamais Git Bash. `.\tools\idf.ps1 build` utilise l'ESP-IDF 5.5.5 de 
 ## Matériel : limites strictes
 
 - **Flasher une carte seulement sur demande explicite d'Axel.** Les deux Tab5 et la 7B sont à lui ; au moins deux sont en service chez lui. Avant le premier flash d'une carte : sauvegarde complète de la flash (`esptool read-flash`, `--no-stub`, vérifier le fichier relu), vérification de la MAC.
-- Verrou de l'appareil et ports : `C:\Users\axell\.tab5\verrous.py` ; COM6 = Tab5 (MAC `30:ED:A0:EA:8E:87`, en SAV), COM8 = Waveshare 7B. Toujours lire la MAC avant d'écrire.
+- Verrou de l'appareil et ports série : propres au PC d'Axel (script `verrous.py` hors dépôt). Le numéro de port change avec la prise USB : retrouver la carte par sa MAC, lue sur la puce (jamais écrite dans le dépôt), et la relire avant d'écrire.
 - Ouvrir ou fermer le port série USB peut réinitialiser la puce.
 - Terminer chaque redémarrage logiciel par `esp_rom_software_reset_system()` (sur P4 `esp_restart()` ne remet à zéro que les cœurs ; boucle du lien C6 sur la 7B).
 - Deux révisions d'écran Tab5 (ST7123, ST7121) plus l'ILI9881C d'origine : détecter le contrôleur avant d'initialiser le DSI.

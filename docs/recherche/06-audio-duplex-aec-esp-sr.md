@@ -1,6 +1,6 @@
 # Audio duplex, AEC et mot d'activation (ESP-SR) — recherche du 06/11/2026 (jalon 1c)
 
-Sources : dépôt Tab5 (`H:\AuxFilsDesIdees\00ProjetTab\docs\` et `Tab5/paquets/`, lecture seule), audit 7B du dépôt de contexte, documentation et code d'Espressif, M5Stack et `xiaozhi-esp32`. **Toutes les pages web ont été lues le 06/11/2026** par des agents dont l'outil rend parfois un résumé et non le texte brut : la colonne « Lu » dit *brut* ou *résumé* quand l'agent l'a précisé ; une valeur de code ou de registre est à relire dans la source avant de s'y fier. **Non vérifié** = absent des sources lues. Aucun code, aucune carte touchée. Complète [02-vocal-et-llm.md](02-vocal-et-llm.md) et [ADR-0002](../decisions/0002-assistant-vocal-en-cascade.md).
+Sources : dépôt Tab5 (`docs/` et `Tab5/paquets/` de `Axellum/M5-Tab5-ESPHome-LVGL`, lecture seule), audit 7B des notes privées d'Axel (hors dépôt), documentation et code d'Espressif, M5Stack et `xiaozhi-esp32`. **Toutes les pages web ont été lues le 06/11/2026** par des agents dont l'outil rend parfois un résumé et non le texte brut : la colonne « Lu » dit *brut* ou *résumé* quand l'agent l'a précisé ; une valeur de code ou de registre est à relire dans la source avant de s'y fier. **Non vérifié** = absent des sources lues. Aucun code, aucune carte touchée. Complète [02-vocal-et-llm.md](02-vocal-et-llm.md) et [ADR-0002](../decisions/0002-assistant-vocal-en-cascade.md).
 
 ## Conclusion
 
