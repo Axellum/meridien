@@ -4,7 +4,7 @@
 
 ---
 
-Updated on 06/11/2026. **Rule: a function is “observed” only on the board where it was seen working, with the firmware commit and the date.** Everything else is written “written, not tested on a board”, “planned” or “not verified”.
+Updated on 07/11/2026. **Rule: a function is “observed” only on the board where it was seen working, with the firmware commit and the date.** Everything else is written “written, not tested on a board”, “planned” or “not verified”.
 
 ### The boards
 
@@ -41,8 +41,9 @@ Software **without a board** (same code for all boards):
 | Minimal JSON reading, Open-Meteo response, local date and time in French | Written, verified on the PC | tests run on the PC with the same detectors, mutations detected (53 of this batch); **real Open-Meteo responses captured by the PC and then stored in the test, no request made by the board**; never run on a board |
 | Voice assistant: states, SSE stream, OpenAI-compatible requests, sentence splitting | Written, verified on the PC | tests run on the PC (135 mutations of this batch detected); **no real STT/LLM/TTS service called**; never run on a board |
 | Whole core | 252 tests run with ASan + UBSan, 206 mutations detected out of 206 (`main` on 06/11/2026) | proves nothing about the behaviour of the board's RISC-V |
-| Settings page (front end) and fake device | Written, tried against a fake device in Node | 49 Playwright checks (phone rendering 390 × 844), 13,905 bytes gzip; **never served by the device**; Chromium only (Safari iOS, Firefox: not verified) |
-| Settings API contract | Written ([api-reglages.md](api-reglages.md)) | implemented by the fake device only |
+| Settings page (front end), fake device and device-served page | Written; tried against a fake device in Node (119 checks of `web/tests/parcours.py`, 06/11/2026); embedded in the firmware (30,327 bytes gzip) and served by `main/serveur_web.cpp` | **compiled; never observed on a board** (nothing served to a phone yet); Chromium only for the browser checks (Safari iOS, Firefox: not verified) |
+| Settings API contract | Written ([api-reglages.md](api-reglages.md)); first subset served by the firmware (list in the status box of that file) | core logic tested on the PC; firmware **compiled, never observed on a board** |
+| City search (settings page and device screen): one shared parser, state machine, download task, shared TLS lock | Parser and state machine written and verified on the PC; download task and lock (`main/geocodage.cpp`, `main/verrou_tls.cpp`) written and compiled | 28 tests **run on the PC** (ASan + UBSan) on 7 **real** Open-Meteo responses captured on 06/11/2026; 40 targeted mutations detected out of 40 (07/11/2026); firmware compiled (ESP-IDF 5.5.5); **no request made by the board**; internal RAM, task priority, lock and timings **not verified** |
 
 ### Firmware and board version: how it is noted
 
@@ -58,7 +59,7 @@ Software **without a board** (same code for all boards):
 
 ---
 
-Mis à jour le 06/11/2026. **Règle : une fonction n'est « constatée » que sur la carte où on l'a vue fonctionner, avec le commit du firmware et la date.** Tout le reste est écrit « écrit, non testé sur carte », « prévu » ou « non vérifié ».
+Mis à jour le 07/11/2026. **Règle : une fonction n'est « constatée » que sur la carte où on l'a vue fonctionner, avec le commit du firmware et la date.** Tout le reste est écrit « écrit, non testé sur carte », « prévu » ou « non vérifié ».
 
 ### Les cartes
 
@@ -95,8 +96,9 @@ Logiciel **sans carte** (même code pour toutes les cartes) :
 | Lecture JSON minimale, réponse Open-Meteo, date et heure locales en français | Écrit, vérifié sur PC | tests exécutés sur le PC avec les mêmes détecteurs, mutations détectées (53 de ce lot) ; **réponses Open-Meteo réelles captées par le PC puis rangées dans le test, aucune requête faite par la carte** ; jamais lancés sur une carte |
 | Assistant vocal : états, flux SSE, requêtes OpenAI-compatibles, découpe en phrases | Écrit, vérifié sur PC | tests exécutés sur le PC (135 mutations de ce lot détectées) ; **aucun service STT/LLM/TTS réel appelé** ; jamais lancés sur une carte |
 | Ensemble du noyau | 252 tests exécutés avec ASan + UBSan, 206 mutations détectées sur 206 (`main` au 06/11/2026) | ne prouve rien sur le comportement du RISC-V de la carte |
-| Page de réglages (front) et faux appareil | Écrit, essayé contre un faux appareil Node | 49 vérifications Playwright (rendu téléphone 390 × 844), 13 905 octets gzip ; **jamais servi par l'appareil** ; Chromium seulement (Safari iOS, Firefox : non vérifié) |
-| Contrat de l'API de réglages | Écrit ([api-reglages.md](api-reglages.md)) | implémenté par le faux appareil seulement |
+| Page de réglages (front), faux appareil et page servie par l'appareil | Écrit ; essayé contre un faux appareil Node (119 vérifications de `web/tests/parcours.py`, 06/11/2026) ; embarqué dans le firmware (30 327 octets gzip) et servi par `main/serveur_web.cpp` | **compilé ; jamais constaté sur une carte** (rien n'a encore été servi à un téléphone) ; Chromium seulement pour les vérifications du navigateur (Safari iOS, Firefox : non vérifié) |
+| Contrat de l'API de réglages | Écrit ([api-reglages.md](api-reglages.md)) ; premier sous-ensemble servi par le firmware (liste dans l'encadré de ce fichier) | logique du noyau testée sur le PC ; firmware **compilé, jamais constaté sur une carte** |
+| Recherche de ville (page de réglages et écran de l'appareil) : un analyseur commun, machine d'état, tâche de téléchargement, verrou TLS commun | Analyseur et machine d'état écrits et vérifiés sur le PC ; tâche et verrou (`main/geocodage.cpp`, `main/verrou_tls.cpp`) écrits et compilés | 28 tests **exécutés sur le PC** (ASan + UBSan) sur 7 réponses **réelles** d'Open-Meteo capturées le 06/11/2026 ; 40 mutations ciblées détectées sur 40 (07/11/2026) ; firmware compilé (ESP-IDF 5.5.5) ; **aucune requête faite par la carte** ; RAM interne, priorité de la tâche, verrou et délais **non vérifiés** |
 
 ### Version du firmware et de la carte : comment on la note
 
