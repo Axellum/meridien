@@ -1,6 +1,8 @@
 // Bus I2C, expandeurs PI4IOE5V6408 (0x43 : ecran et tactile ; 0x44 : alimentation du coprocesseur Wi-Fi), retroeclairage, reset
 // de l'ecran et du tactile.
+#include "board.h"
 #include "driver/ledc.h"
+#include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_io_expander_pi4ioe5v6408.h"
 #include "esp_log.h"
@@ -59,6 +61,77 @@ esp_err_t tab5_backlight_set_percent(int percent) {
     return ledc_update_duty(BACKLIGHT_LEDC_MODE, BACKLIGHT_LEDC_CHANNEL);
 }
 
+// --- Reprise sur un expandeur qui ne repond pas au demarrage -----------------------------------------------------------------
+// Constate le 06/11/2026 (Tab5 ST7121, demarrage n° 65, binaire c1fa7f6) : « pi4ioe5v6408: reset(252): Chip reset failed » puis
+// « carte non initialisee ; arret (l'ecran reste eteint) » : une seule tentative, puis ecran noir definitif. On fait jusqu'a
+// EXPANDEUR_ESSAIS essais espaces (avec une remise a zero du bus I2C entre deux), une ligne de journal par essai ; si tout echoue,
+// la carte redemarre (au plus REDEMARRAGES_MAX fois de suite, compteur en memoire RTC non initialisee) avant de s'arreter avec un
+// message lisible. Le compteur revient a zero des qu'un demarrage reussit.
+#define EXPANDEUR_ESSAIS 5
+#define EXPANDEUR_PAUSE_MS 150
+#define REDEMARRAGES_MAX 3
+#define REPRISE_MAGIC                                                                                                  \
+    0x45585031u // « EXP1 » : distingue un compteur ecrit par nous d'un contenu aleatoire (mise sous tension)
+
+// Essai sur carte du chemin de reprise : nombre d'essais a faire echouer artificiellement (0 = binaire normal). Option CMake
+// TAB5_AUTOTEST_EXPANDEUR (voir CMakeLists.txt). 99 : tous les essais echouent, donc redemarrages puis arret.
+#ifndef TAB5_AUTOTEST_EXPANDEUR
+#define TAB5_AUTOTEST_EXPANDEUR 0
+#endif
+
+typedef struct {
+    uint32_t magic;
+    uint32_t redemarrages;
+} reprise_t;
+
+static RTC_NOINIT_ATTR reprise_t s_reprise;
+
+static esp_err_t expandeur_principal_creer(void) {
+    if (s_reprise.magic != REPRISE_MAGIC) {
+        s_reprise.magic = REPRISE_MAGIC;
+        s_reprise.redemarrages = 0;
+    }
+    esp_err_t err = ESP_FAIL;
+    for (int essai = 1; essai <= EXPANDEUR_ESSAIS; essai++) {
+        if (essai <= TAB5_AUTOTEST_EXPANDEUR) {
+            err = ESP_ERR_TIMEOUT; // echec simule (binaire d'essai)
+        } else {
+            err =
+                esp_io_expander_new_i2c_pi4ioe5v6408(s_bus, ESP_IO_EXPANDER_I2C_PI4IOE5V6408_ADDRESS_LOW, &s_expander);
+        }
+        if (err == ESP_OK) {
+            if (essai > 1 || s_reprise.redemarrages > 0) {
+                ESP_LOGW(TAG, "expandeur 0x43 : répond à l'essai %d/%d (après %u redémarrage(s) de reprise)", essai,
+                         EXPANDEUR_ESSAIS, (unsigned)s_reprise.redemarrages);
+            }
+            s_reprise.redemarrages = 0;
+            return ESP_OK;
+        }
+        ESP_LOGW(TAG, "expandeur 0x43 : essai %d/%d, erreur %s", essai, EXPANDEUR_ESSAIS, esp_err_to_name(err));
+        if (essai < EXPANDEUR_ESSAIS) {
+            const esp_err_t bus_err = i2c_master_bus_reset(s_bus);
+            if (bus_err != ESP_OK) {
+                ESP_LOGW(TAG, "remise à zéro du bus I2C refusée : %s", esp_err_to_name(bus_err));
+            }
+            vTaskDelay(pdMS_TO_TICKS(EXPANDEUR_PAUSE_MS));
+        }
+    }
+    if (s_reprise.redemarrages < REDEMARRAGES_MAX) {
+        s_reprise.redemarrages++;
+        ESP_LOGE(TAG, "expandeur 0x43 muet après %d essais : redémarrage de reprise %u/%d dans 1 s", EXPANDEUR_ESSAIS,
+                 (unsigned)s_reprise.redemarrages, REDEMARRAGES_MAX);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        board_restart();
+    }
+    ESP_LOGE(TAG,
+             "expandeur 0x43 muet après %d essais et %d redémarrages de reprise : l'écran reste éteint (bus I2C ou "
+             "alimentation "
+             "de l'écran à vérifier ; débrancher puis rebrancher l'USB)",
+             EXPANDEUR_ESSAIS, REDEMARRAGES_MAX);
+    s_reprise.redemarrages = 0; // le prochain démarrage (appui sur reset, USB) repart d'un compteur propre
+    return err;
+}
+
 esp_err_t tab5_io_init(void) {
     // Retroeclairage a 0 % d'abord : la broche flotte tant que le LEDC n'est pas configure.
     ESP_RETURN_ON_ERROR(backlight_init(), TAG, "retroeclairage");
@@ -75,9 +148,9 @@ esp_err_t tab5_io_init(void) {
 
     // Attention : creer le pilote de l'expandeur le REMET A ZERO (registre 0x01, puis tous les registres par defaut :
     // sorties a bas, haute impedance). Au demarrage c'est l'etat voulu ; ce n'est pas un appel a refaire en marche.
-    ESP_RETURN_ON_ERROR(
-        esp_io_expander_new_i2c_pi4ioe5v6408(s_bus, ESP_IO_EXPANDER_I2C_PI4IOE5V6408_ADDRESS_LOW, &s_expander), TAG,
-        "expandeur 0x43");
+    // Plusieurs essais, puis redemarrage limite : un premier echec (« Chip reset failed », boot n° 65 du 06/11/2026, ecran
+    // reste noir jusqu'a l'action de l'auteur) ne doit plus laisser la carte eteinte (voir expandeur_principal_creer).
+    ESP_RETURN_ON_ERROR(expandeur_principal_creer(), TAG, "expandeur 0x43");
 
     // Alimentation du coprocesseur Wi-Fi. Une erreur ici ne doit pas empecher l'ecran de demarrer : on la journalise et
     // l'application affichera "Wi-Fi absent". Creer ce pilote remet aussi l'expandeur 0x44 a ses valeurs par defaut ; le seul

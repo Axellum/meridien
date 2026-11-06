@@ -30,4 +30,26 @@ bool horloge_formater(int64_t instant_utc_s, TexteHorloge &sortie) {
     return n_heure > 0 && n_date > 0;
 }
 
+bool horloge_hhmm(int64_t instant_utc_s, char *sortie, std::size_t capacite) {
+    if (sortie == nullptr || capacite == 0) {
+        return false;
+    }
+    sortie[0] = '\0';
+    const heure::AnalyseTz &analyse = fuseau_local();
+    if (!analyse.ok() || capacite < 6) {
+        return false;
+    }
+    const heure::HeureLocale locale = heure::en_heure_locale(instant_utc_s, analyse.fuseau);
+    if (locale.heure < 0 || locale.heure > 23 || locale.minute < 0 || locale.minute > 59) {
+        return false;
+    }
+    sortie[0] = static_cast<char>('0' + locale.heure / 10);
+    sortie[1] = static_cast<char>('0' + locale.heure % 10);
+    sortie[2] = ':';
+    sortie[3] = static_cast<char>('0' + locale.minute / 10);
+    sortie[4] = static_cast<char>('0' + locale.minute % 10);
+    sortie[5] = '\0';
+    return true;
+}
+
 } // namespace ecran

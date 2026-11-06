@@ -24,11 +24,14 @@ CONTROLE_WEB = RACINE / "web" / "tests" / "controle_langues.py"
 UI_BONJOUR = RACINE / "main" / "ui_bonjour.cpp"
 BOOT_INFO = RACINE / "main" / "boot_info.cpp"
 TEST_I18N = RACINE / "test" / "host" / "test_i18n.cpp"
+API_REGLAGES = RACINE / "components" / "core" / "include" / "ecran" / "api_reglages.hpp"
+TEST_API = RACINE / "test" / "host" / "test_api_reglages.cpp"
 
 LITTERAL = r'"((?:[^"\\]|\\.)*)"'
 CONSTANTES_UI = re.compile(r"\bk[A-Z]\w*\s*=\s*" + LITTERAL + r"\s*;")
 RETOURS_BOOT = re.compile(r"\breturn\s+" + LITTERAL + r"\s*;")
 LISTE_TEST = re.compile(r"BONJOUR\[\]\s*=\s*\{(.*?)\};", re.DOTALL)
+LISTE_PHRASES = re.compile(r"PHRASES\[\]\s*=\s*\{(.*?)\};", re.DOTALL)
 LITTERAUX = re.compile(LITTERAL)
 
 
@@ -61,6 +64,48 @@ def textes_du_test():
     return {_sans_echappements(t) for t in LITTERAUX.findall(m.group(1))} if m else set()
 
 
+def phrases_de_l_api():
+    """Phrases françaises que l'API de la page de réglages peut dire : les littéraux de api_reglages.hpp qui contiennent une
+    espace et trois lettres de suite (les adresses et les séparateurs comme « , » n'en sont pas)."""
+    texte = API_REGLAGES.read_text(encoding="utf-8")
+    phrases = set()
+    for t in LITTERAUX.findall(texte):
+        if " " in t and re.search(r"[A-Za-zÀ-ÿ]{3}", t) and not t.startswith(("http", "/api")):
+            phrases.add(_sans_echappements(t))
+    return phrases
+
+
+def phrases_du_test_api():
+    """Copie de la liste dans test_api_reglages.cpp (PHRASES[])."""
+    m = LISTE_PHRASES.search(TEST_API.read_text(encoding="utf-8"))
+    return {_sans_echappements(t) for t in LITTERAUX.findall(m.group(1))} if m else set()
+
+
+def controle_phrases_de_l_api():
+    """Chaque phrase de l'API est une clé de la table de traduction ET figure dans test_api_reglages.cpp, qui vérifie qu'elle
+    existe dans les sept langues. Retourne le nombre de contrôles en échec."""
+    if not API_REGLAGES.exists() or not TEST_API.exists():
+        print("  saute   api_reglages.hpp ou test_api_reglages.cpp absent : phrases de l'API non comparées")
+        return 0
+    _, _, cles, _ = _generateur().sorties_attendues()
+    table = {c for c, _section in cles}
+    api = phrases_de_l_api()
+    copie = phrases_du_test_api()
+    echecs = 0
+    for libelle, a, b in (
+        ("api_reglages.hpp dit une phrase absente de la table de traduction", api, table),
+        ("api_reglages.hpp dit une phrase absente de test_api_reglages.cpp PHRASES[]", api, copie),
+        ("test_api_reglages.cpp PHRASES[] contient une phrase que l'API ne dit plus", copie, api),
+    ):
+        ecart = sorted(a - b)
+        if ecart:
+            print(f"  ECHEC   {libelle} : {ecart[:3]}")
+            echecs += 1
+    if echecs == 0:
+        print(f"  ok      {len(api)} phrases de l'API : api_reglages.hpp, table de traduction et test_api_reglages.cpp identiques")
+    return echecs
+
+
 def controle_i18n():
     """Retourne le nombre de contrôles en échec (0 = tout passe) ; affiche ce qui a été vérifié."""
     echecs = 0
@@ -79,6 +124,8 @@ def controle_i18n():
     else:
         print("  ECHEC   controle_langues.py :\n" + (r.stdout + r.stderr).strip())
         echecs += 1
+
+    echecs += controle_phrases_de_l_api()
 
     if not UI_BONJOUR.exists() or not BOOT_INFO.exists():
         print("  saute   main/ui_bonjour.cpp ou main/boot_info.cpp absent : textes de l'écran « Bonjour » non comparés")

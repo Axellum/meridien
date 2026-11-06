@@ -1,0 +1,105 @@
+"""Mutations du noyau « météo sur l'appareil » (requête, règles de zone, synthèse, planning, cache), lues par lancer.py --mutations.
+
+Même format que MUTATIONS_METEO_HEURE : (fichier du noyau, texte exact à remplacer — il doit apparaître UNE fois —,
+remplacement, test qui doit échouer, nom de la fonction de test qui doit être citée (None : n'importe laquelle), ce que la
+mutation simule). Une mutation « non détectée » ou « détectée par autre chose » fait échouer le lanceur.
+
+Les mutations « équivalentes » (qui ne changent aucun comportement observable) n'ont pas leur place ici : une mutation qui
+survit doit révéler un test manquant, pas un texte inutile.
+
+Écartée volontairement : retirer `&& base < PERIODE_S` de la boucle de delai_avant_essai_s. Le mutant fait doubler `base` pendant
+INT_MAX tours dans une évaluation constante : clang la poursuit jusqu'à la limite de 2 milliards de pas (plus de 12 minutes de
+CPU, constaté le 06/11/2026) au lieu de la refuser. Le test planning_normal_et_reessais couvre quand même le cas (1 000 000 et
+INT_MAX échecs rendent 900 s) ; seule la preuve par mutation est trop coûteuse.
+"""
+
+APPAREIL = "test_meteo_appareil.cpp"
+
+MUTATIONS_METEO_APPAREIL = [
+    # --- meteo_requete.hpp ---
+    ("meteo_requete.hpp", "if (n + 1 >= capacite) { // garder la place du zéro final", "if (n + 1 > capacite) {",
+     APPAREIL, "requete_refuse_une_place_insuffisante_sans_deborder", "l'écriture déborde d'un octet (plus de place pour le zéro final)"),
+    ("meteo_requete.hpp", "            car('-');\n            a = -a;\n", "            a = -a;\n",
+     APPAREIL, "requete_coordonnees_negatives_et_chiffres_de_remplissage", "le signe moins d'une coordonnée est perdu"),
+    ("meteo_requete.hpp", "for (std::int64_t pas = 10000; pas > 0; pas /= 10) {", "for (std::int64_t pas = 1000; pas > 0; pas /= 10) {",
+     APPAREIL, "requete_de_lyon_exacte", "la fraction n'a plus que quatre chiffres"),
+    ("meteo_requete.hpp", "s.degres_e5(latitude_e5);\n    s.texte(detail::REQUETE_MILIEU);\n    s.degres_e5(longitude_e5);",
+     "s.degres_e5(longitude_e5);\n    s.texte(detail::REQUETE_MILIEU);\n    s.degres_e5(latitude_e5);",
+     APPAREIL, "requete_de_lyon_exacte", "latitude et longitude échangées"),
+    ("meteo_requete.hpp", "latitude_e5 > LATITUDE_E5_MAX)\n        return 0;", "latitude_e5 > LATITUDE_E5_MAX + 1)\n        return 0;",
+     APPAREIL, "requete_aux_bornes_et_refus_hors_bornes", "90,00001 ° de latitude est accepté"),
+    ("meteo_requete.hpp", "if (longitude_e5 < -LONGITUDE_E5_MAX || longitude_e5 > LONGITUDE_E5_MAX)", "if (longitude_e5 > LONGITUDE_E5_MAX)",
+     APPAREIL, "requete_aux_bornes_et_refus_hors_bornes", "-180,00001 ° de longitude est accepté"),
+    ("meteo_requete.hpp", '"&forecast_days=7&timezone=auto&timeformat=unixtime"', '"&forecast_days=3&timezone=auto&timeformat=unixtime"',
+     APPAREIL, "requete_de_lyon_exacte", "trois jours de prévision au lieu de sept"),
+    ("meteo_requete.hpp", "detail::REQUETE_DEBUT.size() + 9 +", "detail::REQUETE_DEBUT.size() + 8 +",
+     APPAREIL, "requete_aux_bornes_et_refus_hors_bornes", "tampon maximal trop petit d'un octet"),
+    # --- meteo_zone_regles.hpp ---
+    ("meteo_zone_regles.hpp", "if (!(v >= -max_deg && v <= max_deg))", "if (v < -max_deg || v > max_deg)",
+     APPAREIL, "degres_non_finis_refuses", "NaN est accepté comme coordonnée"),
+    ("meteo_zone_regles.hpp", "mis_a_l_echelle >= 0.0 ? mis_a_l_echelle + 0.5 : mis_a_l_echelle - 0.5", "mis_a_l_echelle + 0.5",
+     APPAREIL, "degres_vers_e5_arrondi_et_bornes", "l'arrondi des coordonnées négatives va vers zéro"),
+    ("meteo_zone_regles.hpp", "constexpr bool latitude_vers_e5(double v, std::int32_t &e5) noexcept { return degres_vers_e5(v, 90.0, e5); }",
+     "constexpr bool latitude_vers_e5(double v, std::int32_t &e5) noexcept { return degres_vers_e5(v, 180.0, e5); }",
+     APPAREIL, "degres_vers_e5_arrondi_et_bornes", "une latitude de 100 ° est acceptée"),
+    ("meteo_zone_regles.hpp", "if (c >= 0xC2 && c <= 0xDF)", "if (c >= 0xC0 && c <= 0xDF)",
+     APPAREIL, "nom_de_zone_utf8_mal_forme_refuse", "UTF-8 : forme trop longue sur 2 octets acceptée"),
+    ("meteo_zone_regles.hpp", "return suite(1, 0x80, 0x9F) && suite(2, 0x80, 0xBF) ? 3 : -1;", "return suite(1, 0x80, 0xBF) && suite(2, 0x80, 0xBF) ? 3 : -1;",
+     APPAREIL, "nom_de_zone_utf8_mal_forme_refuse", "UTF-8 : substitut UTF-16 accepté"),
+    ("meteo_zone_regles.hpp", "return suite(1, 0x80, 0x8F) && suite(2, 0x80, 0xBF) && suite(3, 0x80, 0xBF) ? 4 : -1;",
+     "return suite(1, 0x80, 0xBF) && suite(2, 0x80, 0xBF) && suite(3, 0x80, 0xBF) ? 4 : -1;",
+     APPAREIL, "nom_de_zone_utf8_mal_forme_refuse", "UTF-8 : au-delà de U+10FFFF accepté"),
+    ("meteo_zone_regles.hpp", "if (c < 0x20 || c == 0x7F)", "if (c < 0x20)",
+     APPAREIL, "nom_de_zone_valide_ou_non", "le caractère DEL est accepté dans un nom"),
+    ("meteo_zone_regles.hpp", "return i < capacite && nom[i] == '\\0' && visible;", "return i < capacite && nom[i] == '\\0';",
+     APPAREIL, "nom_de_zone_valide_ou_non", "un nom fait d'espaces est accepté"),
+    ("meteo_zone_regles.hpp", "c == '-' || c == '+')) {", "c == '-')) {",
+     APPAREIL, "fuseau_de_zone_valide_ou_non", "« Etc/GMT+5 » est refusé"),
+    ("meteo_zone_regles.hpp", "return i >= 1 && i < capacite && fuseau[i] == '\\0';", "return i < capacite && fuseau[i] == '\\0';",
+     APPAREIL, "fuseau_de_zone_valide_ou_non", "un fuseau vide est accepté"),
+    # --- meteo_synthese.hpp ---
+    ("meteo_synthese.hpp", "!= Fraicheur::Frais)", "== Fraicheur::TresPerime)",
+     APPAREIL, "peremption_apres_deux_heures", "une réponse de 2 h 1 min n'est pas périmée"),
+    ("meteo_synthese.hpp", "DELAI_PERIME_APPAREIL_S = 2 * 3600;", "DELAI_PERIME_APPAREIL_S = 3600;",
+     APPAREIL, "peremption_apres_deux_heures", "le délai de péremption passe de 2 h à 1 h"),
+    ("meteo_synthese.hpp", "ECHECS_POUR_PERIME = 3;", "ECHECS_POUR_PERIME = 2;",
+     APPAREIL, "peremption_apres_des_echecs_repetes", "deux échecs suffisent à périmer"),
+    ("meteo_synthese.hpp", "AGE_PERIME_PAR_ECHECS_S = 30 * 60;", "AGE_PERIME_PAR_ECHECS_S = 15 * 60;",
+     APPAREIL, "peremption_apres_des_echecs_repetes", "le seuil d'âge après échecs passe de 30 à 15 min"),
+    ("meteo_synthese.hpp", "echecs_consecutifs >= ECHECS_POUR_PERIME && age > AGE_PERIME_PAR_ECHECS_S", "echecs_consecutifs >= ECHECS_POUR_PERIME || age > AGE_PERIME_PAR_ECHECS_S",
+     APPAREIL, "peremption_apres_des_echecs_repetes", "échecs OU âge au lieu d'échecs ET âge"),
+    ("meteo_synthese.hpp", "i = index_du_jour(r, r.instant_s);", "i = -1;",
+     APPAREIL, "min_max_du_jour_et_replis", "pas de repli sur le jour de la mesure"),
+    ("meteo_synthese.hpp", "s.min_dixiemes = r.jours[i].min_dixiemes;", "s.min_dixiemes = r.jours[i].max_dixiemes;",
+     APPAREIL, "synthese_de_paris", "le minimum du jour est le maximum"),
+    ("meteo_synthese.hpp", "s.libelle = decrire(r.code_wmo, r.jour).libelle;", "s.libelle = decrire(0, r.jour).libelle;",
+     APPAREIL, "synthese_de_paris", "le libellé ignore le code météo"),
+    ("meteo_synthese.hpp", "    if (negatif)\n        sortie[n++] = '-';\n", "",
+     APPAREIL, "dixiemes_en_texte_francais", "-0,5 s'écrit « 0,5 »"),
+    ("meteo_synthese.hpp", "std::int64_t entier = a / 10;", "std::int64_t entier = a / 100;",
+     APPAREIL, "dixiemes_en_texte_francais", "la partie entière perd un chiffre"),
+    ("meteo_synthese.hpp", "if (capacite < besoin)", "if (capacite + 1 < besoin)",
+     APPAREIL, "dixiemes_en_texte_francais", "écriture du zéro final hors du tampon"),
+    ("meteo_synthese.hpp", "sortie[n++] = static_cast<char>('0' + a % 10);", "sortie[n++] = static_cast<char>('0' + dixiemes % 10);",
+     APPAREIL, "dixiemes_en_texte_francais", "le chiffre des dixièmes d'une valeur négative est faux"),
+    # --- meteo_planning.hpp ---
+    ("meteo_planning.hpp", "        if (base > PERIODE_S)\n            base = PERIODE_S;\n", "",
+     APPAREIL, "planning_normal_et_reessais", "le délai après échecs n'est plus plafonné à 15 min"),
+    ("meteo_planning.hpp", "base = PREMIER_REESSAI_S;", "base = 2 * PREMIER_REESSAI_S;",
+     APPAREIL, "planning_normal_et_reessais", "le premier réessai attend 30 s au lieu de 15 s"),
+    ("meteo_planning.hpp", "base *= 2;", "base *= 3;",
+     APPAREIL, "planning_normal_et_reessais", "le délai triple à chaque échec"),
+    ("meteo_planning.hpp", "if (trop_de_requetes && base < PAUSE_TROP_DE_REQUETES_S)", "if (trop_de_requetes && base > PAUSE_TROP_DE_REQUETES_S)",
+     APPAREIL, "planning_apres_un_trop_de_requetes", "après un 429 le délai n'est pas relevé"),
+    ("meteo_planning.hpp", "(base / 10) * alea / 255;", "(base / 10) * alea / 128;",
+     APPAREIL, "planning_jamais_a_l_envers_ni_plus_court_que_le_pas", "le décalage aléatoire dépasse un dixième"),
+    # --- meteo_cache.hpp ---
+    ("meteo_cache.hpp", "if (detail::crc32(donnees, taille - 4) != attendu) {", "if (false) {",
+     APPAREIL, "cache_refuse_toute_alteration", "la somme de contrôle de l'enveloppe n'est plus vérifiée"),
+    ("meteo_cache.hpp", "if (donnees[2] != 1) {", "if (false) {",
+     APPAREIL, "cache_refuse_un_autre_format_et_une_position_invraisemblable", "une version inconnue du cache est acceptée"),
+    ("meteo_cache.hpp", "if (lat < -LATITUDE_E5_MAX || lat > LATITUDE_E5_MAX || lon < -LONGITUDE_E5_MAX || lon > LONGITUDE_E5_MAX) {", "if (false) {",
+     APPAREIL, "cache_refuse_un_autre_format_et_une_position_invraisemblable", "une position invraisemblable est relue du cache"),
+    ("meteo_cache.hpp", "        return 0; // une position invraisemblable ne se met pas en cache", "        (void)0;",
+     APPAREIL, "cache_refuse_un_autre_format_et_une_position_invraisemblable", "une position invraisemblable est écrite en cache"),
+]

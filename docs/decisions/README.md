@@ -15,6 +15,7 @@ below it, including its "proposed" status.
 | [0004](0004-calendrier-par-adresse-ical-secrete.md) | Google calendar (version 2): secret iCal address | proposed, awaiting the owner's validation |
 | [0005](0005-couche-carte.md) | One board layer: develop on the Tab5, keep the Waveshare 7B compilable | proposed, awaiting the owner's validation |
 | [0006](0006-ecran-en-sept-langues.md) | The screen speaks seven languages, with the Tab5's translation system | principle decided by the owner (2026-11-06), details proposed |
+| [0007](0007-reglages-a-l-ecran-et-installation-guidee.md) | Every setting on the screen, the web page as a second way, a replayable guided first-start set-up | principle decided by the owner (2026-11-06), details proposed |
 
 Status as of 2026-11-06. "Proposed" means written by the AI agent from the research notes and not yet settled by the owner;
 the code follows it in the meantime. The open questions (wake word, local STT/TTS, project name, repository, licence, ESP-IDF
@@ -35,5 +36,6 @@ Une décision non évidente = une page numérotée ici (numéro suivant), avec l
 | [0004](0004-calendrier-par-adresse-ical-secrete.md) | Calendrier Google (phase 2) : adresse iCal secrète | proposée, à valider par Axel |
 | [0005](0005-couche-carte.md) | Une couche carte : développer sur le Tab5, garder la 7B compilable | proposée, à valider par Axel |
 | [0006](0006-ecran-en-sept-langues.md) | L'écran parle sept langues, avec le système de traduction du Tab5 | principe décidé par Axel (06/11/2026), détails proposés |
+| [0007](0007-reglages-a-l-ecran-et-installation-guidee.md) | Tous les réglages à l'écran, la page web en second chemin, installation guidée au premier démarrage et rejouable | principe décidé par Axel (06/11/2026), détails proposés |
 
 Statut au 06/11/2026. « Proposée » = écrite par l'agent d'après les recherches, pas encore tranchée par Axel ; le code s'y conforme en attendant. Les questions ouvertes (mot d'activation, STT/TTS locaux, nom du projet, dépôt, licence, version d'ESP-IDF, fraîcheur du calendrier) sont listées dans [le plan](../plan.md#décisions-à-prendre-par-axel).

@@ -6,7 +6,9 @@
 #include <unistd.h>
 
 #include "board.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -17,8 +19,20 @@ namespace {
 const char *TAG = "commande_serie";
 
 constexpr const char *kCommandeRedemarrer = "redemarrer";
+constexpr const char *kCommandeMemoire = "memoire";
 
 void traiter(const char *ligne) {
+    if (std::strcmp(ligne, kCommandeMemoire) == 0) {
+        // Une ligne « MEMOIRE … » par demande, lue par le banc du PC pour suivre la mémoire libre dans le temps (provisoire, comme
+        // « redemarrer »). Rien ne tourne tant qu'elle n'est pas demandée : la mesure n'ajoute aucune activité à la carte.
+        ESP_LOGI(TAG, "MEMOIRE t_s=%lld interne_libre=%u plus_gros_bloc=%u interne_min=%u psram_libre=%u",
+                 static_cast<long long>(esp_timer_get_time() / 1000000),
+                 static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+                 static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
+                 static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
+                 static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+        return;
+    }
     if (std::strcmp(ligne, kCommandeRedemarrer) == 0) {
         ESP_LOGW(TAG, "redémarrage logiciel demandé sur la console (esp_rom_software_reset_system)");
         vTaskDelay(pdMS_TO_TICKS(200)); // laisser partir le journal sur l'USB

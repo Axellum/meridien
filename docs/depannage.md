@@ -35,6 +35,8 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 
 **Seen on** Tab5 ST7121, native firmware commit `e7a4803`, 06/11/2026. **Evidence**: log of start-up no. 9, the author's observation; details in [mesures/1a.md](mesures/1a.md). **Status**: open. Milestone 1b (06/11/2026): the step-by-step trial was **postponed by the author** (“Not now”, 20:59), neither done nor failed; see [mesures/1b.md](mesures/1b.md).
 
+**Update 06/11/2026, 22:27 (same family of failure, reproduced WITH a log).** *Seen on* Tab5 ST7121, binary of commit `c1fa7f6`, start-up no. 65, right after a flash (reset by esptool's RTS signal, **not** a power cut): `pi4ioe5v6408: reset(252): Chip reset failed` → `Reset failed` → `tab5_io_init: expandeur 0x43` → `board_init: E/S` → `carte non initialisée ; arrêt (l'écran reste éteint)`. The expander at 0x43 did not answer the very first I2C transaction; the firmware made **one** attempt and stopped, **black screen** (the author: “écran noir”); a new flash gave the image back. **Hypothesis, not verified**: this is also what happened at the first start-up “without a screen” after the power cut (no. 8 → 9, not captured). **Fix** (`tab5_io.c`): up to 5 attempts 150 ms apart with an I2C bus reset in between, one log line per attempt, then at most 3 recovery restarts (RTC counter) before a stop with a readable message. Tried on the board with **simulated** failures (test binaries): 2 failures then success at attempt 3/5; 5 failures repeated → 3 restarts (`SW_SYS_RESET`, counter kept) then stop. The **real** failure was not reproduced since: the fix is not proven against it. **Series of 20 resets** (06/11/2026, 22:49–23:00, Tab5 ST7121, esptool-style RTS reset with a fresh port each time; a start-up counts only if a new start-up number and the version line appear): **before** (`c1fa7f6`, single attempt) start-ups no. 99–118, **20/20** “Carte prête” + main screen loaded in the log, 0 “Chip reset failed”; **after** (`9f82623`, with recovery) no. 78–97, **20/20**, 0 “expandeur 0x43 : essai” line (the expander answers at the first attempt every time), 0 “Chip reset failed”; the start-ups right after each flash (no. 98 and no. 119) are fine too. So the no. 65 failure is **not reproduced** and the recovery is **not proven** by this test (0/21 failures before, 0/21 after); it only shows the recovery does not slow down a normal start-up (3.03–3.08 s to “Carte prête”). “Image back” means log lines: only the author saw the screen itself. **Do not confuse**: `ESP_ERR_TIMEOUT` on the expander = a **simulated** failure from a test binary (`TAB5_AUTOTEST_EXPANDEUR`, start-ups no. 67–72, version shown `g3b68f4` because built from a dirty tree); `Chip reset failed` / `ESP_ERR_INVALID_STATE` = the **real** failure (no. 65). **Status**: still open (cause of the real failure unknown; recovery added, not proven).
+
 #### Return to ESPHome never tried
 
 The restore recipe (three writes: start of the flash, application, NVS) is in the `LISEZMOI.md` file of the author's local backup, which is outside this repository. It has **never been played**: as long as it has not been, the return is “not verified”. **Status**: open.
@@ -72,6 +74,22 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 **Solution.** Delete `sdkconfig`, run `.\tools\idf.ps1 set-target esp32p4` again, then check the value in the generated `sdkconfig` (not in the defaults file). **Seen on** Tab5 ST7121, 06/11/2026. **Status**: resolved.
 
+#### In a git worktree, CMake fails: `grabRef.cmake` “file failed to open head-ref”
+
+**Symptom.** In a worktree created by `git worktree add` (one per session), `idf.py set-target` or the first build stops in `grabRef.cmake` (`file failed to open head-ref`), while the main checkout builds.
+
+**Cause.** ESP-IDF reads the branch reference as a file `<git dir>/refs/heads/<branch>`; a branch that exists only in `packed-refs` (no loose file) has none. The version string (`git describe`) then cannot be computed.
+
+**Solution.** Create the loose reference with the same commit: write the commit hash into the file `<git dir of the worktree's repository>/refs/heads/<branch>` (a `git update-ref` alone did not create it). Also: a binary built from a tree with modified tracked files carries `-dirty` in its version (`project_version` in `build/project_description.json`): commit first, then build the binary that is handed over.
+
+**Seen on** the author's PC, worktree `claude/ecran-principal-f0f722`, 06/11/2026. **Evidence**: the build failed with that message, then succeeded after the file was created (version `jalon-1a-tab5-st7121-49-g6a0e6cc`, no `-dirty`). **Status**: worked around (cause read in the CMake script, not explored further).
+
+#### The build stops on `-Werror=format-truncation` in the interface
+
+**Cause.** The ESP-IDF build compiles with `-Werror=all`: an `snprintf` into a buffer the compiler cannot prove large enough (here 40 bytes for “min %s · max %s” with two 15-byte texts) is an error, not a warning.
+
+**Solution.** A buffer sized for the worst case of the format (48 bytes there). **Seen on** ESP-IDF 5.5.5, 06/11/2026. **Status**: resolved.
+
 #### A PowerShell script is refused: a deletion aimed at the ESP-IDF folder
 
 The safeguard of the author's AI session tool refuses any command containing a `Remove-Item` aimed at the ESP-IDF folder owned by ESPHome, even inside a script written elsewhere. Do not delete in scripts; move or ignore. **Status**: worked around.
@@ -101,6 +119,22 @@ The safeguard of the author's AI session tool refuses any command containing a `
 #### The translation guard does not see the texts added in 1b
 
 `test/host/controle_i18n.py` reads only the `kXxx = "…";` constants of `main/ui_bonjour.cpp` and `main/boot_info.cpp`, checked against the “Bonjour screen” section of the translation table. The new texts of 1b (clock, network state) therefore live in `main/textes_1b.h`, **not covered** by the table and not through `tr()`; they will go through `tr()` with the settings page. **Status**: worked around, to be redone in phase 2.
+
+#### `verrous.py` fails with “No module named 'filelock'” after a build
+
+**Cause.** `tools/idf.ps1` puts the Python of the ESP-IDF environment first on the `PATH` for the rest of the PowerShell session (read in the script). The lock script that tells the sessions who builds or flashes (it lives outside the repository) needs `filelock`, which that Python does not have. Taking the lock before the build works; giving it back after the build, in the same session, fails and leaves the lock held.
+
+**Solution.** Give the lock back from another PowerShell call (or with the PC's own Python, not the ESP-IDF one) and check with the `etat` command that it is free. **Seen on** the author's PC, 06/11/2026, commit `793bdfc`. **Evidence**: the traceback at the `rendre` call after `.\tools\idf.ps1 build`; the same call from a fresh call worked. **Status**: worked around.
+
+#### `idf.py set-target` fails while downloading components: “No such file or directory” on a very long path
+
+**Symptom.** In a new git worktree, `.\tools\idf.ps1 set-target esp32p4` stops during the component download with a Python `FileNotFoundError: [Errno 2] No such file or directory: '…\.cache\composants\service_…\espressif__esp_hosted_2.12.12_…\examples\host_network_split__power_save\…\host_wakeup_demo_using_udp_packet.c'`. A half-written `build/` is then left behind, and the next `set-target` stops on “doesn't seem to be a CMake build directory”.
+
+**Cause.** The 260-character Windows path limit (`LongPathsEnabled` is 0 on this PC) meets the component cache that `tools/idf.ps1` puts inside the project (`<worktree>\.cache\composants`). The longest file of `esp_hosted` 2.12.12 lies 184 characters below the worktree root; with the folder `reglages-appareil-b3aad6` (root of 76 characters) its path is exactly 260 characters. The other worktrees, whose names are 2 to 5 characters shorter, come out at 251–258 and pass: **a worktree folder name of 24 characters or more fails** here.
+
+**Solution.** Worked around, not fixed in the repository: delete the half-written `build/` and `sdkconfig*`, then run the build with a private copy of `tools/idf.ps1` (not committed) in which `IDF_COMPONENT_CACHE_PATH` points to a short folder outside the repository (here `C:\Users\axell\.tab5\cache-composants`); everything else is identical. Durable options **not done**: have `tools/idf.ps1` keep an `IDF_COMPONENT_CACHE_PATH` that is already set (one line), or give worktrees shorter names. Turning on Windows long paths is a system setting and was not touched.
+
+**Seen on** the build PC (Windows 11, ESP-IDF 5.5.5), branch `claude/reglages-appareil-b3aad6`, 06/11/2026; no board involved. **Evidence**: Python traceback in the build log; path length computed (260) and the same computation for the other worktrees; with the short cache the configuration, the download of the components (including `espressif/mdns` 1.13.1) and the build (exit code 0) went through. **Status**: worked around.
 
 ---
 
@@ -144,6 +178,19 @@ Its macros describe a 720 × 1560 panel, not the Tab5's. The init table of the T
 **Solution.** Point on the top layer (no padding), non-scrollable screen, and a test pattern (“mire”: a frame on the edges + five targets at the corners and the centre) to measure the remaining offset between touch and image from the presses in the serial log.
 
 **Seen on** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Evidence**: the author's observation (the point is under the finger) and five presses on known targets: mean error (−6, −4) px, from −12 to +10 px on four targets and −26 px in x on the fifth (top right), with no calibration applied (details in [mesures/1a.md](mesures/1a.md)). **Status**: resolved; accuracy of the order of a finger.
+
+#### Landscape: the touch ring is “completely shifted from the finger”
+
+**Symptom.** First landscape trial on the Tab5: the image is upright (“Yes, it's straight”), but the green ring does not appear under the finger (“not at the right place, completely shifted”).
+
+**Cause.** The touch point was rotated **twice**: once by `esp_lcd_touch` (mirror Y + swap X/Y requested in `tab5_touch.c`), once by LVGL itself (`lv_indev.c`, `indev_pointer_proc` → `lv_display_rotate_point`, which for a 90° rotation gives `x = ver_res − Y − 1`, `y = X`). The original comment wrongly claimed that LVGL does not rotate the touch. A finger at logical `(x, y)` gave a ring at `(1279 − y, x)`, off-screen as soon as `x > 719`.
+
+**Solution.** No mirror or swap in `tab5_touch.c`: the chip returns the native frame and LVGL rotates it alone. One log line per press (`appui : brut (X, Y) … -> logique (x, y) …`, `tab5_orientation.c`) gives the proof without relying on what is seen.
+
+**Seen on** Tab5 ST7121, symptom on the binary of commit `102077b`, fix checked on `3b68f42` (test build with the touch self-test) and `9f82623`, 06/11/2026. **Evidence**: the self-test injects six presses in raw panel coordinates (four corners, centre, Settings button) and the log gives “AUTOTEST appui n/6 … OK” six times; 27 real presses are logged and the formula `x = 1279 − Y`, `y = X` holds on every line; the author: “the fingers were right”. **Status**: resolved (details in [mesures/orientation.md](mesures/orientation.md) § 5).
+
+#### Every press on the screen restarted the board
+**Symptom.** With the binary of commit `557eb44`, “as soon as I touch the screen it restarts” (the author, ~22:29). **Cause.** The per-press log callback called `lv_event_get_indev(e)`, but for the events of an input device LVGL passes the **device as the target** and the touched object as the parameter (`lv_indev_send_event`): the callback read an object as if it were a device. It had been compiled but never executed before the author was asked to press. **Solution.** `lv_event_get_target(e)` (commit `c1fa7f6`), then a self-test build injects six synthetic presses at start-up so that the event code runs on the board **before** anyone is asked to touch it. **Seen on** Tab5 ST7121, `557eb44` then `c1fa7f6`, 06/11/2026. **Evidence**: self-test 6/6 OK with no restart, then 27 real presses without a restart. **Status**: resolved.
 
 #### No log over USB, or a build error on a `|` between two LVGL flags
 
@@ -238,6 +285,12 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 **Seen on** PC rendering bench (software LVGL 9.5.0, `tools/rendre.ps1`), branch `claude/reglages-ecran-aea4e2`, 06/11/2026. **Evidence**: scripted journeys `zones-tactiles-reglages`, `zones-tactiles-installation` and `curseur-au-doigt` (`tools/rendu/scenes/scene_parcours.cpp`; the last one uses a pointer input device and `lv_indev_search_obj`, so the touch goes through LVGL's own search) in 7 languages × 3 sizes; four of five deliberately introduced faults are detected (the fifth, a button forced back to 56 px, is neutralised by `min_height`). **Status**: resolved on the PC for buttons, slider and scroll indicator; the keyboard keys are an open decision; not seen on a board (real finger, physical size of the target: not verified).
 
+#### A mutation keeps the compiler busy for minutes
+
+**Cause.** The proof by mutation compiles the tests with one change in the core. A mutant that removes the exit condition of a `constexpr` loop (here `&& base < PERIODE_S` in `delai_avant_essai_s`) makes clang evaluate the loop up to its limit of 2 billion steps (`-fconstexpr-steps=2000000000`, set so that the tests which read a real response compile): 765 s of CPU measured before the compiler was stopped.
+
+**Solution.** That mutant is left out of `test/host/mutations_meteo_appareil.py` (the reason is written at the top of the file); the real code leaves the loop after 7 turns, and `planning_normal_et_reessais` covers 1 000 000 and `INT_MAX` failures. When writing a mutation, check that it does not remove the end of a loop. **Seen on** the author's PC, 06/11/2026, clang 23.1.5. **Evidence**: process CPU time, mutant no. 32 of the list. **Status**: worked around.
+
 ---
 
 ## Version Française
@@ -274,6 +327,8 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 **Solution.** Aucune appliquée. Pour l'utilisateur : après une coupure complète, un appui court sur le bouton allume la mire. Le critère de 1a (« image après redémarrage **et** après coupure ») est donc constaté **avec réserve** ; l'essai pas à pas (rebrancher l'USB sans toucher aucun bouton, attendre 30 s, noter ce qui s'affiche, port série ouvert) est à refaire au jalon 1b avant d'attribuer la cause au firmware ou à la carte. L'auteur a choisi de ne pas le refaire pendant 1a.
 
 **Vu sur** Tab5 ST7121, firmware natif commit `e7a4803`, 06/11/2026. **Preuve** : journal du démarrage n° 9, constat de l'auteur ; détail dans [mesures/1a.md](mesures/1a.md). **Statut** : ouvert. Jalon 1b (06/11/2026) : l'essai pas à pas a été **reporté par l'auteur** (« Pas maintenant », 20 h 59), ni fait ni raté ; voir [mesures/1b.md](mesures/1b.md).
+
+**Mise à jour du 06/11/2026, 22 h 27 (même famille de panne, reproduite AVEC journal).** *Vu sur* Tab5 ST7121, binaire du commit `c1fa7f6`, démarrage n° 65, juste après un flash (remise à zéro par le signal RTS d'esptool, **pas** une coupure de courant) : `pi4ioe5v6408: reset(252): Chip reset failed` → `Reset failed` → `tab5_io_init : expandeur 0x43` → `board_init : E/S` → `carte non initialisée ; arrêt (l'écran reste éteint)`. L'expandeur 0x43 n'a pas répondu à la toute première transaction I2C ; le firmware n'a fait **qu'un** essai et s'est arrêté, **écran noir** (Axel : « écran noir ») ; un nouveau flash a rendu l'image. **Hypothèse, non vérifiée** : c'est aussi ce qui s'est passé au premier démarrage « sans écran » après la coupure (n° 8 → 9, non capturé). **Correctif** (`tab5_io.c`) : jusqu'à 5 essais espacés de 150 ms avec remise à zéro du bus I2C entre deux, une ligne de journal par essai, puis au plus 3 redémarrages de reprise (compteur RTC) avant un arrêt avec un message lisible. Essayé sur la carte avec des échecs **simulés** (binaires d'essai) : 2 échecs puis succès à l'essai 3/5 ; 5 échecs répétés → 3 redémarrages (`SW_SYS_RESET`, compteur conservé) puis arrêt. La **vraie** panne n'a pas été reproduite depuis : le correctif n'est pas prouvé contre elle. **Séries de 20 remises à zéro** (06/11/2026, 22 h 49 à 23 h 00, Tab5 ST7121, remise à zéro par RTS comme esptool avec un port neuf à chaque tour ; un démarrage ne compte que si un nouveau numéro de démarrage et la ligne de version apparaissent) : **avant** (`c1fa7f6`, un seul essai) démarrages n° 99 à 118, **20/20** « Carte prête » + écran principal chargé dans le journal, 0 « Chip reset failed » ; **après** (`9f82623`, avec reprise) n° 78 à 97, **20/20**, 0 ligne « expandeur 0x43 : essai » (l'expandeur répond du premier essai à chaque fois), 0 « Chip reset failed » ; les démarrages qui suivent chaque flash (n° 98 et n° 119) sont corrects aussi. La panne du n° 65 n'est donc **pas reproduite** et la reprise n'est **pas prouvée** par ce test (0/21 échec avant, 0/21 après) ; il montre seulement qu'elle ne ralentit pas un démarrage normal (3,03 à 3,08 s jusqu'à « Carte prête »). « Image revenue » = lignes du journal : seul Axel a vu l'écran. **À ne pas confondre** : `ESP_ERR_TIMEOUT` sur l'expandeur = un échec **simulé** par un binaire d'essai (`TAB5_AUTOTEST_EXPANDEUR`, démarrages n° 67 à 72, version affichée `g3b68f4` car compilé sur un arbre sale) ; `Chip reset failed` / `ESP_ERR_INVALID_STATE` = la **vraie** panne (n° 65). **Statut** : toujours ouvert (cause de la vraie panne inconnue ; reprise ajoutée, non prouvée).
 
 #### Retour à ESPHome jamais essayé
 
@@ -312,6 +367,22 @@ La recette de remise en état (trois écritures : début de flash, application, 
 
 **Solution.** Supprimer `sdkconfig`, relancer `.\tools\idf.ps1 set-target esp32p4`, puis vérifier la valeur dans le `sdkconfig` généré (pas dans le fichier de défauts). **Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : résolu.
 
+#### Dans un worktree git, CMake échoue : `grabRef.cmake` « file failed to open head-ref »
+
+**Symptôme.** Dans un worktree créé par `git worktree add` (un par session), `idf.py set-target` ou la première compilation s'arrête dans `grabRef.cmake` (`file failed to open head-ref`), alors que le dépôt principal se compile.
+
+**Cause.** ESP-IDF lit la référence de la branche comme un fichier `<dossier git>/refs/heads/<branche>` ; une branche qui n'existe que dans `packed-refs` (pas de fichier) n'en a pas. La version (`git describe`) ne peut alors pas être calculée.
+
+**Solution.** Créer la référence en fichier avec le même commit : écrire l'empreinte du commit dans le fichier `<dossier git du dépôt du worktree>/refs/heads/<branche>` (un `git update-ref` seul ne l'a pas créé). Autre point : un binaire compilé avec des fichiers suivis modifiés porte `-dirty` dans sa version (`project_version` de `build/project_description.json`) : commiter d'abord, puis compiler le binaire que l'on remet.
+
+**Vu sur** PC de l'auteur, worktree `claude/ecran-principal-f0f722`, 06/11/2026. **Preuve** : la compilation échouait avec ce message, puis réussissait après la création du fichier (version `jalon-1a-tab5-st7121-49-g6a0e6cc`, sans `-dirty`). **Statut** : contourné (cause lue dans le script CMake, pas creusée davantage).
+
+#### La compilation s'arrête sur `-Werror=format-truncation` dans l'interface
+
+**Cause.** La compilation d'ESP-IDF utilise `-Werror=all` : un `snprintf` dans un tampon que le compilateur ne peut pas prouver assez grand (ici 40 octets pour « min %s · max %s » avec deux textes de 15 octets) est une erreur, pas un avertissement.
+
+**Solution.** Un tampon dimensionné pour le pire cas du format (48 octets ici). **Vu sur** ESP-IDF 5.5.5, 06/11/2026. **Statut** : résolu.
+
 #### Un script PowerShell est refusé : suppression visant le dossier d'ESP-IDF
 
 Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenant un `Remove-Item` visant le dossier de l'ESP-IDF d'ESPHome, même dans un script écrit ailleurs. Ne pas supprimer dans les scripts ; déplacer ou ignorer. **Statut** : contourné.
@@ -341,6 +412,22 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 #### Le garde de traduction ne voit pas les textes ajoutés en 1b
 
 `test/host/controle_i18n.py` ne lit que les constantes `kXxx = "…";` de `main/ui_bonjour.cpp` et `main/boot_info.cpp`, confrontées à la section « Écran Bonjour » de la table de traduction. Les textes nouveaux de 1b (horloge, état du réseau) vivent donc dans `main/textes_1b.h`, **hors table** et sans passer par `tr()` ; ils passeront par `tr()` avec la page de réglages. **Statut** : contourné, à refaire en phase 2.
+
+#### `verrous.py` échoue avec « No module named 'filelock' » après une compilation
+
+**Cause.** `tools/idf.ps1` met le Python de l'environnement ESP-IDF en tête du `PATH` pour la suite de la session PowerShell (lu dans le script). Le script de verrous qui dit aux sessions qui compile ou flashe (il vit hors du dépôt) a besoin de `filelock`, que ce Python n'a pas. Prendre le verrou avant la compilation marche ; le rendre après, dans la même session, échoue et laisse le verrou tenu.
+
+**Solution.** Rendre le verrou depuis un autre appel PowerShell (ou avec le Python du PC, pas celui d'ESP-IDF) et vérifier avec la commande `etat` qu'il est libre. **Vu sur** PC de l'auteur, 06/11/2026, commit `793bdfc`. **Preuve** : la trace de l'appel `rendre` après `.\tools\idf.ps1 build` ; le même appel depuis un appel neuf a marché. **Statut** : contourné.
+
+#### `idf.py set-target` échoue au téléchargement des composants : « No such file or directory » sur un chemin très long
+
+**Symptôme.** Dans un nouveau worktree git, `.\tools\idf.ps1 set-target esp32p4` s'arrête pendant le téléchargement des composants sur une `FileNotFoundError: [Errno 2] No such file or directory: '…\.cache\composants\service_…\espressif__esp_hosted_2.12.12_…\examples\host_network_split__power_save\…\host_wakeup_demo_using_udp_packet.c'` de Python. Un `build/` à moitié écrit reste, et le `set-target` suivant s'arrête sur « doesn't seem to be a CMake build directory ».
+
+**Cause.** La limite de 260 caractères des chemins Windows (`LongPathsEnabled` vaut 0 sur ce PC) rencontre le cache de composants que `tools/idf.ps1` place dans le projet (`<worktree>\.cache\composants`). Le plus long fichier d'`esp_hosted` 2.12.12 est à 184 caractères sous la racine du worktree ; avec le dossier `reglages-appareil-b3aad6` (racine de 76 caractères) son chemin fait exactement 260 caractères. Les autres worktrees, aux noms plus courts de 2 à 5 caractères, tombent à 251–258 et passent : **un nom de dossier de worktree de 24 caractères ou plus échoue** ici.
+
+**Solution.** Contournée, pas corrigée dans le dépôt : supprimer le `build/` à moitié écrit et `sdkconfig*`, puis lancer la compilation avec une copie privée de `tools/idf.ps1` (non commitée) où `IDF_COMPONENT_CACHE_PATH` désigne un dossier court hors du dépôt (ici `C:\Users\axell\.tab5\cache-composants`) ; tout le reste est identique. Pistes durables **non faites** : faire respecter par `tools/idf.ps1` un `IDF_COMPONENT_CACHE_PATH` déjà défini (une ligne), ou donner des noms plus courts aux worktrees. Activer les chemins longs de Windows est un réglage système : non touché.
+
+**Vu sur** le PC de compilation (Windows 11, ESP-IDF 5.5.5), branche `claude/reglages-appareil-b3aad6`, 06/11/2026 ; aucune carte en jeu. **Preuve** : trace Python dans le journal de compilation ; longueur du chemin calculée (260) et même calcul pour les autres worktrees ; avec le cache court, la configuration, le téléchargement des composants (dont `espressif/mdns` 1.13.1) et la compilation (code de sortie 0) sont passés. **Statut** : contourné.
 
 ---
 
@@ -384,6 +471,19 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 **Solution.** Point sur la couche supérieure (sans remplissage), écran non défilable, et une **mire** (cadre sur les bords + cinq cibles aux coins et au centre) pour mesurer le décalage restant entre le tactile et l'image à partir des appuis du journal série.
 
 **Vu sur** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Preuve** : constat de l'auteur (le point est sous son doigt) et cinq appuis sur des cibles connues : écart moyen (−6, −4) px, de −12 à +10 px sur quatre cibles et −26 px en x sur la cinquième (haut droit), sans étalonnage appliqué (détail dans [mesures/1a.md](mesures/1a.md)). **Statut** : résolu ; précision de l'ordre d'un doigt.
+
+#### Paysage : l'anneau tactile est « totalement décalé par rapport au doigt »
+
+**Symptôme.** Premier essai du paysage sur le Tab5 : l'image est droite (« Oui, c'est droit »), mais l'anneau vert n'apparaît pas sous le doigt (« pas au bon endroit, totalement décalé »).
+
+**Cause.** Le point tactile était tourné **deux fois** : une fois par `esp_lcd_touch` (miroir Y + échange X/Y demandés dans `tab5_touch.c`), une fois par LVGL lui-même (`lv_indev.c`, `indev_pointer_proc` → `lv_display_rotate_point`, qui pour une rotation de 90° donne `x = ver_res − Y − 1`, `y = X`). Le commentaire d'origine affirmait à tort que LVGL ne tourne pas le tactile. Un doigt en `(x, y)` logique donnait un anneau en `(1279 − y, x)`, hors écran dès que `x > 719`.
+
+**Solution.** Aucun miroir ni échange dans `tab5_touch.c` : la puce rend le repère natif et LVGL le tourne seul. Une ligne de journal par appui (`appui : brut (X, Y) … -> logique (x, y) …`, `tab5_orientation.c`) donne la preuve sans dépendre de ce que l'on voit.
+
+**Vu sur** Tab5 ST7121, symptôme sur le binaire du commit `102077b`, correctif vérifié sur `3b68f42` (version d'essai avec l'autotest du tactile) et `9f82623`, 06/11/2026. **Preuve** : l'autotest injecte six appuis en coordonnées brutes de la dalle (quatre coins, centre, bouton Réglages) et le journal affiche six fois « AUTOTEST appui n/6 … OK » ; 27 appuis réels sont journalisés et la formule `x = 1279 − Y`, `y = X` se vérifie sur chaque ligne ; Axel : « les doigts étaient bons ». **Statut** : résolu (détail dans [mesures/orientation.md](mesures/orientation.md) § 5).
+
+#### Chaque appui sur l'écran redémarrait la carte
+**Symptôme.** Avec le binaire du commit `557eb44`, « dès que je touche l'écran il redémarre » (Axel, ~22:29). **Cause.** Le rappel du journal par appui appelait `lv_event_get_indev(e)`, or pour les événements d'un périphérique d'entrée LVGL passe le **périphérique comme cible** et l'objet touché comme paramètre (`lv_indev_send_event`) : le rappel lisait un objet comme si c'était un périphérique. Il avait été compilé mais jamais exécuté avant de demander à Axel d'appuyer. **Solution.** `lv_event_get_target(e)` (commit `c1fa7f6`), puis une version d'essai injecte six appuis simulés au démarrage pour que le code d'événement tourne sur la carte **avant** qu'on demande à quelqu'un de toucher. **Vu sur** Tab5 ST7121, `557eb44` puis `c1fa7f6`, 06/11/2026. **Preuve** : autotest 6/6 OK sans redémarrage, puis 27 appuis réels sans redémarrage. **Statut** : résolu.
 
 #### Aucun journal par l'USB, ou une erreur de compilation sur un `|` entre deux drapeaux LVGL
 
@@ -477,3 +577,9 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 - **Reste ouvert** : les touches du clavier mesurent 59 px de haut à 1280×720 (49 px à 1024×600) dans les langues à rangée d'accents (fr, nl, es, it) → six rangées ne peuvent pas dépasser 55 % de l'écran en paysage ; à cinq rangées (en, de, tr) elles font exactement 72 px.
 
 **Vu sur** banc de rendu PC (LVGL 9.5.0 logiciel, `tools/rendre.ps1`), branche `claude/reglages-ecran-aea4e2`, 06/11/2026. **Preuve** : parcours `zones-tactiles-reglages`, `zones-tactiles-installation` et `curseur-au-doigt` (`tools/rendu/scenes/scene_parcours.cpp` ; le dernier passe par un pointeur LVGL et `lv_indev_search_obj`, donc par la recherche d'objet de LVGL elle-même) dans 7 langues × 3 tailles ; quatre fautes sur cinq introduites exprès sont détectées (la cinquième, un bouton remis à 56 px, est neutralisée par `min_height`). **Statut** : résolu sur le PC pour les boutons, le curseur et l'indicateur de défilement ; touches du clavier : décision ouverte ; non vu sur une carte (doigt réel, taille physique de la cible : non vérifiés).
+
+#### Une mutation occupe le compilateur pendant des minutes
+
+**Cause.** La preuve par mutation compile les tests avec une modification du noyau. Un mutant qui retire la condition de sortie d'une boucle `constexpr` (ici `&& base < PERIODE_S` dans `delai_avant_essai_s`) fait évaluer la boucle à clang jusqu'à sa limite de 2 milliards de pas (`-fconstexpr-steps=2000000000`, réglée pour que les tests qui relisent une vraie réponse compilent) : 765 s de CPU mesurées avant d'arrêter le compilateur.
+
+**Solution.** Ce mutant est écarté de `test/host/mutations_meteo_appareil.py` (la raison est écrite en tête du fichier) ; le vrai code sort de la boucle après 7 tours, et `planning_normal_et_reessais` couvre 1 000 000 et `INT_MAX` échecs. En écrivant une mutation, vérifier qu'elle ne supprime pas la fin d'une boucle. **Vu sur** PC de l'auteur, 06/11/2026, clang 23.1.5. **Preuve** : temps CPU du processus, mutant n° 32 de la liste. **Statut** : contourné.
