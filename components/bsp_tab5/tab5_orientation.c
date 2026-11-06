@@ -209,9 +209,13 @@ static void lecture_tracee(lv_indev_t *indev, lv_indev_data_t *data) {
 }
 
 static void sur_appui(lv_event_t *e) {
+    // Sur la liste d'evenements d'un indev, la CIBLE de l'evenement est l'indev (lv_indev_send_event le passe en target) ;
+    // son PARAMETRE est l'objet touche (indev_obj_act) : lv_event_get_indev() lisait ce parametre et rendait un objet pris pour
+    // un indev -> plantage « Load access fault » a chaque appui (binaire 557eb44, constate le 06/11/2026 a 22:25).
+    lv_indev_t *indev = (lv_indev_t *)lv_event_get_target(e);
     lv_point_t logique = {0, 0};
-    lv_indev_get_point(lv_event_get_indev(e), &logique);
-    lv_display_t *disp = lv_indev_get_display(lv_event_get_indev(e));
+    lv_indev_get_point(indev, &logique);
+    lv_display_t *disp = lv_indev_get_display(indev);
     ESP_LOGI(TAG, "appui : brut (%d, %d) sur la dalle %d x %d -> logique (%d, %d) sur l'interface %d x %d",
              (int)s_brut.x, (int)s_brut.y, TAB5_LCD_H_RES, TAB5_LCD_V_RES, (int)logique.x, (int)logique.y,
              (int)lv_display_get_horizontal_resolution(disp), (int)lv_display_get_vertical_resolution(disp));
