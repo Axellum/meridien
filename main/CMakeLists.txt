@@ -47,6 +47,15 @@ endif()
 # ete retire quand la colle est arrivee.
 target_sources(${COMPONENT_LIB} PRIVATE "ui_commun.cpp" "ui_reglages.cpp" "ui_installation.cpp" "ui_clavier.cpp"
                "ui_reglages_ouvrir.cpp" "hote_appareil_esp.cpp" "wifi_stocke.cpp")
+# Essai des reglages SUR LA CARTE, sans doigt (main/autotest_reglages.cpp) : un pointeur virtuel rejoue les gestes sur le vrai LVGL,
+# trois phases separees par un vrai redemarrage, constats au journal serie. JAMAIS dans le binaire normal (OFF par defaut) :
+#   .\tools\idf.ps1 -DMERIDIEN_AUTOTEST_REGLAGES=ON build
+# Le fichier n'est reference par personne : "-u" force l'editeur de liens a le garder (sinon son constructeur statique ne tourne pas).
+set(MERIDIEN_AUTOTEST_REGLAGES OFF CACHE BOOL "Essai des reglages sur la carte, sans doigt (jamais dans le binaire normal)")
+if(MERIDIEN_AUTOTEST_REGLAGES)
+    target_sources(${COMPONENT_LIB} PRIVATE "autotest_reglages.cpp")
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,-u,autotest_reglages_ancre")
+endif()
 # Contrat reseau des reglages (recherche de reseaux, essai d'un nouveau Wi-Fi avec retour arriere) : a fournir par jalon-1b dans
 # main/reseau_wifi.h. Tant que ce fichier n'existe pas, un BOUCHON (main/bouchons/reseau_wifi*.{h,cpp}) repond "rien trouve" et
 # "impossible" : l'ecran le dit au lieu d'attendre. Des que le vrai fichier est la, le bouchon n'est plus compile.
