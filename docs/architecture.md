@@ -55,7 +55,7 @@ Chip settings live in `boards/<board>/sdkconfig.defaults.board`, never in the sh
 ### Planned data flows
 
 - **Time**: SNTP → UTC seconds → POSIX TZ rule of the chosen time zone (kept in NVS) → local date and time in French.
-- **Weather**: settings (place chosen by the page, `zone_ecrire`) → minimal Open-Meteo request over HTTPS every 15 min (task `meteo_client.cpp`) → parsing by the core → cache in NVS → `meteo_etat_lire()` → screen; offline, the last weather stays, with the mention “stale” (`perime`). Written and compiled; **not yet seen on the board** (see [mesures/meteo.md](mesures/meteo.md)).
+- **Weather**: settings (place chosen by the page, `zone_ecrire`) → minimal Open-Meteo request over HTTPS every 15 min (task `meteo_client.cpp`) → parsing by the core → cache in NVS → `meteo_etat_lire()` → screen; offline, the last weather stays, with the mention “stale” (`perime`). Seen on the Tab5 ST7121 on 06/11/2026 (first answer, state back from the cache after a software restart, second request 15 min later); Wi-Fi cut, power cut and change of place **not tested** (see [mesures/meteo.md](mesures/meteo.md)).
 - **Assistant**: wake word on the device → STT → streamed LLM → TTS, each one an independent OpenAI-compatible service, local or cloud ([ADR-0002](decisions/0002-assistant-vocal-en-cascade.md)).
 - **Settings**: phone → page served by the device → REST API protected by a token shown on the screen → NVS. An API key is written, never read back.
 
@@ -116,6 +116,6 @@ Les réglages de puce vivent dans `boards/<carte>/sdkconfig.defaults.board`, jam
 ### Flux de données prévus
 
 - **Heure** : SNTP → secondes UTC → règle POSIX TZ du fuseau choisi (gardé en NVS) → date et heure locales en français.
-- **Météo** : réglages (lieu choisi par la page, `zone_ecrire`) → requête Open-Meteo minimale en HTTPS toutes les 15 min (tâche `meteo_client.cpp`) → lecture par le noyau → cache en NVS → `meteo_etat_lire()` → écran ; hors ligne, la dernière météo reste avec la mention « périmée » (`perime`). Écrit et compilé ; **pas encore vu sur la carte** (voir [mesures/meteo.md](mesures/meteo.md)).
+- **Météo** : réglages (lieu choisi par la page, `zone_ecrire`) → requête Open-Meteo minimale en HTTPS toutes les 15 min (tâche `meteo_client.cpp`) → lecture par le noyau → cache en NVS → `meteo_etat_lire()` → écran ; hors ligne, la dernière météo reste avec la mention « périmée » (`perime`). Vu sur le Tab5 ST7121 le 06/11/2026 (première réponse, état revenu du cache après un redémarrage logiciel, deuxième requête 15 min plus tard) ; Wi-Fi coupé, coupure de courant et changement de lieu **non testés** (voir [mesures/meteo.md](mesures/meteo.md)).
 - **Assistant** : mot d'activation sur l'appareil → STT → LLM en flux → TTS, chacun un service OpenAI-compatible indépendant, local ou cloud ([ADR-0002](decisions/0002-assistant-vocal-en-cascade.md)).
 - **Réglages** : téléphone → page servie par l'appareil → API REST protégée par un jeton affiché à l'écran → NVS. Une clé API s'écrit, ne se relit jamais.
