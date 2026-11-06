@@ -54,7 +54,10 @@ constexpr uint16_t kPort = 80;
 constexpr size_t kTailleSortie = 8192;   // une réponse JSON (huit lieux ≈ 3 Ko)
 constexpr size_t kTailleTravail = 16384; // réponse brute d'Open-Meteo (≈ 5 Ko pour huit lieux)
 constexpr int kDelaiGeocodageMs = 8000;
-constexpr uint32_t kPileServeur = 16384; // la prise de contact TLS du géocodage s'exécute dans ce fil
+// La prise de contact TLS du géocodage s'exécute dans ce fil (≈ 10 Ko de pile pour mbedtls, plus ≈ 4 Ko de tampons locaux de
+// l'API et de l'adresse) : 20 Ko, pour ne pas planter la première recherche de ville.
+constexpr uint32_t kPileServeur = 20480;
+constexpr uint32_t kPileTache = 12288; // la tâche qui démarre le serveur crée aussi les polices du bandeau (TinyTTF)
 constexpr UBaseType_t kPrioriteServeur = 3;
 constexpr uint32_t kPasAttenteIpMs = 1000;
 constexpr uint32_t kPasSurveillanceMs = 2000;
@@ -528,7 +531,7 @@ void tache_serveur(void *) {
 } // namespace
 
 void serveur_web_demarrer() {
-    if (xTaskCreate(tache_serveur, "serveur_web", 6144, nullptr, kPrioriteServeur, nullptr) != pdPASS) {
+    if (xTaskCreate(tache_serveur, "serveur_web", kPileTache, nullptr, kPrioriteServeur, nullptr) != pdPASS) {
         ESP_LOGE(TAG, "tâche du serveur non créée : la page n'est pas servie");
     }
 }
