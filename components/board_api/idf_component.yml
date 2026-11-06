@@ -1,0 +1,6 @@
+# LVGL est epingle ici, une seule fois, parce que l'interface expose lv_display_t.
+# 9.5.x et non 9.6.0 : esp_lvgl_port 2.9.0 (07/08/2026) est anterieur a la 9.6.0 (16/09/2026) ; la 9.5 est aussi celle du
+# firmware ESPHome du Tab5. A relever apres essai (docs/mesures/1a.md).
+dependencies:
+  idf: ">=5.4"
+  lvgl/lvgl: "~9.5.0"

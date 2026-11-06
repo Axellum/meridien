@@ -1,0 +1,10 @@
+# Pilotes du registre Espressif, versions epinglees (lues sur components.espressif.com le 06/11/2026).
+# Non ajoutes en phase 1a : esp_lcd_st7123 et esp_lcd_ili9881c. Leur sequence d'init propre au Tab5 n'est pas dans le composant
+# du registre (macros pour une dalle 720x1560 differente) mais dans le BSP esp-bsp ; a porter quand un exemplaire est la pour
+# l'essayer (docs/mesures/1a.md).
+dependencies:
+  idf: ">=5.4"
+  espressif/esp_io_expander_pi4ioe5v6408: "1.0.1"
+  espressif/esp_lcd_st7121: "1.0.1"
+  espressif/esp_lcd_touch_st7123: "1.0.2"
+  espressif/esp_lvgl_port: "2.9.0"

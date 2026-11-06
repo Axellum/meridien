@@ -1,0 +1,18 @@
+# Table de partitions du M5Stack Tab5 (flash 16 Mo). Decision : docs/mesures/1a.md, "Partitions".
+#
+# Memes decalages que le firmware ESPHome pour otadata (0x9000), phy_init (0xb000) et l'application
+# (0x10000), mais :
+#  - l'application tient dans 4 Mo (au lieu de 7,75 Mo) pour que notre NVS ne tombe PAS sur celle
+#    d'ESPHome ;
+#  - la NVS d'ESPHome (0xf90000, 448 Ko : Wi-Fi, cle API, reglages) est declaree ici sous un type
+#    inerte (donnees, sous-type 0x99) : aucun code ne la lit, elle ne risque pas d'etre reformatee,
+#    et revenir a ESPHome ne demande que le debut de flash + l'application (recette du LISEZMOI.md de
+#    la sauvegarde).
+# Une OTA avec retour arriere (phase 3) a besoin des deux emplacements ota_0 / ota_1 et d'otadata.
+# Name,        Type, SubType, Offset,   Size,     Flags
+otadata,       data, ota,     0x9000,   0x2000,
+phy_init,      data, phy,     0xb000,   0x1000,
+ota_0,         app,  ota_0,   0x10000,  0x400000,
+ota_1,         app,  ota_1,   0x410000, 0x400000,
+nvs,           data, nvs,     0x810000, 0x70000,
+esphome_nvs,   data, 0x99,    0xf90000, 0x70000,
