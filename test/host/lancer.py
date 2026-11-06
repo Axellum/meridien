@@ -104,7 +104,7 @@ MUTATIONS = [
     ("meteo_wmo.hpp", '"Bruine verglaçante légère"', '"Bruine verglaçante très très légère"', "test_meteo_wmo.cpp",
      "libelles_courts_distincts_et_sans_chiffre", "un libellé trop long pour l'écran"),
     # --- fuseaux ---
-    ("fuseaux.hpp", "constexpr const Entree* trouver(", "constexpr const Entree* trouver_absente(", "test_fuseaux.cpp", None,
+    ("fuseaux.hpp", "constexpr const Entree *trouver(", "constexpr const Entree *trouver_absente(", "test_fuseaux.cpp", None,
      "la fonction trouver n'existe pas"),
     ("fuseaux.hpp", "if (c < 0) {\n            bas = milieu + 1;\n        } else {\n            haut = milieu;\n        }",
      "if (c > 0) {\n            bas = milieu + 1;\n        } else {\n            haut = milieu;\n        }", "test_fuseaux.cpp",
@@ -117,7 +117,7 @@ MUTATIONS = [
      "complements_de_la_base_tz", "Europe/Kyiv retiré"),
     ("fuseaux_donnees.inc", '{"Asia/Tokyo", "JST-9"}', '{"Asia/Tokyo", "JST -9"}', "test_fuseaux.cpp",
      "chaque_chaine_posix_est_plausible", "chaîne POSIX avec une espace"),
-    ("fuseaux.hpp", "if (c >= 'A' && c <= 'Z') return static_cast<char>(c - 'A' + 'a');", "if (false) return c;", "test_fuseaux.cpp",
+    ("fuseaux.hpp", "if (c >= 'A' && c <= 'Z')\n        return static_cast<char>(c - 'A' + 'a');", "if (false) return c;", "test_fuseaux.cpp",
      "recherche_par_ville_sans_casse", "la recherche tient compte de la casse"),
     ("fuseaux.hpp", "return c == ' ' ? '_' : c;", "return c;", "test_fuseaux.cpp",
      "recherche_espace_vaut_souligne", "l'espace ne vaut plus « _ »"),
@@ -126,7 +126,7 @@ MUTATIONS = [
     ("fuseaux.hpp", "if (!detail::commence_par(TABLE[i].iana, saisie) && detail::contient(TABLE[i].iana, saisie)) {",
      "if (detail::contient(TABLE[i].iana, saisie)) {", "test_fuseaux.cpp",
      "recherche_les_debuts_passent_avant_les_sous_chaines", "doublons et ordre cassé dans la recherche"),
-    ("fuseaux.hpp", "if (saisie.empty() || resultats == nullptr) return 0;", "if (resultats == nullptr) return 0;", "test_fuseaux.cpp",
+    ("fuseaux.hpp", "if (saisie.empty() || resultats == nullptr)\n        return 0;", "if (resultats == nullptr) return 0;", "test_fuseaux.cpp",
      "recherche_vide_ou_sans_resultat_ou_sans_place", "la saisie vide renvoie tout"),
 ]
 
