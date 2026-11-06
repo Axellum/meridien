@@ -17,3 +17,6 @@ CONFIG_LV_USE_CLIB_STRING=y
 # s'arretent a l'ASCII ; une police sans le "e accent aigu" afficherait un rectangle vide.
 CONFIG_LV_USE_TINY_TTF=y
 CONFIG_LV_TINY_TTF_FILE_SUPPORT=n
+
+# Heure reseau (jalon 1b) : deux serveurs SNTP (celui par defaut d'IDF n'en prend qu'un).
+CONFIG_LWIP_SNTP_MAX_SERVERS=2

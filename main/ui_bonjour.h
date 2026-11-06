@@ -1,4 +1,5 @@
-// Écran « Bonjour » de la phase 1a : prouve l'affichage, les accents et le tactile. Pas de fonction produit.
+// Écran « Bonjour » de la phase 1a : prouve l'affichage, les accents et le tactile. Complété en 1b par l'heure, la date et l'état
+// du Wi-Fi (rafraîchis par un minuteur LVGL). Pas de fonction produit au-delà.
 #pragma once
 
 #include "board.h"
