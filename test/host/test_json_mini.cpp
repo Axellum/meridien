@@ -49,6 +49,8 @@ constexpr int litteraux_exacts() {
         VERIFIER(!valide(t));
     }
     VERIFIER(valide("[true,false,null]"));
+    VERIFIER(erreur_de("nullx") == Erreur::Syntaxe && lire("nullx").position == 4);   // mot collé : erreur de syntaxe
+    VERIFIER(erreur_de("true1") == Erreur::Syntaxe && erreur_de("[falsey]") == Erreur::Syntaxe);
     VERIFIER(!valide("[truex]"));
     VERIFIER(!valide("[nullnull]"));
     return 0;
@@ -247,7 +249,7 @@ constexpr int cles_et_valeurs_avec_pieges() {
 }
 
 constexpr int chemins_trouver() {
-    constexpr sv DOC = R"({"current":{"t":11.6,"jour":1},"daily":{"time":[10,20,30],"m":[[1,2],[3,4]]},"s":"ok"})";
+    constexpr sv DOC = R"({"current":{"t":11.6,"jour":1},"daily":{"time":[10,20,30],"m":[[1,2],[3,4]]},"s":"ok","objs":[{"k":7}]})";
     const Valeur v = lire(DOC).valeur;
     std::int64_t n = 0;
     VERIFIER(v.trouver("").brut() == v.brut());
@@ -259,6 +261,8 @@ constexpr int chemins_trouver() {
     VERIFIER(v.trouver("daily").trouver("time[1]").en_entier(n) && n == 20);  // relatif à une sous-valeur
     VERIFIER(v.trouver("s").texte_egal("ok"));
     VERIFIER(v.trouver("daily.time").taille() == 3);
+    VERIFIER(v.trouver("objs[0].k").en_entier(n) && n == 7);
+    VERIFIER(!v.trouver("objs[0]k").existe());          // « a[0]k » : il manque le point
     // absents
     VERIFIER(!v.trouver("daily.time[3]").existe());
     VERIFIER(!v.trouver("daily.zzz").existe());
