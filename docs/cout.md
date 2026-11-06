@@ -10,7 +10,7 @@ Chiffrage du 06/11/2026. **Estimation par analogie, pas une mesure** : ± 50 %. 
 | Dont le Tab5 | 76 % des sessions, 16,2 M tokens de sortie → ≈ 135 000 tokens de sortie par session | idem |
 | Relecture du contexte | ≈ 280 000 tokens relus par appel → ≈ 57 M tokens relus par session (9,0 G / 158) | idem |
 | Sessions lourdes | 1,0 à 1,2 M tokens de sortie, sur 3 à 6 jours | idem |
-| Durée d'une session | médiane ≈ 20 min, 10 % dépassent 5 h | `audit_historique_llm_2026-09-29.md` |
+| Durée d'une session | médiane ≈ 20 min, 10 % dépassent 5 h | audit de l'historique des sessions du 29/09/2026 (notes privées d'Axel, hors dépôt) |
 | Cette préparation (phase 0) | 8 agents de recherche/audit en parallèle ≈ **353 000 tokens** (75 627 + 27 119 + 90 863 + 17 536 + 33 217 + 27 458 + 29 875 + 51 218), ~2,5 min d'horloge ; plus cette session | rapports des agents |
 | Quota à l'écriture | fenêtre de 5 h à 42 %, hebdomadaire à 10 % (toutes sessions confondues, forfait Max) | `get_usage` |
 
