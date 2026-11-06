@@ -33,7 +33,7 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 
 **Solution.** None applied. For the user: after a complete cut, a short press on the button turns the test pattern on. The criterion of 1a (“image after a restart **and** after a power cut”) is therefore observed **with a reservation**; the step-by-step trial (plug the USB back in without touching any button, wait 30 s, note what is displayed, serial port open) is to be redone at milestone 1b before attributing the cause to the firmware or to the board. The author chose not to redo it during 1a.
 
-**Seen on** Tab5 ST7121, native firmware commit `e7a4803`, 06/11/2026. **Evidence**: log of start-up no. 9, the author's observation; details in [mesures/1a.md](mesures/1a.md). **Status**: open.
+**Seen on** Tab5 ST7121, native firmware commit `e7a4803`, 06/11/2026. **Evidence**: log of start-up no. 9, the author's observation; details in [mesures/1a.md](mesures/1a.md). **Status**: open. Milestone 1b (06/11/2026): the step-by-step trial was **postponed by the author** (“Not now”, 20:59), neither done nor failed; see [mesures/1b.md](mesures/1b.md).
 
 #### Return to ESPHome never tried
 
@@ -75,6 +75,32 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 #### A PowerShell script is refused: a deletion aimed at the ESP-IDF folder
 
 The safeguard of the author's AI session tool refuses any command containing a `Remove-Item` aimed at the ESP-IDF folder owned by ESPHome, even inside a script written elsewhere. Do not delete in scripts; move or ignore. **Status**: worked around.
+
+#### `idf.py` stops on “macro expanded to blank string” as soon as `esp_hosted` is a dependency
+
+**Symptom.** After adding `espressif/esp_hosted` 2.12.12, the configuration (`kconfgen`) stops on the Kconfig of that component with “macro expanded to blank string”.
+
+**Cause.** That Kconfig reads `$(ESP_IDF_VERSION)` (e.g. “5.5”), a variable that ESP-IDF does not set (it sets `IDF_VERSION`).
+
+**Solution.** `tools/idf.ps1` sets `ESP_IDF_VERSION` to “major.minor” (here 5.5) before calling `idf.py`, as ESPHome does for its own builds.
+
+**Seen on** the author's PC, ESP-IDF 5.5.5, `esp_hosted` 2.12.12, 06/11/2026, commit `f86b066`. **Evidence**: configuration and full build pass afterwards (binary of 1,240,272 bytes). **Status**: resolved.
+
+#### `ninja`: “reglages_locaux.cmake is defined as an output multiple times”
+
+**Cause.** A `set_property(DIRECTORY … CMAKE_CONFIGURE_DEPENDS …)` on a file that CMake already tracks because `main/CMakeLists.txt` reads it with `include()`.
+
+**Solution.** Remove the `set_property`: CMake re-runs the configuration by itself when an included file changes. **Seen on** the author's PC, 06/11/2026. **Status**: resolved.
+
+#### A new script is missing from `git status`: the secrets safeguard ignored it
+
+**Cause.** The pattern `reglages_locaux*` of `.gitignore` (meant for the generated `reglages_locaux.cmake`, which holds the Wi-Fi credentials) also matched `tools/reglages_locaux.ps1`. Nothing warns: the file just never appears (`git check-ignore -v <file>` shows the pattern).
+
+**Solution.** The script was renamed `tools/preparer_wifi.ps1`; the pattern is kept as it is (it is the safeguard). **Seen on** the author's PC, 06/11/2026, commit `761d135`. **Status**: resolved.
+
+#### The translation guard does not see the texts added in 1b
+
+`test/host/controle_i18n.py` reads only the `kXxx = "…";` constants of `main/ui_bonjour.cpp` and `main/boot_info.cpp`, checked against the “Bonjour screen” section of the translation table. The new texts of 1b (clock, network state) therefore live in `main/textes_1b.h`, **not covered** by the table and not through `tr()`; they will go through `tr()` with the settings page. **Status**: worked around, to be redone in phase 2.
 
 ---
 
@@ -227,7 +253,7 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 
 **Solution.** Aucune appliquée. Pour l'utilisateur : après une coupure complète, un appui court sur le bouton allume la mire. Le critère de 1a (« image après redémarrage **et** après coupure ») est donc constaté **avec réserve** ; l'essai pas à pas (rebrancher l'USB sans toucher aucun bouton, attendre 30 s, noter ce qui s'affiche, port série ouvert) est à refaire au jalon 1b avant d'attribuer la cause au firmware ou à la carte. L'auteur a choisi de ne pas le refaire pendant 1a.
 
-**Vu sur** Tab5 ST7121, firmware natif commit `e7a4803`, 06/11/2026. **Preuve** : journal du démarrage n° 9, constat de l'auteur ; détail dans [mesures/1a.md](mesures/1a.md). **Statut** : ouvert.
+**Vu sur** Tab5 ST7121, firmware natif commit `e7a4803`, 06/11/2026. **Preuve** : journal du démarrage n° 9, constat de l'auteur ; détail dans [mesures/1a.md](mesures/1a.md). **Statut** : ouvert. Jalon 1b (06/11/2026) : l'essai pas à pas a été **reporté par l'auteur** (« Pas maintenant », 20 h 59), ni fait ni raté ; voir [mesures/1b.md](mesures/1b.md).
 
 #### Retour à ESPHome jamais essayé
 
@@ -269,6 +295,32 @@ La recette de remise en état (trois écritures : début de flash, application, 
 #### Un script PowerShell est refusé : suppression visant le dossier d'ESP-IDF
 
 Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenant un `Remove-Item` visant le dossier de l'ESP-IDF d'ESPHome, même dans un script écrit ailleurs. Ne pas supprimer dans les scripts ; déplacer ou ignorer. **Statut** : contourné.
+
+#### `idf.py` s'arrête sur « macro expanded to blank string » dès qu'`esp_hosted` est une dépendance
+
+**Symptôme.** Après l'ajout d'`espressif/esp_hosted` 2.12.12, la configuration (`kconfgen`) s'arrête sur le Kconfig de ce composant avec « macro expanded to blank string ».
+
+**Cause.** Ce Kconfig lit `$(ESP_IDF_VERSION)` (par exemple « 5.5 »), une variable qu'ESP-IDF ne pose pas (il pose `IDF_VERSION`).
+
+**Solution.** `tools/idf.ps1` pose `ESP_IDF_VERSION` en « majeur.mineur » (ici 5.5) avant d'appeler `idf.py`, comme le fait ESPHome pour ses compilations.
+
+**Vu sur** PC de l'auteur, ESP-IDF 5.5.5, `esp_hosted` 2.12.12, 06/11/2026, commit `f86b066`. **Preuve** : la configuration et la compilation complète passent ensuite (binaire de 1 240 272 octets). **Statut** : résolu.
+
+#### `ninja` : « reglages_locaux.cmake is defined as an output multiple times »
+
+**Cause.** Un `set_property(DIRECTORY … CMAKE_CONFIGURE_DEPENDS …)` sur un fichier que CMake suit déjà parce que `main/CMakeLists.txt` le lit avec `include()`.
+
+**Solution.** Retirer le `set_property` : CMake relance la configuration tout seul quand un fichier inclus change. **Vu sur** PC de l'auteur, 06/11/2026. **Statut** : résolu.
+
+#### Un script neuf n'apparaît pas dans `git status` : le garde-fou des secrets l'ignorait
+
+**Cause.** Le motif `reglages_locaux*` du `.gitignore` (prévu pour `reglages_locaux.cmake`, généré, qui contient les identifiants Wi-Fi) correspondait aussi à `tools/reglages_locaux.ps1`. Rien ne prévient : le fichier n'apparaît simplement jamais (`git check-ignore -v <fichier>` montre le motif).
+
+**Solution.** Le script a été renommé `tools/preparer_wifi.ps1` ; le motif reste tel quel (c'est le garde-fou). **Vu sur** PC de l'auteur, 06/11/2026, commit `761d135`. **Statut** : résolu.
+
+#### Le garde de traduction ne voit pas les textes ajoutés en 1b
+
+`test/host/controle_i18n.py` ne lit que les constantes `kXxx = "…";` de `main/ui_bonjour.cpp` et `main/boot_info.cpp`, confrontées à la section « Écran Bonjour » de la table de traduction. Les textes nouveaux de 1b (horloge, état du réseau) vivent donc dans `main/textes_1b.h`, **hors table** et sans passer par `tr()` ; ils passeront par `tr()` avec la page de réglages. **Statut** : contourné, à refaire en phase 2.
 
 ---
 

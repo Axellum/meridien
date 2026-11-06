@@ -1,0 +1,7 @@
+// Modèle du fichier identifiants_wifi.h que main/CMakeLists.txt génère dans le dossier de construction (build/), hors git, à
+// partir de reglages_locaux.cmake (écrit par tools/preparer_wifi.ps1). Le fichier généré contient l'SSID et le mot de passe
+// du Wi-Fi EN CLAIR : ne jamais le copier, le joindre à une demande de support ni le versionner.
+#pragma once
+
+#define MERIDIEN_WIFI_SSID "@MERIDIEN_WIFI_SSID_C@"
+#define MERIDIEN_WIFI_MOT_DE_PASSE "@MERIDIEN_WIFI_MOT_DE_PASSE_C@"

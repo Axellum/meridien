@@ -24,6 +24,12 @@
 #define TAB5_EXPANDER_LCD_RST IO_EXPANDER_PIN_NUM_4
 #define TAB5_EXPANDER_TOUCH_RST IO_EXPANDER_PIN_NUM_5
 
+// Expandeur PI4IOE5V6408 en 0x44 : bit 0 = WIFI_EN, alimentation du coprocesseur ESP32-C6 (docs/tab5-pinout.md du depot Tab5,
+// "Wi-Fi power" ; M5Stack l'appelle BSP_WIFI_EN). Les autres bits (alimentation USB, charge de la batterie, extinction) ne sont
+// PAS touches par ce projet.
+#define TAB5_EXPANDER_POWER_WIFI_EN IO_EXPANDER_PIN_NUM_0
+// Reset du coprocesseur : GPIO15, impulsion generee par esp_hosted (reglages de boards/tab5/sdkconfig.defaults.board).
+
 #define TAB5_LCD_H_RES 720
 #define TAB5_LCD_V_RES 1280
 #define TAB5_DSI_LANES 2
@@ -50,6 +56,13 @@ esp_err_t tab5_lcd_reset_pulse(void);   // reset de la dalle (bit 4) : bas en pu
 esp_err_t tab5_touch_reset_pulse(void); // reset du tactile (bit 5) : bas puis haut, en push-pull
 esp_err_t tab5_touch_enable(void);      // tactile hors reset (bit 5 haut)
 esp_err_t tab5_backlight_set_percent(int percent);
+// Alimentation du coprocesseur radio (expandeur 0x44, bit 0). tab5_wifi_power_init() est appelee par tab5_io_init() ; une
+// erreur n'empeche pas l'ecran de demarrer (le Wi-Fi sera simplement absent).
+bool tab5_wifi_power_available(void);
+esp_err_t tab5_wifi_power_set(bool on);
+
+// tab5_wifi.c
+void tab5_wifi_note_power_on_ms(int32_t ms);
 
 // tab5_detect.c : lit la version du tactile Sitronix (ou cherche le GT911) ; attend que la puce reponde.
 esp_err_t tab5_detect_controller(tab5_display_controller_t *controller, uint8_t *touch_version, int32_t *elapsed_ms);

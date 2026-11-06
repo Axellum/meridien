@@ -54,6 +54,9 @@ $env:IDF_TOOLS_PATH = $racineIdf
 $env:IDF_PATH = $idfPath
 # Dit a idf_tools.py ou est l'environnement Python (sinon il cherche python_env\idf5.5_py3.13_env).
 $env:IDF_PYTHON_ENV_PATH = Split-Path -Parent (Split-Path -Parent $python)
+# Le Kconfig d'esp_hosted (2.12.x) lit $(ESP_IDF_VERSION), que ESP-IDF ne definit pas (il definit IDF_VERSION) : sans elle,
+# kconfgen s'arrete sur "macro expanded to blank string". ESPHome la pose de la meme facon, en "majeur.mineur".
+$env:ESP_IDF_VERSION = ($versionIdf -split '\.')[0..1] -join '.'
 $env:PATH = (($bins + (Split-Path -Parent $python)) -join ';') + ';' + $env:PATH
 # Le PC a deja plante a 6 compilations paralleles (consigne d'Axel : 4 au plus).
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) { $env:CMAKE_BUILD_PARALLEL_LEVEL = '4' }

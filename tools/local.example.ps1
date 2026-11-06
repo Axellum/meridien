@@ -8,3 +8,8 @@
 #
 # Autre moyen, sans fichier : definir la variable d'environnement MERIDIEN_IDF_RACINE (elle passe avant local.ps1).
 $IdfRacine = '<A ADAPTER : dossier de l''installation ESP-IDF>'
+
+# FichierEnv : chemin du fichier .env qui porte MERIDIEN_WIFI_SSID et MERIDIEN_WIFI_MOT_DE_PASSE (le nom et le mot de passe du
+# Wi-Fi de la compilation), lu par tools\preparer_wifi.ps1. Jamais copie dans le depot. Autres moyens : le parametre
+# -FichierEnv du script, ou la variable d'environnement MERIDIEN_ENV.
+$FichierEnv = '<A ADAPTER : chemin du fichier .env>'

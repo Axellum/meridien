@@ -1,4 +1,5 @@
-// Phase 1a : prouver l'écran, le tactile et LVGL sur le Tab5 (docs/plan.md). Aucune fonction produit ici.
+// Phase 1b : heure et date réelles sur l'écran, par le Wi-Fi du coprocesseur ESP32-C6 et SNTP (docs/plan.md). Les lignes de
+// diagnostic de la phase 1a (écran, tactile, compteur de démarrages) restent sous l'heure.
 #include "board.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -7,6 +8,8 @@
 #include "freertos/task.h"
 
 #include "boot_info.h"
+#include "commande_serie.h"
+#include "reseau.h"
 #include "ui_bonjour.h"
 
 static const char *TAG = "ecran";
@@ -16,7 +19,7 @@ static const char *TAG = "ecran";
 static constexpr int kBacklightPercent = 75;
 
 extern "C" void app_main(void) {
-    ESP_LOGI(TAG, "écran autonome, phase 1a ; ESP-IDF %s ; application démarrée à %d ms", esp_get_idf_version(),
+    ESP_LOGI(TAG, "écran autonome, phase 1b ; ESP-IDF %s ; application démarrée à %d ms", esp_get_idf_version(),
              static_cast<int>(esp_timer_get_time() / 1000));
 
     const ecran::BootInfo boot = ecran::boot_info_load();
@@ -37,4 +40,9 @@ extern "C" void app_main(void) {
     board_set_backlight_percent(kBacklightPercent);
     ESP_LOGI(TAG, "rétroéclairage allumé à %d %% à %d ms ; première image affichée", kBacklightPercent,
              static_cast<int>(esp_timer_get_time() / 1000));
+
+    // Le réseau démarre après la première image : l'écran garde le temps de démarrage mesuré en 1a (docs/mesures/1b.md dit
+    // si le Wi-Fi l'a changé).
+    ecran::reseau_demarrer(boot);
+    ecran::commande_serie_demarrer();
 }
