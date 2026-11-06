@@ -75,10 +75,10 @@ enum class Erreur : std::uint8_t {
     VersionInconnue,      // cache binaire d'un autre format
 };
 
-// Phrase courte pour l'écran (jamais un code ni un état brut).
+// Phrase courte pour l'écran (jamais un code ni un état brut) ; vide s'il n'y a pas d'erreur.
 constexpr std::string_view message_court(Erreur e) noexcept {
     switch (e) {
-        case Erreur::Aucune: return "Météo à jour";
+        case Erreur::Aucune: return "";  // jamais « à jour » : la fraîcheur se juge avec fraicheur()
         case Erreur::JsonInvalide: return "Réponse météo illisible";
         case Erreur::ChampAbsent: return "Donnée météo manquante";
         case Erreur::MauvaisType: return "Donnée météo inattendue";

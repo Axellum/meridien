@@ -555,7 +555,7 @@ constexpr int messages_courts_en_francais_sans_code() {
     VERIFIER(message_court(Erreur::TableauxIncoherents) == "Prévisions incohérentes");
     VERIFIER(message_court(Erreur::Corrompu) == "Cache météo corrompu");
     VERIFIER(message_court(Erreur::VersionInconnue) == "Cache météo trop ancien");
-    VERIFIER(message_court(Erreur::Aucune) == "Météo à jour");
+    VERIFIER(message_court(Erreur::Aucune).empty());   // sans erreur : rien à dire (surtout pas « à jour »)
     return 0;
 }
 
