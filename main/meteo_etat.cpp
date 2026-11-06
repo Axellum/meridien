@@ -55,6 +55,20 @@ int meteo_etat_echecs() {
 
 } // namespace ecran
 
+// PROVISOIRE : le contrat v2 (meteo_etat.h) est publié avant son implémentation pour que l'interface puisse se compiler et se
+// rendre. Tant que ce stub est là, aucune météo détaillée n'est produite : valide = faux, indices à -1.
+bool meteo_detail_lire(MeteoDetail *sortie) {
+    if (sortie == nullptr) {
+        return false;
+    }
+    std::memset(sortie, 0, sizeof(*sortie));
+    sortie->heure_courante = -1;
+    sortie->jour_courant = -1;
+    sortie->quart_courant = -1;
+    return false;
+}
+
+uint32_t meteo_detail_version() { return 0; }
 bool meteo_etat_lire(MeteoEtat *sortie) {
     if (sortie == nullptr) {
         return false;
