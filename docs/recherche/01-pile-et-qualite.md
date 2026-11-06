@@ -1,5 +1,13 @@
 # Pile de développement et qualité — recherche du 06/11/2026
 
+> **Summary (EN)** — Research note of 2026-11-06 on the development stack and quality tooling (two web-research agents plus checks on the maintainer's PC). "Vérifié" = confirmed by a command that day; "Non vérifié" = from a single source, to confirm before relying on it.
+> - Conclusion: native ESP-IDF + Espressif registry components + LVGL 9 through `esp_lvgl_port` + an in-house board layer (ADR-0001). Arduino/PlatformIO with M5Unified is faster for a prototype but its drivers and C6 handling are more opaque, so it is less sound for OTA, tests and two boards.
+> - Versions read that day: ESP-IDF 6.1 (27 Aug), 6.0.3, 5.5.6; LVGL 9.6.0; `esp_lvgl_port` 2.9.0; `esp_hosted` 3.1.0 / `esp_wifi_remote` 1.6.5. Verified on the PC: ESP-IDF 5.5.5 (GCC 14.2.0), which includes MIPI-DSI support for the P4.
+> - Board sources: the Tab5 display changed over time (ILI9881C + GT911, then ST7123, then ST7121) and sources contradict each other about the BSP's drivers; the Waveshare 7B repository is a model for per-chip-revision sdkconfig files; there is no registry component for the RX8130 RTC.
+> - Constraint: the owner decided on 2026-10-16 never to update the C6 coprocessor, so `esp_hosted` and `esp_wifi_remote` must be pinned to versions compatible with the C6 firmware already on the boards.
+> - P4 pitfalls listed: tearing and rotation (a fixed panel orientation avoids them), PSRAM settings, Tab5 screen-reset timing, the battery charger, Secure Boot ECDSA disabled on the P4. A proposed (not official) layout separates a pure C++ core testable on a PC from drivers, UI and board layers.
+> - Testing: no QEMU for the P4, Wokwi P4 is beta, an LVGL PC simulator with screenshot comparison helps (beware: it creates a missing reference, a false green), a hardware bench is still needed. CI and reliability: ESP-IDF CI action, OTA rollback after a self-test (confirming too early defeats it), core dump in flash, C++ exceptions off. Several tool suggestions are marked "not verified".
+
 Sources : 2 agents de recherche web (pile ; architecture et qualité) + vérifications faites sur le PC d'Axel. **Vérifié** = constaté par une commande ce jour-là. **Non vérifié** = affirmé par une source seule, à confirmer avant de s'y appuyer.
 
 ## Conclusion
@@ -11,7 +19,7 @@ ESP-IDF natif + composants du registre Espressif + LVGL 9 via `esp_lvgl_port` + 
 | Élément | Version | Source |
 |---|---|---|
 | ESP-IDF | 6.1 « Latest » (27/08) ; 6.0.3 (02/09) ; 5.5.6 (16/10) | github.com/espressif/esp-idf/releases |
-| ESP-IDF sur le PC | **5.5.5, vérifié** (`idf.py --version`, GCC RISC-V 14.2.0, CMake 3.30.2, Ninja 1.12.1) dans `H:\idf`, installé par ESPHome | `tools/idf.ps1` |
+| ESP-IDF sur le PC | **5.5.5, vérifié** (`idf.py --version`, GCC RISC-V 14.2.0, CMake 3.30.2, Ninja 1.12.1) dans le dossier ESP-IDF installé par ESPHome sur le PC d'Axel | `tools/idf.ps1` |
 | LVGL | 9.6.0 (16/09) | github.com/lvgl/lvgl/releases |
 | `esp_lvgl_port` | 2.9.0 (LVGL 8 et 9) ; `esp_lvgl_adapter` (IDF ≥ 5.5, gère tearing et rotation) | components.espressif.com |
 | `esp_hosted` / `esp_wifi_remote` | 3.1.0 / 1.6.5 | components.espressif.com |

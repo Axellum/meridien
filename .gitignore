@@ -12,6 +12,9 @@ sdkconfig.old
 secrets*
 reglages_locaux*
 
+# Chemins propres a chaque PC (modele suivi : tools/local.example.ps1)
+tools/local.ps1
+
 # Outils
 .claude/
 .vscode/

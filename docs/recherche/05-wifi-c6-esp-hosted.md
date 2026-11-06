@@ -1,6 +1,13 @@
 # Wi-Fi par le C6 (esp_hosted), SoftAP et portail captif — recherche du 06/11/2026 (jalons 1b et 1d)
 
-Sources : lecture du dépôt Tab5 (`H:\AuxFilsDesIdees\00ProjetTab\docs\`, lecture seule), historique de Home Assistant (lecture seule), registre et dépôts Espressif. **Toutes les pages web ont été lues le 06/11/2026** par des agents de recherche dont l'outil rend parfois un résumé et non le texte brut : un code ou une valeur cités ici sont à relire dans le fichier source avant d'en dépendre (colonne « Lu » : *brut* ou *résumé* quand l'agent l'a dit). **Vérifié** = vu dans une source citée. **Non vérifié** = absent des sources lues ou non confirmé. Rien n'a été exécuté sur une carte.
+> **Summary (EN)** — Research note of 2026-11-06 for milestones 1b (Wi-Fi through the ESP32-C6) and 1d (SoftAP and captive portal). Sources are web pages summarised by agents (a quoted value must be re-read in the source before relying on it), the Tab5 repository and Home Assistant history (read-only). Nothing was run on a board.
+> - The Tab5's C6 very probably carries the factory ESP-Hosted firmware 1.4.1 (the "C6 Version" sensor reads 1.4.1; M5Stack's demo ships that binary). The pairing proven on this tablet is the ESPHome one: host `esp_hosted` 2.12.12, SDIO 20 MHz, reset on GPIO15 active high, PSRAM buffers; about fifty boots without Wi-Fi loss since 2026-09-30 according to the Tab5 repository.
+> - A host newer than the C6 is only a warning in the code; what it announces (RPC timeouts) is a risk, not a measured fact. The C6 must never be written to.
+> - SoftAP: an official example exists for P4 + C6, but no source read shows it with a C6 left on 1.4.1, nor with a captive portal; this is what 1d must measure. `espressif/dns_server` is not in the registry: the capturing DNS server has to be copied from ESP-IDF's `captive_portal` example.
+> - Most likely trap in 1b: the C6 is not powered unless the I/O expander sets `wifi_power` (bit 0 of the 0x44 expander) before `esp_hosted` starts.
+> - The note also lists known bugs and recovery after a reboot (C6 stuck after a transport failure, SDIO state errors, memory), what phones do with captive portals (third-party sources: the official Android and Apple pages could not be read), a 1b test plan including 20 consecutive reboots, and a long "not verified" list (for example SoftAP and DHCP behaviour with a C6 on 1.4.1, and the reset polarity: active high in ESPHome, active low at M5Stack).
+
+Sources : lecture du dépôt Tab5 (dossier `docs/` de `Axellum/M5-Tab5-ESPHome-LVGL`, lecture seule), historique de Home Assistant (lecture seule), registre et dépôts Espressif. **Toutes les pages web ont été lues le 06/11/2026** par des agents de recherche dont l'outil rend parfois un résumé et non le texte brut : un code ou une valeur cités ici sont à relire dans le fichier source avant d'en dépendre (colonne « Lu » : *brut* ou *résumé* quand l'agent l'a dit). **Vérifié** = vu dans une source citée. **Non vérifié** = absent des sources lues ou non confirmé. Rien n'a été exécuté sur une carte.
 
 ## Conclusion
 
@@ -17,8 +24,8 @@ Sources : lecture du dépôt Tab5 (`H:\AuxFilsDesIdees\00ProjetTab\docs\`, lectu
 
 | Fait | Valeur | Source | Lu |
 |---|---|---|---|
-| Capteur HA `sensor.tab5_c6_version` | `1.4.1` du 30/10/2026 08:56 au 01/11/2026 (états lus sur 10 lignes d'historique) | historique de Home Assistant, lecture seule, via l'API | 06/11/2026 |
-| Quelle tablette ? | **Non vérifié.** L'entité `tab5_…` n'est pas rattachée à une MAC dans ce que j'ai lu. La première tablette (ST7123) est au SAV depuis le 16/10 (`docs/plan.md`) : à ces dates c'est très probablement le Tab5 ST7121 de développement. L'autre entité (`m5stack_tab5_home_assistant_hmi_c6_version`) reste « Unknown » | idem | 06/11/2026 |
+| Capteur « C6 Version » du firmware ESPHome (dans Home Assistant) | `1.4.1` du 30/10/2026 08:56 au 01/11/2026 (états lus sur 10 lignes d'historique) | historique de Home Assistant, lecture seule, via l'API | 06/11/2026 |
+| Quelle tablette ? | **Non vérifié.** L'entité du capteur n'est pas rattachée à une MAC dans ce que j'ai lu. La première tablette (ST7123) est au SAV depuis le 16/10 (`docs/plan.md`) : à ces dates c'est très probablement le Tab5 ST7121 de développement. L'autre entité de version du C6 reste « Unknown » | idem | 06/11/2026 |
 | Note de l'autre projet Tab5 : « 2.12.12 sur le P4, 1.4.1 sur le C6 », aucun délai RPC vu | dépôt Tab5, `docs/hardware.md` (« Notes from another Tab5 project »), tablette de l'auteur au 07/10/2026 | fichier local | 06/11/2026 |
 | Firmware C6 de la démo M5Stack | `platforms/tab5/wifi_c6_fw/ESP32C6-WiFi-SDIO-Interface-V1.4.1-96bea3a_0x0.bin` | [M5Tab5-UserDemo/…/wifi_c6_fw](https://github.com/m5stack/M5Tab5-UserDemo/tree/main/platforms/tab5/wifi_c6_fw) | 06/11/2026, résumé |
 | Démo M5Stack côté hôte | `esp_hosted` **1.4.0**, `esp_wifi_remote` **0.8.5**, `idf >=5.3`, verrou sur ESP-IDF **5.4.2** | [dependencies.lock](https://raw.githubusercontent.com/m5stack/M5Tab5-UserDemo/main/platforms/tab5/dependencies.lock) | 06/11/2026, résumé |
@@ -195,7 +202,7 @@ Le fond est dans [03-meteo-heure-reglages-calendrier.md](03-meteo-heure-reglages
 
 ## Non vérifié
 
-- La tablette dont l'entité HA `sensor.tab5_c6_version` donne `1.4.1` est-elle la ST7121 de développement ? (probable, non lié à une MAC).
+- La tablette dont le capteur « C6 Version » de Home Assistant donne `1.4.1` est-elle la ST7121 de développement ? (probable, non lié à une MAC).
 - Compatibilité de l'hôte 2.12.12, 1.4.0 ou 3.x avec le C6 en 1.4.1 pour le **SoftAP** et le DHCP ; présence de l'API AP côté C6 1.4.1.
 - Version d'`esp_wifi_remote` utilisée par ESPHome ; borne `esp_hosted` de `esp_wifi_remote` 1.6.5 ; compilation d'`esp_hosted` 1.4.0 + `esp_wifi_remote` 0.8.5 sous ESP-IDF 5.5.5.
 - Le préréglage `ESP32P4_TAB5_C6_BOARD` d'`esp_hosted` (Kconfig de l'hôte en 404 ; seule la note « Jiuhai » du dépôt Tab5 le décrit).

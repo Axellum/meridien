@@ -1,0 +1,32 @@
+# EditorConfig — https://editorconfig.org
+#
+# Décrit le style déjà en place dans le dépôt (relevé le 2026-11-06 sur le contenu de l'index git), pour que l'éditeur de
+# chacun écrive pareil. Il ne reformate rien : un éditeur ne l'applique qu'aux lignes qu'on tape ou à l'enregistrement.
+#
+# - UTF-8 sans BOM et fins de ligne LF : tout l'index est en LF. Sous Windows, core.autocrlf=true extrait en CRLF mais git
+#   garde du LF dans l'index ; les crochets git (.githooks/) doivent rester en LF (.gitattributes).
+# - Aucune tabulation dans les fichiers suivis. 4 espaces pour le C, le C++, Python et PowerShell (le style C/C++ détaillé
+#   est dans .clang-format, celui de Python dans ruff.toml) ; 2 espaces pour la page web, JSON et YAML.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{c,h,cpp,hpp,inc,py,ps1}]
+indent_size = 4
+
+[*.{js,mjs,css,html,json,yml,yaml,lock}]
+indent_size = 2
+
+# Deux espaces en fin de ligne font un saut de ligne en Markdown : ne pas les retirer.
+[*.md]
+trim_trailing_whitespace = false
+
+# Fichiers copiés tels quels (texte de licence, données amont, réponses et exports capturés) : ne pas les « nettoyer ».
+[{main/assets/OFL.txt,components/core/outils/posix_tz_db/*,test/host/donnees/*.json,web/captures/*.json}]
+trim_trailing_whitespace = false
+insert_final_newline = unset
