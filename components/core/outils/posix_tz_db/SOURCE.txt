@@ -1,0 +1,5 @@
+Source : https://github.com/nayarsystems/posix_tz_db (fichier zones.csv, branche master)
+Commit : 93447c0ddac304ca6672a5fd905261c7e8905159 (2025-09-29T10:34:51Z)
+Licence : MIT (fichier LICENSE copié tel quel ; son en-tête "Copyright (c) [year] [fullname]" n'est pas rempli dans le dépôt d'origine)
+Récupéré le 06/11/2026 par curl ; 461 lignes.
+Ne pas modifier zones.csv : les compléments sont dans ../generer_fuseaux.py.
