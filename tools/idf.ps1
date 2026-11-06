@@ -1,20 +1,36 @@
-# Lance idf.py avec l'ESP-IDF deja installe par ESPHome dans H:\idf (rien de nouveau a installer).
+# Lance idf.py avec l'ESP-IDF deja installe par ESPHome (rien de nouveau a installer). Le dossier de cette
+# installation est propre a chaque PC : il vient de tools\local.ps1 (modele : tools\local.example.ps1).
 #
 # Usage (PowerShell, jamais Git Bash) :
 #   .\tools\idf.ps1 --version
 #   .\tools\idf.ps1 set-target esp32p4
 #   .\tools\idf.ps1 build
 #
-# Pourquoi ce script et pas export.ps1 : l'install de H:\idf appartient a ESPHome (fichier
+# Pourquoi ce script et pas export.ps1 : cette install appartient a ESPHome (fichier
 # .esphome.stamp.json dans penvs\5.5.5) et son export.ps1 cherche un environnement Python a un autre
 # emplacement (python_env\idf5.5_py3.13_env), qui n'existe pas -> erreur. On appelle donc idf.py avec le
 # Python du penv et on pose le PATH nous-memes. Verifie le 06/11/2026 : idf.py v5.5.5, GCC RISC-V 14.2.0.
-# Ne JAMAIS modifier H:\idf (ESPHome peut le mettre a jour) ; s'il disparait ou change de version,
+# Ne JAMAIS modifier ce dossier (ESPHome peut le mettre a jour) ; s'il disparait ou change de version,
 # installer un ESP-IDF a part (voir docs/decisions/0001-pile-esp-idf-natif.md).
 param([Parameter(ValueFromRemainingArguments = $true)][string[]]$ArgsIdf)
 
 $ErrorActionPreference = 'Stop'
-$racineIdf = 'H:\idf'
+# Dossier de l'installation ESP-IDF : jamais ecrit dans le depot. Ordre de recherche : la variable d'environnement
+# MERIDIEN_IDF_RACINE, puis tools\local.ps1 (ignore par git) de ce dossier de travail, puis celui du dossier
+# principal du depot (utile dans un worktree git, ou chaque dossier n'aurait sinon pas son local.ps1).
+$racineIdf = $env:MERIDIEN_IDF_RACINE
+if (-not $racineIdf) {
+    $locaux = @(Join-Path $PSScriptRoot 'local.ps1')
+    $commun = $null
+    try { $commun = git -C $PSScriptRoot rev-parse --path-format=absolute --git-common-dir 2>$null } catch { }
+    if ($commun) { $locaux += Join-Path (Split-Path -Parent $commun) 'tools\local.ps1' }
+    foreach ($local in $locaux) {
+        if (Test-Path $local) { . $local; $racineIdf = $IdfRacine; break }
+    }
+}
+if (-not $racineIdf -or $racineIdf -like '<*') {
+    throw "Dossier ESP-IDF inconnu : copier tools\local.example.ps1 en tools\local.ps1 et l'adapter, ou definir MERIDIEN_IDF_RACINE."
+}
 $versionIdf = '5.5.5'
 $idfPath = Join-Path $racineIdf "frameworks\$versionIdf"
 $python = Join-Path $racineIdf "penvs\$versionIdf\Scripts\python.exe"
