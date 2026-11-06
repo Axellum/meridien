@@ -1,0 +1,65 @@
+# Plan — écran autonome
+
+Rédigé le 06/11/2026. Les phases sont ordonnées **du plus risqué au moins risqué** : on prouve d'abord ce qui peut tout faire échouer (duplex audio avec AEC, portail captif par le C6, Wi-Fi avec le C6 non mis à jour), pas l'interface. Chiffrage : [cout.md](cout.md). Choix techniques : [decisions/](decisions/).
+
+**Règle de « fait » (toutes phases)** : un critère n'est rempli que s'il a été **constaté** sur l'appareil (écran, journal série, version et heure de compilation lues sur la carte, redémarrage compris) ou, pour la logique pure, par un test hôte qui échoue sans le correctif. « Build OK » et « flash OK » ne comptent pas.
+
+## Phase 0 — Préparation (faite le 06/11/2026)
+
+Faits constatés : chaîne de compilation ESP32-P4 prouvée (ESP-IDF 5.5.5, squelette compilé en 38 s, `build/ecran_autonome.bin` 204 048 octets, **non flashé**) ; 8 recherches/audits consignés dans [recherche/](recherche/) ; 5 ADR proposées ; CORS et taille de la requête météo mesurés. Rien exécuté sur une carte.
+
+## Phase 1 — Prouver le matériel sur le Tab5 (le plus risqué)
+
+Chaque jalon a un critère mesurable et un repli.
+
+| Jalon | Fini = | Repli si échec |
+|---|---|---|
+| 1a. Sauvegarde de la flash, écran + tactile + LVGL « bonjour » | sauvegarde relue et vérifiée ; une image LVGL s'affiche **après redémarrage et après coupure** ; le tactile répond ; le contrôleur (ST7121/ST7123/ILI9881C) est identifié dans le journal | revenir à la sauvegarde ESPHome (restauration documentée avant le premier flash) |
+| 1b. Wi-Fi par le C6 (esp_hosted épinglé) + SNTP | heure correcte affichée au démarrage, après un redémarrage logiciel (via `esp_rom_software_reset_system()`) et après une coupure de courant ; **20 redémarrages de suite sans perte du lien** | essayer une autre version d'`esp_hosted` ; ne jamais mettre à jour le C6 (décision d'Axel) |
+| 1c. Audio duplex + AEC | lecture ES8388 **et** capture ES7210 en même temps ; **mesure** de l'écho du haut-parleur dans le micro avant/après AEC ; le mot d'activation est détecté pendant que le haut-parleur joue | pas d'AEC : micro coupé pendant la réponse, un appui sur l'écran interrompt (ADR-0002) |
+| 1d. Portail captif par SoftAP via le C6 | un téléphone Android **et** un iPhone atteignent la page de test (test physique, constaté par Axel) | saisie du Wi-Fi sur l'écran tactile + QR code vers la page |
+
+**Barrière de décision** à la fin de la phase 1 : Axel voit les mesures et confirme ou ajuste le plan avant d'engager les phases 2 à 4.
+
+## Phase 2 — Écran principal : heure, date, météo
+
+Horloge et date (fuseau en NVS), client Open-Meteo (requête minimale, cache NVS, « périmé » hors ligne), table WMO → libellé français + icône jour/nuit, thèmes et polices repris du dépôt Tab5, textes via une table de traduction, extinction/veille de l'écran. **Fini =** l'écran affiche une météo qui correspond à celle de la même ville sur le site d'Open-Meteo au moment du contrôle ; coupure du Wi-Fi → la dernière météo reste avec la mention « périmée » ; redémarrage → l'écran revient seul avec la bonne heure. Jalon 7B : compile pour les deux cartes (CI) ; essai physique de la 7B.
+
+## Phase 3 — Page de réglages
+
+SoftAP + portail captif (selon 1d), jeton d'appairage affiché à l'écran, mDNS, API REST, front (Wi-Fi, zone avec recherche de lieu, langue/thème/luminosité, trois cartes STT/LLM/TTS avec « tester », export/import sans clés, mise à jour par la page avec rollback). **Fini =** depuis un téléphone neuf : brancher l'appareil, atteindre la page, choisir « Lyon », voir la météo de Lyon à l'écran sans toucher à un fichier ni compiler ; une clé API n'est jamais lisible dans une réponse de l'API ; un téléversement d'une image volontairement cassée revient à l'ancienne par rollback. Axel valide le **rendu** de la page sur son téléphone.
+
+## Phase 4 — Assistant vocal
+
+Mot d'activation → STT → LLM en streaming → TTS, états à l'écran (prêt, écoute, réflexion, réponse, erreur) en phrases courtes, interruption, erreurs parlées ; backends cloud et local par préréglage. **Fini =** 20 échanges réels en français (accents, questions météo et heure) avec un LLM local **et** un cloud, latence mesurée de la fin de la phrase au début de la réponse, nombre de faux déclenchements sur une soirée, redémarrage sans perte des réglages. Jalon 7B : essai physique.
+
+## Phase 5 — Finition et qualité
+
+Tests hôte du noyau pur, simulateur LVGL PC avec captures de référence (refus de créer une référence en CI), CI GitHub Actions des deux cartes, core dump en flash, journal consultable depuis la page, auto-test de démarrage qui valide le rollback, scan des secrets, documentation, premier tag. Jalon 7B : essai physique complet.
+
+## Phase 6 — Compatibilité Waveshare 7B
+
+La couche carte est écrite dès la phase 1 (ADR-0005) et la CI compile les deux cartes ; cette phase regroupe le portage des pilotes (EK79007, GT911, ES8311 avec volume limité à 75 %, pas d'expandeur) et les **jalons physiques** sur la 7B de la maison (à la fin des phases 2, 4 et 5). **Fini =** les critères des phases 2 et 4 sont constatés sur la 7B, y compris après 20 redémarrages logiciels (boucle du lien C6 connue sur cette carte) ; écran éteint = vraiment noir.
+
+## Phase 7 — Version 2 : calendrier (ICS)
+
+Voir ADR-0004. Prérequis : évaluer `uICAL` sur un **vrai agenda d'Axel** (événements « toute la journée », récurrences, fuseaux) avant de s'engager. **Fini =** les événements du jour affichés correspondent à ceux de l'agenda ; limite de fraîcheur annoncée dans la page.
+
+## Risques (par gravité)
+
+1. **AEC duplex sur Tab5** : aucun exemple trouvé. Levé en 1c.
+2. **Portail captif par esp_hosted** : non démontré sur P4+C6. Levé en 1d.
+3. **Lien C6** : boucle SDIO vue sur la 7B, écran noir après OTA sur le Tab5 ; mise à jour du C6 interdite. Levé en 1b (20 redémarrages), reset CORE repris du dépôt Tab5.
+4. **Une seule carte Tab5 valide, déjà en service** (voir décision 1).
+5. **Dérive de portée** : « un assistant qui fait tout » ; la domotique est hors périmètre. Tout ajout passe par un ADR.
+6. **Licences** : WakeNet limité aux produits Espressif ; Open-Meteo non commercial ; IconeMeteo (pack de Laura Reen) non vérifiée.
+7. **Quotas de session** : la fenêtre de 5 h est déjà à 42 % à l'écriture de ce plan, toutes sessions confondues. Voir cout.md.
+
+## Décisions à prendre par Axel
+
+1. **Quelle carte pour le développement ?** Le Tab5 en service (ST7121) est aujourd'hui l'un des deux écrans de la maison dans Home Assistant (avec la 7B) ; la première tablette (ST7123) est en SAV M5Stack depuis octobre. Recommandation : prendre le Tab5 en service **après sauvegarde complète de sa flash** (restauration = retour à l'état actuel) et accepter qu'il quitte Home Assistant pendant le développement. Alternative : attendre le retour du SAV, ou acheter une troisième carte.
+2. **Mot d'activation** : « Bonjour ESP » (modèle officiel, français) ou entraînement d'un mot propre (coût et licence non documentés). Recommandation : « Bonjour ESP » pour la phase 4, mot propre ensuite.
+3. **Où tournent les STT/TTS locaux** : LM Studio n'a pas d'audio. Il faut un service STT et un TTS sur le PC (ou le Deck). Recommandation : tester d'abord le cloud (rapide), puis Kokoro (voix française) + un STT local, sur le PC d'Axel.
+4. **Nom, dépôt, visibilité, licence** : nom provisoire « écran autonome ». Un dépôt GitHub public serait une publication : à décider par Axel. Licence suggérée MIT comme le dépôt Tab5 (usage d'Open-Meteo : non commercial, CC BY 4.0, à citer).
+5. **Version d'ESP-IDF** : 5.5.5 (recommandé) ou 6.x (ADR-0001).
+6. **Calendrier** : accepter une fraîcheur de 6 à 24 h avec l'adresse iCal (ADR-0004).

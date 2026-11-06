@@ -1,0 +1,3 @@
+# Reglages communs aux deux cartes. Ce qui depend de la carte (flash, PSRAM, frequence CPU, revision de
+# puce) ira dans boards/<carte>/sdkconfig.defaults.board en phase 1, une fois mesure sur l'appareil.
+CONFIG_IDF_TARGET="esp32p4"

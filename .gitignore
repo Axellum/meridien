@@ -1,0 +1,19 @@
+# Compilation et composants telecharges
+build/
+managed_components/
+.cache/
+sdkconfig
+sdkconfig.old
+
+# Secrets : jamais dans le depot
+.env
+*.pem
+*.key
+secrets*
+reglages_locaux*
+
+# Outils
+.claude/
+.vscode/
+__pycache__/
+*.pyc
