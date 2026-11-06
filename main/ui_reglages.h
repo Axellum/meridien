@@ -46,6 +46,19 @@ void ui_simuler_saisie(const char *texte, bool valider = false);
 
 } // namespace ecran
 
-// Appelé par l'écran principal (bouton « Réglages ») : ouvre la liste des réglages par-dessus. Défini dans ui_reglages_ouvrir.cpp
-// (colle du firmware : afficheur de la carte, hôte, police), jamais compilé par le rendu PC.
+namespace ecran {
+
+// Supprime ce que l'interface a construit (pile d'écrans, champs, minuteries). À appeler quand `ContexteReglages::fermer` est
+// appelé et AVANT de supprimer la racine : sinon la prochaine ouverture toucherait des objets déjà supprimés.
+void ui_reglages_liberer();
+
+} // namespace ecran
+
+// Appelé par l'écran principal (bouton « Réglages ») : ouvre la liste des réglages sur un écran à part, l'écran principal reste
+// dessous, intact. Défini dans ui_reglages_ouvrir.cpp (colle du firmware : afficheur de la carte, hôte, police), jamais compilé
+// par le rendu PC. À appeler dans la tâche LVGL, verrou pris.
 void ui_reglages_ouvrir();
+
+// À appeler UNE fois après le chargement de l'écran principal : ouvre l'installation guidée si l'hôte dit qu'elle n'est pas terminée
+// (carte neuve, ou redémarrage au milieu : elle reprend à l'étape où elle était). Sans effet si elle est terminée.
+void ui_installation_ouvrir_si_necessaire();

@@ -72,12 +72,6 @@ lv_obj_t *construire(Entree &e) {
     return obj;
 }
 
-void montrer(Entree &e) {
-    if (e.obj != nullptr) {
-        lv_obj_remove_flag(e.obj, LV_OBJ_FLAG_HIDDEN);
-    }
-}
-
 void cacher(Entree &e) {
     if (e.obj != nullptr) {
         lv_obj_add_flag(e.obj, LV_OBJ_FLAG_HIDDEN);
@@ -1469,6 +1463,8 @@ lv_obj_t *construire_recherche_ville(Entree &) {
 // ---- API publique ----------------------------------------------------------------------------------------------------------------------
 
 namespace ecran {
+
+void ui_reglages_liberer() { ui::nav_vider(); }
 
 void ui_reglages_creer(const ContexteReglages &ctx) {
     ui::nav_vider();
