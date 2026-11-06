@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 namespace ecran {
@@ -22,13 +23,16 @@ const char *TAG = "commande_serie";
 constexpr const char *kCommandeRedemarrer = "redemarrer";
 constexpr const char *kCommandeMemoire = "memoire";
 constexpr const char *kCommandeBlocs = "blocs";
+constexpr const char *kCommandePiles = "piles";
+constexpr const char *kCommandeTourner3 = "tourner3";
+constexpr const char *kCommandeTourner0 = "tourner0";
 
 // --- Budget de la mémoire interne (jalon 1b, provisoire) ---------------------------------------------------------------------
 // « blocs » parcourt le tas interne (heap_caps_walk) et rend : le total utilisé et libre, le nombre de blocs par classe de taille,
 // et les plus gros blocs utilisés (adresse, taille). Les piles de tâches, les tampons de dessin, les tampons TLS sont des blocs
 // de taille reconnaissable : on les attribue par leur taille et par le journal de démarrage. Le parcours ne fait aucune
 // allocation ni aucun affichage pendant qu'il tient le verrou du tas : il remplit un tableau fixe, imprimé ensuite.
-constexpr int kBlocsGardes = 40;
+constexpr int kBlocsGardes = 64;
 constexpr int kClasses = 7;
 constexpr uint32_t kBornesClasses[kClasses - 1] = {64, 256, 1024, 4096, 16384, 65536};
 
@@ -50,6 +54,13 @@ struct Releve {
 };
 
 Releve g_releve;
+
+// g_releve est partagé par « blocs » et par les jalons, appelés depuis plusieurs tâches : un seul parcours à la fois.
+SemaphoreHandle_t verrou_releve() {
+    static StaticSemaphore_t tampon;
+    static SemaphoreHandle_t verrou = xSemaphoreCreateMutexStatic(&tampon);
+    return verrou;
+}
 
 bool parcourir(walker_heap_into_t, walker_block_info_t bloc, void *) {
     Releve &r = g_releve;
@@ -87,6 +98,7 @@ bool parcourir(walker_heap_into_t, walker_block_info_t bloc, void *) {
 }
 
 void journaliser_blocs() {
+    xSemaphoreTake(verrou_releve(), portMAX_DELAY);
     g_releve = Releve{};
     heap_caps_walk(MALLOC_CAP_INTERNAL, parcourir, nullptr);
     const Releve &r = g_releve;
@@ -99,7 +111,7 @@ void journaliser_blocs() {
         ESP_LOGI(TAG, "BLOCS_CLASSE %s : %u blocs, %u octets", noms[c], static_cast<unsigned>(r.classe_nombre[c]),
                  static_cast<unsigned>(r.classe_octets[c]));
     }
-    // Les plus gros d'abord (tri par sélection : 40 éléments).
+    // Les plus gros d'abord (tri par sélection : 64 éléments).
     Bloc tries[kBlocsGardes];
     std::memcpy(tries, r.gros, sizeof(Bloc) * static_cast<std::size_t>(r.gardes));
     for (int i = 0; i < r.gardes; ++i) {
@@ -115,9 +127,87 @@ void journaliser_blocs() {
         ESP_LOGI(TAG, "BLOC rang=%d adresse=0x%08x taille=%u", i + 1, static_cast<unsigned>(tries[i].adresse),
                  static_cast<unsigned>(tries[i].taille));
     }
+    xSemaphoreGive(verrou_releve());
+}
+
+// Une seule ligne : le nombre de blocs et les octets utilisés par classe de taille, à une étape du démarrage. Les différences
+// entre deux étapes disent QUELLE classe de blocs l'étape a consommée (petits objets, tampons, piles).
+void journaliser_classes(const char *etape) {
+    xSemaphoreTake(verrou_releve(), portMAX_DELAY);
+    g_releve = Releve{};
+    heap_caps_walk(MALLOC_CAP_INTERNAL, parcourir, nullptr);
+    const Releve &r = g_releve;
+    ESP_LOGI("jalon_mem",
+             "JALON_CLASSES t_ms=%lld etape=\"%s\" utilise=%u libre=%u c0=%u/%u c1=%u/%u c2=%u/%u c3=%u/%u c4=%u/%u "
+             "c5=%u/%u c6=%u/%u",
+             static_cast<long long>(esp_timer_get_time() / 1000), etape, static_cast<unsigned>(r.utilise),
+             static_cast<unsigned>(r.libre), static_cast<unsigned>(r.classe_nombre[0]),
+             static_cast<unsigned>(r.classe_octets[0]), static_cast<unsigned>(r.classe_nombre[1]),
+             static_cast<unsigned>(r.classe_octets[1]), static_cast<unsigned>(r.classe_nombre[2]),
+             static_cast<unsigned>(r.classe_octets[2]), static_cast<unsigned>(r.classe_nombre[3]),
+             static_cast<unsigned>(r.classe_octets[3]), static_cast<unsigned>(r.classe_nombre[4]),
+             static_cast<unsigned>(r.classe_octets[4]), static_cast<unsigned>(r.classe_nombre[5]),
+             static_cast<unsigned>(r.classe_octets[5]), static_cast<unsigned>(r.classe_nombre[6]),
+             static_cast<unsigned>(r.classe_octets[6]));
+    xSemaphoreGive(verrou_releve());
+}
+
+// « piles » : pour chaque tâche, l'adresse de base de sa pile (à rapprocher des lignes BLOC), la marge minimale restante et la
+// priorité. Demande CONFIG_FREERTOS_USE_TRACE_FACILITY=y, activé seulement dans le sdkconfig local des binaires de mesure.
+void journaliser_piles() {
+#if CONFIG_FREERTOS_USE_TRACE_FACILITY
+    const UBaseType_t nombre = uxTaskGetNumberOfTasks();
+    auto *taches = static_cast<TaskStatus_t *>(
+        heap_caps_calloc(nombre + 4, sizeof(TaskStatus_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (taches == nullptr) {
+        ESP_LOGW(TAG, "PILES : tableau non alloué");
+        return;
+    }
+    const UBaseType_t lues = uxTaskGetSystemState(taches, nombre + 4, nullptr);
+    for (UBaseType_t i = 0; i < lues; ++i) {
+        ESP_LOGI(TAG, "PILE nom=%s base=0x%08x libre_min=%u priorite=%u", taches[i].pcTaskName,
+                 static_cast<unsigned>(reinterpret_cast<uintptr_t>(taches[i].pxStackBase)),
+                 static_cast<unsigned>(taches[i].usStackHighWaterMark),
+                 static_cast<unsigned>(taches[i].uxCurrentPriority));
+    }
+    ESP_LOGI(TAG, "PILES : %u tâches", static_cast<unsigned>(lues));
+    heap_caps_free(taches);
+#else
+    ESP_LOGW(TAG, "PILES : CONFIG_FREERTOS_USE_TRACE_FACILITY absent de ce binaire");
+#endif
+}
+
+// « tourner3 » / « tourner0 » : essai du chien de garde des tâches (provisoire). Une tâche épinglée sur le cœur 0 calcule 8 s sans jamais
+// s'endormir, à la priorité 3 (celle qu'avait la météo) ou 0 (celle de la tâche d'inactivité). À 3, IDLE0 ne tourne plus : le
+// chien de garde (5 s) doit se déclencher ; à 0, il ne doit pas.
+void tache_tourner(void *) {
+    const int64_t fin = esp_timer_get_time() + 8000000;
+    volatile uint32_t compteur = 0;
+    while (esp_timer_get_time() < fin) {
+        compteur = compteur + 1;
+    }
+    ESP_LOGI(TAG, "TOURNER fini : 8 s de calcul sans pause, sur le cœur 0");
+    vTaskDelete(nullptr);
+}
+
+void lancer_tourner(UBaseType_t priorite) {
+    ESP_LOGI(TAG, "TOURNER priorité %u : début", static_cast<unsigned>(priorite));
+    xTaskCreatePinnedToCore(tache_tourner, "tourner", 3072, nullptr, priorite, nullptr, 0);
 }
 
 void traiter(const char *ligne) {
+    if (std::strcmp(ligne, kCommandeTourner3) == 0) {
+        lancer_tourner(3);
+        return;
+    }
+    if (std::strcmp(ligne, kCommandeTourner0) == 0) {
+        lancer_tourner(0);
+        return;
+    }
+    if (std::strcmp(ligne, kCommandePiles) == 0) {
+        journaliser_piles();
+        return;
+    }
     if (std::strcmp(ligne, kCommandeMemoire) == 0) {
         // Une ligne « MEMOIRE … » par demande, lue par le banc du PC pour suivre la mémoire libre dans le temps (provisoire, comme
         // « redemarrer »). Rien ne tourne tant qu'elle n'est pas demandée : la mesure n'ajoute aucune activité à la carte.
@@ -168,6 +258,8 @@ void tache_lecture(void *) {
 
 } // namespace
 
+void memoire_blocs() { journaliser_blocs(); }
+
 void memoire_jalon(const char *etape) {
     // Le delta est celui de la mémoire interne libre depuis l'appel précédent, TOUTES tâches confondues : pendant le démarrage les
     // tâches lancées plus tôt (réseau, serveur) allouent aussi, le delta d'une étape n'est donc exact que tant qu'elles dorment.
@@ -181,6 +273,7 @@ void memoire_jalon(const char *etape) {
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL)),
              static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)));
     precedent = libre;
+    journaliser_classes(etape);
 }
 
 void commande_serie_demarrer() {

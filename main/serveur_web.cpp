@@ -510,6 +510,7 @@ void tache_serveur(void *) {
     }
     const bool mdns = demarrer_mdns();
     memoire_jalon("après httpd_start et mDNS (piles 20 Ko et 4 Ko)");
+    memoire_blocs(); // photo du tas juste avant la première requête TLS de la météo
 
     char ip[16] = {};
     std::memcpy(ip, reseau_etat().ip, sizeof(ip));

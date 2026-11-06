@@ -11,4 +11,7 @@ void commande_serie_demarrer();
 // « memoire »). Une ligne « JALON_MEM … » avec le delta depuis le relevé précédent.
 void memoire_jalon(const char *etape);
 
+// Parcours du tas interne (totaux, blocs par classe de taille, plus gros blocs), comme la commande série « blocs ».
+void memoire_blocs();
+
 } // namespace ecran
