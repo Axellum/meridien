@@ -340,7 +340,9 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     int maxi = 0;
     char petit_min[16];
     char petit_max[16];
-    if (en_dixiemes(m.min_c, mini) && en_dixiemes(m.max_c, maxi) &&
+    // minmax_connus faux : pas de prévision du jour, min_c et max_c valent la température du moment (« min 12° · max 12° »
+    // serait faux) : la ligne reste cachée.
+    if (m.minmax_connus && en_dixiemes(m.min_c, mini) && en_dixiemes(m.max_c, maxi) &&
         ecran::heure::formater_degre(mini, petit_min, sizeof petit_min) > 0 &&
         ecran::heure::formater_degre(maxi, petit_max, sizeof petit_max) > 0) {
         char texte_min_max

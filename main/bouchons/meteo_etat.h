@@ -19,6 +19,8 @@ struct MeteoEtat {
     float min_c;
     float max_c;
     char libelle[40]; // libellé court, déjà traduit
+    // Ajouté comme dans le vrai contrat (commit 4d58846 de meteo-appareil) :
+    bool minmax_connus; // faux : aucune prévision du jour ; min_c et max_c valent alors temperature_c
 };
 
 // Copie atomique, sûre entre tâches. Rend faux si aucune météo n'est disponible.

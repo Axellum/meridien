@@ -16,6 +16,7 @@ bool meteo_etat_lire(MeteoEtat *sortie) {
     sortie->jour = true;
     sortie->min_c = 8.1F;
     sortie->max_c = 14.6F;
+    sortie->minmax_connus = true;
     std::strncpy(sortie->libelle, "Partiellement nuageux", sizeof(sortie->libelle) - 1);
     return true;
 }
