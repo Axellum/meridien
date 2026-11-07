@@ -46,6 +46,11 @@ How to read this file. **Read** = the licence file or the source headers of the 
   a product built on this firmware is responsible for their own use of the API.
 - **Status in this repository (2026-11-06): not done yet.** `README.md` names Open-Meteo in a table, but neither the README
   nor the settings page (`web/app`) shows the credit and the link. It is planned (`docs/plan.md`, « dépôt propre », item 2).
+  *Update 2026-11-07 (weather source by country, [ADR-0010](docs/decisions/0010-source-meteo-par-pays-et-client-reseau-commun.md)):*
+  the sentence above is partly out of date: the settings page now shows the credit with its link (`web/app/app.js`) and
+  the README carries it. The device's own screen has no link to follow; its « Place and weather » card shows « Weather
+  data: Open-Meteo (CC BY 4.0 licence) » and, when a national model is chosen, « Model: <name> » (seen on PC renders only,
+  not on a board). Whether a text without a link is enough for the licence page's wording is **not settled**.
 
 ## Planned, not in the build yet
 
@@ -109,6 +114,12 @@ nommée à chaque ligne). **Non vérifié** = non lu : ne pas s'y fier. Les vers
   produit fondé sur ce firmware répond de son propre usage de l'API.
 - **État dans ce dépôt (06/11/2026) : pas encore fait.** Le `README.md` nomme Open-Meteo dans un tableau, mais ni lui ni la
   page de réglages (`web/app`) n'affichent la mention et le lien. C'est prévu (`docs/plan.md`, « dépôt propre », point 2).
+  *Mise à jour du 07/11/2026 (source de la météo par pays, [ADR-0010](docs/decisions/0010-source-meteo-par-pays-et-client-reseau-commun.md)) :*
+  la phrase ci-dessus est en partie périmée : la page de réglages montre désormais la mention avec son lien
+  (`web/app/app.js`) et le README la porte. L'écran de l'appareil n'a pas de lien à suivre ; sa carte « Lieu et météo »
+  montre « Données météo : Open-Meteo (licence CC BY 4.0) » et, quand un modèle national est choisi, « Modèle : <nom> » (vu
+  sur des rendus PC seulement, pas sur une carte). Qu'un texte sans lien suffise à la formulation de la page de licence
+  n'est **pas tranché**.
 
 ## Prévus, pas encore dans la compilation
 

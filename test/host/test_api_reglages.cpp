@@ -26,6 +26,10 @@ struct FauxHote {
     rg::Zone zone{};
     bool zone_definie = true;
     bool zone_ecriture_ok = true;
+    sv source = "auto"; // la source météo en service (un identifiant de la table : vue sur des données statiques)
+    bool source_retablie = false; // la dernière ville a remis « Automatique »
+    bool source_ecriture_ok = true;
+    int enreg_source = 0;
     std::size_t nom_max = 0; // > 0 : le « NVS » garde au plus ce nombre d'octets du nom
     int enreg_affichage = 0;
     int enreg_zone = 0;
@@ -85,8 +89,25 @@ struct FauxHote {
         if (nom_max > 0)
             zone.nom[nom_max] = '\0';
         zone_definie = true;
+        // Comme l'appareil : une source qui ne couvre pas le pays de la nouvelle ville repasse sur « Automatique ».
+        const sv apres = ecran::meteo::fournisseurs::source_valable_pour(source, z.code_pays);
+        source_retablie = apres != source;
+        source = apres;
         return true;
     }
+    constexpr sv source_meteo() { return source; }
+    constexpr bool source_meteo_enregistrer(sv id) {
+        ++enreg_source;
+        if (!source_ecriture_ok)
+            return false;
+        const std::size_t i = ecran::meteo::fournisseurs::indice_de(id);
+        if (i >= ecran::meteo::fournisseurs::NOMBRE)
+            return false;
+        source = ecran::meteo::fournisseurs::TABLE[i].id; // l'identifiant de la table, pas la copie de la requête
+        source_retablie = false;
+        return true;
+    }
+    constexpr bool source_meteo_retablie() { return source_retablie; }
     constexpr bool meteo_lire(api::MeteoApercu &m) {
         m = meteo;
         return meteo_dispo;
@@ -546,6 +567,149 @@ constexpr int echec_d_ecriture_donne_500() {
     return 0;
 }
 
+// ---- source de la météo ------------------------------------------------------------------------------------------------
+
+constexpr sv AMSTERDAM = R"({"nom":"Amsterdam","region":"Hollande-Septentrionale","pays":"Pays-Bas","code_pays":"NL",
+    "latitude":52.37403,"longitude":4.88969,"fuseau":"Europe/Amsterdam"})";
+
+constexpr int ville_lue_avec_la_source_meteo_et_la_liste_de_son_pays() {
+    Banc b;
+    VERIFIER(b.connecter());
+    api::Reponse r = b.avec_jeton(Methode::Get, "/api/location");
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(texte_est(r, "source_meteo", "auto") && texte_est(r, "source_meteo_nom", "Automatique") &&
+             booleen_est(r, "source_meteo_retablie", false));
+    // France : « Automatique » en tête, puis le seul modèle mondial que le lecteur accepte
+    VERIFIER(taille_de(r, "sources_meteo") == 2);
+    VERIFIER(texte_est(r, "sources_meteo[0].id", "auto") && texte_est(r, "sources_meteo[0].nom", "Automatique"));
+    VERIFIER(texte_est(r, "sources_meteo[1].id", "noaa") && texte_est(r, "sources_meteo[1].nom", "NOAA GFS"));
+    // Pays-Bas : le service national avant le mondial ; son nom est un nom propre, jamais traduit
+    rg::copier_texte("NL", b.hote.zone.code_pays, sizeof b.hote.zone.code_pays);
+    b.hote.source = "knmi";
+    b.hote.aff.langue_ecran = i18n::Langue::Tr;
+    r = b.avec_jeton(Methode::Get, "/api/location");
+    VERIFIER(taille_de(r, "sources_meteo") == 3);
+    VERIFIER(texte_est(r, "sources_meteo[0].id", "auto") && texte_est(r, "sources_meteo[0].nom", "Otomatik"));
+    VERIFIER(texte_est(r, "sources_meteo[1].id", "knmi") && texte_est(r, "sources_meteo[1].nom", "KNMI"));
+    VERIFIER(texte_est(r, "sources_meteo[2].id", "noaa"));
+    VERIFIER(texte_est(r, "source_meteo", "knmi") && texte_est(r, "source_meteo_nom", "KNMI"));
+    return 0;
+}
+
+constexpr int source_meteo_connue_meme_sans_ville_enregistree() {
+    Banc b;
+    VERIFIER(b.connecter());
+    b.hote.zone_definie = false;
+    const api::Reponse r = b.avec_jeton(Methode::Get, "/api/location");
+    VERIFIER(booleen_est(r, "definie", false) && texte_est(r, "source_meteo", "auto"));
+    VERIFIER(taille_de(r, "sources_meteo") == 2 && texte_est(r, "sources_meteo[1].id", "noaa")); // sans pays connu
+    return 0;
+}
+
+constexpr int source_choisie_seule_ne_touche_pas_a_la_ville() {
+    Banc b;
+    VERIFIER(b.connecter());
+    api::Reponse r = b.avec_jeton(Methode::Put, "/api/location", {}, R"({"source_meteo":"noaa"})");
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(b.hote.enreg_source == 1 && b.hote.source == "noaa" && b.hote.enreg_zone == 0);
+    VERIFIER(texte_est(r, "source_meteo", "noaa") && texte_est(r, "source_meteo_nom", "NOAA GFS") &&
+             booleen_est(r, "source_meteo_retablie", false));
+    VERIFIER(texte_est(r, "nom", "Lyon") && texte_est(r, "code_pays", "FR")); // la ville est relue, inchangée
+    r = b.avec_jeton(Methode::Get, "/api/location");
+    VERIFIER(texte_est(r, "source_meteo", "noaa"));
+    // retour à « Automatique »
+    r = b.avec_jeton(Methode::Put, "/api/location", {}, R"({"source_meteo":"auto"})");
+    VERIFIER(r.statut == 200 && texte_est(r, "source_meteo", "auto") && b.hote.source == "auto");
+    return 0;
+}
+
+constexpr int source_seule_sans_ville_enregistree_reste_possible() {
+    Banc b;
+    VERIFIER(b.connecter());
+    b.hote.zone_definie = false;
+    api::Reponse r = b.avec_jeton(Methode::Put, "/api/location", {}, R"({"source_meteo":"noaa"})");
+    VERIFIER(r.statut == 200 && booleen_est(r, "definie", false) && texte_est(r, "source_meteo", "noaa"));
+    VERIFIER(b.hote.enreg_zone == 0 && b.hote.source == "noaa");
+    r = b.avec_jeton(Methode::Put, "/api/location", {}, R"({"source_meteo":"knmi"})"); // aucun pays connu
+    VERIFIER(est_erreur(r, 422, "source_indisponible", "source_meteo"));
+    return 0;
+}
+
+constexpr int source_inconnue_ou_hors_pays_est_refusee_sans_rien_changer() {
+    Banc b;
+    VERIFIER(b.connecter());
+    auto put = [&](sv corps) { return b.avec_jeton(Methode::Put, "/api/location", {}, corps); };
+    VERIFIER(est_erreur(put(R"({"source_meteo":"inconnue"})"), 422, "source_inconnue", "source_meteo"));
+    VERIFIER(est_erreur(put(R"({"source_meteo":""})"), 422, "source_inconnue", "source_meteo"));
+    VERIFIER(est_erreur(put(R"({"source_meteo":null})"), 422, "source_inconnue", "source_meteo"));
+    VERIFIER(est_erreur(put(R"({"source_meteo":5})"), 422, "source_inconnue", "source_meteo"));
+    VERIFIER(est_erreur(put(R"({"source_meteo":["knmi"]})"), 422, "source_inconnue", "source_meteo"));
+    VERIFIER(est_erreur(put(R"({"source_meteo":"knmi_seamless_et_beaucoup_trop_long"})"), 422, "source_inconnue",
+                        "source_meteo"));
+    VERIFIER(est_erreur(put(R"({"source_meteo":"AUTO"})"), 422, "source_inconnue", "source_meteo")); // la casse compte
+    // Existe, mais ne couvre pas la France : refusée comme l'écran ne la propose pas
+    VERIFIER(est_erreur(put(R"({"source_meteo":"knmi"})"), 422, "source_indisponible", "source_meteo"));
+    VERIFIER(est_erreur(put(R"({"source_meteo":"metno"})"), 422, "source_indisponible", "source_meteo"));
+    // Connue de la table mais écartée pour l'instant parce que le lecteur de l'appareil refuserait sa réponse (pas d'UV)
+    VERIFIER(est_erreur(put(R"({"source_meteo":"dwd"})"), 422, "source_indisponible", "source_meteo"));
+    VERIFIER(b.hote.enreg_source == 0 && b.hote.enreg_zone == 0 && b.hote.source == "auto");
+    return 0;
+}
+
+constexpr int ville_et_source_ensemble_la_source_est_jugee_sur_le_nouveau_pays() {
+    Banc b;
+    VERIFIER(b.connecter());
+    // KNMI ne couvre pas la France où la page se trouve encore, mais couvre les Pays-Bas où elle va
+    sv corps_ok = R"({"nom":"Amsterdam","region":"Hollande-Septentrionale","pays":"Pays-Bas","code_pays":"NL",
+        "latitude":52.37403,"longitude":4.88969,"fuseau":"Europe/Amsterdam","source_meteo":"knmi"})";
+    api::Reponse r = b.avec_jeton(Methode::Put, "/api/location", {}, corps_ok);
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(b.hote.enreg_zone == 1 && b.hote.enreg_source == 1 && b.hote.source == "knmi");
+    VERIFIER(texte_est(r, "nom", "Amsterdam") && texte_est(r, "source_meteo", "knmi") &&
+             booleen_est(r, "source_meteo_retablie", false));
+    // Une source de l'ancien pays ne passe pas : la ville n'est PAS enregistrée non plus
+    sv corps_mauvais = R"({"nom":"Marseille","code_pays":"FR","latitude":43.29695,"longitude":5.38107,
+        "fuseau":"Europe/Paris","source_meteo":"knmi"})";
+    r = b.avec_jeton(Methode::Put, "/api/location", {}, corps_mauvais);
+    VERIFIER(est_erreur(r, 422, "source_indisponible", "source_meteo"));
+    VERIFIER(b.hote.enreg_zone == 1 && sv(b.hote.zone.nom) == "Amsterdam");
+    // Une ville refusée est refusée avant la source : l'erreur est celle de la ville
+    r = b.avec_jeton(Methode::Put, "/api/location", {},
+                     R"({"nom":"","latitude":1,"longitude":1,"fuseau":"Europe/Paris","source_meteo":"inconnue"})");
+    VERIFIER(est_erreur(r, 422, "nom_invalide", "nom"));
+    VERIFIER(b.hote.enreg_zone == 1 && b.hote.enreg_source == 1);
+    return 0;
+}
+
+constexpr int changer_de_ville_hors_pays_remet_automatique_et_la_reponse_le_dit() {
+    Banc b;
+    VERIFIER(b.connecter());
+    rg::copier_texte("NL", b.hote.zone.code_pays, sizeof b.hote.zone.code_pays);
+    b.hote.source = "knmi";
+    api::Reponse r = b.avec_jeton(Methode::Put, "/api/location", {}, MARSEILLE); // la France : KNMI ne la couvre pas
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(texte_est(r, "source_meteo", "auto") && booleen_est(r, "source_meteo_retablie", true));
+    VERIFIER(taille_de(r, "sources_meteo") == 2); // la liste est déjà celle du nouveau pays
+    VERIFIER(booleen_est(b.avec_jeton(Methode::Get, "/api/location"), "source_meteo_retablie",
+                         true)); // jusqu'au prochain choix
+    r = b.avec_jeton(Methode::Put, "/api/location", {}, R"({"source_meteo":"noaa"})");
+    VERIFIER(booleen_est(r, "source_meteo_retablie", false));
+    // Une source qui couvre encore le pays est gardée : rien à dire
+    r = b.avec_jeton(Methode::Put, "/api/location", {}, AMSTERDAM);
+    VERIFIER(texte_est(r, "source_meteo", "noaa") && booleen_est(r, "source_meteo_retablie", false));
+    return 0;
+}
+
+constexpr int source_non_enregistree_donne_500() {
+    Banc b;
+    VERIFIER(b.connecter());
+    b.hote.source_ecriture_ok = false;
+    const api::Reponse r = b.avec_jeton(Methode::Put, "/api/location", {}, R"({"source_meteo":"noaa"})");
+    VERIFIER(est_erreur(r, 500, "interne"));
+    VERIFIER(b.hote.source == "auto");
+    return 0;
+}
+
 // ---- affichage ----------------------------------------------------------------------------------------------------------
 
 constexpr int affichage_lu_avec_les_listes_de_l_appareil() {
@@ -853,6 +1017,8 @@ constexpr sv PHRASES[] = {
     "Connecté à « {ssid} ».",
     "Connexion en cours…",
     "La connexion a échoué.",
+    "Cette source météo n’existe pas.",
+    "Cette source météo ne couvre pas le pays de la ville.",
 };
 
 constexpr int chaque_phrase_existe_dans_les_sept_langues() {
@@ -870,7 +1036,7 @@ constexpr int chaque_phrase_existe_dans_les_sept_langues() {
     return 0;
 }
 
-constexpr int NB_SCENARIOS = 22;
+constexpr int NB_SCENARIOS = 24;
 
 // Un scénario d'erreur ou de message par numéro ; `chemin` dit où lire la phrase dans la réponse.
 constexpr api::Reponse scenario(Banc &b, int k, sv &chemin) {
@@ -923,6 +1089,10 @@ constexpr api::Reponse scenario(Banc &b, int k, sv &chemin) {
                             : k == 19 ? api::EtatWifi::Echec
                                       : api::EtatWifi::Deconnecte;
         return b.avec_jeton(Methode::Get, "/api/wifi");
+    case 22:
+        return put("/api/location", R"({"source_meteo":"inconnue"})");
+    case 23:
+        return put("/api/location", R"({"source_meteo":"knmi"})"); // ne couvre pas la France de l'appareil d'essai
     default: { // 21 : verrou de l'appairage (un essai raté a déjà eu lieu au scénario 3)
         api::Reponse r;
         for (int i = 0; i < 6 && r.statut != 429; ++i)
@@ -980,6 +1150,14 @@ constexpr int chaque_message_de_l_api_est_traduit_dans_chaque_langue() {
     X(la_reponse_montre_ce_qui_est_reellement_stocke)                                                                  \
     X(ville_refusee_ne_touche_pas_au_stockage)                                                                         \
     X(echec_d_ecriture_donne_500)                                                                                      \
+    X(ville_lue_avec_la_source_meteo_et_la_liste_de_son_pays)                                                          \
+    X(source_meteo_connue_meme_sans_ville_enregistree)                                                                 \
+    X(source_choisie_seule_ne_touche_pas_a_la_ville)                                                                   \
+    X(source_seule_sans_ville_enregistree_reste_possible)                                                              \
+    X(source_inconnue_ou_hors_pays_est_refusee_sans_rien_changer)                                                      \
+    X(ville_et_source_ensemble_la_source_est_jugee_sur_le_nouveau_pays)                                                \
+    X(changer_de_ville_hors_pays_remet_automatique_et_la_reponse_le_dit)                                               \
+    X(source_non_enregistree_donne_500)                                                                                \
     X(affichage_lu_avec_les_listes_de_l_appareil)                                                                      \
     X(affichage_modifie_champ_par_champ)                                                                               \
     X(affichage_inchange_n_ecrit_rien)                                                                                 \

@@ -17,6 +17,7 @@
 #include <string_view>
 
 #include "ecran/changement_wifi.hpp"
+#include "ecran/fournisseurs_meteo.hpp"
 #include "ecran/installation.hpp"
 
 namespace ecran {
@@ -103,6 +104,13 @@ class HoteReglages {
     virtual std::size_t lieu_resultats(LieuTrouve *sortie, std::size_t max) = 0;
     virtual void lieu_choisir(std::size_t rang) = 0;
     virtual ApercuMeteo meteo_apercu() = 0;
+
+    // ---- source de la météo (réglage « meteo.source » : `nombre` rend la position de la source dans la table des sources, `definir_nombre`
+    // la change). La liste PROPOSÉE dépend du pays de la ville : « Automatique » en tête, puis les sources de ce pays.
+    virtual meteo::fournisseurs::Liste sources_meteo() = 0;
+    // Vrai quand le dernier changement de ville a remis « Automatique » parce que l'ancienne source ne couvre pas le nouveau pays :
+    // l'écran le dit en une phrase (jamais de retour muet). Retombe à faux dès que la source est choisie ou que la ville change encore.
+    virtual bool source_meteo_retablie() = 0;
 
     // ---- appareil
     virtual void tester_service(std::string_view service) = 0; // « stt », « llm » ou « tts »

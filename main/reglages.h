@@ -7,6 +7,9 @@
 // Ce fichier est PUR (aucun en-tête ESP-IDF).
 #pragma once
 
+#include <cstddef>
+#include <string_view>
+
 #include "ecran/reglages_valeurs.hpp"
 
 namespace ecran {
@@ -33,5 +36,19 @@ bool reglages_zone_lire(reglages::Zone &zone);
 // Rend faux si meteo_zone.h refuse la zone (rien n'est écrit). Le complément (région, pays) est enregistré à part : s'il
 // échoue, la ville est quand même enregistrée.
 bool reglages_zone_enregistrer(const reglages::Zone &zone);
+
+// ---- source de la météo (ADR-0010) : l'identifiant d'ecran/fournisseurs_meteo.hpp (« auto », « knmi »), en NVS (espace
+// « reglages », clé « source_meteo »). La même porte pour l'écran et pour la page web.
+// Écrit l'identifiant EN SERVICE : toujours connu ET valable pour le pays de la ville enregistrée. Une valeur absente, inconnue
+// (d'un autre firmware) ou d'un autre pays donne « auto » : jamais une requête avec un modèle qui ne couvre pas la ville.
+void reglages_source_meteo(char *sortie, std::size_t capacite);
+// Enregistre PUIS applique : la météo gardée est effacée et une nouvelle requête part (comme pour une nouvelle ville). Rend faux,
+// sans rien changer, si l'identifiant est inconnu, ne couvre pas le pays de la ville, ou si la NVS refuse l'écriture.
+bool reglages_source_meteo_enregistrer(std::string_view id);
+// Vrai quand le dernier changement de ville a remis « Automatique » parce que l'ancienne source ne couvre pas le nouveau pays ;
+// retombe à faux dès qu'une source est choisie ou que la ville change encore. Perdu au redémarrage (c'est un message, pas un réglage).
+bool reglages_source_meteo_retablie();
+// Remet « Automatique » (carte remise à neuf). Efface la météo gardée si une autre source était en service.
+void reglages_source_meteo_remettre_auto();
 
 } // namespace ecran

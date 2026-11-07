@@ -99,6 +99,10 @@ class PortsFaux final : public PortsAppareil {
     bool zone_connue = true;
     int zones_enregistrees = 0;
     int remises_par_defaut = 0;
+    std::string source = "auto"; // la source de la météo en service (main/reglages.*)
+    int sources_enregistrees = 0;
+    bool source_retablie = false; // comme main/reglages.* : la dernière ville a remis « Automatique »
+    bool source_refusee = false;  // la mémoire permanente refuse l'écriture
     MeteoVue meteo_vue;
     // Wi-Fi
     std::vector<PointAccesVu> reseaux;
@@ -160,12 +164,29 @@ class PortsFaux final : public PortsAppareil {
     bool zone_enregistrer(const reglages::Zone &z) override {
         ++zones_enregistrees;
         zone = z;
+        // Comme main/reglages.cpp : une source qui ne couvre pas le nouveau pays repasse sur « Automatique », et on s'en souvient.
+        const std::string avant = source;
+        source = std::string(meteo::fournisseurs::source_valable_pour(source, z.code_pays));
+        source_retablie = avant != source;
         return true;
     }
     void remettre_affichage_et_ville_par_defaut() override {
         ++remises_par_defaut;
         etat_affichage = reglages::Affichage{};
+        source = "auto";
+        source_retablie = false;
     }
+    void source_meteo(char *sortie, std::size_t capacite) override { reglages::copier_texte(source, sortie, capacite); }
+    bool source_meteo_enregistrer(std::string_view id) override {
+        if (source_refusee || meteo::fournisseurs::trouver(id) == nullptr) {
+            return false;
+        }
+        ++sources_enregistrees;
+        source = std::string(id);
+        source_retablie = false;
+        return true;
+    }
+    bool source_meteo_retablie() override { return source_retablie; }
     MeteoVue meteo() override { return meteo_vue; }
 
     void wifi_scanner_lancer() override { ++scans; }

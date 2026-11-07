@@ -62,6 +62,9 @@ if(MERIDIEN_AUTOTEST_REGLAGES)
     target_sources(${COMPONENT_LIB} PRIVATE "autotest_reglages.cpp")
     target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,-u,autotest_reglages_ancre")
 endif()
+# Client HTTPS commun (http_commun.cpp : GET, gzip par tinfl de la ROM, verrou TLS, tampons en PSRAM), appele par meteo_client.cpp.
+# Ajoute par target_sources() et non dans la liste SRCS, pour ne pas toucher a la ligne que les autres sessions modifient aussi.
+target_sources(${COMPONENT_LIB} PRIVATE "http_commun.cpp")
 # Allocateur de LVGL (lvgl_memoire.cpp, CONFIG_LV_USE_CUSTOM_MALLOC) : c'est LVGL qui appelle ces fonctions, aucun fichier de main
 # ne les reference. Or l'editeur de liens ne tire d'une bibliotheque statique (libmain.a) que les fichiers dont il a besoin AU MOMENT
 # ou il la lit, et libmain.a est lue avant LVGL : sans "-u", lvgl_memoire.o reste dans l'archive et l'edition de liens echoue

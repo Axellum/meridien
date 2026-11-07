@@ -83,8 +83,8 @@ The session token lives in RAM (at most 4 sessions; the oldest is closed when a 
 | Route | Role |
 |---|---|
 | `GET /api/geocode?q=Lyon` | Place search through a **firmware proxy** to Open-Meteo's geocoding. |
-| `GET /api/location` | Saved zone. |
-| `PUT /api/location` | Saves the chosen zone. |
+| `GET /api/location` | Saved zone and its weather source. |
+| `PUT /api/location` | Saves the chosen zone and/or weather source. |
 | `GET /api/weather` | Preview of the saved zone's weather (so the page shows "it works"). |
 
 **Search.** `q`: **at least 3 characters** after `trim` (otherwise `400`, "Type at least 3 letters."), at most 80, UTF-8 encoded for the address. The firmware calls `geocoding-api.open-meteo.com/v1/search` with `name=<q>`, `count=8`, `language=<screen language code>`, `format=json` (parameters and fields read on 06/11/2026 in open-meteo.com/en/docs/geocoding-api: `count` 10 by default and 100 at most; the response puts the places in `results` with `name`, `admin1`, `country`, `country_code`, `latitude`, `longitude`, `elevation`, `timezone`, `population`; empty fields are omitted; an error is a JSON `error`/`reason` with `400`. That the geocoding service supports each of the seven language codes: **not verified**. The firmware renames the fields as below) and returns a reduced list:
@@ -99,7 +99,7 @@ Empty list → `200 {"resultats":[]}` (the page says "No place found for “Lyon
 
 **One search module for the page and the screen** (`main/geocodage.cpp`; reading and states in the pure core `components/core/include/ecran/geocodage.hpp`). The page's `GET /api/geocode` and the screen's search (settings and guided setup) use the **same** reader, so both show the same places with the same labels. Only one search runs at a time, **the last request wins**, and the download shares one lock with the weather request (`main/verrou_tls.h`): a city search and a weather request never run at the same time (a TLS handshake takes about 65 KB of the ~110 KB of internal RAM left). The network work never runs in the screen's task. If the lock is not free within 15 s, the search ends as “no connection”. The text typed is never written to the log. **Reader and states tested on the PC with real captured responses (7 Open-Meteo responses); firmware compiled; never run on a board. The weather client does not take the TLS lock yet** (see [mesures/reglages.md](mesures/reglages.md) §5).
 
-**Saving.** `PUT /api/location` receives a search result as it is (fields `nom`, `region`, `pays`, `code_pays`, `latitude`, `longitude`, `fuseau`; `altitude` optional):
+**Saving.** `PUT /api/location` receives a search result as it is (fields `nom`, `region`, `pays`, `code_pays`, `latitude`, `longitude`, `fuseau`; `altitude` optional; `source_meteo` optional, see below):
 - `latitude` ∈ [−90, 90], `longitude` ∈ [−180, 180] (otherwise `422`, "These coordinates aren’t valid.");
 - `fuseau` must be an **IANA name present in the embedded table** (`posix_tz_db`, pure core); otherwise `422`, "The device doesn’t know this time zone.";
 - the device keeps the **IANA name** (in NVS, to find the time again without a network), derives the POSIX string from it, applies `TZ`, restarts the weather, then answers with the zone read back:
@@ -109,6 +109,13 @@ Empty list → `200 {"resultats":[]}` (the page says "No place found for “Lyon
  "posix": "CET-1CEST,M3.5.0,M10.5.0/3", "libelle": "Lyon, Auvergne-Rhône-Alpes, France"}
 ```
 `GET /api/location` returns the same shape, or `{"definie": false}` as long as no zone has been chosen (the screen then says "Choose a city in the settings page.").
+
+**Weather source** (ADR-0010). The same route carries the weather source of the saved city. `GET /api/location` (and every response of `PUT /api/location`) adds `source_meteo` (stable identifier of the source in use: `auto`, or a national model such as `knmi`), `source_meteo_nom` (the name to show: "Automatic" in the screen language, a service name as it is), `source_meteo_retablie` (see below) and `sources_meteo`, the list **offered for the country of the saved city**, "Automatic" first, then the national service, then the worldwide model (the screen offers exactly the same list):
+```json
+{"source_meteo": "knmi", "source_meteo_nom": "KNMI", "source_meteo_retablie": false,
+ "sources_meteo": [{"id": "auto", "nom": "Automatic"}, {"id": "knmi", "nom": "KNMI"}, {"id": "noaa", "nom": "NOAA GFS"}]}
+```
+`{"definie": false}` carries the same fields (with no known country the list is "Automatic" and the worldwide model only). `PUT /api/location` accepts `source_meteo`, the identifier chosen in that list, **alone** (`{"source_meteo": "knmi"}`: the city does not change) or **with a city** (then the source is judged on the country of the NEW city; if either is refused nothing is saved). An identifier that does not exist, or that is not a string: `422`, "This weather source doesn’t exist.", field `source_meteo`. A known source that the country does not offer: `422`, "This weather source doesn’t cover the city’s country.", same field. Changing the source works like changing the city: the weather kept on the device is erased, a new request starts, the screen updates without a restart. **When the city changes to a country the current source does not cover, the device goes back to "Automatic" and says so**: `source_meteo_retablie` is `true` in that response and in the next `GET`s, until a source is chosen or the city changes again, and the screen shows the same sentence ("Source set back to “Automatic”: the previous one doesn’t cover this country."). The sources are Open-Meteo forecast models; "Automatic" is the request without a `models` parameter, exactly as before this setting existed. Which models are offered, and why the others are not, is in [mesures/meteo-modeles.md](mesures/meteo-modeles.md).
 
 **Weather preview.** `GET /api/weather` →
 ```json
@@ -367,8 +374,8 @@ Le jeton de session vit en RAM (4 sessions au plus, la plus ancienne est fermée
 | Route | Rôle |
 |---|---|
 | `GET /api/geocode?q=Lyon` | Recherche de lieu par un **proxy du firmware** vers le géocodage d'Open-Meteo. |
-| `GET /api/location` | Zone enregistrée. |
-| `PUT /api/location` | Enregistre la zone choisie. |
+| `GET /api/location` | Zone enregistrée et sa source météo. |
+| `PUT /api/location` | Enregistre la zone choisie et/ou la source météo. |
 | `GET /api/weather` | Aperçu de la météo de la zone enregistrée (pour que la page montre « ça marche »). |
 
 **Recherche.** `q` : **3 caractères au moins** après `trim` (sinon `400`, « Tapez au moins 3 lettres. »), 80 au plus, en UTF-8 encodé pour l'adresse. Le firmware appelle `geocoding-api.open-meteo.com/v1/search` avec `name=<q>`, `count=8`, `language=<code de la langue de l'écran>`, `format=json` (paramètres et champs lus le 06/11/2026 dans open-meteo.com/en/docs/geocoding-api : `count` 10 par défaut et 100 au plus ; la réponse met les lieux dans `results` avec `name`, `admin1`, `country`, `country_code`, `latitude`, `longitude`, `elevation`, `timezone`, `population` ; les champs vides sont omis ; erreur = JSON `error`/`reason` en `400`. Que ce géocodage accepte chacun des sept codes de langue : **non vérifié**. Le firmware renomme les champs comme ci-dessous) et renvoie une liste réduite :
@@ -383,7 +390,7 @@ Liste vide → `200 {"resultats":[]}` (la page dit « Aucun lieu trouvé pour «
 
 **Un seul module de recherche pour la page et l'écran** (`main/geocodage.cpp` ; lecture et états dans le noyau pur `components/core/include/ecran/geocodage.hpp`). Le `GET /api/geocode` de la page et la recherche de l'écran (réglages et installation guidée) utilisent le **même** lecteur : les deux affichent les mêmes lieux avec les mêmes libellés. Une seule recherche à la fois, **la dernière demande gagne**, et le téléchargement partage un verrou avec la requête météo (`main/verrou_tls.h`) : une recherche de ville et une requête météo ne se font jamais en même temps (une poignée de main TLS prend environ 65 Ko des ~110 Ko de RAM interne restants). Le travail réseau ne se fait jamais dans la tâche de l'écran. Si le verrou n'est pas libre au bout de 15 s, la recherche se termine en « sans connexion ». Le texte tapé n'est jamais écrit au journal. **Lecteur et états testés sur le PC avec de vraies réponses capturées (7 réponses d'Open-Meteo) ; firmware compilé ; jamais exécuté sur une carte. Le client météo ne prend pas encore le verrou TLS** (voir [mesures/reglages.md](mesures/reglages.md) §5).
 
-**Enregistrement.** `PUT /api/location` reçoit un résultat de recherche tel quel (champs `nom`, `region`, `pays`, `code_pays`, `latitude`, `longitude`, `fuseau`; `altitude` facultatif) :
+**Enregistrement.** `PUT /api/location` reçoit un résultat de recherche tel quel (champs `nom`, `region`, `pays`, `code_pays`, `latitude`, `longitude`, `fuseau`; `altitude` facultatif ; `source_meteo` facultatif, voir plus bas) :
 - `latitude` ∈ [−90, 90], `longitude` ∈ [−180, 180] (sinon `422`, « Ces coordonnées ne sont pas valides. ») ;
 - `fuseau` doit être un **nom IANA présent dans la table embarquée** (`posix_tz_db`, noyau pur) ; sinon `422`, « Ce fuseau horaire n’est pas connu de l’appareil. » ;
 - l'appareil garde le **nom IANA** (en NVS, pour retrouver l'heure sans réseau) et en déduit la chaîne POSIX, applique `TZ`, relance la météo, puis répond avec la zone relue :
@@ -393,6 +400,13 @@ Liste vide → `200 {"resultats":[]}` (la page dit « Aucun lieu trouvé pour «
  "posix": "CET-1CEST,M3.5.0,M10.5.0/3", "libelle": "Lyon, Auvergne-Rhône-Alpes, France"}
 ```
 `GET /api/location` renvoie la même forme, ou `{"definie": false}` tant qu'aucune zone n'est choisie (l'écran dit alors « Choisissez une ville dans la page de réglages. »).
+
+**Source météo** (ADR-0010). La même route porte la source météo de la ville enregistrée. `GET /api/location` (et toutes les réponses de `PUT /api/location`) ajoute `source_meteo` (identifiant stable de la source en service : `auto`, ou un modèle national comme `knmi`), `source_meteo_nom` (le nom à afficher : « Automatique » dans la langue de l'écran, un nom de service tel quel), `source_meteo_retablie` (voir plus bas) et `sources_meteo`, la liste **proposée pour le pays de la ville enregistrée**, « Automatique » en tête, puis le service national, puis le modèle mondial (l'écran propose exactement la même liste) :
+```json
+{"source_meteo": "knmi", "source_meteo_nom": "KNMI", "source_meteo_retablie": false,
+ "sources_meteo": [{"id": "auto", "nom": "Automatique"}, {"id": "knmi", "nom": "KNMI"}, {"id": "noaa", "nom": "NOAA GFS"}]}
+```
+`{"definie": false}` porte les mêmes champs (sans pays connu, la liste est « Automatique » et le modèle mondial seulement). `PUT /api/location` accepte `source_meteo`, l'identifiant choisi dans cette liste, **seul** (`{"source_meteo": "knmi"}` : la ville ne change pas) ou **avec une ville** (la source est alors jugée sur le pays de la NOUVELLE ville ; si l'une des deux est refusée, rien n'est enregistré). Un identifiant qui n'existe pas, ou qui n'est pas une chaîne : `422`, « Cette source météo n’existe pas. », champ `source_meteo`. Une source connue que le pays ne propose pas : `422`, « Cette source météo ne couvre pas le pays de la ville. », même champ. Changer de source se passe comme changer de ville : la météo gardée sur l'appareil est effacée, une nouvelle requête part, l'écran se met à jour sans redémarrage. **Quand la ville passe dans un pays que la source actuelle ne couvre pas, l'appareil revient sur « Automatique » et le dit** : `source_meteo_retablie` vaut `true` dans cette réponse et dans les `GET` suivants, jusqu'à ce qu'une source soit choisie ou que la ville change encore, et l'écran affiche la même phrase (« Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays. »). Les sources sont des modèles de prévision d'Open-Meteo ; « Automatique » est la requête sans paramètre `models`, exactement comme avant ce réglage. Les modèles proposés, et pourquoi les autres ne le sont pas, sont dans [mesures/meteo-modeles.md](mesures/meteo-modeles.md).
 
 **Aperçu météo.** `GET /api/weather` →
 ```json
