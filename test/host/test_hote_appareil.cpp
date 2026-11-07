@@ -426,7 +426,7 @@ int source_meteo_automatique_au_depart_et_liste_selon_le_pays() {
     fixer_pays(b, "NL");
     VERIFIER(propose(b) == "auto knmi noaa"); // le modèle national d'abord, puis le mondial
     fixer_pays(b, "NO");
-    VERIFIER(propose(b) == "auto metno noaa");
+    VERIFIER(propose(b) == "auto metno metnorway noaa");
     fixer_pays(b, "FR");
     VERIFIER(propose(b) == "auto noaa");
     fixer_pays(

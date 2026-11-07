@@ -1,10 +1,13 @@
 // Liaison entre les trois fichiers météo de l'appareil : l'état (meteo_etat.cpp), la zone (meteo_zone.cpp) et le client
 // Open-Meteo (meteo_client.cpp). PAS pour l'interface ni la page de réglages : elles ne voient que meteo_etat.h et
-// meteo_zone.h (contrats), qui ne changent pas.
+// meteo_zone.h (contrats), qui ne changent pas. Exception (ADR-0014) : la colle de l'appareil qui nomme le service sous la météo
+// (hote_appareil_esp.cpp pour l'écran, serveur_web.cpp pour la page) lit `meteo_etat_origine()` ; l'interface, elle, reçoit le nom
+// par l'hôte (`ApercuMeteo::origine`, `MeteoVue::origine`).
 #pragma once
 
 #include <cstdint>
 
+#include "ecran/fournisseurs_meteo.hpp"
 #include "ecran/meteo_riche.hpp"
 #include "meteo_zone.h"
 
@@ -14,7 +17,12 @@ namespace ecran {
 
 // Une réponse reçue, ou relue du cache : devient la météo courante, remet le compteur d'échecs à zéro et change le numéro de
 // version (`MeteoDetail::version`). Rend faux, sans rien publier, si l'état n'a pas pu être alloué (ni PSRAM ni RAM interne).
-bool meteo_etat_publier(const meteo::Meteo &meteo);
+// `origine` : le service qui a RÉELLEMENT donné cette météo. Ce n'est pas la source choisie : quand un service lu directement
+// (MET Norway, NWS) échoue, la météo vient d'Open-Meteo (repli) et l'écran doit le dire (ADR-0014).
+bool meteo_etat_publier(const meteo::Meteo &meteo,
+                        meteo::fournisseurs::Famille origine = meteo::fournisseurs::Famille::OpenMeteo);
+// Le service qui a donné la météo publiée. `Famille::OpenMeteo` quand aucune météo n'est connue.
+meteo::fournisseurs::Famille meteo_etat_origine();
 // Un essai raté de plus (réseau, HTTP, réponse illisible). Sans effet sur la météo déjà connue, qui reste lisible.
 void meteo_etat_compter_echec();
 // La zone a changé : la météo de l'ancien lieu ne s'affiche plus (`valide` repasse à faux, `meteo_detail_version()` à 0) jusqu'à

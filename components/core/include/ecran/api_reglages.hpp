@@ -102,6 +102,8 @@ struct MeteoApercu {
     double temperature_c = 0;
     int code_wmo = 0;
     bool jour = true;
+    // Le service qui a RÉELLEMENT donné cette météo (pas forcément la source choisie : après un échec du service direct, c'est Open-Meteo).
+    meteo::fournisseurs::Famille origine = meteo::fournisseurs::Famille::OpenMeteo;
 };
 
 enum class Telechargement : std::uint8_t { Ok, SansInternet, Echec };
@@ -407,6 +409,9 @@ template <class Hote> class Api {
             e.ouvrir_objet();
             e.champ("id", fm::TABLE[l.indices[k]].id);
             e.champ("nom", nom_de_source(fm::TABLE[l.indices[k]]));
+            // `direct` : le service est lu directement (MET Norway, NWS), ce n'est pas un modèle d'Open-Meteo : la page ne lui écrit
+            // pas « Modèle : … » (ADR-0014).
+            e.champ_booleen("direct", fm::TABLE[l.indices[k]].famille != fm::Famille::OpenMeteo);
             e.fermer_objet();
         }
         e.fermer_tableau();
@@ -574,6 +579,18 @@ template <class Hote> class Api {
             e.champ_booleen("disponible", true);
             e.champ_booleen("perimee", m.perimee);
             e.champ_entier("mise_a_jour", m.maj_epoch_s);
+            // Qui a donné cette météo, à nommer partout où elle est montrée (licence, politesse). `repli` : la source choisie est un
+            // service lu directement qui n'a pas répondu, la météo vient d'Open-Meteo en attendant (ADR-0014).
+            namespace fm = meteo::fournisseurs;
+            const fm::Attribution a = fm::attribution_de(m.origine);
+            e.cle("fournisseur");
+            e.ouvrir_objet();
+            e.champ("id", a.id);
+            e.champ("nom", a.nom);
+            e.champ("lien", a.lien);
+            e.fermer_objet();
+            e.champ_booleen("repli", fm::famille_de(hote_.source_meteo()) != fm::Famille::OpenMeteo &&
+                                         m.origine == fm::Famille::OpenMeteo);
             e.cle("actuelle");
             e.ouvrir_objet();
             e.champ_decimal("temperature", m.temperature_c, 1);

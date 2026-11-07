@@ -20,8 +20,10 @@
 // Unités : °C, km/h, hPa, mm (pluie, tout état confondu), cm (neige), % , degrés, codes WMO d'Open-Meteo. Tous les instants
 // sont en secondes UNIX UTC (`int64_t`) : l'interface les convertit en heure locale avec `decalage_utc_s` (valable à la
 // réception de la réponse) ou avec son propre fuseau. Les `float` sont exacts au dixième (le noyau compte en dixièmes entiers).
-// Valeur absente de la réponse Open-Meteo : `METEO_PROBA_INCONNUE` pour une probabilité, sinon le champ est tel que le
-// commentaire le dit ; aucune valeur n'est inventée.
+// Valeur absente de la réponse de la source : `METEO_PROBA_INCONNUE` pour une probabilité, sinon le champ est tel que le
+// commentaire le dit ; aucune valeur n'est inventée. MET Norway et le NWS (ADR-0014) ne donnent pas tout : un champ qu'ils ne
+// donnent pas vaut NaN (flottant) ou -1 (entier : %, degrés, heures), jamais 0. L'interface les cache (vue_depuis_detail.h).
+// Un 0 est toujours une mesure.
 #pragma once
 
 #include <cstdint>

@@ -11,7 +11,9 @@
 //     pas pendant la décompression ;
 //   - garde les tampons (réponse reçue, texte décompressé, décompresseur de 11 Ko) en PSRAM, jamais sur la pile de 12 Ko de la
 //     tâche (la prise de contact TLS en demande plusieurs Ko), et les rend avant de sortir ;
-//   - ne met JAMAIS l'adresse au journal (elle contient la position de l'appareil) : seulement les tailles et le statut.
+//   - ne met JAMAIS l'adresse au journal (elle contient la position de l'appareil) : seulement les tailles et le statut ;
+//   - lit les en-têtes `Expires` et `Last-Modified` (dates HTTP, ecran/iso8601.hpp) et les rend en secondes UNIX : MET Norway et le
+//     NWS demandent de ne pas redemander avant `Expires` (ecran/meteo_rythme_natif.hpp). Une date absente ou illisible vaut 0.
 // Une réponse de serveur n'est jamais crue : trop grande, gzip qui gonfle au-delà du tampon, flux ou pied faux, `Content-Encoding`
 // inconnu ou menteur : refusée avec une issue précise, jamais lue à moitié.
 #pragma once
@@ -22,16 +24,21 @@
 
 namespace ecran::client_http {
 
-// Taille du tampon de réception ET du tampon de texte décompressé : 64 Ko chacun, en PSRAM, rendus après chaque essai.
-// Pourquoi 64 Ko : la plus grande réponse connue des fournisseurs de météo tient dans les deux tiers du tampon. Relevé du
+// Taille par défaut du tampon de réception ET du tampon de texte décompressé : 64 Ko chacun, en PSRAM, rendus après chaque essai.
+// Pourquoi 64 Ko par défaut : la réponse d'Open-Meteo, seule connue quand ce client a été écrit, y tient largement. Relevé du
 // 07/11/2026 (test/host/donnees/) : Open-Meteo, réponse riche (courant, 24 heures, 7 jours, quarts d'heure) 4 427 à 4 685 octets
-// bruts, 1 300 à 1 600 octets gzippés environ (mesuré ici : Lyon 1 498 → 4 443, Sydney 1 626 → 4 575) ; MET Norway 40 712 octets
-// (91 pas de temps) et Bright Sky 22 198 octets (49 heures) : ces deux derniers chiffres viennent du volet « fournisseurs » de la
-// mission, pas remesurés ici. 64 Ko laisse donc ≈ 1,6 fois la plus grande réponse ; une réponse plus grande est REFUSÉE
-// (`Issue::TropGrand`), jamais lue à moitié. C'est aussi la borne d'une « bombe » gzip : un flux de quelques centaines d'octets qui
-// gonfle de plusieurs mégaoctets s'arrête au tampon. Pourquoi en PSRAM : un tampon de plusieurs Ko en RAM interne mangerait le budget
-// de la prise de contact TLS (docs/mesures/memoire-interne.md).
+// bruts, 1 300 à 1 600 octets gzippés environ (mesuré ici : Lyon 1 498 → 4 443, Sydney 1 626 → 4 575). Les réponses de MET Norway
+// (jusqu'à 90 783 octets, mesuré) et du NWS (jusqu'à 240 402 octets, mesuré) NE TIENNENT PAS dans 64 Ko : elles demandent leur propre
+// borne par requête (`Requete::taille_max`, ecran/meteo_requete_fournisseurs.hpp ; ce commentaire disait, d'après un chiffre de la
+// mission non remesuré, 40 712 octets pour MET Norway : c'était faux). Une réponse plus grande que la borne est REFUSÉE
+// (`Issue::TropGrand`), jamais lue à moitié. La borne est aussi celle d'une « bombe » gzip : un flux de quelques centaines d'octets
+// qui gonfle de plusieurs mégaoctets s'arrête au tampon. Pourquoi en PSRAM : un tampon de plusieurs Ko en RAM interne mangerait le
+// budget de la prise de contact TLS (docs/mesures/memoire-interne.md).
 inline constexpr size_t kTailleTampon = 64 * 1024;
+// La plus grande taille qu'une requête peut demander pour ses tampons (`Requete::taille_max`) : au-delà, la requête n'est pas envoyée.
+// Les fournisseurs lus directement ont de plus grandes réponses (MET Norway jusqu'à 91 Ko, la grille du NWS jusqu'à 240 Ko, mesurés
+// le 07/11/2026) : chacun donne sa borne (ecran/meteo_requete_fournisseurs.hpp).
+inline constexpr size_t kTailleMaxAbsolue = 1024 * 1024;
 
 enum class Issue : uint8_t {
     Ok,
@@ -63,17 +70,22 @@ struct Requete {
         nullptr;                  // qui parle : nom de l'appareil et, si le fournisseur l'exige, un moyen de le joindre
     const char *accept = nullptr; // type de réponse attendu, par exemple « application/json »
     int delai_ms = 15000;         // connexion, TLS et lecture : au-delà, l'essai est un échec
+    // Plus grande réponse acceptée, en octets : la même borne pour ce qui arrive sur le fil ET pour le texte décompressé, deux tampons
+    // en PSRAM le temps de la requête. 0 ou au-delà de `kTailleMaxAbsolue` : la requête n'est pas envoyée (`Issue::Requete`).
+    size_t taille_max = kTailleTampon;
     uint32_t attente_verrou_tls_ms = 40000; // une recherche de ville tient le verrou 8 s au plus (geocodage.cpp)
 };
 
 struct Reponse {
     Issue issue = Issue::Reseau;
     int statut_http = 0;
-    size_t octets_fil = 0; // octets reçus sur le fil (compressés ou non)
-    size_t octets = 0;     // octets du texte rendu à l'appelant (décompressé)
-    bool gzip = false;     // la réponse était compressée
-    int duree_ms = 0;      // l'aller-retour réseau seulement (la décompression n'y est pas)
-    bool connecte = false; // la connexion TLS a été établie
+    size_t octets_fil = 0;  // octets reçus sur le fil (compressés ou non)
+    size_t octets = 0;      // octets du texte rendu à l'appelant (décompressé)
+    bool gzip = false;      // la réponse était compressée
+    int duree_ms = 0;       // l'aller-retour réseau seulement (la décompression n'y est pas)
+    bool connecte = false;  // la connexion TLS a été établie
+    int64_t expires_s = 0;  // en-tête `Expires` de la réponse finale, en secondes UNIX ; 0 : absent ou illisible
+    int64_t modifiee_s = 0; // en-tête `Last-Modified`, en secondes UNIX ; 0 : absent ou illisible
     Memoire
         apres_connexion{}; // mémoire mesurée une fois la connexion TLS établie : là où la RAM interne est la plus sollicitée
 };

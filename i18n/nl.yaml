@@ -163,9 +163,13 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Seules les sources qui couvrent le pays de la ville sont proposées.": "Alleen bronnen die het land van de stad dekken worden aangeboden."
 "Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Bron teruggezet op “Automatisch”: de vorige dekt dit land niet."
 "Modèle : {modele}": "Model: {modele}"
+"Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)": "Weergegevens: {lien} (licenties CC BY 4.0 en NLOD 2.0, gegevens bewerkt)"
+"Données météo : {lien} (domaine public)": "Weergegevens: {lien} (publiek domein)"
+"{service} est indisponible : la météo vient d’Open-Meteo en attendant.": "{service} is niet beschikbaar: het weer komt voorlopig van Open-Meteo."
 
 # --- Page de réglages : source de la météo (07/11/2026) ---
 "Source enregistrée : {source}": "Bron opgeslagen: {source}"
+"Cet appareil n’est ni approuvé ni parrainé par le National Weather Service.": "Dit apparaat wordt niet goedgekeurd of gesponsord door de National Weather Service."
 
 # --- Page de réglages : assistant vocal ---
 "Assistant vocal": "Spraakassistent"

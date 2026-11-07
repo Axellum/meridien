@@ -39,6 +39,7 @@
 #include "ecran/http_requete.hpp"
 #include "geocodage.h"
 #include "meteo_etat.h"
+#include "meteo_interne.h"
 #include "meteo_zone.h"
 #include "reglages.h"
 #include "reseau.h"
@@ -96,6 +97,7 @@ class HoteAppareil {
         m.temperature_c = static_cast<double>(e.temperature_c);
         m.code_wmo = e.code_wmo;
         m.jour = e.jour;
+        m.origine = meteo_etat_origine();
         return true;
     }
 

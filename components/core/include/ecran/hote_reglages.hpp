@@ -56,6 +56,9 @@ struct ApercuMeteo {
     bool disponible = false;
     float temperature_c = 0;
     char libelle[48] = {}; // libellé court dans la langue de l'écran
+    // Le service qui a RÉELLEMENT donné cette météo : à nommer sous la météo (licence). Peut différer de la source choisie quand un
+    // service lu directement n'a pas répondu et que la météo vient d'Open-Meteo en attendant (ADR-0014).
+    meteo::fournisseurs::Famille origine = meteo::fournisseurs::Famille::OpenMeteo;
 };
 
 // ---- services et appareil -------------------------------------------------------------------------------------------------

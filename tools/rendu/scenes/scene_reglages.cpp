@@ -112,6 +112,43 @@ void lieu_source_retablie(const banc::Contexte &ctx) {
     aller("section:1");
 }
 
+// Les services lus directement (ADR-0014). Fixtures inventées : Oslo (MET Norway, deux fois dans la liste : le modèle d'Open-Meteo et le
+// service lu directement) et Denver (NWS). `origine` est le service qui a RÉELLEMENT donné la météo montrée.
+void oslo(const char *source, ecran::meteo::fournisseurs::Famille origine) {
+    g_hote.definir_texte("lieu.ville", "Oslo, Oslo, Norvège");
+    g_hote.code_pays = "NO";
+    g_hote.definir_nombre("meteo.source", static_cast<int32_t>(ecran::meteo::fournisseurs::indice_de(source)));
+    g_hote.meteo.origine = origine;
+}
+
+void source_liste_norvege(const banc::Contexte &ctx) {
+    en_service(ctx);
+    oslo("metnorway", ecran::meteo::fournisseurs::Famille::MetNo);
+    aller("section:1/source");
+}
+
+void lieu_source_metno(const banc::Contexte &ctx) {
+    en_service(ctx);
+    oslo("metnorway", ecran::meteo::fournisseurs::Famille::MetNo);
+    aller("section:1");
+}
+
+void lieu_source_repli(const banc::Contexte &ctx) {
+    en_service(ctx);
+    oslo("metnorway",
+         ecran::meteo::fournisseurs::Famille::OpenMeteo); // MET Norway n'a pas répondu : la météo vient d'Open-Meteo
+    aller("section:1");
+}
+
+void lieu_source_nws(const banc::Contexte &ctx) {
+    en_service(ctx);
+    g_hote.definir_texte("lieu.ville", "Denver, Colorado, États-Unis");
+    g_hote.code_pays = "US";
+    g_hote.definir_nombre("meteo.source", static_cast<int32_t>(ecran::meteo::fournisseurs::indice_de("nws")));
+    g_hote.meteo.origine = ecran::meteo::fournisseurs::Famille::Nws;
+    aller("section:1");
+}
+
 void langue(const banc::Contexte &ctx) {
     en_service(ctx);
     aller("section:2");
@@ -180,6 +217,11 @@ const Scene kScenes[] = {
     {"lieu-source-choisie", "Lieu et météo : un modèle national choisi, attribution", lieu_source_choisie},
     {"lieu-source-retablie", "Lieu et météo : source remise sur « Automatique » après un changement de ville",
      lieu_source_retablie},
+    {"source-liste-norvege", "Source météo : liste proposée à Oslo, MET Norway (service direct) choisi",
+     source_liste_norvege},
+    {"lieu-source-metno", "Lieu et météo : MET Norway a répondu, attribution CC BY 4.0 et NLOD 2.0", lieu_source_metno},
+    {"lieu-source-repli", "Lieu et météo : MET Norway n'a pas répondu, la météo vient d'Open-Meteo", lieu_source_repli},
+    {"lieu-source-nws", "Lieu et météo : NWS a répondu, domaine public", lieu_source_nws},
     {"langue", "Langue de l'écran et de l'assistant", langue},
     {"affichage", "Affichage : thème et luminosité", affichage},
     {"assistant-stt", "Assistant : reconnaissance de la voix", assistant_stt},

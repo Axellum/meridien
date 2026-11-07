@@ -56,11 +56,15 @@
 "ville.min3": "Tapez au moins 3 lettres."
 "ville.enregistree": "Ville enregistrée : {ville}"
 "meteo.attribution": "Données météo : {lien} (licence CC BY 4.0)"
+"meteo.attribution_metno": "Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)"
+"meteo.attribution_nws": "Données météo : {lien} (domaine public)"
+"meteo.sans_parrainage": "Cet appareil n’est ni approuvé ni parrainé par le National Weather Service."
 "source.titre": "Source météo"
 "source.aide": "Le service qui fournit la météo de la ville choisie."
 "source.enregistree": "Source enregistrée : {source}"
 "source.retablie": "Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays."
 "source.modele": "Modèle : {modele}"
+"source.repli": "{service} est indisponible : la météo vient d’Open-Meteo en attendant."
 "source.filtre": "Seules les sources qui couvrent le pays de la ville sont proposées."
 
 # --- Page de réglages : assistant vocal ---

@@ -82,6 +82,8 @@ struct MeteoVue {
     float temperature_c = 0;
     int code_wmo = 0;
     bool jour = true;
+    meteo::fournisseurs::Famille origine =
+        meteo::fournisseurs::Famille::OpenMeteo; // qui a donné cette météo (ADR-0014)
 };
 
 class PortsAppareil {
@@ -429,6 +431,7 @@ class HoteAppareil final : public HoteReglages {
             return a;
         }
         a.disponible = true;
+        a.origine = m.origine;
         a.temperature_c = m.temperature_c;
         reglages::copier_texte(i18n::tr(meteo::decrire(m.code_wmo, m.jour).libelle), a.libelle, sizeof a.libelle);
         return a;

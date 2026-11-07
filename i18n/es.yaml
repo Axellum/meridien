@@ -163,9 +163,13 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Seules les sources qui couvrent le pays de la ville sont proposées.": "Solo se ofrecen las fuentes que cubren el país de la ciudad."
 "Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Fuente restablecida a «Automático»: la anterior no cubre este país."
 "Modèle : {modele}": "Modelo: {modele}"
+"Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)": "Datos del tiempo: {lien} (licencias CC BY 4.0 y NLOD 2.0, datos adaptados)"
+"Données météo : {lien} (domaine public)": "Datos del tiempo: {lien} (dominio público)"
+"{service} est indisponible : la météo vient d’Open-Meteo en attendant.": "{service} no está disponible: el tiempo viene de Open-Meteo por ahora."
 
 # --- Page de réglages : source de la météo (07/11/2026) ---
 "Source enregistrée : {source}": "Fuente guardada: {source}"
+"Cet appareil n’est ni approuvé ni parrainé par le National Weather Service.": "Este dispositivo no está respaldado ni patrocinado por el National Weather Service."
 
 # --- Page de réglages : assistant vocal ---
 "Assistant vocal": "Asistente de voz"

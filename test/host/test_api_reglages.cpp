@@ -583,6 +583,7 @@ constexpr int ville_lue_avec_la_source_meteo_et_la_liste_de_son_pays() {
     VERIFIER(taille_de(r, "sources_meteo") == 2);
     VERIFIER(texte_est(r, "sources_meteo[0].id", "auto") && texte_est(r, "sources_meteo[0].nom", "Automatique"));
     VERIFIER(texte_est(r, "sources_meteo[1].id", "noaa") && texte_est(r, "sources_meteo[1].nom", "NOAA GFS"));
+    VERIFIER(booleen_est(r, "sources_meteo[0].direct", false) && booleen_est(r, "sources_meteo[1].direct", false));
     // Pays-Bas : le service national avant le mondial ; son nom est un nom propre, jamais traduit
     rg::copier_texte("NL", b.hote.zone.code_pays, sizeof b.hote.zone.code_pays);
     b.hote.source = "knmi";
@@ -593,6 +594,34 @@ constexpr int ville_lue_avec_la_source_meteo_et_la_liste_de_son_pays() {
     VERIFIER(texte_est(r, "sources_meteo[1].id", "knmi") && texte_est(r, "sources_meteo[1].nom", "KNMI"));
     VERIFIER(texte_est(r, "sources_meteo[2].id", "noaa"));
     VERIFIER(texte_est(r, "source_meteo", "knmi") && texte_est(r, "source_meteo_nom", "KNMI"));
+    return 0;
+}
+
+// Un service lu directement (ADR-0014) n'est pas un modèle d'Open-Meteo : la liste le dit (`direct`), la page n'écrit pas « Modèle : … ».
+constexpr int la_liste_distingue_un_service_lu_directement_d_un_modele_d_open_meteo() {
+    Banc b;
+    VERIFIER(b.connecter());
+    // Norvège : « MET Norway » existe deux fois, comme modèle d'Open-Meteo (`metno`) et comme service lu directement (`metnorway`)
+    rg::copier_texte("NO", b.hote.zone.code_pays, sizeof b.hote.zone.code_pays);
+    b.hote.source = "metnorway";
+    api::Reponse r = b.avec_jeton(Methode::Get, "/api/location");
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(texte_est(r, "source_meteo", "metnorway") && texte_est(r, "source_meteo_nom", "MET Norway (api.met.no)"));
+    VERIFIER(taille_de(r, "sources_meteo") == 4);
+    VERIFIER(texte_est(r, "sources_meteo[0].id", "auto") && booleen_est(r, "sources_meteo[0].direct", false));
+    VERIFIER(texte_est(r, "sources_meteo[1].id", "metno") && booleen_est(r, "sources_meteo[1].direct", false));
+    VERIFIER(texte_est(r, "sources_meteo[2].id", "metnorway") && booleen_est(r, "sources_meteo[2].direct", true));
+    VERIFIER(texte_est(r, "sources_meteo[2].nom", "MET Norway (api.met.no)"));
+    VERIFIER(texte_est(r, "sources_meteo[3].id", "noaa") && booleen_est(r, "sources_meteo[3].direct", false));
+    // États-Unis : le NWS, lui aussi lu directement
+    rg::copier_texte("US", b.hote.zone.code_pays, sizeof b.hote.zone.code_pays);
+    b.hote.source = "nws";
+    r = b.avec_jeton(Methode::Get, "/api/location");
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(texte_est(r, "source_meteo", "nws") && texte_est(r, "source_meteo_nom", "NWS (weather.gov)"));
+    VERIFIER(taille_de(r, "sources_meteo") == 3);
+    VERIFIER(texte_est(r, "sources_meteo[1].id", "nws") && booleen_est(r, "sources_meteo[1].direct", true));
+    VERIFIER(texte_est(r, "sources_meteo[2].id", "noaa") && booleen_est(r, "sources_meteo[2].direct", false));
     return 0;
 }
 
@@ -809,6 +838,55 @@ constexpr int meteo_valide_avec_libelle_dans_la_langue_de_l_ecran() {
     VERIFIER(!texte_est(r, "actuelle.libelle", francais));
     b.hote.meteo.perimee = true;
     VERIFIER(booleen_est(b.avec_jeton(Methode::Get, "/api/weather"), "perimee", true));
+    return 0;
+}
+
+// La météo nomme le service qui l'a RÉELLEMENT donnée (licence, politesse) et dit quand c'est un repli (ADR-0014).
+constexpr int la_meteo_nomme_le_service_qui_l_a_donnee_et_dit_le_repli() {
+    namespace fm = ecran::meteo::fournisseurs;
+    Banc b;
+    VERIFIER(b.connecter());
+    b.hote.meteo_dispo = true;
+    b.hote.meteo.valide = true;
+    b.hote.meteo.temperature_c = 9.0;
+    b.hote.meteo.code_wmo = 3;
+    b.hote.meteo.maj_epoch_s = 1793960000;
+    // sans rien d'autre : Open-Meteo, comme avant les services directs
+    api::Reponse r = b.avec_jeton(Methode::Get, "/api/weather");
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(texte_est(r, "fournisseur.id", "open-meteo") && texte_est(r, "fournisseur.nom", "Open-Meteo") &&
+             texte_est(r, "fournisseur.lien", "https://open-meteo.com/"));
+    VERIFIER(booleen_est(r, "repli", false));
+    VERIFIER(entier_est(r, "mise_a_jour", 1793960000) && entier_est(r, "actuelle.code", 3)); // le reste ne bouge pas
+    // MET Norway choisi et il a répondu
+    b.hote.source = "metnorway";
+    b.hote.meteo.origine = fm::Famille::MetNo;
+    r = b.avec_jeton(Methode::Get, "/api/weather");
+    VERIFIER(texte_est(r, "fournisseur.id", "met-norway") && texte_est(r, "fournisseur.nom", "MET Norway") &&
+             texte_est(r, "fournisseur.lien", "https://api.met.no/"));
+    VERIFIER(booleen_est(r, "repli", false));
+    // MET Norway choisi, il n'a pas répondu : la météo vient d'Open-Meteo, et c'est dit
+    b.hote.meteo.origine = fm::Famille::OpenMeteo;
+    r = b.avec_jeton(Methode::Get, "/api/weather");
+    VERIFIER(texte_est(r, "fournisseur.id", "open-meteo") && booleen_est(r, "repli", true));
+    // le NWS
+    b.hote.source = "nws";
+    b.hote.meteo.origine = fm::Famille::Nws;
+    r = b.avec_jeton(Methode::Get, "/api/weather");
+    VERIFIER(texte_est(r, "fournisseur.id", "nws") && texte_est(r, "fournisseur.nom", "NWS") &&
+             texte_est(r, "fournisseur.lien", "https://www.weather.gov/"));
+    VERIFIER(booleen_est(r, "repli", false));
+    b.hote.meteo.origine = fm::Famille::OpenMeteo;
+    VERIFIER(booleen_est(b.avec_jeton(Methode::Get, "/api/weather"), "repli", true));
+    // un modèle d'Open-Meteo, ou « Automatique », donné par Open-Meteo : ce n'est pas un repli
+    b.hote.source = "knmi";
+    VERIFIER(booleen_est(b.avec_jeton(Methode::Get, "/api/weather"), "repli", false));
+    b.hote.source = "auto";
+    VERIFIER(booleen_est(b.avec_jeton(Methode::Get, "/api/weather"), "repli", false));
+    // pas de météo : ni fournisseur ni repli à annoncer
+    b.hote.meteo_dispo = false;
+    r = b.avec_jeton(Methode::Get, "/api/weather");
+    VERIFIER(booleen_est(r, "disponible", false) && !existe(r, "fournisseur") && !existe(r, "repli"));
     return 0;
 }
 
@@ -1151,6 +1229,7 @@ constexpr int chaque_message_de_l_api_est_traduit_dans_chaque_langue() {
     X(ville_refusee_ne_touche_pas_au_stockage)                                                                         \
     X(echec_d_ecriture_donne_500)                                                                                      \
     X(ville_lue_avec_la_source_meteo_et_la_liste_de_son_pays)                                                          \
+    X(la_liste_distingue_un_service_lu_directement_d_un_modele_d_open_meteo)                                           \
     X(source_meteo_connue_meme_sans_ville_enregistree)                                                                 \
     X(source_choisie_seule_ne_touche_pas_a_la_ville)                                                                   \
     X(source_seule_sans_ville_enregistree_reste_possible)                                                              \
@@ -1164,6 +1243,7 @@ constexpr int chaque_message_de_l_api_est_traduit_dans_chaque_langue() {
     X(affichage_refuse_tout_ou_rien)                                                                                   \
     X(meteo_absente_ou_invalide)                                                                                       \
     X(meteo_valide_avec_libelle_dans_la_langue_de_l_ecran)                                                             \
+    X(la_meteo_nomme_le_service_qui_l_a_donnee_et_dit_le_repli)                                                        \
     X(recherche_de_lieu_convertie_pour_la_page)                                                                        \
     X(recherche_envoie_la_bonne_adresse)                                                                               \
     X(au_plus_huit_lieux)                                                                                              \
