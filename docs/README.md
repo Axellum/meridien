@@ -22,6 +22,7 @@ This documentation is kept **at the same time as the code**: every result carrie
 | plug the settings page into the firmware | [Settings API contract](api-reglages.md), [the page and its fake device](../web/README.md) |
 | find where a fact comes from (versions, licences, pins) | [Sourced research](recherche/) |
 | check the licence of the code or of a component it uses | [LICENSE](../LICENSE) (MIT), [THIRD_PARTY.md](../THIRD_PARTY.md) |
+| know the security limits, or prepare the public copy of the repository | [SECURITY.md](../SECURITY.md), [Publishing the repository](publication.md) |
 
 ### Reading rules
 
@@ -53,6 +54,7 @@ Cette documentation est tenue **en même temps que le code** : chaque résultat 
 | brancher la page de réglages au firmware | [Contrat de l'API de réglages](api-reglages.md), [la page et son faux appareil](../web/README.md) |
 | retrouver d'où vient un fait (versions, licences, broches) | [Recherches sourcées](recherche/) |
 | vérifier la licence du code ou d'un composant qu'il utilise | [LICENSE](../LICENSE) (MIT), [THIRD_PARTY.md](../THIRD_PARTY.md) |
+| connaître les limites de sécurité, ou préparer la copie publique du dépôt | [SECURITY.md](../SECURITY.md#version-française), [Publier le dépôt](publication.md#version-française) |
 
 ### Règles de lecture
 
