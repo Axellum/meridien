@@ -300,3 +300,27 @@ Série 2 (10 cycles, 35 s d'attente) :
 - **Niveau d'optimisation** : `CONFIG_COMPILER_OPTIMIZATION_LEVEL_DEBUG=y` (−Og) alourdit le calcul des prises de contact TLS ; un niveau de performance n'a pas été essayé.
 - **Autres cartes** (7B, ST7123, ILI9881C) : non essayées. La 7B garde les mêmes réglages dans son fichier de carte à créer.
 - **Coupure de courant complète** : non faite, reportée par Axel.
+
+## 12. L'interface LVGL en PSRAM (07/11/2026)
+
+> **Summary (EN)** — LVGL now has its own allocator (`main/lvgl_memoire.cpp`): PSRAM first, internal RAM only when PSRAM is full. Free internal RAM when the time arrives went from 74 kB to 211 kB, and with the settings open from 9.7 kB (the Wi-Fi scan then crashed the board) to 210 kB. **Seen on one board, serial log only**; drawing speed is not compared with the old allocator.
+
+**Vu sur** : Tab5 ST7121, binaire `fix-retours-axel-07-11-base-ac8422c.meridien.bin` (SHA-256 `756A8333…DD936`, 2 834 320 o, 32 % de la partition libres), commits `ce3ab9f` (allocateur) et `f572d9f` (garde du scan), 07/11/2026 vers 9 h. « Avant » : build intégré `953328d`, journaux du 07/11/2026 de 08 h 22 à 08 h 53.
+
+**Pourquoi.** Avec les réglages ouverts il restait 9,7 Ko libres (plus gros bloc 4,6 Ko, minimum 5,5 Ko) : le scan Wi-Fi n'a pas pu créer un sémaphore (`sem create failed`), le pilote d'`esp_hosted` a levé un `assert` (`port_esp_hosted_host_os.c:589`) et la carte a redémarré, deux fois. LVGL utilisait le `malloc` du système, qui range en mémoire interne tout bloc de moins de 256 o (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256`) : un objet, un style ou une étiquette LVGL pèse 100 à 250 o.
+
+| Étape (ligne `jalon_mem`) | Avant : libre / plus gros bloc / minimum | Après : libre / plus gros bloc / minimum |
+| --- | --- | --- |
+| après l'écran principal (objets, police, première image) | 173 071 / 60 416 / 136 092 o (coût de l'écran : 69 824 o) | 258 707 / 139 264 / 154 912 o (coût : **96 o**) |
+| fin de `app_main` | 130 767 / 36 864 / 98 720 o | 215 471 / 104 448 / 148 660 o |
+| heure reçue (IP, SNTP, serveur web en route) | 74 271 / 31 744 / 73 388 o | 211 407 / 92 160 / 148 500 o |
+| réglages ouverts, quelques minutes après | 41 087 puis 39 927 / 15 360 / 16 308 o, puis **9 747 / 4 608 / 5 524 o** | 210 375 / 71 680 / 148 500 o (une mesure à 199 843 pendant la navigation, revenue à 210 395) |
+
+Le minimum depuis le démarrage (148 500 o) n'a pas bougé pendant que l'auteur ouvrait les réglages, naviguait et lançait la recherche de réseaux à la main (de 9 h 02 à 9 h 10 environ) : aucun redémarrage, aucune ligne `assert`, `sem create failed` ni `Failed to allocate` dans le journal de la période.
+
+**Ce que cela ne dit pas.**
+
+- La vitesse de dessin n'est pas comparée à l'ancien allocateur (la PSRAM est plus lente que la mémoire interne derrière le cache). Les lignes `tab5_orientation` de la période donnent un rendu moyen de 7,8 à 15 ms par image pendant la navigation, 77 à 79 ms pour l'image fixe de l'écran principal ; elles n'ont pas de pendant « avant » de même durée.
+- La perte lente de mémoire interne de §8 (152 o par minute) n'est pas remesurée.
+- Le coût réel d'un scan Wi-Fi en mémoire interne n'est pas mesuré : les seuils de la garde (`kScanLibreInterneMin` 16 Ko, `kScanBlocInterneMin` 8 Ko, `main/reseau.cpp`) sont des valeurs de départ, et la garde ne s'est pas déclenchée pendant l'essai.
+- Un démarrage à froid (coupure de courant) n'a pas été rejoué avec ce binaire.

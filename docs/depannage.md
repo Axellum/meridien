@@ -254,6 +254,16 @@ The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if
 
 ### Flash, serial port and backup
 
+#### Black screen after `write-flash --after no-reset`: the application never starts
+
+**Symptom.** `esptool write-flash … --after no-reset` succeeds (“Hash of data verified”); a capture script that then “resets” the board with an RTS pulse only reads nothing for 35 s, and the screen stays black.
+
+**Cause.** `--after no-reset` leaves the chip in the ROM download mode, and the RTS pulse of the capture script did not bring it out of it (the exact reason was not looked into).
+
+**Solution.** Let esptool reset the chip (`python -m esptool --port COMn --after hard-reset chip-id`, or flash without `--after no-reset`), then start the capture at once: the ROM and bootloader lines of that start are missed, the application lines are not. The application started on the first try.
+
+**Seen on** Tab5 ST7121, binary of the branch `fix/retours-axel-07-11` (SHA-256 `756A8333…`), 07/11/2026. **Evidence**: no byte on the port after the RTS pulse, black screen reported by the author; complete log after esptool's hard reset. **Status**: worked around.
+
 #### `read-flash` fails: “Packet content transfer stopped”
 
 **Cause.** Reading the whole flash with esptool's stub on a zone that does not answer; here also, an offset error (the NVS is not at the start of the flash).
@@ -286,6 +296,16 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 ---
 
 ### Memory and watchdog
+
+#### Tapping “Wi-Fi” in the settings restarts the board: `sem create failed`, then `assert … port_esp_hosted_host_os.c:589`
+
+**Symptom.** Settings open, tap on “Wi-Fi” (network scan): the board restarts. Log: `sem create failed`, `assert failed: hosted_destroy_semaphore port_esp_hosted_host_os.c:589`, reboot. Twice on 07/11/2026. In the same state the city search failed to open its connection (`Failed to allocate memory`).
+
+**Cause.** With the settings open only **9.7 kB** of internal RAM were free (largest block 4.6 kB). The Wi-Fi link with the ESP32-C6 (`esp_hosted`) and TLS live **only** in internal RAM. LVGL used the system `malloc`, and every block under 256 bytes (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256`) is served from internal RAM; an LVGL object, style or label weighs 100 to 250 bytes: the main screen alone took 52 kB, each settings screen about 40 kB.
+
+**Solution.** LVGL has its own allocator, PSRAM first and internal RAM only when PSRAM is full (`main/lvgl_memoire.cpp`, `CONFIG_LV_USE_CUSTOM_MALLOC=y`, commit `ce3ab9f`). The `-Wl,-u,<symbol>` lines of `main/CMakeLists.txt` are required: nothing in `main` calls these functions, and without them the linker leaves the file inside `libmain.a` (`undefined reference to lv_malloc_core`). After a change in `sdkconfig.defaults`, delete `sdkconfig` (the defaults are read again only for a new one). Safety net (commit `f572d9f`): `reseau.cpp` refuses a scan below 16 kB free or an 8 kB largest block, with a log warning; these two thresholds are first values, the real cost of a scan is not measured.
+
+**Seen on** Tab5 ST7121, integrated build `953328d`, 07/11/2026. **Evidence**: before, free internal RAM 74 kB when the time arrives and 9.7 kB with the settings open (minimum 5.5 kB); after, 211 kB and 210 kB (minimum since boot 148,500 B), settings navigated and a scan started by hand by the author, no restart. Drawing speed was not compared with the old allocator. **Status**: resolved on this trial; to watch over a longer run.
 
 #### The weather request fails: `esp-aes: Failed to allocate memory…` or `PK verify failed with error 0x4290`
 
@@ -441,6 +461,16 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 **Seen on** the author's PC, captures of 2026-11-07 00:12 (Paris time), no board. **Evidence**: `hourly.time[0] - current.time` = -2,700 s (Kathmandu), +1,800 s (Newfoundland), 0 (Lyon, Sydney, Singapore). **Status**: resolved in the core; the screen must accept `heure_courante == -1`.
 ### Main screen
+
+#### No time and a near-black sky for the first 13 seconds after a start
+
+**Symptom.** After a start the main screen shows no time and a night sky until the first SNTP answer (about 13 s). The author: “the blue background takes a while to appear”.
+
+**Cause.** `ecran_principal.cpp` took the time only once SNTP had answered, although the system time was already right (the board layer resumes it from the RX8130 at 2.6 s after power-up, or it is kept across a software reset). In addition, as long as the weather was not read, the sky judged day and night in UTC (one or two hours of night too many).
+
+**Solution.** The core rule `rtc::heure_affichable(reseau_synchronise, systeme_s)` (the network gave the time OR the system time is plausible; tested, 2 mutations) and `decalage_secours_s`, the clock's offset passed to the screen (commit `a740935`).
+
+**Seen on** Tab5 ST7121, integrated build `953328d`, 07/11/2026. **Evidence**: log: “09:01” and the date 3.4 s after a restart instead of about 13 s; the sky itself was not looked at by me; a start after a power cut (hardware clock read) not replayed. **Status**: resolved in the log; to confirm by eye.
 
 #### The sky gradient shows visible bands
 
@@ -743,6 +773,16 @@ Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement,
 
 ### Flash, port série et sauvegarde
 
+#### Écran noir après `write-flash --after no-reset` : l'application ne démarre pas
+
+**Symptôme.** `esptool write-flash … --after no-reset` réussit (« Hash of data verified ») ; un script de capture qui « remet à zéro » ensuite la carte par une impulsion RTS ne lit rien pendant 35 s, et l'écran reste noir.
+
+**Cause.** `--after no-reset` laisse la puce en mode téléchargement de la ROM, et l'impulsion RTS du script de capture ne l'en a pas sortie (la raison exacte n'a pas été cherchée).
+
+**Solution.** Laisser esptool remettre la puce à zéro (`python -m esptool --port COMn --after hard-reset chip-id`, ou flasher sans `--after no-reset`), puis lancer la capture aussitôt : les lignes de la ROM et du chargeur de ce démarrage sont manquées, pas celles de l'application. L'application a démarré du premier coup.
+
+**Vu sur** Tab5 ST7121, binaire de la branche `fix/retours-axel-07-11` (SHA-256 `756A8333…`), 07/11/2026. **Preuve** : aucun octet sur le port après l'impulsion RTS, écran noir signalé par l'auteur ; journal complet après la remise à zéro d'esptool. **Statut** : contourné.
+
 #### `read-flash` échoue : « Packet content transfer stopped »
 
 **Cause.** Lecture de toute la flash avec le stub d'esptool sur une zone qui ne répond pas ; ici aussi, une erreur d'offset (la NVS n'est pas au début de la flash).
@@ -775,6 +815,16 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 ---
 
 ### Mémoire et chien de garde
+
+#### Toucher « Wi-Fi » dans les réglages redémarre la carte : `sem create failed`, puis `assert … port_esp_hosted_host_os.c:589`
+
+**Symptôme.** Réglages ouverts, appui sur « Wi-Fi » (recherche de réseaux) : la carte redémarre. Journal : `sem create failed`, `assert failed: hosted_destroy_semaphore port_esp_hosted_host_os.c:589`, redémarrage. Deux fois le 07/11/2026. Dans le même état, la recherche de ville n'arrivait pas à ouvrir sa connexion (`Failed to allocate memory`).
+
+**Cause.** Réglages ouverts, il ne restait que **9,7 Ko** de mémoire interne libres (plus gros bloc 4,6 Ko). La liaison Wi-Fi avec l'ESP32-C6 (`esp_hosted`) et le TLS ne vivent **qu'en** mémoire interne. LVGL utilisait le `malloc` du système, et tout bloc de moins de 256 octets (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256`) va en mémoire interne ; un objet, un style ou une étiquette LVGL pèse 100 à 250 octets : l'écran principal seul en prenait 52 Ko, chaque écran de réglages une quarantaine.
+
+**Solution.** LVGL a son propre allocateur, PSRAM d'abord et mémoire interne seulement quand la PSRAM est pleine (`main/lvgl_memoire.cpp`, `CONFIG_LV_USE_CUSTOM_MALLOC=y`, commit `ce3ab9f`). Les lignes `-Wl,-u,<symbole>` de `main/CMakeLists.txt` sont nécessaires : rien dans `main` n'appelle ces fonctions, et sans elles l'éditeur de liens laisse le fichier dans `libmain.a` (`undefined reference to lv_malloc_core`). Après un changement de `sdkconfig.defaults`, supprimer `sdkconfig` (les defaults ne sont relus que pour un neuf). Filet de sécurité (commit `f572d9f`) : `reseau.cpp` refuse une recherche sous 16 Ko libres ou un plus gros bloc de 8 Ko, avec un avertissement au journal ; ces deux seuils sont des valeurs de départ, le coût réel d'un scan n'est pas mesuré.
+
+**Vu sur** Tab5 ST7121, build intégré `953328d`, 07/11/2026. **Preuve** : avant, mémoire interne libre 74 Ko à la réception de l'heure et 9,7 Ko réglages ouverts (minimum 5,5 Ko) ; après, 211 Ko et 210 Ko (minimum depuis le démarrage 148 500 o), réglages parcourus et recherche lancée à la main par l'auteur, aucun redémarrage. La vitesse de dessin n'a pas été comparée à l'ancien allocateur. **Statut** : résolu sur cet essai ; à surveiller sur une durée plus longue.
 
 #### La requête météo échoue : `esp-aes: Failed to allocate memory…` ou `PK verify failed with error 0x4290`
 
@@ -930,6 +980,16 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 **Vu sur** PC de l'auteur, captures du 2026-11-07 00 h 12 (heure de Paris), aucune carte. **Preuve** : `hourly.time[0] - current.time` = -2 700 s (Katmandou), +1 800 s (Terre-Neuve), 0 (Lyon, Sydney, Singapour). **Statut** : résolu dans le noyau ; l'écran doit accepter `heure_courante == -1`.
 ### Écran principal
+
+#### Pas d'heure et un ciel presque noir pendant les 13 premières secondes
+
+**Symptôme.** Après un démarrage, l'écran principal n'affiche pas l'heure et montre un ciel de nuit jusqu'à la première réponse SNTP (environ 13 s). L'auteur : « le fond bleu met du temps à apparaître ».
+
+**Cause.** `ecran_principal.cpp` ne prenait l'heure qu'une fois SNTP répondu, alors que l'heure du système était déjà juste (la couche carte la reprend du RX8130 à 2,6 s après la mise sous tension, ou elle est gardée à travers un redémarrage logiciel). De plus, tant que la météo n'était pas lue, le ciel jugeait le jour et la nuit en UTC (une à deux heures de nuit de trop).
+
+**Solution.** La règle du noyau `rtc::heure_affichable(reseau_synchronise, systeme_s)` (le réseau a donné l'heure OU l'heure du système est plausible ; testée, 2 mutations) et `decalage_secours_s`, le décalage de l'horloge passé à l'écran (commit `a740935`).
+
+**Vu sur** Tab5 ST7121, build intégré `953328d`, 07/11/2026. **Preuve** : journal : « 09:01 » et la date 3,4 s après un redémarrage au lieu d'environ 13 s ; le ciel lui-même n'a pas été regardé par moi ; démarrage après une coupure de courant (lecture de l'horloge matérielle) non rejoué. **Statut** : résolu dans le journal ; à confirmer à l'œil.
 
 #### Le dégradé du ciel montre des bandes visibles
 
