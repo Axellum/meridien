@@ -143,6 +143,24 @@ constexpr int serie_relevee_sur_la_carte_mot_de_passe_faux() {
     return 0;
 }
 
+// Deuxième essai, même carte, même réseau, même mot de passe faux (07/11/2026, 02 h 27) : 8, 2, 205, 2, 205 puis RIEN avant
+// le délai de 30 s : le « 202 » du premier essai n'est pas venu. Aucune cause sûre n'a été vue : on dit « autre », on ne devine pas.
+constexpr int serie_relevee_sur_la_carte_sans_202_dit_autre() {
+    const int codes[] = {8, 2, 205, 2, 205};
+    w::Sortie s = w::demarrer(w::Essai{}, true);
+    for (const int c : codes) {
+        s = w::sur_deconnexion(s.etat, c);
+        VERIFIER(s.etat.phase == Phase::Essai && !s.appliquer_ancien && !s.rappeler);
+    }
+    s = w::sur_delai_essai(s.etat);
+    VERIFIER(s.etat.phase == Phase::Retour && s.appliquer_ancien && s.etat.attendu == Resultat::Autre);
+    s = w::sur_deconnexion(s.etat, 3); // notre propre coupure pour reprendre l'ancien réseau : sans effet
+    VERIFIER(s.etat.phase == Phase::Retour && !s.rappeler);
+    s = w::sur_adresse_ip(s.etat);
+    VERIFIER(s.rappeler && s.resultat == Resultat::Autre && s.etat.phase == Phase::Repos);
+    return 0;
+}
+
 // Réseau qui n'existe pas (même carte, même jour) : 8, 201 (+2,7 s), 201 (+7,2 s) → échec dit dès la deuxième preuve.
 constexpr int serie_relevee_sur_la_carte_reseau_introuvable() {
     const int codes[] = {8, 201};
@@ -333,6 +351,7 @@ constexpr int un_nouvel_essai_repart_de_zero() {
     X(cause_autre_n_arrete_jamais_l_essai)                                                                             \
     X(une_cause_autre_ne_casse_pas_une_serie_de_preuves)                                                               \
     X(serie_relevee_sur_la_carte_mot_de_passe_faux)                                                                    \
+    X(serie_relevee_sur_la_carte_sans_202_dit_autre)                                                                   \
     X(serie_relevee_sur_la_carte_reseau_introuvable)                                                                   \
     X(la_deconnexion_provoquee_par_nous_est_ignoree)                                                                   \
     X(delai_sans_aucune_cause_rend_autre)                                                                              \
