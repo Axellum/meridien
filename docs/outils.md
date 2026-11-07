@@ -10,20 +10,22 @@ Installed on 06/11/2026 at Axel's request ("install all the tools you need to ma
 
 | Tool | Version | Where | Used for |
 |---|---|---|---|
-| llvm-mingw: `clang`, `clang++`, `lld`, `llvm-symbolizer` | clang 23.1.5 (release 20261104, ucrt x86-64) | `H:\AuxFilsDesIdees\_outils\llvm-mingw\` (`VERSION.txt`: source and verified SHA-256) | compiling **and running** the core tests on the PC; memory-error detector (AddressSanitizer) and undefined-behaviour detector (UBSan) |
+| llvm-mingw: `clang`, `clang++`, `lld`, `llvm-symbolizer` | clang 23.1.5 (release 20261104, ucrt x86-64) | `<tools>\llvm-mingw\` (`VERSION.txt`: source and verified SHA-256) | compiling **and running** the core tests on the PC; memory-error detector (AddressSanitizer) and undefined-behaviour detector (UBSan) |
 | `clang-format` | 23.1.5 | same, and pip package (`--user`) | one single C/C++ formatting for every session |
 | `clang-tidy` | 23.1.4 (pip) / 23.1.5 | same | static analysis of the pure core |
-| `gitleaks` | 8.30.1 | `H:\AuxFilsDesIdees\_outils\gitleaks\` (`VERSION.txt`: source and verified SHA-256) | secret scan of the index (before a commit) and of the history |
+| `gitleaks` | 8.30.1 | `<tools>\gitleaks\` (`VERSION.txt`: source and verified SHA-256) | secret scan of the index (before a commit) and of the history |
 | `pre-commit` (pip package) | installed by pip (`--user`) | pip `Scripts` folder | **not used**: the repository hook is a small home-made script (`.githooks/pre-commit`), with no download of third-party hooks |
 | `ruff`, `pytest`, `playwright`, `esptool`, `pyserial`, Node | already present before | — | Python tests, settings-page run-through, flashing, fake-device server |
 | Pillow (pip, `--user`) | 12.3.0 | pip | drawing the weather icons (`tools/icones/generer_icones.py`) and assembling the PNG sheets (`rendre.ps1 -Planche`); a development tool, not shipped in the firmware |
 
-llvm-mingw download: <https://github.com/mstorsjo/llvm-mingw/releases/tag/20261104>, 191,037,046-byte archive, SHA-256 `552191b5…1b40f` identical to the one published by GitHub; once extracted, the archive is kept in `_outils\_telechargements\`.
+llvm-mingw download: <https://github.com/mstorsjo/llvm-mingw/releases/tag/20261104>, 191,037,046-byte archive, SHA-256 `552191b5…1b40f` identical to the one published by GitHub; once extracted, the archive is kept in `<tools>\_telechargements\`.
 
 ### Using the tools
 
+`<tools>` above is the folder that holds `env_hote.ps1`, `llvm-mingw\` and `gitleaks\`. It is different on every PC and never written in the repository: `tools\trouver_outils.ps1` (`Trouver-Outils`) looks for it, and `tools\verifier.ps1`, `tools\rendre.ps1` and the commit hook use it. The first of these that exists wins: (1) the environment variable `MERIDIEN_OUTILS`; (2) `$Outils` in `tools\local.ps1` (ignored by git, model: `tools\local.example.ps1`, same file as the ESP-IDF folder), the one of the working folder then the one of the main folder of the repository; (3) a folder named `_outils` in a parent folder of the repository (the author's layout: `_outils` next to the repository). Nothing found: the scripts stop with exit code 2 and say so.
+
 ```powershell
-. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers   # PATH + CXX for this PowerShell session only
+. .\tools\trouver_outils.ps1; . "$(Trouver-Outils)\env_hote.ps1" -Sanitizers   # PATH + CXX for this PowerShell session only
 python test/host/lancer.py                              # must print: mode "complet (compilé + exécuté)"
 python test/host/lancer.py --mutations                  # every mutation of the core must be detected
 clang-format --dry-run -Werror components/core/include/ecran/*.hpp
@@ -43,7 +45,7 @@ Without `-Sanitizers`, `CXX` points to plain `clang++` (faster, no detectors): u
 - The hook is enabled in the repository by `git config core.hooksPath .githooks` (done on 06/11/2026). Every worktree sees it, but the `.githooks` folder only exists in a worktree after `main` has been merged into it: until then, run `.\tools\verifier.ps1` by hand.
 - **Never** bypass it with `--no-verify`: fix the cause. The hook also refuses a commit if the test runner is not in "complet" mode (nothing executed).
 - **Formatting is blocking.** `.clang-format` (LLVM, 4 spaces, 120 columns, comments not reflowed) is the rule; `.clang-format-ignore` leaves the generated files alone (`fuseaux_donnees.inc`, `test/host/donnees/*`). Fix with `clang-format -i --style=file <file>`. A table aligned on purpose is protected with `// clang-format off` … `// clang-format on`. The version is pinned (23.1.5, the same on the PC and in the CI) because another version can format differently.
-- `ruff.toml` belongs to the project: without it ruff inherited a stricter configuration found higher up in `H:\AuxFilsDesIdees` (security rules of the Tab5 repository).
+- `ruff.toml` belongs to the project: without it ruff inherited a stricter configuration found in a parent folder of the author's workspace (the security rules of another repository).
 - Proof of 06/11/2026 (before the formatting became blocking): a fake Slack token in the index → commit refused (gitleaks, code 1); a broken assertion (`NOMBRE_CODES == 30`) → commit refused (code 1, compiler error on the line); in both cases no commit was created and the tree came back clean.
 - Proof of 06/11/2026 after the one-shot reformatting (clang-format 23.1.5): complete `.\tools\verifier.ps1` (mutations included) on commit `034a3d7`, 28 min 59 s, exit code 0: secrets OK, 252 tests executed with AddressSanitizer + UBSan, 206 mutations out of 206 detected (0 problem), ruff OK on 9 files, formatting OK on 36 files (the 10 generated files are excluded). Run again, with the same result, on commit `29a548e` (27 min 20 s). Seen on: the PC (clang++ 23.1.5, Windows), no board involved.
 
@@ -156,20 +158,22 @@ Installés le 06/11/2026 sur demande d'Axel (« installe tous les outils qu'il t
 
 | Outil | Version | Où | Sert à |
 |---|---|---|---|
-| llvm-mingw : `clang`, `clang++`, `lld`, `llvm-symbolizer` | clang 23.1.5 (publication 20261104, ucrt x86-64) | `H:\AuxFilsDesIdees\_outils\llvm-mingw\` (`VERSION.txt` : source et SHA-256 vérifié) | compiler **et exécuter** les tests du noyau sur le PC ; détecteurs d'erreurs mémoire (AddressSanitizer) et de comportements indéfinis (UBSan) |
+| llvm-mingw : `clang`, `clang++`, `lld`, `llvm-symbolizer` | clang 23.1.5 (publication 20261104, ucrt x86-64) | `<outils>\llvm-mingw\` (`VERSION.txt` : source et SHA-256 vérifié) | compiler **et exécuter** les tests du noyau sur le PC ; détecteurs d'erreurs mémoire (AddressSanitizer) et de comportements indéfinis (UBSan) |
 | `clang-format` | 23.1.5 | idem, et paquet pip (`--user`) | une seule mise en forme du C/C++ pour toutes les sessions |
 | `clang-tidy` | 23.1.4 (pip) / 23.1.5 | idem | analyse statique du noyau pur |
-| `gitleaks` | 8.30.1 | `H:\AuxFilsDesIdees\_outils\gitleaks\` (`VERSION.txt` : source et SHA-256 vérifié) | recherche de secrets dans l'index (avant commit) et dans l'historique |
+| `gitleaks` | 8.30.1 | `<outils>\gitleaks\` (`VERSION.txt` : source et SHA-256 vérifié) | recherche de secrets dans l'index (avant commit) et dans l'historique |
 | `pre-commit` (paquet pip) | installé par pip (`--user`) | dossier `Scripts` de pip | **non utilisé** : le crochet du dépôt est un petit script maison (`.githooks/pre-commit`), sans téléchargement de crochets tiers |
 | `ruff`, `pytest`, `playwright`, `esptool`, `pyserial`, Node | déjà présents avant | — | tests Python, parcours de la page, flash, serveur du faux appareil |
 | Pillow (pip, `--user`) | 12.3.0 | pip | dessiner les icônes météo (`tools/icones/generer_icones.py`) et assembler les planches PNG (`rendre.ps1 -Planche`) ; outil de développement, pas livré dans le firmware |
 
-Téléchargement d'llvm-mingw : <https://github.com/mstorsjo/llvm-mingw/releases/tag/20261104>, archive de 191 037 046 octets, SHA-256 `552191b5…1b40f` identique à celui publié par GitHub ; extraite, l'archive est gardée dans `_outils\_telechargements\`.
+Téléchargement d'llvm-mingw : <https://github.com/mstorsjo/llvm-mingw/releases/tag/20261104>, archive de 191 037 046 octets, SHA-256 `552191b5…1b40f` identique à celui publié par GitHub ; extraite, l'archive est gardée dans `<outils>\_telechargements\`.
 
 ### Se servir des outils
 
+`<outils>` ci-dessus est le dossier qui contient `env_hote.ps1`, `llvm-mingw\` et `gitleaks\`. Il change d'un PC à l'autre et n'est jamais écrit dans le dépôt : `tools\trouver_outils.ps1` (`Trouver-Outils`) le cherche, et `tools\verifier.ps1`, `tools\rendre.ps1` et le crochet de commit s'en servent. Le premier qui existe gagne : (1) la variable d'environnement `MERIDIEN_OUTILS` ; (2) `$Outils` dans `tools\local.ps1` (ignoré par git, modèle : `tools\local.example.ps1`, le même fichier que pour le dossier d'ESP-IDF), celui du dossier de travail puis celui du dossier principal du dépôt ; (3) un dossier nommé `_outils` dans un dossier parent du dépôt (la disposition de l'auteur : `_outils` à côté du dépôt). Rien de trouvé : les scripts s'arrêtent avec le code 2 et le disent.
+
 ```powershell
-. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers   # PATH + CXX pour cette session PowerShell seulement
+. .\tools\trouver_outils.ps1; . "$(Trouver-Outils)\env_hote.ps1" -Sanitizers   # PATH + CXX pour cette session PowerShell seulement
 python test/host/lancer.py                              # doit afficher : mode « complet (compilé + exécuté) »
 python test/host/lancer.py --mutations                  # chaque mutation du noyau doit être détectée
 clang-format --dry-run -Werror components/core/include/ecran/*.hpp
@@ -189,7 +193,7 @@ Sans `-Sanitizers`, `CXX` pointe sur `clang++` simple (plus rapide, sans détect
 - Le crochet est activé dans le dépôt par `git config core.hooksPath .githooks` (fait le 06/11/2026). Il est vu par tous les worktrees, mais le dossier `.githooks` n'existe dans un worktree qu'après y avoir fusionné `main` : avant cela, lancer `.\tools\verifier.ps1` à la main.
 - **Ne jamais** contourner avec `--no-verify` : corriger la cause. Le crochet refuse aussi un commit si le lanceur de tests n'est pas en mode « complet » (rien d'exécuté).
 - **La mise en forme est bloquante.** `.clang-format` (LLVM, 4 espaces, 120 colonnes, commentaires non recoupés) fait foi ; `.clang-format-ignore` laisse les fichiers générés tranquilles (`fuseaux_donnees.inc`, `test/host/donnees/*`). Corriger avec `clang-format -i --style=file <fichier>`. Un tableau aligné exprès se protège avec `// clang-format off` … `// clang-format on`. La version est épinglée (23.1.5, la même sur le PC et dans la CI) parce qu'une autre version peut formater autrement.
-- `ruff.toml` est propre au projet : sans lui ruff héritait d'une configuration plus stricte (règles de sécurité du dépôt Tab5) trouvée plus haut dans `H:\AuxFilsDesIdees`.
+- `ruff.toml` est propre au projet : sans lui ruff héritait d'une configuration plus stricte (règles de sécurité du dépôt Tab5) trouvée dans un dossier parent de l'espace de travail de l'auteur (les règles de sécurité d'un autre dépôt).
 - Preuve du 06/11/2026 (avant que la mise en forme devienne bloquante) : un faux jeton Slack dans l'index → commit refusé (gitleaks, code 1) ; une assertion cassée (`NOMBRE_CODES == 30`) → commit refusé (code 1, erreur du compilateur sur la ligne) ; dans les deux cas aucun commit créé et l'arbre est revenu propre.
 - Preuve du 06/11/2026 après le reformatage d'un seul coup (clang-format 23.1.5) : `.\tools\verifier.ps1` complet (mutations comprises) sur le commit `034a3d7`, 28 min 59 s, code de sortie 0 : secrets OK, 252 tests exécutés avec AddressSanitizer + UBSan, 206 mutations sur 206 détectées (0 problème), ruff OK sur 9 fichiers, mise en forme OK sur 36 fichiers (les 10 fichiers générés sont exclus). Relancé avec le même résultat sur le commit `29a548e` (27 min 20 s). Vu sur : le PC (clang++ 23.1.5, Windows), aucune carte concernée.
 

@@ -7,4 +7,5 @@
 ### Changed
 
 - **README status** brought up to date (it still described a “Bonjour” screen and a plan for Wi-Fi), and the repository is no longer described as private there; `AGENTS.md` points to `docs/publication.md` for any change of visibility.
+- **The folder of the PC's development tools is no longer written in the repository.** `tools/trouver_outils.ps1` (`Trouver-Outils`) finds it: the `MERIDIEN_OUTILS` variable, then `$Outils` in `tools/local.ps1` (model: `tools/local.example.ps1`), then a folder named `_outils` in a parent folder of the repository. `tools/verifier.ps1` (so the commit hook), `tools/rendre.ps1` and `tools/rendu/rendre.py` use it; the documents say `<tools>`. Checked on 2026-11-07 under PowerShell 5.1 and 7: the same folder is found, and a render of the `bonjour` scene is byte-identical (SHA-256) before and after the change.
 - A Windows user path in `docs/depannage.md` and the board's real IP address in `docs/mesures/meteo-journal-carte.log` were replaced (`%USERPROFILE%`, `192.168.1.52`, the example address used elsewhere in the documents).

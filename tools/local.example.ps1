@@ -9,6 +9,11 @@
 # Autre moyen, sans fichier : definir la variable d'environnement MERIDIEN_IDF_RACINE (elle passe avant local.ps1).
 $IdfRacine = '<A ADAPTER : dossier de l''installation ESP-IDF>'
 
+# Outils : dossier des outils de developpement du PC (il contient env_hote.ps1, llvm-mingw\ et gitleaks\ : voir docs/outils.md),
+# cherche par tools\trouver_outils.ps1. Facultatif : sans cette valeur, un dossier nomme _outils dans un dossier parent du depot est
+# trouve tout seul. Autre moyen, sans fichier : la variable d'environnement MERIDIEN_OUTILS (elle passe avant local.ps1).
+$Outils = '<A ADAPTER : dossier des outils (facultatif)>'
+
 # FichierEnv : chemin du fichier .env qui porte MERIDIEN_WIFI_SSID et MERIDIEN_WIFI_MOT_DE_PASSE (le nom et le mot de passe du
 # Wi-Fi de la compilation), lu par tools\preparer_wifi.ps1. Jamais copie dans le depot. Autres moyens : le parametre
 # -FichierEnv du script, ou la variable d'environnement MERIDIEN_ENV.

@@ -6,7 +6,7 @@
 #   .\tools\verifier.ps1 -Rapide     seulement ce qui est dans l'index git (appele par .githooks/pre-commit)
 #
 # Code de sortie non nul = au moins un controle a ECHOUE, la mise en forme comprise (bloquante depuis le reformatage
-# d'un seul coup du code). Outils : H:\AuxFilsDesIdees\_outils (voir docs/outils.md).
+# d'un seul coup du code). Dossier des outils : tools\trouver_outils.ps1 (voir docs/outils.md).
 param(
     [switch]$Rapide,
     [switch]$Web
@@ -16,9 +16,10 @@ $ErrorActionPreference = 'Continue'
 $racine = (& git rev-parse --show-toplevel).Trim()
 Set-Location $racine
 
-$outils = 'H:\AuxFilsDesIdees\_outils'
-if (-not (Test-Path "$outils\env_hote.ps1")) {
-    Write-Host "ECHEC : outils absents ($outils). Voir docs/outils.md pour les reinstaller." -ForegroundColor Red
+. (Join-Path $PSScriptRoot 'trouver_outils.ps1')
+$outils = Trouver-Outils
+if (-not $outils) {
+    Write-Host "ECHEC : dossier des outils introuvable (MERIDIEN_OUTILS, `$Outils de tools\local.ps1, ou un dossier _outils a cote du depot). Voir docs/outils.md." -ForegroundColor Red
     exit 2
 }
 . "$outils\env_hote.ps1" -Sanitizers | Out-Null
