@@ -164,6 +164,7 @@ from mutations_meteo_detail import MUTATIONS_METEO_DETAIL  # noqa: E402  (mété
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
 from mutations_meteo_riche import MUTATIONS_METEO_RICHE  # noqa: E402  (météo riche : heures, quarts d'heure, pluie proche, cache v2)
 from mutations_meteo_tendance import MUTATIONS_METEO_TENDANCE  # noqa: E402  (tendance de pression sur 3 h)
+from mutations_nvs_securite import MUTATIONS_NVS_SECURITE  # noqa: E402  (sécurité de la NVS : classement, décision, migration)
 from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (page de réglages : JSON, valeurs, appairage, API)
 from mutations_wifi import MUTATIONS_WIFI  # noqa: E402  (Wi-Fi : essai avec retour arrière, classement des réseaux)
 from mutations_vigie import MUTATIONS_VIGIE  # noqa: E402  (alertes officielles de Vigie : requête, planning, gzip, lecture, vue, textes)
@@ -191,6 +192,7 @@ MUTATIONS += MUTATIONS_VIGIE
 MUTATIONS += MUTATIONS_GZIP
 MUTATIONS += MUTATIONS_FUSEAUX
 MUTATIONS += MUTATIONS_SURF
+MUTATIONS += MUTATIONS_NVS_SECURITE
 
 
 @functools.lru_cache(maxsize=None)

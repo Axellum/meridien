@@ -1,0 +1,7 @@
+### Added
+
+- **Study of encrypted settings storage, and the tested core of a clear → encrypted migration (not wired, nothing enabled)**: [docs/recherche/07-chiffrement-nvs.md](docs/recherche/07-chiffrement-nvs.md) compares the ways to encrypt the Wi-Fi password, the API keys and the settings on the ESP32-P4 (ESP-IDF 5.5.5), says plainly what each one protects and what it burns, and recommends one (NVS keys derived by the HMAC peripheral from one eFuse block) with the commands to validate one by one. `components/core/include/ecran/nvs_securite.hpp` reads a raw NVS partition, decides whether it may be opened or migrated (never in the wrong mode, which silently erases, never without the owner's order), and migrates to the encrypted mode with a proof that no readable copy is left. The firmware does not use it yet: the settings are still stored in clear text, and no eFuse is burnt by this change. Tested on: not tested on board (PC only: 50 host tests, 61 mutations, pages produced by the official ESP-IDF tool).
+
+### Security
+
+- **The limits stay as published**: the Wi-Fi password, the API keys and the settings are still in the flash without encryption, and erasing a setting very probably does not wipe its bytes from the flash (read in the ESP-IDF code and simulated on a page made by the official tool; not seen on a board). The report lists the sentences to change in `SECURITY.md` and `docs/publication.md` once an encrypted storage is really enabled and seen on a board.
