@@ -37,6 +37,7 @@ Without `-Sanitizers`, `CXX` points to plain `clang++` (faster, no detectors): u
 |---|---|---|
 | **Before every commit** | hook `.githooks/pre-commit` → `tools/verifier.ps1 -Rapide` (only what is in the git index) | yes: secrets, core tests, ruff and C/C++ formatting |
 | **On demand, whole repository** | `.\tools\verifier.ps1` (add `-Web` for the Playwright run-through of the page, which needs the network) | same, plus the mutations |
+| **Before anything is made public** | `python tools/controle_publication.py` (MAC addresses, personal paths, the Wi-Fi password, commit identities), then `tools/instantane_public.ps1`: [publication.md](publication.md) | no: run by hand, it stops the snapshot on a blocking finding |
 | **On GitHub** | `.github/workflows/ci.yml` (next section) | the jobs listed below once `main` is protected |
 
 - The hook is enabled in the repository by `git config core.hooksPath .githooks` (done on 06/11/2026). Every worktree sees it, but the `.githooks` folder only exists in a worktree after `main` has been merged into it: until then, run `.\tools\verifier.ps1` by hand.
@@ -182,6 +183,7 @@ Sans `-Sanitizers`, `CXX` pointe sur `clang++` simple (plus rapide, sans détect
 |---|---|---|
 | **Avant chaque commit** | crochet `.githooks/pre-commit` → `tools/verifier.ps1 -Rapide` (ce qui est dans l'index seulement) | oui : secrets, tests du noyau, ruff et mise en forme C/C++ |
 | **À la demande, tout le dépôt** | `.\tools\verifier.ps1` (ajouter `-Web` pour le parcours Playwright de la page, qui demande le réseau) | idem, plus les mutations |
+| **Avant toute publication** | `python tools/controle_publication.py` (adresses MAC, chemins personnels, mot de passe Wi-Fi, identités de commit), puis `tools/instantane_public.ps1` : [publication.md](publication.md#version-française) | non : lancé à la main, il arrête l'instantané sur une trouvaille bloquante |
 | **Sur GitHub** | `.github/workflows/ci.yml` (section suivante) | les jobs listés ci-dessous, une fois `main` protégée |
 
 - Le crochet est activé dans le dépôt par `git config core.hooksPath .githooks` (fait le 06/11/2026). Il est vu par tous les worktrees, mais le dossier `.githooks` n'existe dans un worktree qu'après y avoir fusionné `main` : avant cela, lancer `.\tools\verifier.ps1` à la main.
