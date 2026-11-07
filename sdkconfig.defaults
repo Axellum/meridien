@@ -5,11 +5,13 @@ CONFIG_IDF_TARGET="esp32p4"
 # La tache principale construit l'interface (TinyTTF, formats) : la pile par defaut (3584 octets) est trop juste.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
-# LVGL 9 configure par Kconfig (pas de lv_conf.h). Allocation, chaines et formats : ceux de la libc d'IDF,
-# comme le BSP d'Espressif (m5stack_tab5/examples).
+# LVGL 9 configure par Kconfig (pas de lv_conf.h). Chaines et formats : ceux de la libc d'IDF, comme le BSP d'Espressif
+# (m5stack_tab5/examples). Allocation : celle de main/lvgl_memoire.cpp (PSRAM d'abord) et non le malloc du systeme, qui range tout
+# bloc de moins de 256 octets en memoire interne, la seule ou le Wi-Fi et le TLS peuvent vivre (plantage du scan Wi-Fi, 07/11/2026).
+# Apres un changement de ces defaults : supprimer sdkconfig (les defaults ne sont relus que sur un sdkconfig neuf).
 CONFIG_LV_CONF_SKIP=y
 CONFIG_LV_BUILD_EXAMPLES=n
-CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_USE_CUSTOM_MALLOC=y
 CONFIG_LV_USE_CLIB_SPRINTF=y
 CONFIG_LV_USE_CLIB_STRING=y
 

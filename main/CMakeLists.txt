@@ -22,7 +22,7 @@ endif()
 
 idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp" "sntp_rapide.cpp" "commande_serie.cpp" "ui_bonjour.cpp"
                        "meteo_etat.cpp" "meteo_zone.cpp" "meteo_client.cpp"
-                       "appairage.cpp" "reglages.cpp" "serveur_web.cpp" "geocodage.cpp" "verrou_tls.cpp"
+                       "appairage.cpp" "reglages.cpp" "serveur_web.cpp" "geocodage.cpp" "verrou_tls.cpp" "lvgl_memoire.cpp"
                        INCLUDE_DIRS "."
                        PRIV_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
                        REQUIRES board_api core esp_event esp_netif esp_rom esp_system esp_timer esp_wifi freertos lwip nvs_flash
@@ -62,6 +62,14 @@ if(MERIDIEN_AUTOTEST_REGLAGES)
     target_sources(${COMPONENT_LIB} PRIVATE "autotest_reglages.cpp")
     target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,-u,autotest_reglages_ancre")
 endif()
+# Allocateur de LVGL (lvgl_memoire.cpp, CONFIG_LV_USE_CUSTOM_MALLOC) : c'est LVGL qui appelle ces fonctions, aucun fichier de main
+# ne les reference. Or l'editeur de liens ne tire d'une bibliotheque statique (libmain.a) que les fichiers dont il a besoin AU MOMENT
+# ou il la lit, et libmain.a est lue avant LVGL : sans "-u", lvgl_memoire.o reste dans l'archive et l'edition de liens echoue
+# ("undefined reference to lv_malloc_core"). "-u" declare les symboles comme attendus des le depart.
+foreach(_lv_symbole lv_mem_init lv_mem_deinit lv_mem_add_pool lv_mem_remove_pool lv_malloc_core lv_realloc_core lv_free_core
+                    lv_mem_monitor_core lv_mem_test_core)
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,-u,${_lv_symbole}")
+endforeach()
 # Contrat reseau des reglages (recherche de reseaux, essai d'un nouveau Wi-Fi avec retour arriere) : a fournir par jalon-1b dans
 # main/reseau_wifi.h. Tant que ce fichier n'existe pas, un BOUCHON (main/bouchons/reseau_wifi*.{h,cpp}) repond "rien trouve" et
 # "impossible" : l'ecran le dit au lieu d'attendre. Des que le vrai fichier est la, le bouchon n'est plus compile.
