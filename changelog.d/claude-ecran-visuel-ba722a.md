@@ -1,0 +1,9 @@
+### Added
+
+- **New main screen**: very large time and date in the language of the screen; weather now (big icon, temperature, feels-like, label, minimum and maximum); wind with a direction arrow and gusts; rain (probability, « rain in N min » when known); humidity; pressure and its trend; UV index in five levels; sunrise and sunset on an arc with the sun's position; moon phase (computed on the device); an hourly strip; seven days with a minimum-maximum bar; alerts (frost, heat, strong wind, heavy rain, storm); a sky background that follows the time of the day and the weather, dithered to avoid colour bands. Values the device does not receive yet (hourly strip, pressure trend, rain amount) are hidden, never invented. Works at 1280 × 720, 720 × 1280 and 1024 × 600, in the seven languages. Design, criteria and choice: [docs/design/ecran-principal.md](../docs/design/ecran-principal.md); decision: [ADR-0008](../docs/decisions/0008-ecran-principal-par-zones-themes-et-ciel-trame.md). Tested on: not tested on board (compiled for the ESP32-P4, 2,722,192 bytes; rendered on the PC in French, German and Turkish; pure core: 64 tests, 42 mutations detected out of 42).
+- **Original weather icon set**: drawn by `tools/icones/generer_icones.py`, kept in flash (825,032 bytes, no RAM for the pixels), no third-party artwork. Tested on: not tested on board.
+- **Four themes**: *Ciel* (default), *Tableau sombre*, *Horloge*, *Clair*; the existing « thème » setting (auto, clair, sombre) picks *Ciel*, *Clair* or *Tableau sombre* and the switch is live. *Horloge* is not reachable from that setting yet. Tested on: not tested on board.
+
+### Changed
+
+- **Render bench**: thirteen variants of the main screen, a themes scene, a live theme-switch check (`tools/rendu/verifier_bascule.py`) and `BANC_CHRONO=1` for relative timings on the PC ([docs/outils.md](../docs/outils.md)).

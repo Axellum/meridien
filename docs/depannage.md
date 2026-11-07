@@ -20,6 +20,7 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 - [Chip, display and touch](#chip-display-and-touch)
 - [Flash, serial port and backup](#flash-serial-port-and-backup)
 - [Settings page and core](#settings-page-and-core)
+- [Main screen](#main-screen)
 
 ---
 
@@ -271,6 +272,42 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 **Solution.** That mutant is left out of `test/host/mutations_meteo_appareil.py` (the reason is written at the top of the file); the real code leaves the loop after 7 turns, and `planning_normal_et_reessais` covers 1 000 000 and `INT_MAX` failures. When writing a mutation, check that it does not remove the end of a loop. **Seen on** the author's PC, 06/11/2026, clang 23.1.5. **Evidence**: process CPU time, mutant no. 32 of the list. **Status**: worked around.
 
+### Main screen
+
+#### The sky gradient shows visible bands
+
+**Symptom.** On a sky that goes from dark blue to a lighter blue, steps of colour show across the screen.
+
+**Cause.** The panel takes RGB565 (32 or 64 levels per channel) and LVGL 9.5 has no dithering; its gradient (at most two stops here, `LV_GRADIENT_MAX_STOPS 2`) is drawn straight into that format, so each level becomes a band.
+
+**Solution.** The sky is an RGB565 image built with an ordered 8 × 8 (Bayer) dither and set as the background image of the screen (`remplir_ciel_trame` and `appliquer_ciel` in `main/ui_principal.cpp`). It is rebuilt only when the moment of the day or the weather class changes, and its 1,843,200 bytes (1280 × 720) live in PSRAM. If the allocation fails, the screen falls back on LVGL's own vertical gradient (bands, but a working screen).
+- **Seen on**: PC render (LVGL 9.5.0, clang), branch `claude/ecran-visuel-ba722a`, 2026-11-07. Not seen on a board.
+- **Evidence**: renders before and after (the bands vanish); the allocation in PSRAM and the redraw time on the ESP32-P4 are **not verified**.
+- **Status**: *resolved on the PC render*; *not verified on the board*.
+
+#### Hourly strip, pressure trend and rain amounts are absent on the device
+
+**Symptom.** The main screen shows the weather now and the days, but neither the hourly strip, nor the pressure trend, nor the amount of rain, nor « rain in N min ».
+
+**Cause.** The device's weather client (`meteo_client.cpp`, session `meteo-appareil`) does not request or keep those fields yet; the screen shows only what is received and never invents a value (the zone disappears and the others take its place).
+
+**Solution.** A request listing the fields (hourly temperature, code and rain probability; pressure at three hours; rain amount; minutely precipitation) was written for the session that owns the client, in the shared notes folder (`ecran-visuel_besoins-meteo.md`). No answer was seen yet.
+- **Seen on**: not on a board; the PC render shows the reduced screen with the variant `donnees-minimales`.
+- **Status**: *open*.
+
+#### Turkish: Sunday and Monday had the same abbreviation
+
+**Symptom.** In the week, both « Pazar » (Sunday) and « Pazartesi » (Monday) were written « Paz ».
+
+**Cause.** The first three letters of the two names are the same.
+
+**Solution.** The abbreviations are a table per language (`JOURS_COURTS` in `components/core/include/ecran/visuel_dates.hpp`), not a cut of the name; the test checks that the seven abbreviations of every language are distinct (« Paz » for Sunday, « Pzt » for Monday).
+- **Seen on**: PC render, `fr de tr`, 2026-11-07. **Status**: *resolved*.
+
+#### The render refuses to start: « a build is already running (ninja) »
+
+`toolsendre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy compilation on the PC. Wait for the other session's build to end (the `build` lock of `verrous.py`), or, if you know what you are doing, `-Forcer`.
+
 ---
 
 ## Version Française
@@ -293,6 +330,7 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 - [Puce, écran et tactile](#puce-écran-et-tactile)
 - [Flash, port série et sauvegarde](#flash-port-série-et-sauvegarde)
 - [Page de réglages et noyau](#page-de-réglages-et-noyau)
+- [Écran principal](#écran-principal)
 
 ---
 
@@ -543,3 +581,39 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 **Cause.** La preuve par mutation compile les tests avec une modification du noyau. Un mutant qui retire la condition de sortie d'une boucle `constexpr` (ici `&& base < PERIODE_S` dans `delai_avant_essai_s`) fait évaluer la boucle à clang jusqu'à sa limite de 2 milliards de pas (`-fconstexpr-steps=2000000000`, réglée pour que les tests qui relisent une vraie réponse compilent) : 765 s de CPU mesurées avant d'arrêter le compilateur.
 
 **Solution.** Ce mutant est écarté de `test/host/mutations_meteo_appareil.py` (la raison est écrite en tête du fichier) ; le vrai code sort de la boucle après 7 tours, et `planning_normal_et_reessais` couvre 1 000 000 et `INT_MAX` échecs. En écrivant une mutation, vérifier qu'elle ne supprime pas la fin d'une boucle. **Vu sur** PC de l'auteur, 06/11/2026, clang 23.1.5. **Preuve** : temps CPU du processus, mutant n° 32 de la liste. **Statut** : contourné.
+
+### Écran principal
+
+#### Le dégradé du ciel montre des bandes visibles
+
+**Symptôme.** Sur un ciel qui va du bleu sombre à un bleu plus clair, des paliers de couleur se voient en travers de l'écran.
+
+**Cause.** La dalle prend du RGB565 (32 ou 64 niveaux par canal) et LVGL 9.5 n'a pas de tramage ; son dégradé (deux arrêts au plus ici, `LV_GRADIENT_MAX_STOPS 2`) est dessiné tel quel dans ce format, donc chaque niveau devient une bande.
+
+**Solution.** Le ciel est une image RGB565 construite avec un tramage ordonné 8 × 8 (Bayer) et posée en image de fond de l'écran (`remplir_ciel_trame` et `appliquer_ciel` dans `main/ui_principal.cpp`). Elle n'est refaite que quand le moment de la journée ou la classe de temps change, et ses 1 843 200 octets (1280 × 720) vivent en PSRAM. Si l'allocation échoue, l'écran retombe sur le dégradé vertical de LVGL (des bandes, mais un écran qui marche).
+- **Vu sur** : rendu PC (LVGL 9.5.0, clang), branche `claude/ecran-visuel-ba722a`, 07/11/2026. Pas vu sur une carte.
+- **Preuve** : rendus avant et après (les bandes disparaissent) ; l'allocation en PSRAM et le temps de redessin sur l'ESP32-P4 sont **non vérifiés**.
+- **Statut** : *résolu sur le rendu PC* ; *non vérifié sur la carte*.
+
+#### L'heure par heure, la tendance de pression et les cumuls de pluie sont absents sur l'appareil
+
+**Symptôme.** L'écran principal montre la météo du moment et les jours, mais ni la bande heure par heure, ni la tendance de pression, ni le cumul de pluie, ni « pluie dans N min ».
+
+**Cause.** Le client météo de l'appareil (`meteo_client.cpp`, session `meteo-appareil`) ne demande pas encore ces champs ni ne les garde ; l'écran ne montre que ce qu'il reçoit et n'invente jamais une valeur (la zone disparaît et les autres prennent sa place).
+
+**Solution.** Une demande qui liste les champs (température, code et probabilité de pluie par heure ; pression à trois heures ; cumul de pluie ; précipitations à la minute) a été écrite pour la session propriétaire du client, dans le dossier de notes partagé (`ecran-visuel_besoins-meteo.md`). Aucune réponse vue pour l'instant.
+- **Vu sur** : pas sur une carte ; le rendu PC montre l'écran réduit avec la variante `donnees-minimales`.
+- **Statut** : *ouvert*.
+
+#### Turc : dimanche et lundi avaient la même abréviation
+
+**Symptôme.** Dans la semaine, « Pazar » (dimanche) et « Pazartesi » (lundi) s'écrivaient tous deux « Paz ».
+
+**Cause.** Les trois premières lettres des deux noms sont les mêmes.
+
+**Solution.** Les abréviations sont une table par langue (`JOURS_COURTS` dans `components/core/include/ecran/visuel_dates.hpp`), pas une coupure du nom ; le test vérifie que les sept abréviations de chaque langue sont distinctes (« Paz » pour dimanche, « Pzt » pour lundi).
+- **Vu sur** : rendu PC, `fr de tr`, 07/11/2026. **Statut** : *résolu*.
+
+#### Le rendu refuse de démarrer : « une compilation tourne déjà (ninja) »
+
+`toolsendre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une seconde compilation lourde sur le PC. Attendre la fin de la compilation de l'autre session (verrou `build` de `verrous.py`) ou, en connaissance de cause, `-Forcer`.
