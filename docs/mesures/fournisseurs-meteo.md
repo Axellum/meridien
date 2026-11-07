@@ -10,8 +10,8 @@
 >   120 347 to 240 402 bytes: **neither fits the 64 KiB default buffer** of the common network client, so each request carries its own
 >   bound. MET's `Expires` falls 310 to 1 828 s after the request; the NWS grid is valid one hour at most, its address (`/points`) 2 to
 >   24 hours. MET Norway answers HTTP 304 to `If-Modified-Since` (not implemented, see ADR-0014). The NWS answers 404 outside its area.
-> - **Neither service gives the UV index** (MET only gives a clear-sky one), **sunrise or sunset** (computed on the device, within
->   81 s of MET's own "Sunrise 3.0" below 60° of latitude, 257 s above 66.5°) — and the NWS gives **no pressure** and, for most days,
+> - **Neither service gives the UV index** (MET only gives a clear-sky one), **sunrise or sunset** (computed on the device with the
+>   same calculation as for Open-Meteo, ADR-0012: within 60 s of MET's own "Sunrise 3.0" on 69 days at every latitude) — and the NWS gives **no pressure** and, for most days,
 >   **no daily rain total**. Unknown stays unknown, never 0.
 > - **Not verified**: anything on a board; countries other than the places listed; the 2026-11-07 headers are one sample per place.
 
@@ -134,15 +134,15 @@ Le **lecteur de MET Norway** compte 85 à 91 éléments horaires puis par six he
 
 ## 5. Mesuré : lever et coucher du soleil calculés sur l'appareil
 
-Ni MET Norway ni le NWS ne donnent le lever ni le coucher dans cette réponse ; l'appareil les calcule (`soleil_calcule.hpp`, équation du temps, déclinaison, réfraction et demi-disque du soleil, sans bibliothèque mathématique). Trois références qui ne viennent pas du code :
+Ni MET Norway ni le NWS ne donnent le lever ni le coucher dans cette réponse ; l'appareil les calcule avec **le même calcul que pour Open-Meteo** (`soleil.hpp`, décrit une seule fois dans [ADR-0012](../decisions/0012-l-heure-affichee-est-celle-du-lieu-choisi.md) : équation du temps, déclinaison, réfraction et demi-disque du soleil, sans bibliothèque mathématique). Trois références qui ne viennent pas du code :
 
 | Référence | Jours comparés | Plus grand écart du calcul, par latitude |
 |---|---|---|
-| **MET Norway « Sunrise 3.0 »** (79 réponses réelles, 24 lieux, des cercles polaires à l'équateur, changements d'heure compris ; 69 jours normaux, 3 nuits polaires, 7 jours polaires) | situations (normal / nuit polaire / jour polaire) **identiques sur les 79 jours** | ≤ 45° : **67 s** (39 jours) ; 45–60° : **81 s** (16) ; 60–66,5° : **56 s** (7) ; > 66,5° : **257 s** (7) |
-| **Open-Meteo** (lever et coucher donnés pour 6 lieux × 7 jours) | 42 jours | Lyon 15 s, Seattle 18 s, Singapour 3 s, Sydney 26 s, Katmandou (+5 h 45) 12 s, Terre-Neuve (−3 h 30) 18 s ; Longyearbyen : 7 nuits polaires des deux côtés |
-| **Second calcul** écrit en Python (algorithme « Almanac for Computers » de l'US Naval Observatory) | mêmes 79 jours | ≤ 45° : 143 s ; 45–60° : 86 s ; 60–66,5° : 147 s ; > 66,5° : 1 177 s — il est moins précis que le calcul de l'appareil, il ne sert qu'à vérifier à 5 minutes jusqu'à 60° |
+| **MET Norway « Sunrise 3.0 »** (79 réponses réelles, 24 lieux, des cercles polaires à l'équateur, changements d'heure compris ; 69 jours normaux, 3 nuits polaires, 7 jours polaires) | situations (normal / nuit polaire / jour polaire) **identiques sur les 79 jours** | ≤ 45° : **60 s** (39 jours) ; 45–60° : **60 s** (16) ; 60–66,5° : **54 s** (7) ; > 66,5° : **60 s** (7) |
+| **Open-Meteo** (lever et coucher donnés pour 6 lieux × 7 jours) | 42 jours | Lyon 8 s, Seattle 7 s, Singapour 4 s, Sydney 12 s, Katmandou (+5 h 45) 6 s, Terre-Neuve (−3 h 30) 5 s ; Longyearbyen : 7 nuits polaires des deux côtés |
+| **Second calcul** écrit en Python (algorithme « Almanac for Computers » de l'US Naval Observatory) | mêmes 79 jours | ≤ 45° : 119 s ; 45–60° : 55 s ; 60–66,5° : 108 s ; > 66,5° : 1 113 s — il est moins précis que le calcul de l'appareil, il ne sert qu'à vérifier à 5 minutes jusqu'à 60° |
 
-**Tolérance retenue par les tests** : 2 minutes jusqu'à 60° de latitude, 5 minutes au-delà (le pire écart mesuré au-delà de 66,5° est de 257 s = 4,3 minutes ; MET Norway donne des minutes entières et la réfraction près de l'horizon change de plusieurs minutes avec quelques centièmes de degré). Les chiffres de ce paragraphe sont ceux de `test/host/mesure_ecarts_soleil.cpp` (la ligne de commande est en tête du fichier), lancé le 07/11/2026 sur les mêmes données que les tests (`test_soleil_calcule.cpp`).
+**Tolérance retenue par les tests** : 2 minutes jusqu'à 60° de latitude, 5 minutes au-delà (le pire écart mesuré, à toutes les latitudes, est de 60 s ; MET Norway donne des minutes entières et la réfraction près de l'horizon change de plusieurs minutes avec quelques centièmes de degré). **Elle n'a pas été desserrée** quand le premier calcul (position du soleil estimée une seule fois, à midi solaire) a été remplacé le 07/11/2026 par celui d'ADR-0012 : celui-là donnait 81 s jusqu'à 60° et 257 s au-delà de 66,5° (4,3 minutes sur 5 permises), et la comparaison des deux, jour par jour, est dans ADR-0012. Les chiffres de ce paragraphe sont ceux de `test/host/mesure_ecarts_soleil.cpp` (la ligne de commande est en tête du fichier), lancé le 07/11/2026 sur les mêmes données que les tests (`test_soleil.cpp`). **Vu sur** : PC d'Axel, clang++ 23.1.5, branche `claude/soleil-unique-7e44fa` ; aucune carte.
 
 ## 6. Ce qui a été prouvé, ce qui ne l'a pas été
 

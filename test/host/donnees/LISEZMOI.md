@@ -139,8 +139,8 @@ du firmware (lus dans `meteo_requete_fournisseurs.hpp`, jamais recopiés) et les
 | `attendu_metno_<lieu>.inc`, `attendu_nws_<lieu>.inc` | ce que `analyser_metno()` et `analyser_nws()` doivent produire, une valeur entière par ligne, rang et nom en commentaire (généré) | les `*_identique_a_python` |
 | `lieux_metno.inc`, `lieux_nws.inc` | pour chaque capture : nom, instant de réception, position en e5, fuseau (et, pour le NWS, bureau et maille lus dans `/points`) (générés) | les `*_identique_a_python` et `test_requete_fournisseurs.cpp` |
 | `fournisseurs_capture.json` | pour chaque appel : adresse, statut HTTP, octets sur le fil et décompressés, `Expires`, `Last-Modified`, `Cache-Control`, `Date`, `Age`, instant de réception ; plus l'essai de requête conditionnelle (`If-Modified-Since` → 304 chez MET Norway) | `docs/mesures/fournisseurs-meteo.md` |
-| `soleil_metno_reference.json` | 79 réponses du produit « Sunrise 3.0 » de MET Norway (lever et coucher du soleil), captées le 07/11/2026 par `capturer_soleil_metno.py` pour 24 lieux et autant de jours choisis, des cercles polaires à l'équateur, changements d'heure compris | `attendu_soleil_metno.inc` (généré) |
-| `attendu_soleil_almanac.inc` | lever et coucher recalculés en Python par un AUTRE algorithme (« Almanac for Computers » de l'US Naval Observatory) | `test_soleil_calcule.cpp` |
+| `soleil_metno_reference.json` | 79 réponses du produit « Sunrise 3.0 » de MET Norway (lever et coucher du soleil), captées le 07/11/2026 par `capturer_soleil_metno.py` pour 24 lieux et autant de jours choisis, des cercles polaires à l'équateur, changements d'heure compris | `attendu_soleil_metno.inc` (généré ; même numérotation des cas ; relu par `test_soleil.cpp`) |
+| `attendu_soleil_almanac.inc` | lever et coucher recalculés en Python par un AUTRE algorithme (« Almanac for Computers » de l'US Naval Observatory) ; numérotation des cas de `soleil::Situation` (0 normal, 1 jour polaire, 2 nuit polaire) | `test_soleil.cpp` |
 | `attendu_symboles_metno.inc` | les 41 symboles de la légende officielle de MET Norway, chacun avec ses variantes `_day`, `_night`, `_polartwilight`, et le code WMO attendu (règle écrite dans `lecture_fournisseurs.py`, d'après l'ADR-0014) | `les_41_symboles_officiels_et_leurs_variantes` |
 
 Les valeurs attendues sont calculées par `python test/host/controle_python_fournisseurs.py` : les réponses sont lues avec
@@ -157,6 +157,6 @@ Données MET Norway : CC BY 4.0 et NLOD 2.0 (https://api.met.no/license_data.htm
 
 Résultat consigné (07/11/2026, PC d'Axel, clang++ 23.1.5 avec AddressSanitizer + UBSan, mode « complet (compilé + exécuté) », branche
 `claude/meteo-fournisseurs-e3cd8b`) : `test_meteo_metno.cpp` 32 tests, `test_meteo_nws.cpp` 45, `test_requete_fournisseurs.cpp` 11,
-`test_soleil_calcule.cpp` 12, 0 échec (exécution complète du dépôt : 51 fichiers, 1 009 tests, 0 échec) ; `python test/host/controle_python_fournisseurs.py
---verifier` : « tout est à jour » (14 captures, 449 valeurs attendues chacune) ; `--mutations` : 19 (MET Norway) + 17 (NWS) + 8 (requêtes) + 8 (soleil)
+12 tests du calcul du soleil de l'époque (ce second calcul a été remplacé le 07/11/2026 par celui d'ADR-0012 ; ses preuves sont dans `test_soleil.cpp`), 0 échec (exécution complète du dépôt : 51 fichiers, 1 009 tests, 0 échec) ; `python test/host/controle_python_fournisseurs.py
+--verifier` : « tout est à jour » (14 captures, 449 valeurs attendues chacune) ; `--mutations` : 19 (MET Norway) + 17 (NWS) + 8 (requêtes) + 8 (soleil de l'époque)
 mutations, toutes détectées par le test visé. **Limites** : mesuré sur x86-64, pas sur le RISC-V de la carte ; aucune carte.
