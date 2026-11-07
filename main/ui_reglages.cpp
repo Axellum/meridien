@@ -51,6 +51,8 @@ lv_obj_t *construire_selon_le_type(Entree &e) {
         return construire_connexion_wifi(e);
     case TypeEcran::RechercheVille:
         return construire_recherche_ville(e);
+    case TypeEcran::ListeSource:
+        return construire_liste_source(e);
     case TypeEcran::Etape:
         return construire_etape(e);
     }
@@ -582,6 +584,9 @@ void sur_rangee_editeur(lv_event_t *e) {
     case registre::Editeur::RechercheVille:
         n.type = TypeEcran::RechercheVille;
         break;
+    case registre::Editeur::ListeSource:
+        n.type = TypeEcran::ListeSource;
+        break;
     case registre::Editeur::Clavier:
     case registre::Editeur::ClavierSecret:
         n.type = TypeEcran::EditeurTexte;
@@ -607,7 +612,8 @@ void rangee_pour(lv_obj_t *parent, const registre::Reglage &r, const registre::R
     case registre::Editeur::Clavier:
     case registre::Editeur::ClavierSecret:
     case registre::Editeur::ListeWifi:
-    case registre::Editeur::RechercheVille: {
+    case registre::Editeur::RechercheVille:
+    case registre::Editeur::ListeSource: {
         char valeur[96];
         resume_reglage(r, valeur, sizeof valeur);
         creer_rangee_bouton(parent, T(r.libelle.data()), valeur, sur_rangee_editeur,
@@ -744,8 +750,23 @@ void rangee_action_ou_info(lv_obj_t *parent, std::string_view id) {
             const Param ps[] = {{"ville", ville}, {"temp", temp}, {"meteo", m.libelle}};
             creer_texte(c, remplir("À {ville} : {temp} °C, {meteo}", ps, 3, tampon, sizeof tampon), env().f.texte,
                         p.texte);
+            // L'attribution d'Open-Meteo (CC BY 4.0) et, si une source nationale est choisie, le nom de son modèle : là où la météo est montrée.
+            const Param pl[] = {{"lien", "Open-Meteo"}};
+            creer_texte(c, remplir("Données météo : {lien} (licence CC BY 4.0)", pl, 1, tampon, sizeof tampon),
+                        env().f.petite, p.texte_discret);
+            const std::int32_t source = h.nombre("meteo.source");
+            if (source > 0 && static_cast<std::size_t>(source) < meteo::fournisseurs::NOMBRE) {
+                const Param pm[] = {{"modele", meteo::fournisseurs::TABLE[source].libelle.data()}};
+                creer_texte(c, remplir("Modèle : {modele}", pm, 1, tampon, sizeof tampon), env().f.petite,
+                            p.texte_discret);
+            }
         } else {
             creer_texte(c, T("Pas encore de ville"), env().f.texte, p.texte_discret);
+        }
+        if (h.source_meteo_retablie()) {
+            // Le changement de ville a remis « Automatique » : on le dit, jamais de retour muet (ADR-0010).
+            creer_texte(c, T("Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays."), env().f.petite,
+                        p.avertissement);
         }
     } else if (id == "info.telephone") {
         lv_obj_t *c = creer_carte(parent);
@@ -1166,6 +1187,44 @@ lv_obj_t *construire_liste_wifi(Entree &e) {
     return ecran;
 }
 
+// ---- source de la météo ---------------------------------------------------------------------------------------------------------
+// « Automatique » en tête, puis les sources du pays de la ville (hote().sources_meteo()). Un toucher enregistre le choix et revient :
+// l'hôte redemande la météo à la nouvelle source, comme pour un changement de ville.
+
+namespace {
+
+void sur_source(lv_event_t *e) {
+    const intptr_t indice = reinterpret_cast<intptr_t>(lv_event_get_user_data(e));
+    hote().definir_nombre("meteo.source", static_cast<int32_t>(indice));
+    nav_retour();
+}
+
+} // namespace
+
+lv_obj_t *construire_liste_source(Entree &) {
+    const PaletteReglages &p = *env().p;
+    lv_obj_t *ecran = nullptr;
+    lv_obj_t *corps = creer_ecran_standard("Source météo", false, &ecran);
+    const registre::Reglage &reglage = *registre::chercher("meteo.source");
+    creer_texte(corps, T(reglage.aide.data()), env().f.petite, p.texte_discret);
+    creer_texte(corps, T("Seules les sources qui couvrent le pays de la ville sont proposées."), env().f.petite,
+                p.texte_discret);
+    const int32_t choisie = hote().nombre("meteo.source");
+    const meteo::fournisseurs::Liste liste = hote().sources_meteo();
+    for (std::size_t k = 0; k < liste.n; ++k) {
+        const std::size_t i = liste.indices[k];
+        lv_obj_t *b = creer_rangee_bouton(corps, libelle_option(reglage.options[i]), nullptr, sur_source,
+                                          reinterpret_cast<void *>(static_cast<intptr_t>(i)));
+        if (static_cast<int32_t>(i) == choisie) {
+            // La source en service, comme la pastille choisie des autres réglages : fond d'accent, texte posé sur l'accent.
+            lv_obj_set_style_bg_color(b, couleur(p.accent), 0);
+            lv_obj_set_style_bg_color(b, couleur(p.accent), LV_STATE_PRESSED);
+            lv_obj_set_style_text_color(lv_obj_get_child(b, 0), couleur(p.texte_sur_accent), 0);
+        }
+    }
+    return ecran;
+}
+
 // ---- connexion avec retour arrière ---------------------------------------------------------------------------------------------------
 
 namespace {
@@ -1500,7 +1559,7 @@ void pousser_section(int section, int onglet) {
 }
 
 // Écran(s) ouvert(s) PAR-DESSUS l'écran du dessus : « wifi », « wifi-mdp:<ssid> », « connexion:<ssid>[:<mot de passe>] », « ville »,
-// « editeur:<identifiant> ».
+// « source », « editeur:<identifiant> ».
 void pousser_sous_ecran(const char *sous) {
     using namespace ui;
     if (std::strcmp(sous, "wifi") == 0 || commence_par(sous, "wifi-mdp:") || commence_par(sous, "connexion:")) {
@@ -1530,6 +1589,10 @@ void pousser_sous_ecran(const char *sous) {
         Entree v;
         v.type = TypeEcran::RechercheVille;
         nav_pousser(v);
+    } else if (std::strcmp(sous, "source") == 0) {
+        Entree s;
+        s.type = TypeEcran::ListeSource;
+        nav_pousser(s);
     } else if (commence_par(sous, "editeur:")) {
         Entree e;
         e.type = TypeEcran::EditeurTexte;

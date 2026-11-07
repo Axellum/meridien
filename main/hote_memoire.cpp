@@ -60,6 +60,8 @@ void HoteMemoire::remettre_par_defaut() {
     recherche_lieu_ = RechercheLieu::Inactive;
     trouves_.clear();
     meteo = ApercuMeteo{};
+    code_pays = "FR";
+    source_retablie = false;
 }
 
 int HoteMemoire::index(std::string_view id) const {
@@ -89,9 +91,15 @@ void HoteMemoire::definir_nombre(std::string_view id, int32_t valeur) {
     }
     const registre::Reglage &r = registre::REGISTRE[i];
     // La même règle que le registre : un nombre hors plage ou un choix hors liste est refusé, jamais enregistré.
-    const bool valide = r.type == registre::Type::Nombre ? registre::nombre_valide(r, valeur)
-                                                         : (r.type == registre::Type::Choix && valeur >= -1 &&
-                                                            valeur < static_cast<int32_t>(r.nb_options));
+    bool valide = r.type == registre::Type::Nombre ? registre::nombre_valide(r, valeur)
+                                                   : (r.type == registre::Type::Choix && valeur >= -1 &&
+                                                      valeur < static_cast<int32_t>(r.nb_options));
+    // La source de la météo : seulement une de celles que le pays de la ville propose (comme HoteAppareil et l'API).
+    if (valide && id == "meteo.source") {
+        valide = valeur >= 0 && meteo::fournisseurs::propose_pour(
+                                    meteo::fournisseurs::TABLE[static_cast<std::size_t>(valeur)].id, code_pays);
+        source_retablie = false;
+    }
     if (valide) {
         valeurs_[static_cast<std::size_t>(i)].nombre = valeur;
     }
@@ -223,6 +231,8 @@ void HoteMemoire::lieu_choisir(std::size_t rang) {
 }
 
 ApercuMeteo HoteMemoire::meteo_apercu() { return meteo; }
+
+meteo::fournisseurs::Liste HoteMemoire::sources_meteo() { return meteo::fournisseurs::pour_pays(code_pays); }
 
 // ---- appareil ------------------------------------------------------------------------------------------------------------
 

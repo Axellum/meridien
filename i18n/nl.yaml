@@ -156,6 +156,17 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Ville enregistrée : {ville}": "Stad opgeslagen: {ville}"
 "Données météo : {lien} (licence CC BY 4.0)": "Weergegevens: {lien} (licentie CC BY 4.0)"
 
+# --- Écran : source de la météo (07/11/2026) ---
+"Source météo": "Weerbron"
+"Le service qui fournit la météo de la ville choisie.": "De dienst die het weer voor de gekozen stad levert."
+"Automatique": "Automatisch"
+"Seules les sources qui couvrent le pays de la ville sont proposées.": "Alleen bronnen die het land van de stad dekken worden aangeboden."
+"Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Bron teruggezet op “Automatisch”: de vorige dekt dit land niet."
+"Modèle : {modele}": "Model: {modele}"
+
+# --- Page de réglages : source de la météo (07/11/2026) ---
+"Source enregistrée : {source}": "Bron opgeslagen: {source}"
+
 # --- Page de réglages : assistant vocal ---
 "Assistant vocal": "Spraakassistent"
 "Trois services : comprendre votre voix, réfléchir, parler. Touchez-en un pour le régler.": "Drie diensten: je stem begrijpen, nadenken, praten. Tik op een dienst om hem in te stellen."
@@ -321,6 +332,9 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "Terug op versie {version}."
 "Il n’y a pas de version précédente à remettre.": "Er is geen vorige versie om terug te zetten."
 "Cette page n’existe pas.": "Deze pagina bestaat niet."
+
+"Cette source météo n’existe pas.": "Deze weerbron bestaat niet."
+"Cette source météo ne couvre pas le pays de la ville.": "Deze weerbron dekt het land van de stad niet."
 
 # --- Écran : réglages et installation guidée (06/11/2026) ---
 "Retour": "Terug"

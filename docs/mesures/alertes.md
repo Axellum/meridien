@@ -67,7 +67,7 @@ Constaté sur les réponses réelles : des avertissements qui se suivent à la s
 
 ## 4. Ce qui est constaté, et où
 
-**Vu sur** : PC d'Axel (Windows 11), clang des outils hôte (`H:\AuxFilsDesIdees\_outils`), ASan + UBSan ; branche `claude/alertes-vigie-9b13fe` ; réponses de l'instance publique de Vigie du 07/11/2026 08:52–08:53 UTC. **Aucune carte.**
+**Vu sur** : PC d'Axel (Windows 11), clang des outils hôte (dossier trouvé par `tools\trouver_outils.ps1`), ASan + UBSan ; branche `claude/alertes-vigie-9b13fe` ; réponses de l'instance publique de Vigie du 07/11/2026 08:52–08:53 UTC. **Aucune carte.**
 
 | Contrôle | Résultat | Commande |
 | --- | --- | --- |

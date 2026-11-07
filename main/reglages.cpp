@@ -7,9 +7,11 @@
 // testé sur le PC ; ce fichier ne fait que lire, écrire et appliquer.
 #include "reglages.h"
 
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <string_view>
 
 #include "board.h"
 #include "esp_log.h"
@@ -17,7 +19,9 @@
 #include "freertos/portmacro.h"
 #include "nvs.h"
 
+#include "ecran/fournisseurs_meteo.hpp"
 #include "ecran/i18n.hpp"
+#include "meteo_interne.h"
 #include "meteo_zone.h"
 
 namespace {
@@ -26,6 +30,8 @@ const char *TAG = "reglages";
 constexpr const char *kEspace = "reglages";
 constexpr const char *kCleAffichage = "affichage";
 constexpr const char *kCleZoneExtra = "zone_extra";
+constexpr const char *kCleSource = "source_meteo";
+constexpr std::size_t kSourceOctets = 16; // « meteosuisse » + zéro : les identifiants de la table tiennent largement
 constexpr uint8_t kVersionAffichage = 1;
 constexpr uint8_t kVersionExtra = 1;
 
@@ -56,6 +62,7 @@ static_assert(sizeof(ZoneExtraNvs) == 192, "format du complément de zone en NVS
 portMUX_TYPE g_verrou = portMUX_INITIALIZER_UNLOCKED;
 ecran::reglages::Affichage g_courant{};
 ecran::RappelReglages g_rappel = nullptr;
+std::atomic<bool> g_source_retablie{false};
 
 ecran::reglages::Affichage affichage_depuis_nvs(const AffichageNvs &b) {
     ecran::reglages::Affichage a{};
@@ -90,6 +97,48 @@ bool lire_extra(ZoneExtraNvs &extra) {
     extra.region[sizeof(extra.region) - 1] = '\0';
     extra.pays[sizeof(extra.pays) - 1] = '\0';
     extra.code_pays[sizeof(extra.code_pays) - 1] = '\0';
+    return true;
+}
+
+// L'identifiant de source tel qu'il est en NVS : peut être absent, inconnu, ou d'un autre pays. Faux (et `id` vide) s'il manque ou
+// ne tient pas dans le tampon.
+bool lire_source_brute(char (&id)[kSourceOctets]) {
+    id[0] = '\0';
+    nvs_handle_t h = 0;
+    if (nvs_open(kEspace, NVS_READONLY, &h) != ESP_OK) {
+        return false;
+    }
+    size_t taille = sizeof(id);
+    const esp_err_t err = nvs_get_str(h, kCleSource, id, &taille);
+    nvs_close(h);
+    if (err != ESP_OK) {
+        id[0] = '\0';
+        return false;
+    }
+    id[sizeof(id) - 1] = '\0';
+    return true;
+}
+
+bool ecrire_source_brute(std::string_view id) {
+    char texte[kSourceOctets] = {};
+    if (id.empty() || id.size() >= sizeof(texte)) {
+        return false;
+    }
+    ecran::reglages::copier_texte(id, texte, sizeof(texte));
+    nvs_handle_t h = 0;
+    esp_err_t err = nvs_open(kEspace, NVS_READWRITE, &h);
+    if (err == ESP_OK) {
+        err = nvs_set_str(h, kCleSource, texte);
+        if (err == ESP_OK) {
+            err = nvs_commit(h);
+        }
+        nvs_close(h);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "source météo « %s » non enregistrée en NVS : %s (l'ancienne reste en service)", texte,
+                 esp_err_to_name(err));
+        return false;
+    }
     return true;
 }
 
@@ -209,8 +258,29 @@ bool reglages_zone_enregistrer(const reglages::Zone &zone) {
     reglages::copier_texte(zone.fuseau, m.fuseau, sizeof(m.fuseau));
     m.latitude = static_cast<float>(zone.latitude);
     m.longitude = static_cast<float>(zone.longitude);
+    // La source météo suit le pays de la ville : celle qui ne couvre pas le nouveau pays repasse sur « Automatique ». À écrire AVANT
+    // la zone, car l'écriture de la zone réveille le client météo ; il lirait sinon la nouvelle ville avec l'ancienne source. La
+    // valeur gardée devient exactement la valeur en service pour la nouvelle ville : un reste d'avant ne peut pas « revenir » seul.
+    char brut[kSourceOctets] = {};
+    lire_source_brute(brut);
+    char actuelle[kSourceOctets] = {};
+    reglages_source_meteo(actuelle, sizeof(actuelle)); // celle de la ville d'AVANT
+    const std::string_view apres = meteo::fournisseurs::source_valable_pour(actuelle, zone.code_pays);
+    const bool retablie = apres != std::string_view(actuelle);
+    const bool a_ecrire = std::string_view(brut) != apres;
+    if (a_ecrire) {
+        ecrire_source_brute(apres);
+    }
     if (!::zone_ecrire(m)) {
+        if (a_ecrire) {
+            ecrire_source_brute(brut[0] != '\0' ? std::string_view(brut) : std::string_view("auto"));
+        }
         return false;
+    }
+    g_source_retablie.store(retablie, std::memory_order_relaxed);
+    if (retablie) {
+        ESP_LOGI(TAG, "la source météo « %s » ne couvre pas le pays « %s » : retour sur « %.*s »", actuelle,
+                 zone.code_pays, static_cast<int>(apres.size()), apres.data());
     }
     // La zone relue (arrondie comme elle le sera à chaque démarrage) : c'est elle que le complément doit suivre.
     ZoneMeteo relue = {};
@@ -240,6 +310,48 @@ bool reglages_zone_enregistrer(const reglages::Zone &zone) {
                  esp_err_to_name(err));
     }
     return true;
+}
+
+void reglages_source_meteo(char *sortie, std::size_t capacite) {
+    char brut[kSourceOctets] = {};
+    lire_source_brute(brut);
+    reglages::Zone zone;
+    reglages_zone_lire(zone); // illisible : pas de pays, donc seulement les sources mondiales
+    reglages::copier_texte(meteo::fournisseurs::source_valable_pour(brut, zone.code_pays), sortie, capacite);
+}
+
+bool reglages_source_meteo_enregistrer(std::string_view id) {
+    reglages::Zone zone;
+    reglages_zone_lire(zone);
+    if (!meteo::fournisseurs::propose_pour(id, zone.code_pays)) {
+        ESP_LOGW(TAG, "source météo « %.*s » refusée : inconnue ou ne couvre pas le pays « %s »",
+                 static_cast<int>(id.size()), id.data(), zone.code_pays);
+        return false;
+    }
+    char avant[kSourceOctets] = {};
+    reglages_source_meteo(avant, sizeof(avant));
+    if (!ecrire_source_brute(id)) {
+        return false;
+    }
+    g_source_retablie.store(false, std::memory_order_relaxed);
+    ESP_LOGI(TAG, "source météo enregistrée : « %.*s » (avant : « %s »)", static_cast<int>(id.size()), id.data(),
+             avant);
+    if (std::string_view(avant) != id) {
+        meteo_client_source_changee(); // efface la météo de l'ancienne source et en redemande une
+    }
+    return true;
+}
+
+bool reglages_source_meteo_retablie() { return g_source_retablie.load(std::memory_order_relaxed); }
+
+void reglages_source_meteo_remettre_auto() {
+    char avant[kSourceOctets] = {};
+    reglages_source_meteo(avant, sizeof(avant));
+    ecrire_source_brute("auto");
+    g_source_retablie.store(false, std::memory_order_relaxed);
+    if (std::string_view(avant) != "auto") {
+        meteo_client_source_changee();
+    }
 }
 
 } // namespace ecran

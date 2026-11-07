@@ -154,7 +154,18 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Aucun lieu trouvé pour « {q} ».": "No se ha encontrado ningún lugar para «{q}»."
 "Tapez au moins 3 lettres.": "Escribe al menos 3 letras."
 "Ville enregistrée : {ville}": "Ciudad guardada: {ville}"
-"Données météo : {lien} (licence CC BY 4.0)": "Datos meteorológicos: {lien} (licencia CC BY 4.0)"
+"Données météo : {lien} (licence CC BY 4.0)": "Datos del tiempo: {lien} (licencia CC BY 4.0)"
+
+# --- Écran : source de la météo (07/11/2026) ---
+"Source météo": "Fuente del tiempo"
+"Le service qui fournit la météo de la ville choisie.": "El servicio que proporciona el tiempo de la ciudad elegida."
+"Automatique": "Automático"
+"Seules les sources qui couvrent le pays de la ville sont proposées.": "Solo se ofrecen las fuentes que cubren el país de la ciudad."
+"Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Fuente restablecida a «Automático»: la anterior no cubre este país."
+"Modèle : {modele}": "Modelo: {modele}"
+
+# --- Page de réglages : source de la météo (07/11/2026) ---
+"Source enregistrée : {source}": "Fuente guardada: {source}"
 
 # --- Page de réglages : assistant vocal ---
 "Assistant vocal": "Asistente de voz"
@@ -321,6 +332,9 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "De vuelta a la versión {version}."
 "Il n’y a pas de version précédente à remettre.": "No hay ninguna versión anterior que restaurar."
 "Cette page n’existe pas.": "Esta página no existe."
+
+"Cette source météo n’existe pas.": "Esta fuente del tiempo no existe."
+"Cette source météo ne couvre pas le pays de la ville.": "Esta fuente del tiempo no cubre el país de la ciudad."
 
 # --- Écran : réglages et installation guidée (06/11/2026) ---
 "Retour": "Atrás"

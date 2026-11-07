@@ -24,13 +24,14 @@ enum class Genre : std::uint8_t {
 };
 
 enum class Editeur : std::uint8_t {
-    Aucun,         // Action et Info
-    Pastilles,     // un Choix : toutes les options en boutons sur la page
-    Curseur,       // un Nombre : curseur sur la page
-    Clavier,       // un Texte : éditeur plein écran avec le clavier
-    ClavierSecret, // un Secret : idem, masqué, avec « Afficher / Masquer »
-    ListeWifi,     // le nom du réseau : éditeur plein écran, liste des réseaux trouvés
-    RechercheVille // un Lieu : éditeur plein écran, recherche puis résultats
+    Aucun,          // Action et Info
+    Pastilles,      // un Choix : toutes les options en boutons sur la page
+    Curseur,        // un Nombre : curseur sur la page
+    Clavier,        // un Texte : éditeur plein écran avec le clavier
+    ClavierSecret,  // un Secret : idem, masqué, avec « Afficher / Masquer »
+    ListeWifi,      // le nom du réseau : éditeur plein écran, liste des réseaux trouvés
+    RechercheVille, // un Lieu : éditeur plein écran, recherche puis résultats
+    ListeSource // un Choix dont les options dépendent de la ville (source de la météo) : liste plein écran, filtrée par pays
 };
 
 struct Rangee {
@@ -58,6 +59,7 @@ inline constexpr Rangee RANGEES_RESEAU[] = {
 };
 inline constexpr Rangee RANGEES_LIEU[] = {
     {Genre::Reglage, "lieu.ville", Editeur::RechercheVille, true},
+    {Genre::Reglage, "meteo.source", Editeur::ListeSource, true},
     {Genre::Info, "info.meteo", Editeur::Aucun, true},
 };
 inline constexpr Rangee RANGEES_ALERTES[] = {
@@ -156,7 +158,7 @@ constexpr std::size_t page_de_section(Section s, std::size_t rang) noexcept {
 constexpr bool editeur_convient(Type t, Editeur e) noexcept {
     switch (t) {
     case Type::Choix:
-        return e == Editeur::Pastilles;
+        return e == Editeur::Pastilles || e == Editeur::ListeSource;
     case Type::Nombre:
         return e == Editeur::Curseur;
     case Type::Texte:

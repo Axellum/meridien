@@ -92,6 +92,36 @@ void alertes_adresse_saisie(const banc::Contexte &ctx) {
     aller("section:1:1/editeur:alertes.adresse");
 }
 
+// La source de la météo (ADR-0010). Fixtures inventées : Lyon (la liste ne propose que « Automatique » et le modèle mondial), puis
+// Amsterdam (le service néerlandais s'y ajoute).
+void source_liste(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:1/source");
+}
+
+void source_liste_pays_bas(const banc::Contexte &ctx) {
+    en_service(ctx);
+    g_hote.definir_texte("lieu.ville", "Amsterdam, Hollande-Septentrionale, Pays-Bas");
+    g_hote.code_pays = "NL";
+    g_hote.definir_nombre("meteo.source", static_cast<int32_t>(ecran::meteo::fournisseurs::indice_de("knmi")));
+    aller("section:1/source");
+}
+
+void lieu_source_choisie(const banc::Contexte &ctx) {
+    en_service(ctx);
+    g_hote.definir_texte("lieu.ville", "Amsterdam, Hollande-Septentrionale, Pays-Bas");
+    g_hote.code_pays = "NL";
+    g_hote.definir_nombre("meteo.source", static_cast<int32_t>(ecran::meteo::fournisseurs::indice_de("knmi")));
+    aller("section:1");
+}
+
+void lieu_source_retablie(const banc::Contexte &ctx) {
+    en_service(ctx);
+    g_hote.definir_nombre("meteo.source", 0);
+    g_hote.source_retablie = true; // la ville vient de changer vers un pays que l'ancienne source ne couvre pas
+    aller("section:1");
+}
+
 void langue(const banc::Contexte &ctx) {
     en_service(ctx);
     aller("section:2");
@@ -157,6 +187,11 @@ const Scene kScenes[] = {
     {"lieu-vide", "Lieu et météo : pas de ville", lieu_vide},
     {"lieu-alertes", "Lieu et météo : alertes officielles (Vigie)", lieu_alertes},
     {"alertes-adresse-saisie", "Alertes officielles : saisie de l'adresse de Vigie", alertes_adresse_saisie},
+    {"source-liste", "Source météo : liste proposée à Lyon", source_liste},
+    {"source-liste-pays-bas", "Source météo : liste proposée à Amsterdam, KNMI choisi", source_liste_pays_bas},
+    {"lieu-source-choisie", "Lieu et météo : un modèle national choisi, attribution", lieu_source_choisie},
+    {"lieu-source-retablie", "Lieu et météo : source remise sur « Automatique » après un changement de ville",
+     lieu_source_retablie},
     {"langue", "Langue de l'écran et de l'assistant", langue},
     {"affichage", "Affichage : thème et luminosité", affichage},
     {"assistant-stt", "Assistant : reconnaissance de la voix", assistant_stt},

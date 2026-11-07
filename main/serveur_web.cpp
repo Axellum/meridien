@@ -35,6 +35,7 @@
 #include "appairage.h"
 #include "commande_serie.h"
 #include "ecran/api_reglages.hpp"
+#include "ecran/fournisseurs_meteo.hpp"
 #include "ecran/http_requete.hpp"
 #include "geocodage.h"
 #include "meteo_etat.h"
@@ -77,6 +78,15 @@ class HoteAppareil {
     bool enregistrer_alertes(const reglages::Alertes &a) { return reglages_alertes_enregistrer(a); }
     bool zone_lire(reglages::Zone &z) { return reglages_zone_lire(z); }
     bool zone_enregistrer(const reglages::Zone &z) { return reglages_zone_enregistrer(z); }
+    // La source de la météo : l'identifiant est lu dans la table des sources (données statiques), la vue reste valable après l'appel.
+    std::string_view source_meteo() {
+        char id[16] = {};
+        reglages_source_meteo(id, sizeof id);
+        const meteo::fournisseurs::Fournisseur *f = meteo::fournisseurs::trouver(id);
+        return (f != nullptr ? *f : meteo::fournisseurs::TABLE[meteo::fournisseurs::INDICE_AUTO]).id;
+    }
+    bool source_meteo_enregistrer(std::string_view id) { return reglages_source_meteo_enregistrer(id); }
+    bool source_meteo_retablie() { return reglages_source_meteo_retablie(); }
 
     bool meteo_lire(api::MeteoApercu &m) {
         MeteoEtat e = {};

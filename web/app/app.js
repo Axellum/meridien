@@ -233,6 +233,23 @@ function carteVille() {
   /* Attribution exigée par la licence CC BY 4.0 des données Open-Meteo : toujours visible, dans la langue de la page. */
   const attribution = h('p', { class: 'aide attribution', id: 'attribution' },
     tNoeuds('meteo.attribution', { lien: h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener', text: 'Open-Meteo' }) }));
+  /* Source de la météo : la liste vient de l'appareil et ne contient que les sources qui couvrent le pays de la ville (ADR-0010) ;
+     « Automatique » est toujours là. Le modèle choisi est nommé à côté de l'attribution, là où la source est montrée. */
+  const modele = h('span', { id: 'attribution-modele' });
+  attribution.append(modele);
+  const source = h('select', { id: 'source-meteo', 'aria-describedby': 'source-meteo-aide', onchange: () => choisirSource(source.value) });
+  const sourceRetablie = retour('info', t('source.retablie'));
+  sourceRetablie.id = 'source-retablie';
+  const champSource = h('div', { class: 'f', id: 'source-champ' },
+    h('label', { class: 'lab', for: 'source-meteo', text: t('source.titre') }), h('div', { class: 'champ' }, source, ico('chevd')),
+    h('p', { class: 'aide', id: 'source-meteo-aide', text: t('source.aide') + ' ' + t('source.filtre') }), sourceRetablie);
+  const majSource = () => {
+    const z = S.zone, liste = z && Array.isArray(z.sources_meteo) ? z.sources_meteo : [];
+    champSource.hidden = !liste.length;
+    source.replaceChildren(...liste.map((s) => h('option', { value: s.id, text: s.nom, selected: s.id === z.source_meteo })));
+    sourceRetablie.hidden = !(z && z.source_meteo_retablie);
+    modele.textContent = z && z.source_meteo && z.source_meteo !== 'auto' ? ' · ' + t('source.modele', { modele: z.source_meteo_nom }) : '';
+  };
   majVille = () => {
     const z = S.zone, def = z && z.definie !== false;
     etiquette.textContent = def ? t('ville.changer') : t('ville.choisir');
@@ -276,12 +293,27 @@ function carteVille() {
     retours.replaceChildren(q && q.length < 3 ? h('p', { class: 'aide', text: t('ville.min3') }) : '');
     if (q.length >= 3) minuteur = setTimeout(() => chercher(q), 350);
   });
+  /* Changer la source se passe comme changer de ville : l'appareil efface la météo gardée et en redemande une. */
+  const choisirSource = async (id) => {
+    source.disabled = true;
+    try {
+      S.zone = await api('PUT', '/api/location', { source_meteo: id });
+      retours.replaceChildren();
+      S.meteo = null; majVille();
+      toast(t('source.enregistree', { source: S.zone.source_meteo_nom }));
+      chargerMeteo(1);
+    } catch (e) {
+      retours.replaceChildren(retour('err', msg(e)));
+    }
+    source.disabled = false;
+    majSource(); /* la liste montre toujours ce que l'appareil a vraiment retenu */
+  };
   const choisir = async (lieu) => {
     liste.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     try {
       S.zone = await api('PUT', '/api/location', lieu);
       champ.value = ''; liste.replaceChildren(); liste.hidden = true; retours.replaceChildren();
-      S.meteo = null; majVille();
+      S.meteo = null; majVille(); majSource();
       toast(t('ville.enregistree', { ville: S.zone.nom }));
       chargerMeteo(1);
     } catch (e) {
@@ -292,7 +324,8 @@ function carteVille() {
   clearInterval(horloge);
   horloge = setInterval(majVille, 30000);
   majVille();
-  return carte('ville', 'pin', t('ville.titre'), hero, aide, h('div', { class: 'f' }, etiquette, h('div', { class: 'champ' }, ico('search'), champ)), retours, liste, attribution);
+  majSource();
+  return carte('ville', 'pin', t('ville.titre'), hero, aide, h('div', { class: 'f' }, etiquette, h('div', { class: 'champ' }, ico('search'), champ)), retours, liste, champSource, attribution);
 }
 
 /* ---------- assistant : trois services ---------- */

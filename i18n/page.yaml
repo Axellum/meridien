@@ -56,6 +56,12 @@
 "ville.min3": "Tapez au moins 3 lettres."
 "ville.enregistree": "Ville enregistrée : {ville}"
 "meteo.attribution": "Données météo : {lien} (licence CC BY 4.0)"
+"source.titre": "Source météo"
+"source.aide": "Le service qui fournit la météo de la ville choisie."
+"source.enregistree": "Source enregistrée : {source}"
+"source.retablie": "Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays."
+"source.modele": "Modèle : {modele}"
+"source.filtre": "Seules les sources qui couvrent le pays de la ville sont proposées."
 
 # --- Page de réglages : assistant vocal ---
 "assistant.titre": "Assistant vocal"

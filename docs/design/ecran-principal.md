@@ -93,7 +93,7 @@ jalon 1b added in a separate build directory (never committed), 2026-11-07 from 
 **Reproduce:**
 
 ```powershell
-. H:\AuxFilsDesIdees\_outils\env_hote.ps1
+. .\tools\trouver_outils.ps1; . "$(Trouver-Outils)\env_hote.ps1"
 .\tools\rendre.ps1 -Scene principal -Planche            # 13 variants, fr de tr, three sizes + sheets -> docs\captures\ecran\
 .\tools\rendre.ps1 -Scene principal-themes -Langue fr -Planche -Variante ciel-soleil,ciel-pluie,ciel-neige,ciel-orage,ciel-brouillard,ciel-nuit,ciel-chaleur,ciel-pires
 python test\host\lancer.py --seulement visuel --mutations   # pure core tests and mutations
@@ -196,7 +196,7 @@ mémoire du jalon 1b ajoutés dans un dossier de compilation à part (jamais com
 **Reproduire :**
 
 ```powershell
-. H:\AuxFilsDesIdees\_outils\env_hote.ps1
+. .\tools\trouver_outils.ps1; . "$(Trouver-Outils)\env_hote.ps1"
 .\tools\rendre.ps1 -Scene principal -Planche            # 13 variantes, fr de tr, trois tailles + planches -> docs\captures\ecran\
 .\tools\rendre.ps1 -Scene principal-themes -Langue fr -Planche -Variante ciel-soleil,ciel-pluie,ciel-neige,ciel-orage,ciel-brouillard,ciel-nuit,ciel-chaleur,ciel-pires
 python test\host\lancer.py --seulement visuel --mutations   # tests du noyau pur et mutations

@@ -199,6 +199,56 @@ void ville_choisie(const banc::Contexte &ctx) {
     exiger(chercher(est_clavier, nullptr) == nullptr, "la recherche est fermée");
 }
 
+// La source de la météo : la liste ne montre que ce que le pays de la ville couvre, « Automatique » en tête ; toucher une source
+// l'enregistre et revient à la page, qui nomme le modèle et donne l'attribution ; un changement de ville vers un pays que la source
+// ne couvre pas la remet sur « Automatique » ET le dit.
+void source_meteo_choix(const banc::Contexte &ctx) {
+    namespace fm = ecran::meteo::fournisseurs;
+    preparer(ctx, "source-meteo-choix", Interface::Reglages);
+    g_hote.definir_texte("lieu.ville", "Lyon, Auvergne-Rhône-Alpes, France");
+    g_hote.code_pays = "FR";
+    ecran::ui_aller("section:1/source");
+    tourner();
+    exiger(existe("Automatique") && existe("Seules les sources qui couvrent le pays de la ville sont proposées."),
+           "la liste commence par « Automatique » et dit qu'elle est filtrée par pays");
+    exiger(affiche("NOAA GFS"), "à Lyon, le modèle mondial est proposé");
+    exiger(!affiche("KNMI") && !affiche("MET Norway"), "à Lyon, les services d'autres pays ne sont pas proposés");
+    exiger(g_hote.nombre("meteo.source") == 0, "la source de départ est « Automatique »");
+    exiger(toucher_texte("NOAA GFS"), "choisir NOAA GFS");
+    exiger(g_hote.nombre("meteo.source") == static_cast<int32_t>(fm::indice_de("noaa")), "la source est enregistrée");
+    exiger(chercher(est_clavier, nullptr) == nullptr && existe("Source météo"), "retour à la page « Lieu et météo »");
+    exiger(affiche_modele("Modèle : {modele}", "modele", "NOAA GFS"), "la page nomme le modèle choisi");
+    exiger(affiche_modele("Données météo : {lien} (licence CC BY 4.0)", "lien", "Open-Meteo"),
+           "l'attribution d'Open-Meteo est donnée");
+    // Un service qui ne couvre pas le pays est refusé par l'hôte, comme par l'API.
+    g_hote.definir_nombre("meteo.source", static_cast<int32_t>(fm::indice_de("knmi")));
+    exiger(g_hote.nombre("meteo.source") == static_cast<int32_t>(fm::indice_de("noaa")),
+           "KNMI ne couvre pas la France : la source ne change pas");
+    // Amsterdam : le service néerlandais s'ajoute, la liste le montre.
+    g_hote.definir_texte("lieu.ville", "Amsterdam, Hollande-Septentrionale, Pays-Bas");
+    g_hote.code_pays = "NL";
+    ecran::ui_aller("section:1/source");
+    tourner();
+    exiger(affiche("KNMI") && affiche("NOAA GFS") && !affiche("MET Norway"), "à Amsterdam, KNMI s'ajoute");
+    exiger(toucher_texte("KNMI"), "choisir KNMI");
+    exiger(affiche_modele("Modèle : {modele}", "modele", "KNMI"), "la page nomme KNMI");
+    // De retour en France : l'hôte remet « Automatique », l'écran le dit en une phrase.
+    g_hote.code_pays = "FR";
+    g_hote.definir_nombre("meteo.source", 0);
+    g_hote.source_retablie = true;
+    ecran::ui_aller("section:1");
+    tourner();
+    exiger(existe("Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays."),
+           "le retour sur « Automatique » est dit, pas muet");
+    exiger(!affiche_modele("Modèle : {modele}", "modele", "KNMI"), "plus de modèle national affiché");
+    // Choisir une source efface le message.
+    ecran::ui_aller("section:1/source");
+    tourner();
+    exiger(toucher_texte("NOAA GFS"), "choisir NOAA GFS à nouveau");
+    exiger(!existe("Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays."),
+           "le message disparaît dès qu'une source est choisie");
+}
+
 // Un mot de passe Wi-Fi trop court est refusé par l'écran, sans lancer de connexion.
 void wifi_mot_de_passe_trop_court(const banc::Contexte &ctx) {
     preparer(ctx, "wifi-mot-de-passe-trop-court", Interface::Reglages);
@@ -272,6 +322,7 @@ void zones_tactiles_reglages(const banc::Contexte &ctx) {
                                    "section:0/connexion:Freebox-A1B2C3:fautedefrappe",
                                    "section:1",
                                    "section:1/ville",
+                                   "section:1/source",
                                    "section:2",
                                    "section:3",
                                    "section:4:0",
@@ -379,6 +430,7 @@ const Scene kScenes[] = {
     {"preset-service-local", "Parcours : préréglage d'un service du PC", preset_service_local},
     {"clavier-saisie", "Parcours : saisie au clavier", clavier_saisie},
     {"ville-choisie", "Parcours : recherche et choix d'une ville", ville_choisie},
+    {"source-meteo-choix", "Parcours : source de la météo, liste par pays, retour sur Automatique", source_meteo_choix},
     {"wifi-mdp-trop-court", "Parcours : mot de passe Wi-Fi trop court", wifi_mot_de_passe_trop_court},
     {"luminosite-immediate", "Parcours : luminosité appliquée au relâchement", luminosite_immediate},
     {"langue-immediate", "Parcours : changement de langue immédiat", langue_immediate},

@@ -156,6 +156,17 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Ville enregistrée : {ville}": "Stadt gespeichert: {ville}"
 "Données météo : {lien} (licence CC BY 4.0)": "Wetterdaten: {lien} (Lizenz CC BY 4.0)"
 
+# --- Écran : source de la météo (07/11/2026) ---
+"Source météo": "Wetterquelle"
+"Le service qui fournit la météo de la ville choisie.": "Der Dienst, der das Wetter für die gewählte Stadt liefert."
+"Automatique": "Automatisch"
+"Seules les sources qui couvrent le pays de la ville sont proposées.": "Es werden nur Quellen angeboten, die das Land der Stadt abdecken."
+"Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Quelle auf „Automatisch“ zurückgesetzt: die bisherige deckt dieses Land nicht ab."
+"Modèle : {modele}": "Modell: {modele}"
+
+# --- Page de réglages : source de la météo (07/11/2026) ---
+"Source enregistrée : {source}": "Quelle gespeichert: {source}"
+
 # --- Page de réglages : assistant vocal ---
 "Assistant vocal": "Sprachassistent"
 "Trois services : comprendre votre voix, réfléchir, parler. Touchez-en un pour le régler.": "Drei Dienste: deine Stimme verstehen, nachdenken, sprechen. Tippe auf einen, um ihn einzurichten."
@@ -321,6 +332,9 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "Zurück auf Version {version}."
 "Il n’y a pas de version précédente à remettre.": "Es gibt keine frühere Version zum Wiederherstellen."
 "Cette page n’existe pas.": "Diese Seite gibt es nicht."
+
+"Cette source météo n’existe pas.": "Diese Wetterquelle gibt es nicht."
+"Cette source météo ne couvre pas le pays de la ville.": "Diese Wetterquelle deckt das Land der Stadt nicht ab."
 
 # --- Écran : réglages et installation guidée (06/11/2026) ---
 "Retour": "Zurück"

@@ -107,6 +107,18 @@ class PortsAppareil {
     // Enregistre PUIS applique (le client réseau est prévenu). Faux : rien n'a changé.
     virtual bool enregistrer_alertes(const reglages::Alertes &nouveau) = 0;
 
+    // ---- source de la météo : la source de la page web aussi (main/reglages.*)
+    // Écrit l'identifiant de la source en service (« auto », « knmi »). Toujours un identifiant connu ET valable pour la ville
+    // actuelle : une valeur absente, inconnue ou qui ne couvre pas le pays donne « auto ».
+    virtual void source_meteo(char *sortie, std::size_t capacite) = 0;
+    // Enregistre PUIS applique (efface la météo gardée, relance la requête). Faux : rien n'a changé. L'identifiant a déjà été
+    // validé pour le pays de la ville par l'appelant.
+    virtual bool source_meteo_enregistrer(std::string_view id) = 0;
+    // Vrai quand le dernier changement de ville (de l'écran ou de la page) a remis « Automatique » parce que l'ancienne source ne
+    // couvre pas le nouveau pays. Retombe à faux quand une source est choisie ou que la ville change encore. Lu par l'écran et par
+    // la page : un seul drapeau, pour que ni l'un ni l'autre ne change de source sans le dire.
+    virtual bool source_meteo_retablie() = 0;
+
     // ---- Wi-Fi (main/reseau_wifi.h) : rien n'est bloquant
     virtual void wifi_scanner_lancer() = 0;
     virtual bool wifi_scanner_en_cours() = 0;
@@ -171,6 +183,12 @@ class HoteAppareil final : public HoteReglages {
         if (id == "alertes.periode") {
             return p_.alertes().periode_min;
         }
+        if (id == "meteo.source") {
+            char source[16] = {};
+            p_.source_meteo(source, sizeof source);
+            const std::size_t i = meteo::fournisseurs::indice_de(source);
+            return i < meteo::fournisseurs::NOMBRE ? static_cast<std::int32_t>(i) : 0;
+        }
         char cle[16];
         std::int32_t valeur = 0;
         if ((r->type == registre::Type::Choix || r->type == registre::Type::Nombre) && cle_services(id, cle) &&
@@ -221,6 +239,18 @@ class HoteAppareil final : public HoteReglages {
                 a.periode_min = valeur;
             }
             p_.enregistrer_alertes(a);
+            return;
+        }
+        if (id == "meteo.source") {
+            // Seulement une source proposée pour le pays de la ville (la liste de l'écran n'en montre pas d'autre ; ce garde-fou
+            // fait la même règle que l'API web). `valeur` est déjà bornée plus haut ; on ne lit pourtant jamais hors de la table.
+            if (static_cast<std::size_t>(valeur) >= meteo::fournisseurs::NOMBRE) {
+                return;
+            }
+            const meteo::fournisseurs::Fournisseur &f = meteo::fournisseurs::TABLE[static_cast<std::size_t>(valeur)];
+            if (meteo::fournisseurs::propose_pour(f.id, code_pays_de_la_ville())) {
+                p_.source_meteo_enregistrer(f.id);
+            }
             return;
         }
         char cle[16];
@@ -433,10 +463,18 @@ class HoteAppareil final : public HoteReglages {
 
     void lieu_choisir(std::size_t rang) override {
         if (rang < nb_lieux_) {
+            // Si le nouveau pays n'est pas couvert par la source d'avant, main/reglages.* la remet sur « Automatique » et
+            // `source_meteo_retablie()` le dit.
             p_.zone_enregistrer(
                 lieux_[rang].zone); // la ville de la page web ; la météo se relance d'elle-même (meteo_zone.h)
         }
     }
+
+    meteo::fournisseurs::Liste sources_meteo() override {
+        return meteo::fournisseurs::pour_pays(code_pays_de_la_ville());
+    }
+
+    bool source_meteo_retablie() override { return p_.source_meteo_retablie(); }
 
     ApercuMeteo meteo_apercu() override {
         ApercuMeteo a;
@@ -528,6 +566,16 @@ class HoteAppareil final : public HoteReglages {
     std::int64_t maintenant_ms() override { return p_.maintenant_ms(); }
 
   private:
+    // Code pays (« FR ») de la ville enregistrée ; vide si la ville n'a pas de pays connu (réglage ancien, ville par défaut).
+    std::string_view code_pays_de_la_ville() {
+        reglages::Zone z;
+        if (!p_.zone_lire(z)) {
+            return {};
+        }
+        reglages::copier_texte(z.code_pays, code_pays_, sizeof code_pays_);
+        return code_pays_;
+    }
+
     // « stt.url » -> clé « stt.url » de l'espace « services » (15 octets au plus). Faux pour un réglage qui n'y vit pas.
     static bool cle_services(std::string_view id, char (&cle)[16]) {
         if (id.size() >= sizeof cle ||
@@ -610,6 +658,8 @@ class HoteAppareil final : public HoteReglages {
     std::size_t nb_lieux_ = 0;
 
     bool test_fait_[3] = {false, false, false};
+
+    char code_pays_[sizeof(reglages::Zone::code_pays)] = {};
 };
 
 } // namespace ecran

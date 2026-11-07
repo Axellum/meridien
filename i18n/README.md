@@ -70,7 +70,7 @@ identifiant ne change jamais de sens.
 ```powershell
 python components/core/outils/generer_i18n.py              # écrit i18n_donnees.inc et web/app/lang/*.json
 python components/core/outils/generer_i18n.py --verifier   # sources cohérentes et sorties à jour, sans rien écrire
-. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers
+. .\tools\trouver_outils.ps1; . "$(Trouver-Outils)\env_hote.ps1" -Sanitizers
 python test/host/lancer.py                                 # dont test_i18n.cpp
 ```
 

@@ -337,10 +337,14 @@ class PortsEsp final : public PortsAppareil {
     bool enregistrer_alertes(const reglages::Alertes &nouveau) override {
         return reglages_alertes_enregistrer(nouveau);
     }
+    void source_meteo(char *sortie, std::size_t capacite) override { reglages_source_meteo(sortie, capacite); }
+    bool source_meteo_enregistrer(std::string_view id) override { return reglages_source_meteo_enregistrer(id); }
+    bool source_meteo_retablie() override { return reglages_source_meteo_retablie(); }
 
     // Une carte neuve : français, thème auto, 75 %, Lyon (mêmes valeurs que main/reglages.cpp et main/meteo_zone.cpp).
     void remettre_affichage_et_ville_par_defaut() override {
         reglages_enregistrer_affichage(reglages::Affichage{});
+        reglages_source_meteo_remettre_auto(); // avant la ville : la ville par défaut n'a pas de pays connu
         reglages::Zone lyon;
         reglages::copier_texte("Lyon", lyon.nom, sizeof lyon.nom);
         reglages::copier_texte("Europe/Paris", lyon.fuseau, sizeof lyon.fuseau);

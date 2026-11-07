@@ -40,6 +40,7 @@ constexpr ChampApi CONTRAT_API[] = {
     {"/api/wifi", "ssid", Couverture::Direct},
     {"/api/wifi", "mot_de_passe", Couverture::Direct},
     {"/api/location", "nom", Couverture::Direct},
+    {"/api/location", "source_meteo", Couverture::Direct},
     {"/api/location", "region", Couverture::Compose},
     {"/api/location", "pays", Couverture::Compose},
     {"/api/location", "code_pays", Couverture::Compose},
@@ -110,7 +111,7 @@ constexpr int identifiants_uniques_et_bien_formes() {
         for (std::size_t j = i + 1; j < NOMBRE_REGLAGES; ++j)
             VERIFIER(REGISTRE[i].id != REGISTRE[j].id);
     }
-    VERIFIER(NOMBRE_REGLAGES == 24);
+    VERIFIER(NOMBRE_REGLAGES == 25);
     return 0;
 }
 
@@ -294,17 +295,19 @@ constexpr int les_libelles_et_les_aides_sont_des_cles_de_traduction() {
 }
 
 constexpr int les_sections_et_les_etapes_sont_coherentes() {
-    // Réseau 2, Lieu et météo 5 (la ville et les 4 alertes), Langue 2, Affichage 2, Assistant 13, Appareil 0 : l'appareil n'a que
-    // des actions et des informations
-    VERIFIER(compter_section(Section::Reseau) == 2 && compter_section(Section::LieuMeteo) == 5);
+    // Réseau 2, Lieu et météo 6 (la ville, sa source météo et les 4 alertes), Langue 2, Affichage 2, Assistant 13,
+    // Appareil 0 : l'appareil n'a que des actions et des informations
+    VERIFIER(compter_section(Section::Reseau) == 2 && compter_section(Section::LieuMeteo) == 6);
     VERIFIER(compter_section(Section::Langue) == 2 && compter_section(Section::Affichage) == 2);
     VERIFIER(compter_section(Section::AssistantVocal) == 13 && compter_section(Section::Appareil) == 0);
     // L'installation : langue, Wi-Fi, lieu, affichage, assistant ont des réglages ; téléphone et récapitulatif n'en ont pas.
     VERIFIER(compter_etape(Etape::Langue) == 1 && compter_etape(Etape::Wifi) == 2 && compter_etape(Etape::Lieu) == 1);
     VERIFIER(compter_etape(Etape::Affichage) == 2 && compter_etape(Etape::Assistant) == 14);
-    VERIFIER(compter_etape(Etape::Telephone) == 0 && compter_etape(Etape::Recapitulatif) == 0);
-    VERIFIER(compter_etape(Etape::Aucune) ==
-             4); // les quatre alertes : hors de l'installation, leurs défauts conviennent
+    // Ni la source météo (« Automatique » convient à tout le monde, on la change plus tard) ni les quatre alertes
+    // (leurs défauts conviennent) ne sont demandées à l'installation.
+    VERIFIER(compter_etape(Etape::Telephone) == 0 && compter_etape(Etape::Recapitulatif) == 0 &&
+             compter_etape(Etape::Aucune) == 5);
+    VERIFIER(chercher("meteo.source")->etape == Etape::Aucune);
     VERIFIER(NOMBRE_ETAPES == 7);
     return 0;
 }
@@ -468,25 +471,48 @@ constexpr int choix_et_nombres_se_reglent_sur_la_page_les_autres_ouvrent_un_edit
     for (std::size_t i = 0; i < NOMBRE_REGLAGES; ++i) {
         const Reglage &r = REGISTRE[i];
         const Rangee &rg = *rangee_du_reglage(r.id);
+        // Une seule exception : la source de la météo. Sa liste dépend du pays de la ville et compte jusqu'à quatre entrées, avec
+        // des noms de service : des pastilles ne la tiennent pas ; elle ouvre une liste plein écran (un niveau, comme la ville).
         if (r.type == Type::Choix)
-            VERIFIER(rg.editeur == Editeur::Pastilles);
+            VERIFIER(rg.editeur == (r.id == "meteo.source" ? Editeur::ListeSource : Editeur::Pastilles));
         if (r.type == Type::Nombre)
             VERIFIER(rg.editeur == Editeur::Curseur);
     }
     return 0;
 }
 
+// Le réglage « meteo.source » est dérivé de la table des sources (ecran/fournisseurs_meteo.hpp) : une option par entrée, dans le
+// même ordre (la position est l'indice du choix, gardé et servi sous forme d'identifiant). Les valeurs attendues sont écrites ici à
+// la main ; seule la comparaison avec la table est calculée.
+constexpr int les_options_de_la_source_meteo_suivent_la_table_des_sources() {
+    namespace fm = ecran::meteo::fournisseurs;
+    const Reglage *r = chercher("meteo.source");
+    VERIFIER(r != nullptr && r->type == Type::Choix && r->section == Section::LieuMeteo);
+    VERIFIER(r->nb_options == fm::NOMBRE && r->min == 0 && r->max == static_cast<std::int32_t>(fm::NOMBRE) - 1);
+    VERIFIER(r->defaut == 0 && r->options[0].code == "auto" &&
+             !r->facultatif); // « Automatique » : le défaut, jamais « pas choisi »
+    VERIFIER(r->options[0].libelle == "Automatique" && r->options[0].traduire);
+    for (std::size_t i = 0; i < fm::NOMBRE; ++i) {
+        VERIFIER(r->options[i].code == fm::TABLE[i].id && r->options[i].libelle == fm::TABLE[i].libelle);
+        VERIFIER(r->options[i].traduire == fm::TABLE[i].libelle_traduit);
+        VERIFIER(i == 0 || !r->options[i].traduire); // un nom de service est un nom propre
+    }
+    VERIFIER(r->route == "/api/location" &&
+             r->champ == "source_meteo"); // la même route que la ville : un seul appel pour les deux
+    return 0;
+}
+
 constexpr int l_editeur_ne_convient_qu_au_type_prevu() {
-    // La matrice complète (5 types × 7 éditeurs), écrite à la main : « 1 » = l'éditeur convient. Rien n'est déduit du code testé.
-    //                                Aucun Pastilles Curseur Clavier ClavierSecret ListeWifi RechercheVille
-    constexpr int ATTENDU[5][7] = {
-        {0, 1, 0, 0, 0, 0, 0},  // Choix
-        {0, 0, 1, 0, 0, 0, 0},  // Nombre
-        {0, 0, 0, 1, 0, 1, 0},  // Texte : le clavier, ou la liste des réseaux pour le nom du Wi-Fi
-        {0, 0, 0, 0, 1, 0, 0},  // Secret : jamais un clavier qui affiche
-        {0, 0, 0, 0, 0, 0, 1}}; // Lieu
+    // La matrice complète (5 types × 8 éditeurs), écrite à la main : « 1 » = l'éditeur convient. Rien n'est déduit du code testé.
+    //                                Aucun Pastilles Curseur Clavier ClavierSecret ListeWifi RechercheVille ListeSource
+    constexpr int ATTENDU[5][8] = {
+        {0, 1, 0, 0, 0, 0, 0, 1},  // Choix : des pastilles, ou la liste filtrée par pays de la source météo
+        {0, 0, 1, 0, 0, 0, 0, 0},  // Nombre
+        {0, 0, 0, 1, 0, 1, 0, 0},  // Texte : le clavier, ou la liste des réseaux pour le nom du Wi-Fi
+        {0, 0, 0, 0, 1, 0, 0, 0},  // Secret : jamais un clavier qui affiche
+        {0, 0, 0, 0, 0, 0, 1, 0}}; // Lieu
     for (int t = 0; t < 5; ++t) {
-        for (int e = 0; e < 7; ++e)
+        for (int e = 0; e < 8; ++e)
             VERIFIER(editeur_convient(static_cast<Type>(t), static_cast<Editeur>(e)) == (ATTENDU[t][e] == 1));
     }
     return 0;
@@ -648,6 +674,7 @@ constexpr int les_reglages_d_alertes_suivent_le_noyau_des_alertes() {
     X(le_mot_de_passe_wifi_n_est_atteint_qu_apres_le_choix_du_reseau)                                                  \
     X(choix_et_nombres_se_reglent_sur_la_page_les_autres_ouvrent_un_editeur)                                           \
     X(l_editeur_ne_convient_qu_au_type_prevu)                                                                          \
+    X(les_options_de_la_source_meteo_suivent_la_table_des_sources)                                                     \
     X(la_saisie_d_un_texte_est_controlee)                                                                              \
     X(les_options_de_chaque_service_sont_les_presets_qui_le_documentent)                                               \
     X(google_n_a_pas_d_audio_et_lm_studio_non_plus)                                                                    \

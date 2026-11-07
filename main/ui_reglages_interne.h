@@ -81,6 +81,7 @@ enum class TypeEcran : uint8_t {
     ListeWifi,      // les réseaux trouvés
     ConnexionWifi,  // essai de connexion avec compte à rebours
     RechercheVille, // saisie + résultats
+    ListeSource,    // les sources de la météo proposées pour le pays de la ville (ADR-0010)
     Etape,          // une étape de l'installation guidée ; a = numéro de l'étape
 };
 
@@ -130,6 +131,7 @@ lv_obj_t *construire_editeur_texte(Entree &e);
 lv_obj_t *construire_liste_wifi(Entree &e);
 lv_obj_t *construire_connexion_wifi(Entree &e);
 lv_obj_t *construire_recherche_ville(Entree &e);
+lv_obj_t *construire_liste_source(Entree &e);
 const char *ssid_en_cours();
 void definir_ssid_en_cours(std::string_view ssid);
 // Lance la connexion au réseau choisi (l'hôte, puis le suivi du délai) et ouvre l'écran de connexion par-dessus l'écran du dessus.
