@@ -4,7 +4,7 @@
 
 A non-obvious decision gets one numbered page here (next number), with the context, the choice, the alternatives that were
 rejected and what would reopen it. Read the relevant page **before** "fixing" something that looks wrong. The pages are
-written in French; each of 0001 to 0005, 0008, 0009, 0010, 0012 and 0013 opens with a short English summary. A summary says no more than the French text
+written in French; each of 0001 to 0005, 0008, 0009, 0010, 0012, 0013 and 0014 opens with a short English summary. A summary says no more than the French text
 below it, including its "proposed" status.
 
 | No. | Decision | Status |
@@ -21,6 +21,7 @@ below it, including its "proposed" status.
 | [0010](0010-source-meteo-par-pays-et-client-reseau-commun.md) | Weather source chosen by country (Open-Meteo national models), one common network client | proposed, awaiting the owner's validation (seen on PC only) |
 | [0012](0012-l-heure-affichee-est-celle-du-lieu-choisi.md) | The time on screen is the time of the chosen place: the clock, forecast hours, sunrise and sunset, day names and alert hours follow the saved zone's time zone | proposed, awaiting the owner's validation (seen on PC only, never on a board) |
 | [0013](0013-surf-donnees-note-et-limites.md) | Surf: spots typed by the person, Open-Meteo marine and wind data, offshore / cross-shore / onshore classes, an indicative tide and a house 0-100 score; only the pure core exists, no screen yet | proposed, awaiting the owner's validation (seen on PC only, never on a board) |
+| [0014](0014-met-norway-et-nws-comme-sources.md) | MET Norway and the NWS read directly, key-less, as weather sources; fallback on Open-Meteo | proposed, awaiting the owner's validation (seen on PC only, compiled for both boards, never run on a board) |
 
 Status as of 2026-11-06. "Proposed" means written by the AI agent from the research notes and not yet settled by the owner;
 the code follows it in the meantime. The open questions (wake word, local STT/TTS, project name, repository, licence, ESP-IDF
@@ -31,7 +32,7 @@ summary at the top).
 
 ## Version française
 
-Une décision non évidente = une page numérotée ici (numéro suivant), avec le contexte, le choix, les alternatives écartées et ce qui la remettrait en cause. À lire **avant** de « corriger » quelque chose qui a l'air faux. Les pages sont en français ; chacune de 0001 à 0005, 0008, 0009, 0010 et 0012 commence par un court résumé en anglais, qui n'en dit pas plus que le texte français, statut « proposée » compris.
+Une décision non évidente = une page numérotée ici (numéro suivant), avec le contexte, le choix, les alternatives écartées et ce qui la remettrait en cause. À lire **avant** de « corriger » quelque chose qui a l'air faux. Les pages sont en français ; chacune de 0001 à 0005, 0008, 0009, 0010, 0012, 0013 et 0014 commence par un court résumé en anglais, qui n'en dit pas plus que le texte français, statut « proposée » compris.
 
 | N° | Décision | Statut |
 |---|---|---|
@@ -47,5 +48,6 @@ Une décision non évidente = une page numérotée ici (numéro suivant), avec l
 | [0010](0010-source-meteo-par-pays-et-client-reseau-commun.md) | Source de la météo choisie par pays (modèles nationaux d'Open-Meteo), un client réseau commun | proposée, à valider par Axel (vue sur le PC seulement) |
 | [0012](0012-l-heure-affichee-est-celle-du-lieu-choisi.md) | L'heure affichée est celle du lieu choisi : l'horloge, les heures de la prévision, le lever et le coucher du soleil, les noms de jours et les heures des alertes suivent le fuseau de la zone enregistrée | proposée, à valider par Axel (vue sur le PC seulement, jamais sur une carte) |
 | [0013](0013-surf-donnees-note-et-limites.md) | Surf : spots saisis par la personne, données mer et vent d'Open-Meteo, vent offshore / de travers / onshore, une marée indicative et un barème maison de 0 à 100 ; seul le noyau pur existe, pas encore d'écran | proposée, à valider par Axel (vue sur le PC seulement, jamais sur une carte) |
+| [0014](0014-met-norway-et-nws-comme-sources.md) | MET Norway et le NWS lus directement, sans clé, comme sources météo ; repli sur Open-Meteo | proposée, à valider par Axel (vue sur le PC seulement, compilée pour les deux cartes, jamais lancée sur une carte) |
 
 Statut au 06/11/2026. « Proposée » = écrite par l'agent d'après les recherches, pas encore tranchée par Axel ; le code s'y conforme en attendant. Les questions ouvertes (mot d'activation, STT/TTS locaux, nom du projet, dépôt, licence, version d'ESP-IDF, fraîcheur du calendrier) sont listées dans [le plan](../plan.md#décisions-à-prendre-par-axel).

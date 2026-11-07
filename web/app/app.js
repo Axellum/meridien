@@ -230,28 +230,53 @@ function carteVille() {
   const liste = h('ul', { class: 'resultats', hidden: true });
   const retours = h('div', { 'aria-live': 'polite' });
   const champ = h('input', { id: 'ville-q', type: 'search', placeholder: t('ville.recherche_ph'), autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'search' });
-  /* Attribution exigée par la licence CC BY 4.0 des données Open-Meteo : toujours visible, dans la langue de la page. */
-  const attribution = h('p', { class: 'aide attribution', id: 'attribution' },
-    tNoeuds('meteo.attribution', { lien: h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener', text: 'Open-Meteo' }) }));
+  /* Attribution exigée par les licences des données (Open-Meteo : CC BY 4.0 ; MET Norway : CC BY 4.0 et NLOD 2.0, données adaptées ;
+     NWS : domaine public, sans parrainage) : toujours visible, dans la langue de la page. Elle nomme le service qui a RÉELLEMENT donné
+     la météo montrée (`fournisseur` de /api/weather), pas celui qui est choisi : quand un service lu directement n'a pas répondu, la météo
+     vient d'Open-Meteo et c'est lui qu'il faut citer (ADR-0014). Sans météo reçue, c'est Open-Meteo, comme avant. */
+  const attribution = h('p', { class: 'aide attribution', id: 'attribution' });
   /* Source de la météo : la liste vient de l'appareil et ne contient que les sources qui couvrent le pays de la ville (ADR-0010) ;
      « Automatique » est toujours là. Le modèle choisi est nommé à côté de l'attribution, là où la source est montrée. */
   const modele = h('span', { id: 'attribution-modele' });
-  attribution.append(modele);
+  const PHRASES = { 'open-meteo': 'meteo.attribution', 'met-norway': 'meteo.attribution_metno', nws: 'meteo.attribution_nws' };
+  const PAR_DEFAUT = { id: 'open-meteo', nom: 'Open-Meteo', lien: 'https://open-meteo.com/' };
+  let cleAttribution = '';
+  const majAttribution = () => {
+    const f = S.meteo && S.meteo.fournisseur;
+    const sur = f && PHRASES[f.id] && typeof f.nom === 'string' && /^https:\/\//.test(f.lien) ? f : PAR_DEFAUT; /* le lien vient de l'appareil : https seulement */
+    const cle = sur.id;
+    if (cle === cleAttribution) return;
+    cleAttribution = cle;
+    attribution.replaceChildren(...nets(tNoeuds(PHRASES[sur.id], { lien: h('a', { href: sur.lien, target: '_blank', rel: 'noopener', text: sur.nom }) }), modele,
+      sur.id === 'nws' ? ' ' + t('meteo.sans_parrainage') : null));
+  };
   const source = h('select', { id: 'source-meteo', 'aria-describedby': 'source-meteo-aide', onchange: () => choisirSource(source.value) });
   const sourceRetablie = retour('info', t('source.retablie'));
   sourceRetablie.id = 'source-retablie';
+  const sourceRepliTexte = h('span');
+  const sourceRepli = h('p', { class: 'res info', role: 'status', id: 'source-repli', hidden: true }, ico('info'), sourceRepliTexte);
   const champSource = h('div', { class: 'f', id: 'source-champ' },
     h('label', { class: 'lab', for: 'source-meteo', text: t('source.titre') }), h('div', { class: 'champ' }, source, ico('chevd')),
-    h('p', { class: 'aide', id: 'source-meteo-aide', text: t('source.aide') + ' ' + t('source.filtre') }), sourceRetablie);
+    h('p', { class: 'aide', id: 'source-meteo-aide', text: t('source.aide') + ' ' + t('source.filtre') }), sourceRetablie, sourceRepli);
   const majSource = () => {
     const z = S.zone, liste = z && Array.isArray(z.sources_meteo) ? z.sources_meteo : [];
     champSource.hidden = !liste.length;
     source.replaceChildren(...liste.map((s) => h('option', { value: s.id, text: s.nom, selected: s.id === z.source_meteo })));
     sourceRetablie.hidden = !(z && z.source_meteo_retablie);
-    modele.textContent = z && z.source_meteo && z.source_meteo !== 'auto' ? ' · ' + t('source.modele', { modele: z.source_meteo_nom }) : '';
+    /* « Modèle : … » seulement pour un modèle d'Open-Meteo : un service lu directement (MET Norway, NWS) n'est pas un modèle. */
+    const choisie = z && liste.find((s) => s.id === z.source_meteo);
+    modele.textContent = z && z.source_meteo && z.source_meteo !== 'auto' && choisie && !choisie.direct ? ' · ' + t('source.modele', { modele: z.source_meteo_nom }) : '';
+  };
+  /* Le service choisi n'a pas répondu : la météo vient d'Open-Meteo en attendant, et la page le dit (l'écran dit la même chose).
+     À part de majSource : celle-ci refait la liste déroulante, et la météo se met à jour toute seule pendant qu'on choisit. */
+  const majRepli = () => {
+    const repli = !!(S.meteo && S.meteo.repli && S.zone);
+    sourceRepli.hidden = !repli;
+    sourceRepliTexte.textContent = repli ? t('source.repli', { service: S.zone.source_meteo_nom }) : '';
   };
   majVille = () => {
     const z = S.zone, def = z && z.definie !== false;
+    majAttribution(); majRepli(); /* la météo reçue (ou effacée) change le service nommé et le message de repli */
     etiquette.textContent = def ? t('ville.changer') : t('ville.choisir');
     if (!def) {
       hero.replaceChildren(h('div', { class: 'hero' }, h('div', {}, h('small', { text: t('ville.aucune') }), h('b', { class: 'ville', text: t('ville.choisissez') }))));

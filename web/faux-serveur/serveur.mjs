@@ -37,8 +37,11 @@ const FUSEAUX = new Map([...readFileSync(path.join(NOYAU, 'fuseaux_donnees.inc')
 /* Les sources de météo (fournisseurs_meteo.hpp) : la table, ce que le lecteur du firmware tolère et la liste par pays sont lus dans le noyau
    pur, pas recopiés. La règle « proposée » est celle de proposable() et de pour_pays() ; le test C++ la garde, ici on ne fait que la rejouer. */
 const TEXTE_SOURCES = readFileSync(path.join(NOYAU, 'fournisseurs_meteo.hpp'), 'utf8');
-const SOURCES = [...TEXTE_SOURCES.matchAll(/^\s*\{"(\w+)",\s+"([^"]+)",\s+(true|false),\s+Famille::OpenMeteo,\s+"([^"]*)",\s*"([^"]*)",\s+([^}]+)\},/gm)].map((m) => (
-  { id: m[1], libelle: m[2], traduit: m[3] === 'true', modeles: m[4], pays: m[5].split(' ').filter(Boolean), limites: (m[6].match(/limite::(\w+)/g) || []).map((x) => x.slice(8)) }));
+const SOURCES = [...TEXTE_SOURCES.matchAll(/^\s*\{"(\w+)",\s+"([^"]+)",\s+(true|false),\s+Famille::(\w+),\s+"([^"]*)",\s*"([^"]*)",\s+([^}]+)\},/gm)].map((m) => (
+  { id: m[1], libelle: m[2], traduit: m[3] === 'true', famille: m[4], modeles: m[5], pays: m[6].split(' ').filter(Boolean), limites: (m[7].match(/limite::(\w+)/g) || []).map((x) => x.slice(8)) }));
+/* Une source « directe » (MET Norway, NWS ; ADR-0014) est un service lu par l'appareil lui-même, pas un modèle d'Open-Meteo. Ce faux serveur ne sait
+   lire que Open-Meteo : choisir une source directe, c'est ce que l'appareil vit quand ce service ne répond pas (météo d'Open-Meteo, `repli` vrai). */
+const estDirecte = (f) => f.famille !== 'OpenMeteo';
 const LECTEUR_TOLERE = (TEXTE_SOURCES.match(/LECTEUR_TOLERE\s*=\s*([^;]+);/)[1].match(/limite::(\w+)/g) || []).map((x) => x.slice(8));
 if (SOURCES.length < 2 || SOURCES[0].id !== 'auto') throw new Error('table des sources illisible : fournisseurs_meteo.hpp a changé de forme ?');
 const proposable = (f) => f.limites.every((l) => LECTEUR_TOLERE.includes(l));
@@ -54,7 +57,7 @@ const sourcesPour = (code) => [
 const champsSource = () => {
   const f = sourceDe(etat.source) || SOURCES[0];
   return { source_meteo: f.id, source_meteo_nom: nomDeSource(f), source_meteo_retablie: etat.sourceRetablie,
-    sources_meteo: sourcesPour(codePays()).map((s) => ({ id: s.id, nom: nomDeSource(s) })) };
+    sources_meteo: sourcesPour(codePays()).map((s) => ({ id: s.id, nom: nomDeSource(s), direct: estDirecte(s) })) };
 };
 const lieu = () => ({ ...(etat.zone || { definie: false }), ...champsSource() });
 /* Une nouvelle ville : la météo gardée est effacée ; une source qui ne couvre pas son pays repasse sur « Automatique » et on s'en souvient. */
@@ -273,7 +276,8 @@ async function geocoder(q) {
 }
 const sansInternet = () => new Refus(503, 'sans_internet', T('L’appareil n’a pas accès à Internet pour chercher un lieu.'));
 /* Le libellé est traduit à chaque réponse (la langue de l'écran peut changer entre deux), la mesure est mise en cache. */
-const releveMeteo = (c, perimee) => ({ disponible: true, perimee, mise_a_jour: c.time, actuelle: { temperature: c.temperature_2m, ressentie: c.apparent_temperature, code: c.weather_code, libelle: T(WMO.get(c.weather_code) || 'Météo inconnue'), jour: !!c.is_day } });
+const FOURNISSEUR_OPEN_METEO = { id: 'open-meteo', nom: 'Open-Meteo', lien: 'https://open-meteo.com/' };
+const releveMeteo = (c, perimee) => ({ disponible: true, perimee, mise_a_jour: c.time, fournisseur: FOURNISSEUR_OPEN_METEO, repli: estDirecte(sourceDe(etat.source) || SOURCES[0]), actuelle: { temperature: c.temperature_2m, ressentie: c.apparent_temperature, code: c.weather_code, libelle: T(WMO.get(c.weather_code) || 'Météo inconnue'), jour: !!c.is_day } });
 async function meteo() {
   const z = etat.zone;
   if (!z) return { disponible: false };

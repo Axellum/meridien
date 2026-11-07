@@ -111,6 +111,8 @@ constexpr int toute_source_refusee_a_une_raison_dans_ses_limites() {
 constexpr int chaque_pays_annonce_par_la_table_a_sa_reponse_reelle() {
     // « pays » ne liste que des pays où une capture a rendu quelque chose : jamais un code deviné.
     for (const Fournisseur &f : TABLE) {
+        if (f.famille != Famille::OpenMeteo)
+            continue; // MET Norway et le NWS : leurs pays sont comparés à leurs captures dans test_meteo_metno.cpp et test_meteo_nws.cpp
         for (std::size_t i = 0; i < f.pays.size(); i += 3) {
             const sv code = f.pays.substr(i, 2);
             bool vu = false;
@@ -147,8 +149,9 @@ constexpr int la_source_mondiale_est_vue_sur_cinq_continents() {
 constexpr int ordre_et_identifiants_figes() {
     // L'ordre sert d'indice d'option dans le registre des réglages et l'identifiant est gardé en mémoire permanente : rien ne
     // bouge, on ajoute à la fin (et on met cette liste à jour en le sachant).
-    constexpr sv IDS[] = {"auto", "meteofrance", "dwd",       "metoffice", "metno", "dmi",  "knmi", "meteosuisse",
-                          "jma",  "gem",         "geosphere", "arpae",     "chmi",  "noaa", "ecmwf"};
+    constexpr sv IDS[] = {"auto", "meteofrance", "dwd",   "metoffice", "metno",     "dmi",
+                          "knmi", "meteosuisse", "jma",   "gem",       "geosphere", "arpae",
+                          "chmi", "noaa",        "ecmwf", "metnorway", "nws"};
     VERIFIER(NOMBRE == sizeof(IDS) / sizeof(IDS[0]));
     for (std::size_t i = 0; i < NOMBRE; ++i) {
         VERIFIER(TABLE[i].id == IDS[i]);
@@ -176,6 +179,10 @@ constexpr int seuls_les_modeles_verifies_sont_dans_la_table() {
                                "gfs_seamless",
                                "ecmwf_ifs025"};
     for (std::size_t i = 1; i < NOMBRE; ++i) {
+        if (TABLE[i].famille != Famille::OpenMeteo) {
+            VERIFIER(TABLE[i].modeles.empty()); // un service lu directement n'a pas de `models=`
+            continue;
+        }
         bool connu = false;
         for (const sv m : VERIFIES)
             connu = connu || TABLE[i].modeles == m;
@@ -213,6 +220,8 @@ constexpr int le_modele_le_plus_long_atteint_la_borne_de_l_adresse() {
 
 constexpr int chaque_source_donne_une_adresse_qui_tient_dans_le_tampon_d_envoi() {
     for (const Fournisseur &f : TABLE) {
+        if (f.famille != Famille::OpenMeteo)
+            continue; // les services lus directement ont leurs adresses (test_requete_fournisseurs.cpp)
         char t[TAILLE_REQUETE_MAX] = {};
         const std::size_t n = construire_requete(-9000000, -18000000, t, sizeof(t), f.modeles);
         VERIFIER(n != 0 && n < TAILLE_REQUETE_MAX);
@@ -238,6 +247,55 @@ constexpr int automatique_ne_demande_aucun_modele() {
     VERIFIER(entree("auto").libelle_traduit && entree("auto").libelle == "Automatique");
     for (std::size_t i = 1; i < NOMBRE; ++i)
         VERIFIER(!TABLE[i].libelle_traduit); // un nom de service est un nom propre : jamais traduit
+    return 0;
+}
+
+// ---- les services lus directement (ADR-0014) ------------------------------------------------------------------------------
+
+constexpr int la_famille_d_une_source_vient_de_la_table() {
+    VERIFIER(entree("metnorway").famille == Famille::MetNo && entree("nws").famille == Famille::Nws);
+    VERIFIER(famille_de("metnorway") == Famille::MetNo && famille_de("nws") == Famille::Nws);
+    // « metno » (le modèle de MET Norway servi par Open-Meteo) reste une source d'Open-Meteo : seul « metnorway » est lu en direct
+    VERIFIER(famille_de("metno") == Famille::OpenMeteo && famille_de("auto") == Famille::OpenMeteo &&
+             famille_de("noaa") == Famille::OpenMeteo);
+    // un identifiant inconnu, vide ou d'une autre casse n'est jamais un service direct : on ne tente que ce qu'on connaît
+    VERIFIER(famille_de("inconnu") == Famille::OpenMeteo && famille_de("") == Famille::OpenMeteo &&
+             famille_de("NWS") == Famille::OpenMeteo && famille_de("MetNorway") == Famille::OpenMeteo);
+    std::size_t directes = 0;
+    for (std::size_t i = 0; i < NOMBRE; ++i) {
+        const Fournisseur &f = TABLE[i];
+        if (f.famille == Famille::OpenMeteo) {
+            VERIFIER(i == 0 || !f.modeles.empty());
+        } else {
+            ++directes;
+            VERIFIER(f.modeles.empty() && !f.pays.empty() &&
+                     f.limites == 0); // pays précis, aucune limite qui refuse la réponse
+            VERIFIER(proposable(f, 0));
+            VERIFIER(modeles_de(f.id).empty()); // jamais un `models=` dans l'adresse de repli
+        }
+    }
+    VERIFIER(directes == 2);
+    return 0;
+}
+
+constexpr int l_attribution_nomme_le_service_qui_a_donne_la_meteo() {
+    const Attribution o = attribution_de(Famille::OpenMeteo);
+    const Attribution m = attribution_de(Famille::MetNo);
+    const Attribution n = attribution_de(Famille::Nws);
+    VERIFIER(o.id == "open-meteo" && o.nom == "Open-Meteo" && o.lien == "https://open-meteo.com/");
+    VERIFIER(m.id == "met-norway" && m.nom == "MET Norway" && m.lien == "https://api.met.no/");
+    VERIFIER(n.id == "nws" && n.nom == "NWS" && n.lien == "https://www.weather.gov/");
+    for (const Attribution &a : {o, m, n}) {
+        VERIFIER(a.lien.size() > 12 && a.lien.substr(0, 8) == "https://" && a.lien.back() == '/');
+        VERIFIER(a.nom.size() >= 3);
+    }
+    VERIFIER(o.nom != m.nom && m.nom != n.nom && o.nom != n.nom);
+    VERIFIER(o.id != m.id && m.id != n.id && o.id != n.id);
+    for (const Attribution &a : {o, m, n}) {
+        VERIFIER(!a.id.empty());
+        for (const char c : a.id)
+            VERIFIER((c >= 'a' && c <= 'z') || c == '-'); // un identifiant d'API : minuscules et tirets
+    }
     return 0;
 }
 
@@ -274,12 +332,22 @@ constexpr int liste_proposee_pour_chaque_pays() {
     // Automatique en tête, puis les sources nationales proposables, puis les mondiales proposables.
     VERIFIER(
         liste_est(pour_pays("FR"), {"auto", "noaa"})); // Météo-France n'est pas proposée : pas d'UV (voir plus haut)
-    VERIFIER(liste_est(pour_pays("NO"), {"auto", "metno", "noaa"}));
-    for (const sv nordique : {sv("SE"), sv("FI"), sv("DK"), sv("IS"), sv("EE")})
+    // MET Norway lu directement (« metnorway ») vient après le modèle d'Open-Meteo du même nom (« metno »), avant les mondiales.
+    VERIFIER(liste_est(pour_pays("NO"), {"auto", "metno", "metnorway", "noaa"}));
+    for (const sv nordique : {sv("FI"), sv("IS"), sv("SJ")}) {
+        // « SJ » (Svalbard) : seulement le service direct, le modèle d'Open-Meteo ne le liste pas
+        const bool modele = nordique != sv("SJ");
+        if (modele)
+            VERIFIER(liste_est(pour_pays(nordique), {"auto", "metno", "metnorway", "noaa"}));
+        else
+            VERIFIER(liste_est(pour_pays(nordique), {"auto", "metnorway", "noaa"}));
+    }
+    for (const sv nordique : {sv("SE"), sv("DK"), sv("EE")}) // pas encore de capture du service direct dans ces pays
         VERIFIER(liste_est(pour_pays(nordique), {"auto", "metno", "noaa"}));
     for (const sv bnl : {sv("NL"), sv("BE"), sv("LU")})
         VERIFIER(liste_est(pour_pays(bnl), {"auto", "knmi", "noaa"}));
-    VERIFIER(liste_est(pour_pays("US"), {"auto", "noaa"}));
+    VERIFIER(liste_est(pour_pays("US"), {"auto", "nws", "noaa"}));
+    VERIFIER(liste_est(pour_pays("PR"), {"auto", "nws", "noaa"}));
     VERIFIER(liste_est(pour_pays("DE"), {"auto", "noaa"}));
     VERIFIER(liste_est(pour_pays("JP"), {"auto", "noaa"}));
     return 0;
@@ -291,7 +359,8 @@ constexpr int pays_inconnu_ou_mal_forme_ne_donne_que_les_mondiales() {
     VERIFIER(liste_est(pour_pays("FRA"), {"auto", "noaa"})); // trois lettres : pas un code ISO alpha-2
     VERIFIER(liste_est(pour_pays("F"), {"auto", "noaa"}));
     VERIFIER(liste_est(pour_pays("N0"), {"auto", "noaa"}));
-    VERIFIER(liste_est(pour_pays("no"), {"auto", "metno", "noaa"})); // casse indifférente
+    VERIFIER(liste_est(pour_pays("no"), {"auto", "metno", "metnorway", "noaa"})); // casse indifférente
+    VERIFIER(liste_est(pour_pays("us"), {"auto", "nws", "noaa"}));
     return 0;
 }
 
@@ -311,7 +380,7 @@ constexpr int tolerer_une_limite_fait_apparaitre_les_sources_qui_n_ont_que_celle
     VERIFIER(liste_est(pour_pays("FR", TOUT), {"auto", "meteofrance", "noaa", "ecmwf"}));
     VERIFIER(liste_est(pour_pays("JP", TOUT), {"auto", "jma", "noaa", "ecmwf"}));
     // Ne rien tolérer : « Automatique » et les sources sans aucune limite seulement.
-    VERIFIER(liste_est(pour_pays("NO", 0), {"auto", "metno", "noaa"}));
+    VERIFIER(liste_est(pour_pays("NO", 0), {"auto", "metno", "metnorway", "noaa"}));
     VERIFIER(!proposable(entree("metoffice"), 0) && !proposable(entree("metoffice")));
     return 0;
 }
@@ -321,6 +390,10 @@ constexpr int propose_pour_dit_si_la_source_convient_a_la_ville() {
     VERIFIER(propose_pour("metno", "NO") && propose_pour("metno", "ee"));
     VERIFIER(!propose_pour("metno", "FR") && !propose_pour("metno", "") && !propose_pour("metno", "JP"));
     VERIFIER(propose_pour("noaa", "FR") && propose_pour("noaa", "") && propose_pour("noaa", "AU"));
+    VERIFIER(propose_pour("metnorway", "NO") && propose_pour("metnorway", "sj") && !propose_pour("metnorway", "SE") &&
+             !propose_pour("metnorway", "") && !propose_pour("metnorway", "US"));
+    VERIFIER(propose_pour("nws", "US") && propose_pour("nws", "pr") && !propose_pour("nws", "FR") &&
+             !propose_pour("nws", "") && !propose_pour("nws", "CA"));
     VERIFIER(propose_pour("knmi", "BE") && !propose_pour("knmi", "DE"));
     VERIFIER(!propose_pour("dwd", "DE")); // dans la table, pas proposée (UV)
     VERIFIER(!propose_pour("meteofrance", "FR"));
@@ -337,6 +410,9 @@ constexpr int source_valable_pour_garde_la_source_ou_remet_automatique() {
     VERIFIER(source_valable_pour("metno", "se") == "metno"); // casse indifférente
     VERIFIER(source_valable_pour("knmi", "FR") == "auto");   // ne couvre pas la France : retour à « Automatique »
     VERIFIER(source_valable_pour("metno", "NL") == "auto");
+    VERIFIER(source_valable_pour("nws", "US") == "nws" &&
+             source_valable_pour("nws", "FR") == "auto"); // un service lu directement
+    VERIFIER(source_valable_pour("metnorway", "FI") == "metnorway" && source_valable_pour("metnorway", "FR") == "auto");
     VERIFIER(source_valable_pour("knmi", "") == "auto"); // pays inconnu : seule une source mondiale reste
     VERIFIER(source_valable_pour("auto", "FR") == "auto" && source_valable_pour("auto", "") == "auto");
     VERIFIER(source_valable_pour("inconnu", "FR") == "auto" &&
@@ -359,8 +435,8 @@ constexpr int source_valable_pour_garde_la_source_ou_remet_automatique() {
 }
 
 constexpr int la_liste_n_a_ni_doublon_ni_trou_pour_aucun_pays() {
-    constexpr sv PAYS[] = {"",   "FR", "DE", "GB", "NO", "SE", "FI", "DK", "IS", "EE", "NL", "BE", "LU", "CH",
-                           "JP", "CA", "AT", "IT", "CZ", "US", "AU", "BR", "ZA", "TR", "ES", "RE", "ZZ", "fr"};
+    constexpr sv PAYS[] = {"",   "FR", "DE", "GB", "NO", "SE", "FI", "DK", "IS", "EE", "NL", "BE", "LU", "CH", "SJ",
+                           "PR", "JP", "CA", "AT", "IT", "CZ", "US", "AU", "BR", "ZA", "TR", "ES", "RE", "ZZ", "fr"};
     for (const sv p : PAYS) {
         const Liste l = pour_pays(p);
         VERIFIER(l.n >= 2 && l.n <= NOMBRE);
@@ -403,6 +479,8 @@ constexpr int la_liste_n_a_ni_doublon_ni_trou_pour_aucun_pays() {
     X(le_modele_le_plus_long_atteint_la_borne_de_l_adresse)                                                            \
     X(chaque_source_donne_une_adresse_qui_tient_dans_le_tampon_d_envoi)                                                \
     X(automatique_ne_demande_aucun_modele)                                                                             \
+    X(la_famille_d_une_source_vient_de_la_table)                                                                       \
+    X(l_attribution_nomme_le_service_qui_a_donne_la_meteo)                                                             \
     X(code_pays_reconnu_a_la_lettre_pres)                                                                              \
     X(liste_proposee_pour_chaque_pays)                                                                                 \
     X(pays_inconnu_ou_mal_forme_ne_donne_que_les_mondiales)                                                            \

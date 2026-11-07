@@ -11,6 +11,7 @@
 #include "miniz.h" // tinfl_decompress : ROM de l'ESP32-P4 (esp32p4.rom.ld), aucun code de décompression dans la flash
 
 #include "ecran/gzip.hpp"
+#include "ecran/iso8601.hpp"
 #include "verrou_tls.h"
 
 namespace ecran::client_http {
@@ -21,6 +22,8 @@ const char *TAG = "http";
 
 constexpr size_t kTailleCodage =
     32; // « Content-Encoding » : « gzip », « x-gzip », « identity »… une valeur plus longue n'est pas gzip
+constexpr size_t kTailleDate =
+    40; // « Sat, 07 Nov 2026 13:27:13 GMT » : 29 caractères ; une valeur plus longue n'est pas une date
 
 // ---- une requête ---------------------------------------------------------------------------------------------------
 
@@ -33,7 +36,19 @@ struct Reception {
     Memoire apres_connexion;    // mesurée une fois la connexion TLS établie
     char codage[kTailleCodage]; // valeur de l'en-tête Content-Encoding de la réponse finale (vide : absent)
     bool codage_trop_long;
+    char expires[kTailleDate];  // valeur de l'en-tête Expires de la réponse finale (vide : absent ou trop long)
+    char modifiee[kTailleDate]; // valeur de l'en-tête Last-Modified (idem)
 };
+
+// Copie la valeur d'un en-tête de date dans `cible` ; vide si elle ne tient pas (ce n'est pas une date HTTP).
+void garder_date(char *cible, const char *valeur) {
+    const size_t len = std::strlen(valeur);
+    if (len >= kTailleDate) {
+        cible[0] = '\0';
+    } else {
+        std::memcpy(cible, valeur, len + 1);
+    }
+}
 
 esp_err_t sur_evenement_http(esp_http_client_event_t *evt) {
     auto *rec = static_cast<Reception *>(evt->user_data);
@@ -49,8 +64,16 @@ esp_err_t sur_evenement_http(esp_http_client_event_t *evt) {
         rec->trop = false;
         rec->codage[0] = '\0';
         rec->codage_trop_long = false;
+        rec->expires[0] = '\0';
+        rec->modifiee[0] = '\0';
         break;
     case HTTP_EVENT_ON_HEADER:
+        if (evt->header_key != nullptr && evt->header_value != nullptr && strcasecmp(evt->header_key, "Expires") == 0) {
+            garder_date(rec->expires, evt->header_value);
+        } else if (evt->header_key != nullptr && evt->header_value != nullptr &&
+                   strcasecmp(evt->header_key, "Last-Modified") == 0) {
+            garder_date(rec->modifiee, evt->header_value);
+        }
         if (evt->header_key != nullptr && evt->header_value != nullptr &&
             strcasecmp(evt->header_key, "Content-Encoding") == 0) {
             const size_t len = std::strlen(evt->header_value);
@@ -156,7 +179,8 @@ __attribute__((noinline)) Decompresse decompresser(const uint8_t *fil, size_t n,
 
 // Lit la réponse 200 reçue dans `rec` : décide si elle est compressée, la décompresse au besoin, puis la rend à `lire`. Remplit
 // `r.issue`, `r.octets` et `r.gzip`. Les tampons de sortie sont rendus avant le retour.
-__attribute__((noinline)) void interpreter(const Reception &rec, LireCorps lire, void *utilisateur, Reponse &r) {
+__attribute__((noinline)) void interpreter(const Reception &rec, size_t capacite, LireCorps lire, void *utilisateur,
+                                           Reponse &r) {
     const gzip::Codage annonce = rec.codage_trop_long ? gzip::Codage::Inconnu : gzip::codage_de(rec.codage);
     const bool signature = gzip::ressemble_a_gzip(rec.donnees, rec.n);
     const gzip::Decision decision = gzip::decider(annonce, signature);
@@ -178,12 +202,12 @@ __attribute__((noinline)) void interpreter(const Reception &rec, LireCorps lire,
     }
 
     r.gzip = true;
-    auto *texte = static_cast<uint8_t *>(heap_caps_malloc(kTailleTampon, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    auto *texte = static_cast<uint8_t *>(heap_caps_malloc(capacite, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     if (texte == nullptr) {
         r.issue = Issue::Memoire;
         return;
     }
-    const Decompresse d = decompresser(rec.donnees, rec.n, texte, kTailleTampon);
+    const Decompresse d = decompresser(rec.donnees, rec.n, texte, capacite);
     if (d.issue != Issue::Ok) {
         heap_caps_free(texte);
         r.issue = d.issue;
@@ -222,15 +246,21 @@ Reponse obtenir(const Requete &requete, LireCorps lire, void *utilisateur) {
         r.issue = Issue::Requete;
         return r;
     }
+    if (requete.taille_max == 0 || requete.taille_max > kTailleMaxAbsolue) {
+        ESP_LOGE(TAG, "requête non envoyée : taille maximale de réponse demandée hors limites (%u octets)",
+                 static_cast<unsigned>(requete.taille_max));
+        r.issue = Issue::Requete;
+        return r;
+    }
 
-    auto *recu = static_cast<uint8_t *>(heap_caps_malloc(kTailleTampon, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    auto *recu = static_cast<uint8_t *>(heap_caps_malloc(requete.taille_max, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     if (recu == nullptr) {
         r.issue = Issue::Memoire;
         return r;
     }
     Reception rec = {};
     rec.donnees = recu;
-    rec.capacite = kTailleTampon;
+    rec.capacite = requete.taille_max;
 
     esp_http_client_config_t config = {};
     config.url = requete.adresse;
@@ -278,6 +308,15 @@ Reponse obtenir(const Requete &requete, LireCorps lire, void *utilisateur) {
     r.octets_fil = rec.n;
     r.connecte = rec.connecte;
     r.apres_connexion = rec.apres_connexion;
+    // Les dates d'`Expires` et de `Last-Modified` : lues quel que soit le statut (une 404 du NWS en porte aussi), 0 si absentes ou
+    // illisibles. Jamais devinées : une date que le lecteur refuse reste 0.
+    int64_t date_s = 0;
+    if (rec.expires[0] != '\0' && iso::date_http(rec.expires, date_s)) {
+        r.expires_s = date_s;
+    }
+    if (rec.modifiee[0] != '\0' && iso::date_http(rec.modifiee, date_s)) {
+        r.modifiee_s = date_s;
+    }
 
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "requête échouée : %s (errno %d) après %d ms", esp_err_to_name(err), erreur_socket, r.duree_ms);
@@ -289,7 +328,7 @@ Reponse obtenir(const Requete &requete, LireCorps lire, void *utilisateur) {
     } else if (rec.trop) {
         r.issue = Issue::TropGrand;
     } else {
-        interpreter(rec, lire, utilisateur, r);
+        interpreter(rec, requete.taille_max, lire, utilisateur, r);
     }
     heap_caps_free(recu);
     return r;

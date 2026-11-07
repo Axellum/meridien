@@ -1,0 +1,112 @@
+{
+    "@context": [
+        "https://geojson.org/geojson-ld/geojson-context.jsonld",
+        {
+            "@version": "1.1",
+            "wx": "https://api.weather.gov/ontology#",
+            "s": "https://schema.org/",
+            "geo": "http://www.opengis.net/ont/geosparql#",
+            "unit": "http://codes.wmo.int/common/unit/",
+            "@vocab": "https://api.weather.gov/ontology#",
+            "geometry": {
+                "@id": "s:GeoCoordinates",
+                "@type": "geo:wktLiteral"
+            },
+            "city": "s:addressLocality",
+            "state": "s:addressRegion",
+            "distance": {
+                "@id": "s:Distance",
+                "@type": "s:QuantitativeValue"
+            },
+            "bearing": {
+                "@type": "s:QuantitativeValue"
+            },
+            "value": {
+                "@id": "s:value"
+            },
+            "unitCode": {
+                "@id": "s:unitCode",
+                "@type": "@id"
+            },
+            "forecastOffice": {
+                "@type": "@id"
+            },
+            "forecastGridData": {
+                "@type": "@id"
+            },
+            "publicZone": {
+                "@type": "@id"
+            },
+            "county": {
+                "@type": "@id"
+            }
+        }
+    ],
+    "id": "https://api.weather.gov/points/61.2181,-149.9003",
+    "type": "Feature",
+    "geometry": {
+        "type": "Point",
+        "coordinates": [
+            -149.9003,
+            61.2181
+        ]
+    },
+    "properties": {
+        "@id": "https://api.weather.gov/points/61.2181,-149.9003",
+        "@type": "wx:Point",
+        "cwa": "AFC",
+        "type": "land",
+        "forecastOffice": "https://api.weather.gov/offices/AFC",
+        "gridId": "AER",
+        "gridX": 143,
+        "gridY": 236,
+        "forecast": "https://api.weather.gov/gridpoints/AER/143,236/forecast",
+        "forecastHourly": "https://api.weather.gov/gridpoints/AER/143,236/forecast/hourly",
+        "forecastGridData": "https://api.weather.gov/gridpoints/AER/143,236",
+        "observationStations": "https://api.weather.gov/gridpoints/AER/143,236/stations",
+        "relativeLocation": {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -149.2843294,
+                    61.1742503
+                ]
+            },
+            "properties": {
+                "city": "Anchorage",
+                "state": "AK",
+                "distance": {
+                    "unitCode": "wmoUnit:m",
+                    "value": 0
+                },
+                "bearing": {
+                    "unitCode": "wmoUnit:degree_(angle)",
+                    "value": 0
+                }
+            }
+        },
+        "forecastZone": "https://api.weather.gov/zones/forecast/AKZ701",
+        "county": "https://api.weather.gov/zones/county/AKC020",
+        "fireWeatherZone": "https://api.weather.gov/zones/fire/AKZ701",
+        "timeZone": "America/Anchorage",
+        "radarStation": "PAHG",
+        "astronomicalData": {
+            "sunrise": "2026-11-07T08:44:59-09:00",
+            "sunset": "2026-11-07T16:41:36-09:00",
+            "transit": "2026-11-07T12:43:18-09:00",
+            "civilTwilightBegin": "2026-11-07T07:56:04-09:00",
+            "civilTwilightEnd": "2026-11-07T17:30:31-09:00",
+            "nauticalTwilightBegin": "2026-11-07T07:03:33-09:00",
+            "nauticalTwilightEnd": "2026-11-07T18:23:02-09:00",
+            "astronomicalTwilightBegin": "2026-11-07T06:13:15-09:00",
+            "astronomicalTwilightEnd": "2026-11-07T19:13:20-09:00"
+        },
+        "nwr": {
+            "transmitter": "KEC43",
+            "sameCode": "002020",
+            "areaBroadcast": "https://api.weather.gov/radio/KEC43/broadcast",
+            "pointBroadcast": "https://api.weather.gov/points/61.2181,-149.9003/radio"
+        }
+    }
+}

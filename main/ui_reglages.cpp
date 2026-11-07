@@ -750,15 +750,39 @@ void rangee_action_ou_info(lv_obj_t *parent, std::string_view id) {
             const Param ps[] = {{"ville", ville}, {"temp", temp}, {"meteo", m.libelle}};
             creer_texte(c, remplir("À {ville} : {temp} °C, {meteo}", ps, 3, tampon, sizeof tampon), env().f.texte,
                         p.texte);
-            // L'attribution d'Open-Meteo (CC BY 4.0) et, si une source nationale est choisie, le nom de son modèle : là où la météo est montrée.
-            const Param pl[] = {{"lien", "Open-Meteo"}};
-            creer_texte(c, remplir("Données météo : {lien} (licence CC BY 4.0)", pl, 1, tampon, sizeof tampon),
-                        env().f.petite, p.texte_discret);
+            // Le service qui a RÉELLEMENT donné cette météo, avec la phrase de sa licence : là où la météo est montrée (ADR-0014).
+            // Open-Meteo : CC BY 4.0 ; MET Norway : CC BY 4.0 et NLOD 2.0, les valeurs sont converties et complétées ici (« adaptées »,
+            // ce que CC BY demande d'indiquer) ; NWS : domaine public.
+            namespace fm = meteo::fournisseurs;
+            const Param pl[] = {{"lien", fm::attribution_de(m.origine).nom.data()}};
+            const char *attribution =
+                m.origine == fm::Famille::MetNo
+                    ? remplir("Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)", pl, 1,
+                              tampon, sizeof tampon)
+                : m.origine == fm::Famille::Nws
+                    ? remplir("Données météo : {lien} (domaine public)", pl, 1, tampon, sizeof tampon)
+                    : remplir("Données météo : {lien} (licence CC BY 4.0)", pl, 1, tampon, sizeof tampon);
+            creer_texte(c, attribution, env().f.petite, p.texte_discret);
+            if (m.origine == fm::Famille::Nws) {
+                // Le NWS demande de ne pas laisser croire à son approbation (ses conditions d'usage, docs/mesures/fournisseurs-meteo.md).
+                creer_texte(c, T("Cet appareil n’est ni approuvé ni parrainé par le National Weather Service."),
+                            env().f.petite, p.texte_discret);
+            }
             const std::int32_t source = h.nombre("meteo.source");
-            if (source > 0 && static_cast<std::size_t>(source) < meteo::fournisseurs::NOMBRE) {
-                const Param pm[] = {{"modele", meteo::fournisseurs::TABLE[source].libelle.data()}};
-                creer_texte(c, remplir("Modèle : {modele}", pm, 1, tampon, sizeof tampon), env().f.petite,
-                            p.texte_discret);
+            if (source >= 0 && static_cast<std::size_t>(source) < fm::NOMBRE) {
+                const fm::Fournisseur &choisie = fm::TABLE[source];
+                if (choisie.famille != fm::Famille::OpenMeteo && m.origine == fm::Famille::OpenMeteo) {
+                    // Le service choisi n'a pas répondu : la météo vient d'Open-Meteo en attendant, et l'écran le dit.
+                    const Param ps2[] = {{"service", choisie.libelle.data()}};
+                    creer_texte(c,
+                                remplir("{service} est indisponible : la météo vient d’Open-Meteo en attendant.", ps2,
+                                        1, tampon, sizeof tampon),
+                                env().f.petite, p.avertissement);
+                } else if (source > 0 && choisie.famille == fm::Famille::OpenMeteo) {
+                    const Param pm[] = {{"modele", choisie.libelle.data()}};
+                    creer_texte(c, remplir("Modèle : {modele}", pm, 1, tampon, sizeof tampon), env().f.petite,
+                                p.texte_discret);
+                }
             }
         } else {
             creer_texte(c, T("Pas encore de ville"), env().f.texte, p.texte_discret);

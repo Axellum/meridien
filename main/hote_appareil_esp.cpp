@@ -25,6 +25,7 @@
 #include "appairage.h"
 #include "ecran/hote_appareil.hpp"
 #include "meteo_etat.h"
+#include "meteo_interne.h"
 #include "reglages.h"
 #include "reglages_alertes.h"
 #include "reseau.h"
@@ -361,6 +362,7 @@ class PortsEsp final : public PortsAppareil {
             m.temperature_c = e.temperature_c;
             m.code_wmo = e.code_wmo;
             m.jour = e.jour;
+            m.origine = meteo_etat_origine();
         }
         return m;
     }

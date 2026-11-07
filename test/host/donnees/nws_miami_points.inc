@@ -1,0 +1,115 @@
+// FICHIER GÉNÉRÉ par test/host/controle_python_fournisseurs.py : ne pas modifier à la main.
+// Réponse réelle de NWS api.weather.gov /points (miami /points), voir donnees/LISEZMOI.md.
+// 3920 octets en 1 morceau(x) de 60000 octets au plus.
+R"NWS({
+    "@context": [
+        "https://geojson.org/geojson-ld/geojson-context.jsonld",
+        {
+            "@version": "1.1",
+            "wx": "https://api.weather.gov/ontology#",
+            "s": "https://schema.org/",
+            "geo": "http://www.opengis.net/ont/geosparql#",
+            "unit": "http://codes.wmo.int/common/unit/",
+            "@vocab": "https://api.weather.gov/ontology#",
+            "geometry": {
+                "@id": "s:GeoCoordinates",
+                "@type": "geo:wktLiteral"
+            },
+            "city": "s:addressLocality",
+            "state": "s:addressRegion",
+            "distance": {
+                "@id": "s:Distance",
+                "@type": "s:QuantitativeValue"
+            },
+            "bearing": {
+                "@type": "s:QuantitativeValue"
+            },
+            "value": {
+                "@id": "s:value"
+            },
+            "unitCode": {
+                "@id": "s:unitCode",
+                "@type": "@id"
+            },
+            "forecastOffice": {
+                "@type": "@id"
+            },
+            "forecastGridData": {
+                "@type": "@id"
+            },
+            "publicZone": {
+                "@type": "@id"
+            },
+            "county": {
+                "@type": "@id"
+            }
+        }
+    ],
+    "id": "https://api.weather.gov/points/25.7617,-80.1918",
+    "type": "Feature",
+    "geometry": {
+        "type": "Point",
+        "coordinates": [
+            -80.1918,
+            25.7617
+        ]
+    },
+    "properties": {
+        "@id": "https://api.weather.gov/points/25.7617,-80.1918",
+        "@type": "wx:Point",
+        "cwa": "MFL",
+        "type": "land",
+        "forecastOffice": "https://api.weather.gov/offices/MFL",
+        "gridId": "MFL",
+        "gridX": 110,
+        "gridY": 50,
+        "forecast": "https://api.weather.gov/gridpoints/MFL/110,50/forecast",
+        "forecastHourly": "https://api.weather.gov/gridpoints/MFL/110,50/forecast/hourly",
+        "forecastGridData": "https://api.weather.gov/gridpoints/MFL/110,50",
+        "observationStations": "https://api.weather.gov/gridpoints/MFL/110,50/stations",
+        "relativeLocation": {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -80.2086152,
+                    25.775163
+                ]
+            },
+            "properties": {
+                "city": "Miami",
+                "state": "FL",
+                "distance": {
+                    "unitCode": "wmoUnit:m",
+                    "value": 0
+                },
+                "bearing": {
+                    "unitCode": "wmoUnit:degree_(angle)",
+                    "value": 0
+                }
+            }
+        },
+        "forecastZone": "https://api.weather.gov/zones/forecast/FLZ173",
+        "county": "https://api.weather.gov/zones/county/FLC086",
+        "fireWeatherZone": "https://api.weather.gov/zones/fire/FLZ173",
+        "timeZone": "America/New_York",
+        "radarStation": "KAMX",
+        "astronomicalData": {
+            "sunrise": "2026-11-07T06:33:11-05:00",
+            "sunset": "2026-11-07T17:35:43-05:00",
+            "transit": "2026-11-07T12:04:27-05:00",
+            "civilTwilightBegin": "2026-11-07T06:09:19-05:00",
+            "civilTwilightEnd": "2026-11-07T17:59:34-05:00",
+            "nauticalTwilightBegin": "2026-11-07T05:41:51-05:00",
+            "nauticalTwilightEnd": "2026-11-07T18:27:02-05:00",
+            "astronomicalTwilightBegin": "2026-11-07T05:14:41-05:00",
+            "astronomicalTwilightEnd": "2026-11-07T18:54:13-05:00"
+        },
+        "nwr": {
+            "transmitter": "WZ2531",
+            "sameCode": "012086",
+            "areaBroadcast": "https://api.weather.gov/radio/WZ2531/broadcast",
+            "pointBroadcast": "https://api.weather.gov/points/25.7617,-80.1918/radio"
+        }
+    }
+})NWS",

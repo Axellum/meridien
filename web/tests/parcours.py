@@ -133,15 +133,33 @@ def norm(texte):
     return " ".join(texte.split())
 
 
-def verifier_attribution(page, code, quand):
-    """L'attribution CC BY 4.0 d'Open-Meteo : visible, traduite, « Open-Meteo » est un lien vers open-meteo.com."""
+# Le service qui a donné la météo, tel que /api/weather le nomme (`fournisseur`) : identifiant -> (phrase du catalogue, nom, lien).
+FOURNISSEURS = {
+    "open-meteo": ("meteo.attribution", "Open-Meteo", "https://open-meteo.com/"),
+    "met-norway": ("meteo.attribution_metno", "MET Norway", "https://api.met.no/"),
+    "nws": ("meteo.attribution_nws", "NWS", "https://www.weather.gov/"),
+}
+
+
+def verifier_attribution(page, code, quand, fournisseur="open-meteo"):
+    """L'attribution du service qui a donné la météo : visible, traduite, son nom est un lien vers son site.
+    Open-Meteo : CC BY 4.0. MET Norway : CC BY 4.0 et NLOD 2.0. NWS : domaine public, et la phrase « ni approuvé ni parrainé »."""
+    cle, nom, adresse = FOURNISSEURS[fournisseur]
+    cat = catalogue(code)
     zone = page.locator("#attribution")
     lien = zone.locator("a")
-    attendu = norm(catalogue(code)["meteo.attribution"].replace("{lien}", "Open-Meteo"))
+    expect(lien).to_have_text(nom)  # la page change d'attribution quand la réponse météo arrive : on attend le bon service avant de comparer
+    attendu = norm(cat[cle].replace("{lien}", nom))
+    if fournisseur == "nws":
+        attendu += " " + norm(cat["meteo.sans_parrainage"])
     texte = norm(zone.inner_text())
-    verifier(f"attribution ({quand}) : texte de la licence, dans la langue de la page", texte == attendu and "CC BY 4.0" in texte, f"{texte!r} au lieu de {attendu!r}")
-    verifier(f"attribution ({quand}) : « Open-Meteo » est un lien vers open-meteo.com",
-             lien.count() == 1 and lien.inner_text() == "Open-Meteo" and lien.get_attribute("href") == "https://open-meteo.com/", str(lien.count()))
+    verifier(f"attribution ({quand}) : texte de la licence, dans la langue de la page", texte == attendu, f"{texte!r} au lieu de {attendu!r}")
+    if fournisseur != "nws":
+        verifier(f"attribution ({quand}) : la licence est nommée", "CC BY 4.0" in texte, texte)
+    if fournisseur == "met-norway":
+        verifier(f"attribution ({quand}) : la seconde licence (NLOD 2.0) est nommée", "NLOD 2.0" in texte, texte)
+    verifier(f"attribution ({quand}) : « {nom} » est un lien vers {adresse}",
+             lien.count() == 1 and lien.inner_text() == nom and lien.get_attribute("href") == adresse, str(lien.count()))
 
 
 def sans_null(page, quand):
@@ -299,6 +317,97 @@ def main():
                 verifier_attribution(page, "fr", "après les changements de source")
                 sans_null(page, "source météo")
             etape("Source météo : liste par pays, choix, refus, retour automatique", t_source, page)
+
+            def t_source_directe():
+                # MET Norway : un service lu directement par l'appareil (ADR-0014), proposé pour la Norvège seulement. Le faux serveur ne sait lire
+                # qu'Open-Meteo : il fait ce que l'appareil fait quand le service ne répond pas (météo d'Open-Meteo, `repli` vrai). Le cas où le
+                # service répond est joué en remplaçant la réponse de /api/weather : on ne teste ici que ce que la PAGE affiche.
+                cat = catalogue("fr")
+                champ = page.locator("#ville-q")
+                liste_js = "[...document.querySelectorAll('#source-meteo option')].map((o) => [o.value, o.textContent])"
+                champ.fill("")
+                champ.press_sequentially("Oslo", delay=60)
+                oslo = page.locator(".lieu").filter(has_text="Norvège").first
+                expect(oslo).to_be_visible(timeout=20000)
+                oslo.click()
+                expect(page.locator(".hero .ville")).to_have_text("Oslo")
+                options = page.evaluate(liste_js)
+                verifier("source directe : à Oslo, les deux « MET Norway » sont proposés (le modèle d'Open-Meteo et le service lu directement)",
+                         [o[0] for o in options] == ["auto", "metno", "metnorway", "noaa"], str(options))
+                code, zone = api(page, "GET", "/api/location")
+                directs = {s["id"]: s["direct"] for s in zone["sources_meteo"]}
+                verifier("source directe : l'API dit quelles sources sont lues directement", directs == {"auto": False, "metno": False, "metnorway": True, "noaa": False}, str(directs))
+                page.locator("#source-meteo").select_option("metno")
+                expect(page.locator("#attribution-modele")).to_contain_text(cat["source.modele"].replace("{modele}", "MET Norway"))
+                verifier("source directe : le modèle d'Open-Meteo est nommé « Modèle : … »", page.locator("#source-repli").is_hidden())
+                # 1. le service direct ne répond pas : la météo vient d'Open-Meteo, la page le dit et cite Open-Meteo
+                page.locator("#source-meteo").select_option("metnorway")
+                expect(page.locator("#toast")).to_contain_text("MET Norway (api.met.no)")
+                expect(page.locator(".hero .temp b")).to_have_text(re.compile(r"-?\d+\s°C"), timeout=20000)
+                expect(page.locator("#source-repli")).to_be_visible()
+                phrase = norm(cat["source.repli"].replace("{service}", "MET Norway (api.met.no)"))
+                verifier("source directe : le repli est dit, avec le nom du service choisi", norm(page.locator("#source-repli").inner_text()) == phrase, page.locator("#source-repli").inner_text())
+                verifier("source directe : pas de « Modèle : … » pour un service lu directement", page.locator("#attribution-modele").inner_text() == "", page.locator("#attribution-modele").inner_text())
+                verifier_attribution(page, "fr", "repli : la météo vient d'Open-Meteo")
+                code, meteo = api(page, "GET", "/api/weather")
+                verifier("source directe : /api/weather nomme Open-Meteo et dit « repli »", meteo.get("repli") is True and meteo["fournisseur"]["id"] == "open-meteo", str(meteo.get("fournisseur")))
+                page.screenshot(path=str(CAPTURES / "04e-source-repli.png"))
+
+                # 2. le service répond : on joue la réponse de l'appareil (même forme que /api/weather, `fournisseur` de MET Norway)
+                def reponse(fournisseur, repli=False):
+                    return {"disponible": True, "perimee": False, "mise_a_jour": 1794000000, "fournisseur": fournisseur, "repli": repli,
+                            "actuelle": {"temperature": 4.0, "ressentie": 2.0, "code": 3, "libelle": "Couvert", "jour": True}}
+
+                met = {"id": "met-norway", "nom": "MET Norway", "lien": "https://api.met.no/"}
+                nws = {"id": "nws", "nom": "NWS", "lien": "https://www.weather.gov/"}
+                page.route("**/api/weather", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(reponse(met))))
+                page.locator("#source-meteo").select_option("noaa")
+                expect(page.locator("#toast")).to_contain_text("NOAA GFS")
+                page.locator("#source-meteo").select_option("metnorway")
+                expect(page.locator("#toast")).to_contain_text("MET Norway (api.met.no)")
+                expect(page.locator(".hero .temp b")).to_have_text(re.compile(r"4\s°C"), timeout=20000)
+                expect(page.locator("#source-repli")).to_be_hidden()
+                verifier_attribution(page, "fr", "MET Norway a répondu", "met-norway")
+                verifier("source directe : pas de repli ni de « Modèle : … » quand le service a répondu",
+                         page.locator("#source-repli").is_hidden() and page.locator("#attribution-modele").inner_text() == "")
+                page.locator("#attribution").scroll_into_view_if_needed()
+                page.screenshot(path=str(CAPTURES / "04f-source-metno.png"))
+                # 3. la phrase du NWS (domaine public, sans parrainage) : la page n'a qu'à suivre ce que l'appareil annonce
+                page.unroute("**/api/weather")
+                page.route("**/api/weather", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(reponse(nws))))
+                page.locator("#source-meteo").select_option("noaa")
+                expect(page.locator("#toast")).to_contain_text("NOAA GFS")
+                page.locator("#source-meteo").select_option("metnorway")
+                expect(page.locator("#toast")).to_contain_text("MET Norway (api.met.no)")
+                expect(page.locator(".hero .temp b")).to_have_text(re.compile(r"4\s°C"), timeout=20000)
+                verifier_attribution(page, "fr", "NWS a répondu", "nws")
+                # 4. un fournisseur que la page ne connaît pas, ou un lien qui n'est pas https : retour à Open-Meteo, jamais un lien douteux
+                page.unroute("**/api/weather")
+                inconnu = {"id": "inconnu", "nom": "Inconnu", "lien": "javascript:alert(1)"}
+                page.route("**/api/weather", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(reponse(inconnu))))
+                page.locator("#source-meteo").select_option("noaa")
+                expect(page.locator("#toast")).to_contain_text("NOAA GFS")
+                page.locator("#source-meteo").select_option("metnorway")
+                expect(page.locator("#toast")).to_contain_text("MET Norway (api.met.no)")
+                expect(page.locator(".hero .temp b")).to_have_text(re.compile(r"4\s°C"), timeout=20000)
+                verifier_attribution(page, "fr", "fournisseur inconnu : Open-Meteo par défaut")
+                page.unroute("**/api/weather")
+                # retour à Lyon et à « Automatique » pour la suite du parcours
+                page.locator("#source-meteo").select_option("auto")
+                expect(page.locator("#toast")).to_contain_text("Automatique")
+                champ.fill("")
+                champ.press_sequentially("Lyon", delay=60)
+                page.locator(".lieu").filter(has_text="Auvergne-Rhône-Alpes").filter(has_text="France").first.click()
+                expect(page.locator(".hero .ville")).to_have_text("Lyon")
+                expect(page.locator(".hero .temp b")).to_have_text(re.compile(r"-?\d+\s°C"), timeout=20000)
+                verifier("source directe : retour à Lyon, « Automatique », aucun message de repli",
+                         page.locator("#source-meteo").input_value() == "auto" and page.locator("#source-repli").is_hidden())
+                verifier_attribution(page, "fr", "retour à Lyon")
+                sans_null(page, "source directe")
+            if REEL:
+                sauter("Source directe : MET Norway (repli, réponse), NWS, fournisseur inconnu", "le test joue des réponses de l'appareil et change de ville : il ne se joue que contre le faux appareil")
+            else:
+                etape("Source directe : MET Norway (repli, réponse), NWS, fournisseur inconnu", t_source_directe, page)
 
             def t_services():
                 ouvrir(page, "Réfléchir")

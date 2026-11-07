@@ -40,10 +40,13 @@ struct Etat {
     uint32_t compteur;                     // numéro de la dernière publication, jamais 0
     std::atomic<uint32_t> version_visible; // = compteur si une météo est connue, sinon 0
     ecran::meteo::HistoPression histo;     // pressions mesurées, pour la tendance sur 3 h (~170 octets, RAM interne)
+    ecran::meteo::fournisseurs::Famille
+        origine; // le service qui a donné la météo publiée (MET Norway, NWS, Open-Meteo)
 
     Etat()
         : tampon_verrou(), verrou(xSemaphoreCreateMutexStatic(&tampon_verrou)), meteo(nullptr), a_meteo(false),
-          echecs(0), compteur(0), version_visible(0), histo() {}
+          echecs(0), compteur(0), version_visible(0), histo(), origine(ecran::meteo::fournisseurs::Famille::OpenMeteo) {
+    }
 };
 
 Etat g_etat;
@@ -69,7 +72,7 @@ void mettre_a_zero(MeteoDetail *sortie) {
 
 namespace ecran {
 
-bool meteo_etat_publier(const meteo::Meteo &meteo) {
+bool meteo_etat_publier(const meteo::Meteo &meteo, meteo::fournisseurs::Famille origine) {
     Verrou v;
     if (g_etat.meteo == nullptr) {
         void *place = heap_caps_calloc(1, sizeof(meteo::Meteo), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -86,14 +89,22 @@ bool meteo_etat_publier(const meteo::Meteo &meteo) {
         g_etat.meteo = new (place) meteo::Meteo();
     }
     *g_etat.meteo = meteo;
-    ecran::meteo::tendance_noter(g_etat.histo, meteo.releve.instant_s, meteo.releve.pression_dixiemes_hpa);
+    if (meteo.releve.pression_dixiemes_hpa != ecran::meteo::INCONNU_DIX) { // le NWS ne donne pas la pression
+        ecran::meteo::tendance_noter(g_etat.histo, meteo.releve.instant_s, meteo.releve.pression_dixiemes_hpa);
+    }
     g_etat.a_meteo = true;
+    g_etat.origine = origine;
     g_etat.echecs = 0;
     if (++g_etat.compteur == 0) {
         g_etat.compteur = 1; // 0 veut dire « aucune météo » : on ne le réutilise pas après le débordement
     }
     g_etat.version_visible.store(g_etat.compteur, std::memory_order_release);
     return true;
+}
+
+meteo::fournisseurs::Famille meteo_etat_origine() {
+    Verrou v;
+    return g_etat.a_meteo ? g_etat.origine : meteo::fournisseurs::Famille::OpenMeteo;
 }
 
 void meteo_etat_compter_echec() {

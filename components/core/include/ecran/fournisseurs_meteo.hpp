@@ -17,9 +17,10 @@
 // L'ORDRE DE LA TABLE NE CHANGE JAMAIS : la position sert d'indice d'option dans le registre des réglages. On ajoute à la fin.
 // Les identifiants (`id`) ne changent jamais non plus : ils sont gardés en mémoire permanente et servis par l'API.
 //
-// Une seule « famille » aujourd'hui (Open-Meteo, un seul analyseur). Une source à analyseur propre (MET Norway natif, NWS) s'y
-// branchera plus tard : une valeur de plus dans `Famille`, une entrée de plus, et le client choisit l'adresse et l'analyseur
-// selon `famille` ; rien d'autre ne change ici.
+// Trois « familles » : Open-Meteo (un seul analyseur, tous les modèles nationaux), et deux services lus DIRECTEMENT, sans clé, par
+// leur propre analyseur : MET Norway (api.met.no) et le NWS américain (api.weather.gov), ADR-0014. Le client choisit l'adresse et
+// l'analyseur selon `famille`. Une source directe n'a pas de `models=` (vide) ; si elle échoue, le client se replie sur
+// « Automatique » d'Open-Meteo et le dit (l'écran et la page montrent la source qui a VRAIMENT donné la météo, `attribution_de`).
 #pragma once
 
 #include <cstddef>
@@ -33,6 +34,8 @@ namespace ecran::meteo::fournisseurs {
 // Quel analyseur lit la réponse (et quelle adresse la demande).
 enum class Famille : std::uint8_t {
     OpenMeteo = 0, // adresse de meteo_requete.hpp + `models=`, réponse lue par analyser_riche() (meteo_riche.hpp)
+    MetNo = 1,     // api.met.no : une requête, réponse lue par analyser_metno() (meteo_metno.hpp)
+    Nws = 2,       // api.weather.gov : deux requêtes (/points puis la grille), lues par analyser_nws() (meteo_nws.hpp)
 };
 
 // Limites mesurées (bits). Vu sur : PC, réponses réelles d'Open-Meteo du 07/11/2026, une ville par modèle ; voir
@@ -84,6 +87,13 @@ inline constexpr Fournisseur TABLE[] = {
     // Modèles mondiaux : proposés dans tous les pays.
     {"noaa",        "NOAA GFS",                 false, Famille::OpenMeteo, "gfs_seamless",              "",                     0},
     {"ecmwf",       "ECMWF IFS",                false, Famille::OpenMeteo, "ecmwf_ifs025",              "",                     limite::SANS_UV},
+    // Services lus directement (ADR-0014), ajoutés APRÈS les précédents : l'ordre ne change jamais. Pas de `models=`. Leurs limites
+    // (pas d'UV, pas de rafales hors de la zone nordique…) ne refusent pas la réponse : le lecteur laisse la valeur « inconnue »
+    // (docs/mesures/fournisseurs-meteo.md), d'où `limites` à 0. Pays : seulement ceux dont une réponse RÉELLE du 07/11/2026 est en
+    // fixture (test_meteo_metno.cpp, test_meteo_nws.cpp les comparent à cette liste) ; Suède, Danemark, Estonie, îles Vierges, Guam…
+    // viendront avec leur capture.
+    {"metnorway",   "MET Norway (api.met.no)",  false, Famille::MetNo,     "",                          "NO FI IS SJ",          0},
+    {"nws",         "NWS (weather.gov)",        false, Famille::Nws,       "",                          "US PR",                0},
 };
 // clang-format on
 
@@ -108,6 +118,33 @@ constexpr std::size_t indice_de(std::string_view id) noexcept {
             return i;
     }
     return NOMBRE;
+}
+
+// La famille de la source d'identifiant `id` : celle d'« Automatique » pour un identifiant inconnu (on ne tente jamais un service
+// qu'on ne connaît pas).
+constexpr Famille famille_de(std::string_view id) noexcept {
+    const Fournisseur *f = trouver(id);
+    return f != nullptr ? f->famille : Famille::OpenMeteo;
+}
+
+// Qui doit être nommé à côté de la météo affichée (l'obligation de la licence, ou la politesse). `nom` et `lien` sont des noms
+// propres : jamais traduits. La phrase qui les entoure (licence) est dans la table de traduction, une par famille.
+struct Attribution {
+    std::string_view id; // identifiant stable servi par l'API (« open-meteo », « met-norway », « nws »)
+    std::string_view nom;
+    std::string_view lien; // adresse du site du service
+};
+
+constexpr Attribution attribution_de(Famille f) noexcept {
+    switch (f) {
+    case Famille::MetNo:
+        return {"met-norway", "MET Norway", "https://api.met.no/"};
+    case Famille::Nws:
+        return {"nws", "NWS", "https://www.weather.gov/"};
+    case Famille::OpenMeteo:
+        break;
+    }
+    return {"open-meteo", "Open-Meteo", "https://open-meteo.com/"};
 }
 
 // ---- ce qui est proposé -------------------------------------------------------------------------------------------------
@@ -226,8 +263,10 @@ constexpr bool table_coherente() noexcept {
         const Fournisseur &f = TABLE[i];
         if (f.id.empty() || f.libelle.empty() || f.id.size() > 15) // 15 : longueur d'une clé NVS
             return false;
-        if (i > 0 && f.modeles.empty())
-            return false; // seul « Automatique » n'a pas de modèle
+        if (i > 0 && (f.modeles.empty() != (f.famille != Famille::OpenMeteo)))
+            return false; // un modèle pour chaque source d'Open-Meteo (sauf « Automatique »), aucun pour un service lu directement
+        if (f.famille != Famille::OpenMeteo && f.pays.empty())
+            return false; // un service lu directement couvre des pays précis : il n'est jamais « mondial »
         if (f.modeles.size() > MODELES_MAX || !modeles_valide(f.modeles) || !pays_bien_ecrit(f.pays))
             return false;
         for (std::size_t k = 0; k < i; ++k) {
@@ -240,7 +279,8 @@ constexpr bool table_coherente() noexcept {
 
 } // namespace detail
 
-static_assert(detail::table_coherente(), "TABLE : « auto » en tête sans modèle, identifiants et modèles uniques et "
-                                         "valables, pays bien écrits, tailles bornées");
+static_assert(detail::table_coherente(),
+              "TABLE : « auto » en tête sans modèle, identifiants et modèles uniques et "
+              "valables, un modèle seulement pour Open-Meteo, pays bien écrits, tailles bornées");
 
 } // namespace ecran::meteo::fournisseurs
