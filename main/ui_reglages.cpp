@@ -12,6 +12,7 @@
 
 #include "ecran/changement_wifi.hpp"
 #include "ecran/presets_services.hpp"
+#include "ecran/reglages_alertes.hpp"
 #include "ecran/texte_modele.hpp"
 #include "ui_reglages_interne.h"
 
@@ -372,6 +373,10 @@ void resume_reglage(const registre::Reglage &r, char *sortie, std::size_t capaci
             if (w.connecte && w.ssid[0] != '\0') {
                 std::snprintf(t, sizeof t, "%s", w.ssid);
             }
+        }
+        if (r.id == "alertes.adresse" && t[0] == '\0') { // vide = le service public de Vigie : on dit lequel
+            const std::string_view publique = vigie::ADRESSE_PUBLIQUE.substr(std::string_view("https://").size());
+            std::snprintf(t, sizeof t, "%.*s", static_cast<int>(publique.size()), publique.data());
         }
         std::snprintf(sortie, capacite, "%s", t[0] != '\0' ? t : "—");
         break;
@@ -927,6 +932,13 @@ void sur_validation_texte(void *) {
             return;
         }
         }
+    }
+    // L'adresse de Vigie : « https:// » obligatoire, les mêmes règles que la page web (ecran/reglages_alertes.hpp). Vide : l'instance
+    // publique. Sans ce contrôle, une adresse refusée par l'hôte passerait pour enregistrée.
+    if (g_saisie.mode == ModeSaisie::Reglage && r.id == "alertes.adresse" &&
+        reglages::appliquer_adresse(reglages::Alertes{}, saisi).erreur != reglages::ErreurAlertes::Aucune) {
+        afficher_message(T("L’adresse de Vigie doit commencer par https://."), p.danger);
+        return;
     }
     switch (g_saisie.mode) {
     case ModeSaisie::Reglage:

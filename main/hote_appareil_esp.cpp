@@ -26,6 +26,7 @@
 #include "ecran/hote_appareil.hpp"
 #include "meteo_etat.h"
 #include "reglages.h"
+#include "reglages_alertes.h"
 #include "reseau.h"
 #include "reseau_wifi.h"
 
@@ -331,6 +332,11 @@ class PortsEsp final : public PortsAppareil {
     }
     bool zone_lire(reglages::Zone &zone) override { return reglages_zone_lire(zone); }
     bool zone_enregistrer(const reglages::Zone &zone) override { return reglages_zone_enregistrer(zone); }
+    // Les alertes officielles : la source de la page web (main/reglages_alertes.*), qui prévient aussi le client réseau.
+    reglages::Alertes alertes() override { return reglages_alertes(); }
+    bool enregistrer_alertes(const reglages::Alertes &nouveau) override {
+        return reglages_alertes_enregistrer(nouveau);
+    }
 
     // Une carte neuve : français, thème auto, 75 %, Lyon (mêmes valeurs que main/reglages.cpp et main/meteo_zone.cpp).
     void remettre_affichage_et_ville_par_defaut() override {

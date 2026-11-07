@@ -66,6 +66,15 @@ bool horloge_date_localisee(int64_t instant_utc_s, i18n::Langue langue, char *so
     return visuel::formater_date(langue, locale, sortie, capacite) > 0;
 }
 
+bool horloge_heure_locale(int64_t instant_utc_s, heure::HeureLocale &sortie) {
+    const heure::AnalyseTz &analyse = fuseau_local();
+    if (!analyse.ok()) {
+        return false;
+    }
+    sortie = heure::en_heure_locale(instant_utc_s, analyse.fuseau);
+    return true;
+}
+
 int32_t horloge_decalage_s(int64_t instant_utc_s) {
     const heure::AnalyseTz &analyse = fuseau_local();
     if (!analyse.ok()) {

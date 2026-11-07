@@ -14,6 +14,7 @@
 #include "reglages.h"
 #include "reseau.h"
 #include "serveur_web.h"
+#include "vigie_client.h"
 
 static const char *TAG = "ecran";
 
@@ -59,6 +60,9 @@ extern "C" void app_main(void) {
     ecran::
         meteo_client_demarrer(); // météo Open-Meteo : cache NVS lu tout de suite, requêtes dès que le Wi-Fi et l'heure sont là
     ecran::memoire_jalon("après le lancement de la tâche météo (pile 12 Ko, cache NVS)");
+    ecran::
+        vigie_client_demarrer(); // alertes officielles de Vigie : premier essai 60 à 120 s après que le réseau et l'heure soient prêts
+    ecran::memoire_jalon("après le lancement de la tâche des alertes (pile 12 Ko)");
     ecran::serveur_web_demarrer(); // page de réglages sur le port 80 dès que l'adresse IP est obtenue
     ecran::memoire_jalon("après le lancement de la tâche du serveur web");
     ecran::commande_serie_demarrer();

@@ -33,6 +33,9 @@ idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp
 # Ecran principal (session ecran-principal). Ajoute par target_sources() apres l'enregistrement, et non dans la liste SRCS
 # ci-dessus, pour ne pas toucher a la ligne que les autres sessions (meteo, reglages) modifient aussi : un merge sans conflit.
 target_sources(${COMPONENT_LIB} PRIVATE "ecran_principal.cpp" "ui_principal.cpp" "ui_meteo_icones.cpp")
+# Alertes officielles de Vigie (session alertes-vigie) : client reseau, etat partage, reglages. Meme raison : target_sources() et non la
+# liste SRCS. Le client ne depend ni de meteo_client.cpp ni du client HTTPS commun.
+target_sources(${COMPONENT_LIB} PRIVATE "vigie_etat.cpp" "vigie_client.cpp" "reglages_alertes.cpp" "ui_alertes.cpp")
 # Les pixels des icônes meteo (tools/icones/generer_icones.py -> main/assets/icones_meteo.bin) sont embarqués en flash comme la
 # police, mais par target_add_binary_data() et non par EMBED_FILES : la ligne idf_component_register ci-dessus reste celle que
 # les autres sessions modifient. Symboles : _binary_icones_meteo_bin_start / _end (lus par ui_meteo_icones.cpp).

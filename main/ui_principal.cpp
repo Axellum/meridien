@@ -48,6 +48,18 @@ struct Rect {
     int x = 0, y = 0, w = 0, h = 0;
 };
 
+// Où et comment la pastille de l'alerte officielle est dessinée (calculé quand elle change : placer_pastille_officielle).
+// Les décalages `x_*` sont relatifs au bord gauche de la pastille ; `w_texte` 0 : pas de texte (place trop juste) ; `d_autres` 0 : pas de « +N ».
+struct PlaceOfficielle {
+    bool ok = false;
+    int x = 0, y = 0, w = 0, h = 0; // en coordonnées d'écran
+    int x_texte = 0, w_texte = 0;
+    int x_autres = 0, d_autres = 0;
+    const dz::Police *police = nullptr;
+    char texte[vigie::BANDEAU_TEXTE_CAP + 4] = {};
+    char autres[8] = {};
+};
+
 struct Vue {
     const ThemePrincipal *theme = &kThemeCiel;
     int largeur = 0, hauteur = 0;
@@ -57,7 +69,10 @@ struct Vue {
     lv_obj_t *ecran = nullptr;
     lv_obj_t *zone[Z_NOMBRE] = {};
     lv_obj_t *bouton = nullptr;
+    lv_obj_t *pastille =
+        nullptr; // pastille de l'alerte officielle : se dessine et reçoit l'appui (cachée sans alerte en vigueur)
     lv_obj_t *anneau = nullptr;
+    PlaceOfficielle officielle;
     Rect rect[Z_NOMBRE];
     EntreesPrincipal e = {};
     char date[64] = {};
@@ -70,6 +85,7 @@ struct Vue {
     int objets = 0;
     void (*appui_long)() = nullptr;
     void (*ouvrir_reglages)() = nullptr;
+    void (*ouvrir_alertes)() = nullptr;
     bool appui_long_fait = false;
 };
 
@@ -129,7 +145,8 @@ void libelle_meteo(char *sortie, std::size_t n, int code, bool jour) {
 // Texte qui tient dans `largeur` : la première police de la liste qui convient, sinon la dernière, tronquée avec « … ».
 struct Ajuste {
     const Police *police;
-    char texte[96];
+    char texte[vigie::BANDEAU_TEXTE_CAP +
+               4]; // le titre d'une alerte officielle est long (jusqu'à 191 octets), la ville bien moins
 };
 
 Ajuste ajuster(std::initializer_list<const Police *> polices, const char *s, int largeur) {
@@ -340,6 +357,8 @@ void calculer_disposition() {
     g.rect[Z_SEMAINE] = {c.marge, y, utile, bas - y};
 }
 
+void positionner_pastille_officielle(); // plus bas, avec le dessin de la barre
+
 void appliquer_disposition() {
     calculer_disposition();
     for (int z = 0; z < Z_NOMBRE; ++z) {
@@ -360,6 +379,7 @@ void appliquer_disposition() {
     const int cote = px(48);
     lv_obj_set_size(g.bouton, cote, cote);
     lv_obj_set_pos(g.bouton, g.largeur - c.marge - cote, px(10));
+    positionner_pastille_officielle(); // la barre a pu changer de taille
 }
 
 // ---- zones : briques communes --------------------------------------------------------------------------------------------
@@ -377,6 +397,110 @@ void fond_de_carte(const Ctx &c, int x, int y, int w, int h, int rayon) {
 }
 
 // ---- zone : barre du haut ------------------------------------------------------------------------------------------------
+
+// Place que prennent à droite de la barre les deux indications d'état (exemple, périmée) : le dessin de la barre et le calcul de la
+// place de la pastille de l'alerte officielle s'appuient sur les mêmes valeurs, pour ne jamais se chevaucher.
+int largeur_etat_exemple() {
+    return dz::largeur_texte(g.petit, texte_principal::t(texte_principal::kExemple)) + px(28);
+}
+
+int largeur_etat_perimee() { return dz::largeur_texte(g.petit, texte_principal::t(texte_principal::kPerimee)); }
+
+int bord_droit_libre(int x_barre, int w_barre) {
+    int droite = x_barre + w_barre;
+    if (g.e.meteo.exemple) {
+        droite -= largeur_etat_exemple() + px(12);
+    }
+    if (g.e.meteo.perimee) {
+        droite -= largeur_etat_perimee() + px(30) + px(22);
+    }
+    return droite;
+}
+
+// Où finit la ville dans la barre (épingle, texte ajusté au tiers de la barre au plus, marge) : la pastille de l'alerte commence après,
+// jamais dessus. Sans ville, la barre est libre dès son bord. Mêmes calculs que dessiner_barre.
+int bord_gauche_libre(int x_barre, int w_barre) {
+    const VueMeteo &m = g.e.meteo;
+    if (m.ville[0] == '\0') {
+        return x_barre;
+    }
+    const Ajuste a = ajuster({&g.corps, &g.petit}, m.ville, w_barre / 3);
+    return x_barre + px(30) + px(8) + std::min(w_barre / 3, dz::largeur_texte(*a.police, a.texte)) + px(24);
+}
+
+// Calcule la pastille de l'alerte officielle (ADR-0009) : au centre de la barre, jamais sur la ville ni sur les
+// indications d'état ; son texte est celui de l'émetteur, coupé par « … » s'il est trop long (la page des alertes le donne en entier) ;
+// « +N » quand d'autres alertes sont en vigueur. Si la place manque pour du texte, il reste l'icône et le « +N » : une alerte en
+// vigueur ne disparaît jamais de l'écran faute de place.
+PlaceOfficielle placer_pastille_officielle() {
+    PlaceOfficielle p;
+    const vigie::Bandeau &b = g.e.bandeau;
+    const Rect &r = g.rect[Z_BARRE];
+    if (!b.present || r.w <= 0 || r.h <= 0) {
+        return p;
+    }
+    const int icone = px(30);
+    const int pad_g = px(12);
+    const int ecart = px(10);
+    const int droite = bord_droit_libre(r.x, r.w);
+    const int gauche = bord_gauche_libre(r.x, r.w);
+    const int dispo = droite - gauche;
+    int d_autres = 0;
+    if (b.autres > 0) {
+        std::snprintf(p.autres, sizeof p.autres, "+%u", static_cast<unsigned>(b.autres));
+        d_autres = std::max(px(30), dz::largeur_texte(g.mini, p.autres) + px(14));
+    }
+    const int pad_d = d_autres > 0 ? px(5) : px(20);
+    const int fixe = pad_g + icone + pad_d + (d_autres > 0 ? ecart + d_autres : 0);
+    const int texte_max = dispo - fixe - ecart;
+    if (texte_max >= px(60) && b.texte[0] != '\0') {
+        const Ajuste a = ajuster({&g.corps, &g.petit}, b.texte, texte_max);
+        std::snprintf(p.texte, sizeof p.texte, "%s", a.texte);
+        p.police = a.police;
+        p.w_texte = std::min(texte_max, dz::largeur_texte(*a.police, a.texte));
+    }
+    int x = pad_g + icone;
+    if (p.w_texte > 0) {
+        x += ecart;
+        p.x_texte = x;
+        x += p.w_texte;
+    }
+    if (d_autres > 0) {
+        x += ecart;
+        p.x_autres = x;
+        p.d_autres = d_autres;
+        x += d_autres;
+    }
+    p.w = x + pad_d;
+    p.h = px(40);
+    p.y = r.y + r.h / 2 - p.h / 2;
+    p.x = std::max(r.x + (r.w - p.w) / 2, gauche);
+    if (p.x + p.w > droite) {
+        p.x = droite - p.w;
+    }
+    p.ok = p.x >= r.x;
+    return p;
+}
+
+// Met l'objet de la pastille à sa place (ou le cache). À appeler quand l'alerte, la langue, les indications d'état ou la disposition
+// changent : la zone de la barre est redessinée au même moment (empreinte).
+void positionner_pastille_officielle() {
+    g.officielle = placer_pastille_officielle();
+    if (g.pastille == nullptr) {
+        return;
+    }
+    const PlaceOfficielle &p = g.officielle;
+    if (!p.ok) {
+        if (!lv_obj_has_flag(g.pastille, LV_OBJ_FLAG_HIDDEN)) {
+            lv_obj_add_flag(g.pastille, LV_OBJ_FLAG_HIDDEN);
+        }
+        return;
+    }
+    lv_obj_set_pos(g.pastille, p.x, p.y);
+    lv_obj_set_size(g.pastille, p.w, p.h);
+    lv_obj_remove_flag(g.pastille, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_invalidate(g.pastille);
+}
 
 void dessiner_barre(const Ctx &c) {
     const ThemePrincipal &t = *g.theme;
@@ -396,7 +520,7 @@ void dessiner_barre(const Ctx &c) {
     int droite = c.x + c.w;
     if (m.exemple) {
         const char *s = texte_principal::t(texte_principal::kExemple);
-        const int w = dz::largeur_texte(g.petit, s) + px(28);
+        const int w = largeur_etat_exemple();
         dz::rect(c.pc, droite - w, centre - px(18), w, px(36), px(18), t.avertissement);
         dz::texte(c.pc, g.petit, s, droite - w, centre - dz::hauteur_ligne(g.petit) / 2, w, LV_TEXT_ALIGN_CENTER,
                   t.texte_sur_couleur);
@@ -404,15 +528,16 @@ void dessiner_barre(const Ctx &c) {
     }
     if (m.perimee) {
         const char *s = texte_principal::t(texte_principal::kPerimee);
-        const int w = dz::largeur_texte(g.petit, s);
+        const int w = largeur_etat_perimee();
         dz::texte(c.pc, g.petit, s, droite - w, centre - dz::hauteur_ligne(g.petit) / 2, w, LV_TEXT_ALIGN_RIGHT,
                   t.avertissement);
         icones::piece(c.pc.couche, Piece::hors_ligne, pastille, droite - w - pastille - px(6), centre - pastille / 2,
                       t.avertissement);
         droite -= w + pastille + px(22);
     }
-    // Au centre : l'alerte du jour, une pastille de la couleur de l'alerte.
-    const Alerte al = alerte_du_jour();
+    // Au centre : l'alerte officielle de Vigie quand il y en a une en vigueur (objet g.pastille, dessiné par-dessus cette zone) ;
+    // sinon l'alerte déduite de la météo du jour, une pastille de la couleur de l'alerte.
+    const Alerte al = g.e.bandeau.present ? Alerte::AUCUNE : alerte_du_jour();
     if (al != Alerte::AUCUNE) {
         const char *s = texte_alerte(al);
         const int w_texte = dz::largeur_texte(g.corps, s);
@@ -1088,6 +1213,44 @@ void sur_dessin_bouton(lv_event_t *evenement) {
                   appuye ? t.texte_sur_couleur : t.texte);
 }
 
+// La pastille de l'alerte officielle : un seul objet qui se dessine (couleur du niveau, icône, texte de l'émetteur, « +N ») et reçoit
+// l'appui. Elle voit son propre état « appuyé » : un voile clair le montre, sans redessiner toute la barre.
+void sur_dessin_pastille(lv_event_t *evenement) {
+    const PlaceOfficielle &p = g.officielle;
+    if (!p.ok) {
+        return;
+    }
+    lv_layer_t *couche = lv_event_get_layer(evenement);
+    lv_obj_t *objet = lv_event_get_target_obj(evenement);
+    lv_area_t a;
+    lv_obj_get_coords(objet, &a);
+    const dz::Pinceau pc = {couche, g.theme};
+    const ThemePrincipal &t = *g.theme;
+    const int centre = a.y1 + p.h / 2;
+    const int icone = px(30);
+    const std::uint32_t fond = couleur_officielle(t, static_cast<int>(g.e.bandeau.niveau));
+    dz::rect(pc, a.x1, a.y1, p.w, p.h, p.h / 2, fond);
+    if (lv_obj_has_state(objet, LV_STATE_PRESSED)) {
+        dz::rect(pc, a.x1, a.y1, p.w, p.h, p.h / 2, t.texte_sur_couleur, 70);
+    }
+    icones::piece(couche, Piece::alerte, icone, a.x1 + px(12), centre - icone / 2, t.texte_sur_couleur);
+    if (p.w_texte > 0 && p.police != nullptr) {
+        dz::texte(pc, *p.police, p.texte, a.x1 + p.x_texte, centre - dz::hauteur_ligne(*p.police) / 2,
+                  p.w_texte + px(4), LV_TEXT_ALIGN_LEFT, t.texte_sur_couleur);
+    }
+    if (p.d_autres > 0) {
+        dz::disque(pc, a.x1 + p.x_autres + p.d_autres / 2, centre, p.d_autres / 2, t.texte_sur_couleur);
+        dz::texte(pc, g.mini, p.autres, a.x1 + p.x_autres, centre - dz::hauteur_ligne(g.mini) / 2, p.d_autres,
+                  LV_TEXT_ALIGN_CENTER, fond);
+    }
+}
+
+void sur_pastille(lv_event_t *evenement) {
+    if (lv_event_get_code(evenement) == LV_EVENT_CLICKED && g.ouvrir_alertes != nullptr) {
+        g.ouvrir_alertes();
+    }
+}
+
 // ---- tactile : anneau sous le doigt, appui long ---------------------------------------------------------------------------
 
 void montrer(lv_obj_t *objet, bool visible) {
@@ -1293,6 +1456,15 @@ bool ui_principal_creer(lv_obj_t *ecran, const RessourcesPrincipal &ressources, 
     lv_obj_add_event_cb(g.bouton, sur_bouton_reglages, LV_EVENT_CLICKED, nullptr);
     lv_obj_add_event_cb(g.bouton, sur_dessin_bouton, LV_EVENT_DRAW_MAIN, nullptr);
 
+    // Pastille de l'alerte officielle (ADR-0009) : cachée tant qu'aucune alerte n'est en vigueur (pas de bandeau permanent), placée par
+    // positionner_pastille_officielle. Comme le bouton Réglages, ses événements ne remontent pas à l'écran : pas d'appui long dessus.
+    g.pastille = creer_zone(ecran);
+    lv_obj_add_flag(g.pastille, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(g.pastille, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_ext_click_area(g.pastille, px(12));
+    lv_obj_add_event_cb(g.pastille, sur_pastille, LV_EVENT_CLICKED, nullptr);
+    lv_obj_add_event_cb(g.pastille, sur_dessin_pastille, LV_EVENT_DRAW_MAIN, nullptr);
+
     // Retour tactile : un anneau sous le doigt, sur la couche supérieure (coordonnées d'écran exactes).
     lv_obj_t *couche = lv_display_get_layer_top(lv_obj_get_display(ecran));
     g.anneau = lv_obj_create(couche);
@@ -1344,6 +1516,8 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
         e.u(m.perimee);
         e.u(m.exemple);
         e.u(static_cast<std::uint32_t>(alerte_du_jour()));
+        e.u(g.e.bandeau.present);
+        e.u(g.e.bandeau.empreinte); // texte, niveau et nombre d'autres alertes (noyau : vigie::composer_bandeau)
         neuf[Z_BARRE] = e.h;
     }
     {
@@ -1429,6 +1603,9 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
             if (g.zone[z] != nullptr) {
                 lv_obj_invalidate(g.zone[z]);
             }
+            if (z == Z_BARRE) {
+                positionner_pastille_officielle(); // l'alerte, la langue ou une indication d'état a changé
+            }
         }
     }
     if (tout) {
@@ -1454,6 +1631,7 @@ bool ui_principal_changer_theme(const ThemePrincipal &theme) {
         lv_obj_invalidate(g.zone[z]);
     }
     lv_obj_invalidate(g.bouton);
+    lv_obj_invalidate(g.pastille);
     lv_obj_invalidate(g.ecran);
     return true;
 }
@@ -1461,6 +1639,8 @@ bool ui_principal_changer_theme(const ThemePrincipal &theme) {
 void ui_principal_sur_appui_long(void (*rappel)()) { g.appui_long = rappel; }
 
 void ui_principal_sur_reglages(void (*rappel)()) { g.ouvrir_reglages = rappel; }
+
+void ui_principal_sur_alertes(void (*rappel)()) { g.ouvrir_alertes = rappel; }
 
 CoutEcran ui_principal_cout() { return {g.objets, 7}; }
 

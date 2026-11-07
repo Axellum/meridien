@@ -82,6 +82,16 @@ void lieu_vide(const banc::Contexte &ctx) {
     aller("section:1");
 }
 
+void lieu_alertes(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:1:1");
+}
+
+void alertes_adresse_saisie(const banc::Contexte &ctx) {
+    en_service(ctx);
+    aller("section:1:1/editeur:alertes.adresse");
+}
+
 void langue(const banc::Contexte &ctx) {
     en_service(ctx);
     aller("section:2");
@@ -145,6 +155,8 @@ const Scene kScenes[] = {
     {"wifi-liste", "Réseau : choix d'un réseau", wifi_liste},
     {"lieu", "Lieu et météo : ville choisie", lieu},
     {"lieu-vide", "Lieu et météo : pas de ville", lieu_vide},
+    {"lieu-alertes", "Lieu et météo : alertes officielles (Vigie)", lieu_alertes},
+    {"alertes-adresse-saisie", "Alertes officielles : saisie de l'adresse de Vigie", alertes_adresse_saisie},
     {"langue", "Langue de l'écran et de l'assistant", langue},
     {"affichage", "Affichage : thème et luminosité", affichage},
     {"assistant-stt", "Assistant : reconnaissance de la voix", assistant_stt},

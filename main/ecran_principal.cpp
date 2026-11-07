@@ -12,17 +12,22 @@
 #include "ecran/horloge_materielle.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_synthese.hpp"
+#include "ecran/vigie_bandeau.hpp"
+#include "ecran/vigie_vue.hpp"
 #include "ecran/visuel_vue.hpp"
 #include "horloge.h"
 #include "meteo_etat.h"
 #include "meteo_interne.h"
 #include "meteo_zone.h"
 #include "reglages.h"
+#include "reglages_alertes.h"
 #include "reseau.h"
 #include "textes_principal.h"
+#include "ui_alertes.h"
 #include "ui_bonjour.h"
 #include "ui_principal.h"
 #include "ui_reglages.h"
+#include "vigie_etat.h"
 #include "vue_depuis_detail.h"
 
 // Police Roboto Bold embarquée (main/assets/roboto_700.ttf) et jeu d'icônes météo (main/assets/icones_meteo.bin, lu par
@@ -58,6 +63,9 @@ void vers_principal() {
     }
 }
 
+lv_obj_t *g_ecran_alertes =
+    nullptr; // la page des alertes officielles (ADR-0009), créée à l'appui sur la pastille, supprimée à « Fermer »
+
 // Le réglage « thème » de la page de réglages (reglages.h) choisit l'habillage de l'écran principal : « auto » = ciel (suit l'heure
 // et le temps), « clair » = clair, « sombre » = tableau sombre. Le thème « horloge » (heure géante) n'a pas de valeur dans ce
 // réglage : il faudrait une quatrième valeur au registre des réglages (session reglages-ecran), donc il n'est pas atteignable.
@@ -71,6 +79,54 @@ const visuel::ThemePrincipal &theme_du_reglage() {
         break;
     }
     return visuel::kThemeCiel;
+}
+
+// « Fermer » de la page des alertes : l'écran principal revient d'un coup, la page est supprimée (ses polices sont gardées pour la
+// prochaine ouverture : ui_alertes.cpp).
+void fermer_alertes() {
+    vers_principal();
+    if (g_ecran_alertes != nullptr) {
+        lv_obj_delete_async(g_ecran_alertes);
+        g_ecran_alertes = nullptr;
+    }
+}
+
+// Appui sur la pastille de l'alerte officielle : la page des alertes, bâtie sur la réponse de Vigie au moment de l'appui (une image :
+// elle ne se met pas à jour si une réponse plus récente arrive pendant qu'elle est ouverte).
+void ouvrir_alertes() {
+    const board_info_t *carte = board_get_info();
+    if (g_ecran_alertes != nullptr || g_ecran_principal == nullptr || carte == nullptr) {
+        return;
+    }
+    const reglages::Alertes ra = reglages_alertes();
+    const VigieLecture lecture;
+    if (!lecture.valide()) {
+        return; // la réponse a été oubliée entre le dernier dessin et l'appui : la pastille disparaît au prochain passage
+    }
+    const int64_t instant = static_cast<int64_t>(std::time(nullptr));
+    const vigie::Vue vue = vigie::composer(lecture.alertes(), instant, lecture.recu_s(), ra.niveau_min);
+    lv_obj_t *ecran = lv_obj_create(nullptr);
+    ContexteAlertes ctx;
+    ctx.racine = ecran;
+    ctx.ttf = roboto_700_start;
+    ctx.ttf_taille = static_cast<size_t>(roboto_700_end - roboto_700_start);
+    ctx.largeur = carte->width;
+    ctx.hauteur = carte->height;
+    ctx.theme = &theme_du_reglage();
+    ctx.fermer = fermer_alertes;
+    ctx.heure_locale = horloge_heure_locale;
+    DonneesAlertes donnees;
+    donnees.alertes = &lecture.alertes();
+    donnees.vue = &vue;
+    donnees.recu_s = lecture.recu_s();
+    if (!ui_alertes_creer(ctx, donnees)) {
+        ESP_LOGE(TAG, "page des alertes non créée (police TrueType) : l'écran principal reste affiché");
+        lv_obj_delete(ecran);
+        return;
+    }
+    g_ecran_alertes = ecran;
+    lv_screen_load(ecran);
+    ESP_LOGI(TAG, "page des alertes ouverte : %u alerte(s) en vigueur", static_cast<unsigned>(vue.nombre));
 }
 
 // Appelé par LVGL (dans sa tâche, verrou pris) deux fois par seconde.
@@ -120,6 +176,18 @@ void rafraichir(lv_timer_t *) {
     entrees.meteo.exemple = true; // valeurs d'exemple du bouchon (main/bouchons/) : l'écran le dit
 #endif
 
+    // L'alerte officielle de Vigie (ADR-0009) : la dernière réponse lue, ce qui est en vigueur à cet instant, la pastille. Aucune
+    // pastille quand les alertes sont désactivées, que l'heure n'est pas sûre (on ne sait pas ce qui est « en vigueur »), qu'aucune
+    // réponse n'est en mémoire ou que rien n'est en vigueur : jamais de bandeau permanent.
+    const reglages::Alertes alertes = reglages_alertes();
+    if (alertes.actives && heure_vraie) {
+        const VigieLecture lecture;
+        if (lecture.valide()) {
+            const vigie::Vue vue = vigie::composer(lecture.alertes(), instant, lecture.recu_s(), alertes.niveau_min);
+            entrees.bandeau = vigie::composer_bandeau(lecture.alertes(), vue, i18n::langue_courante());
+        }
+    }
+
     ui_principal_mettre_a_jour(entrees);
 
     // Trace de ce qui est affiché : à la première heure valide puis chaque minute (l'écran n'est pas photographié).
@@ -155,7 +223,8 @@ void ecran_principal_creer(const BootInfo &boot) {
     }
     ui_principal_sur_appui_long(vers_diagnostic);
     ui_principal_sur_reglages(
-        ui_reglages_ouvrir); // ADR-0007 : les réglages restent atteignables depuis l'écran principal
+        ui_reglages_ouvrir);                  // ADR-0007 : les réglages restent atteignables depuis l'écran principal
+    ui_principal_sur_alertes(ouvrir_alertes); // ADR-0009 : la pastille de l'alerte officielle ouvre la page des alertes
 
     // Une première mise à jour avant d'afficher : jamais d'écran vide, même une demi-seconde.
     rafraichir(nullptr);

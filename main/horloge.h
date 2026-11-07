@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "ecran/heure_fr.hpp"
 #include "ecran/i18n.hpp"
 
 namespace ecran {
@@ -27,6 +28,10 @@ bool horloge_hhmm(int64_t instant_utc_s, char *sortie, std::size_t capacite);
 // la tournure de chaque langue est dans le noyau pur (ecran/visuel_dates.hpp). Rend faux si le fuseau n'a pas pu être analysé ou si
 // le tampon est trop petit ; il est alors vide. (Ajout de la session ecran-visuel : horloge_formater ne parle que français.)
 bool horloge_date_localisee(int64_t instant_utc_s, ecran::i18n::Langue langue, char *sortie, std::size_t capacite);
+
+// Date et heure locales d'un instant (même fuseau que les autres), en chiffres : la page des alertes en fait « samedi 8 novembre · 05:59 »
+// dans la langue de l'écran (ecran/vigie_textes.hpp). Rend faux, sans rien écrire, si le fuseau n'a pas pu être analysé.
+bool horloge_heure_locale(int64_t instant_utc_s, ecran::heure::HeureLocale &sortie);
 
 // Décalage à l'UTC en vigueur à cet instant, en secondes (3600 l'hiver, 7200 l'été à Paris) ; 0 si le fuseau n'a pas pu être analysé.
 // Sert à rendre l'heure locale des levers et couchers de soleil et des colonnes « heure par heure ».

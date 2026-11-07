@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "ecran/vigie_bandeau.hpp"
 #include "ecran/visuel_themes.hpp"
 #include "ecran/visuel_vue.hpp"
 #include "lvgl.h"
@@ -32,6 +33,9 @@ struct EntreesPrincipal {
     // Décalage à l'UTC du fuseau de l'horloge, en secondes. Sert au ciel (jour ou nuit) tant que la météo n'est pas lue : sans lui
     // le ciel jugeait l'heure en UTC et restait « nuit » une heure ou deux de trop au démarrage. Ignoré dès que la météo est connue.
     std::int32_t decalage_secours_s;
+    // L'alerte officielle de Vigie en vigueur (ADR-0009) : `present` faux = rien n'est dessiné à sa place (pas de bandeau permanent).
+    // Quand elle est présente, sa pastille remplace celle de l'alerte déduite de la météo, dans la barre du haut.
+    vigie::Bandeau bandeau;
 };
 
 // Données du jeu d'icônes et de la police : octets embarqués, qui doivent vivre aussi longtemps que l'écran.
@@ -61,6 +65,11 @@ void ui_principal_sur_appui_long(void (*rappel)());
 // Bouton « Réglages » (ADR-0007), en haut à droite : `rappel` est appelé dans la tâche LVGL sur un appui court. nullptr : le bouton
 // est dessiné mais ne fait rien. Le branchement sur ui_reglages_ouvrir() est dans ecran_principal.cpp.
 void ui_principal_sur_reglages(void (*rappel)());
+
+// Pastille de l'alerte officielle (ADR-0009) : `rappel` est appelé dans la tâche LVGL sur un appui court sur la pastille, qui n'est
+// tactile que tant qu'une alerte est en vigueur (EntreesPrincipal::bandeau.present). Le branchement sur la page des alertes est dans
+// ecran_principal.cpp. nullptr : la pastille est dessinée mais ne fait rien.
+void ui_principal_sur_alertes(void (*rappel)());
 
 // Pour les essais : nombre d'objets LVGL de l'écran (racine comprise) et de polices créées, afin de mesurer ce que l'écran coûte
 // en mémoire interne (chaque objet est alloué en RAM interne).

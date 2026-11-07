@@ -40,6 +40,7 @@
 #include "meteo_etat.h"
 #include "meteo_zone.h"
 #include "reglages.h"
+#include "reglages_alertes.h"
 #include "reseau.h"
 #include "web_fichiers.h"
 
@@ -72,6 +73,8 @@ class HoteAppareil {
   public:
     reglages::Affichage affichage() const { return reglages_affichage(); }
     bool enregistrer_affichage(const reglages::Affichage &a) { return reglages_enregistrer_affichage(a); }
+    reglages::Alertes alertes() const { return reglages_alertes(); }
+    bool enregistrer_alertes(const reglages::Alertes &a) { return reglages_alertes_enregistrer(a); }
     bool zone_lire(reglages::Zone &z) { return reglages_zone_lire(z); }
     bool zone_enregistrer(const reglages::Zone &z) { return reglages_zone_enregistrer(z); }
 
