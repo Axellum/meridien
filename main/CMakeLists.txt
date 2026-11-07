@@ -47,14 +47,26 @@ if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/meteo_etat.h")
     target_sources(${COMPONENT_LIB} PRIVATE "bouchons/meteo_etat_bouchon.cpp")
     set(_meridien_bouchons TRUE)
 endif()
-# Meme principe pour ui_reglages_ouvrir() (ADR-0007), definie par la session reglages-ecran : le bouton "Reglages" de l'ecran
-# principal l'appelle ; le bouchon affiche "Reglages : bientot" deux secondes. Le test porte sur le fichier qui DEFINIT la
-# fonction (la colle main/ui_reglages_ouvrir.cpp), pas sur main/ui_reglages.h : la session reglages-ecran livre l'en-tete avant
-# la colle, et tester l'en-tete laisserait ui_reglages_ouvrir() indefinie (erreur d'edition de liens) entre les deux. Le bouchon
-# garde son propre en-tete (bouchons/ui_reglages.h, trouve en premier depuis bouchons/) ; les fichiers de main/ trouvent
-# main/ui_reglages.h en premier quand il existe.
-if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/ui_reglages_ouvrir.cpp")
-    target_sources(${COMPONENT_LIB} PRIVATE "bouchons/ui_reglages_bouchon.cpp")
+# Reglages et installation guidee (ADR-0007, session reglages-ecran) : les ecrans (LVGL pur, rendus aussi sur le PC), la colle
+# qui les ouvre (ui_reglages_ouvrir.cpp : ecran de la carte, police, hote) et l'hote de l'appareil (hote_appareil_esp.cpp : memoire
+# permanente, Wi-Fi, lieu, redemarrage) sont compiles tels quels. Le bouchon de ui_reglages_ouvrir() ("Reglages : bientot") a
+# ete retire quand la colle est arrivee.
+target_sources(${COMPONENT_LIB} PRIVATE "ui_commun.cpp" "ui_reglages.cpp" "ui_installation.cpp" "ui_clavier.cpp"
+               "ui_reglages_ouvrir.cpp" "hote_appareil_esp.cpp" "wifi_stocke.cpp")
+# Essai des reglages SUR LA CARTE, sans doigt (main/autotest_reglages.cpp) : un pointeur virtuel rejoue les gestes sur le vrai LVGL,
+# trois phases separees par un vrai redemarrage, constats au journal serie. JAMAIS dans le binaire normal (OFF par defaut) :
+#   .\tools\idf.ps1 -DMERIDIEN_AUTOTEST_REGLAGES=ON build
+# Le fichier n'est reference par personne : "-u" force l'editeur de liens a le garder (sinon son constructeur statique ne tourne pas).
+set(MERIDIEN_AUTOTEST_REGLAGES OFF CACHE BOOL "Essai des reglages sur la carte, sans doigt (jamais dans le binaire normal)")
+if(MERIDIEN_AUTOTEST_REGLAGES)
+    target_sources(${COMPONENT_LIB} PRIVATE "autotest_reglages.cpp")
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,-u,autotest_reglages_ancre")
+endif()
+# Contrat reseau des reglages (recherche de reseaux, essai d'un nouveau Wi-Fi avec retour arriere) : a fournir par jalon-1b dans
+# main/reseau_wifi.h. Tant que ce fichier n'existe pas, un BOUCHON (main/bouchons/reseau_wifi*.{h,cpp}) repond "rien trouve" et
+# "impossible" : l'ecran le dit au lieu d'attendre. Des que le vrai fichier est la, le bouchon n'est plus compile.
+if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/reseau_wifi.h")
+    target_sources(${COMPONENT_LIB} PRIVATE "bouchons/reseau_wifi_bouchon.cpp")
     set(_meridien_bouchons TRUE)
 endif()
 if(_meridien_bouchons)

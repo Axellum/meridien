@@ -316,6 +316,42 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 `python web/tests/parcours.py` really calls Open-Meteo (place search, weather): without Internet it fails. Replayed on 06/11/2026 by the coordination session: 49/49 checks, exit code 0. The stylesheet uses `:has()`: on an old phone, only the red outline of an invalid field would be missing (Safari iOS and Firefox: not verified).
 
+#### LVGL 9.5 screens: three pitfalls found while building the settings screens
+
+**Symptom → cause → solution.**
+- A disabled button (the "Continuer" of step 1 before a language is touched) showed the **theme's grey** instead of the palette's disabled look → the default theme styles `LV_STATE_DISABLED` on top of the object's own style → the disabled look is drawn by hand (`bouton_activer(false)`, `main/ui_commun.cpp`: own colours, clickable flag removed).
+- Testing "is it a button?" with `LV_OBJ_FLAG_CLICKABLE` also matched plain containers → `lv_obj_create()` objects are clickable by default in LVGL 9.5 → a button is recognised with `lv_obj_check_type(o, &lv_button_class)`.
+- A screen deleted from one of its own event callbacks, or a keyboard/field replaced while its `DELETE` callback still points to it, left a stale pointer → objects are hidden then deleted with `lv_obj_delete_async()`, and the `DELETE` callbacks only clear the global if the deleted object is the one it holds.
+
+**Seen on** PC rendering bench (software LVGL 9.5.0, `tools/rendre.ps1`), branch `claude/reglages-ecran-aea4e2`, 06/11/2026. **Evidence**: rendered boards (disabled button) and the scripted journeys of `tools/rendu/scenes/scene_parcours.cpp` (a disabled "Continuer" does nothing; the keyboard and fields survive a screen change). **Status**: resolved on the PC; not seen on a board.
+
+#### LVGL 9.5 touch targets: slider zone, parents, scroll indicator
+
+**Symptom → cause → solution.**
+- Touch targets measured below the 72 px minimum (Retour 60, "Nouveau code" and "Tester" 60, preset pills 64, "Quitter l'installation" 56) and a brightness slider that could only be grabbed on a 22 px bar → buttons had their height overridden after `creer_bouton()`; for the slider, LVGL 9.5 accepts a touch only on the bar widened by `LV_DPX(8)` (`lv_slider.c:250` sets it, `lv_obj_pos.c:1195-1205` reads it), and the "knob only" test of `lv_slider.c:269-277` runs only when `LV_OBJ_FLAG_ADV_HITTEST` is set, which the slider does not do (only `lv_image.c:694` sets it) → the overrides are gone, `creer_bouton` sets a `min_height` that no caller can undercut, and the slider bar is widened with `lv_obj_set_ext_click_area()` up to 72 px high (`rangee_curseur`, `main/ui_reglages.cpp`).
+- The widened slider zone did not answer near its top and bottom edges → LVGL searches a parent's children only if the point is inside the parent's own limits (`lv_indev.c:636`) → the slider sits in a row exactly as tall as its touch zone.
+- A page cut off at its edge with no sign that there is more below → the scrollbar was `LV_SCROLLBAR_MODE_OFF` → `style_defilement()` (`main/ui_commun.cpp`) shows a bar (`LV_SCROLLBAR_MODE_AUTO`) as long as the content overflows.
+- A render check that flagged an empty `flex_grow` text as an "overflowing container" → an empty label reports one line of content in a 0 px box → the check only looks at plain containers (`lv_obj_class`).
+- **Still open**: keyboard keys are 59 px tall at 1280×720 (49 px at 1024×600) in the languages with an accent row (fr, nl, es, it) → six rows cannot exceed 55 % of the screen in landscape; with five rows (en, de, tr) they are exactly 72 px.
+
+**Seen on** PC rendering bench (software LVGL 9.5.0, `tools/rendre.ps1`), branch `claude/reglages-ecran-aea4e2`, 06/11/2026. **Evidence**: scripted journeys `zones-tactiles-reglages`, `zones-tactiles-installation` and `curseur-au-doigt` (`tools/rendu/scenes/scene_parcours.cpp`; the last one uses a pointer input device and `lv_indev_search_obj`, so the touch goes through LVGL's own search) in 7 languages × 3 sizes; four of five deliberately introduced faults are detected (the fifth, a button forced back to 56 px, is neutralised by `min_height`). **Status**: resolved on the PC for buttons, slider and scroll indicator; the keyboard keys are an open decision; not seen on a board (real finger, physical size of the target: not verified).
+
+#### On-board test: the virtual finger lands on the wrong object
+
+**Symptom.** In the first two runs of the settings test on the board, a tap on the centre of "Affichage" opened the "Appareil" page, "Retour" did nothing, and the aimed button received no press, no release and no click (counts 0, 0, 0), although `lv_indev_search_obj()` found that button at that very point.
+
+**Cause.** `lv_indev.c:743` calls `lv_display_rotate_point()` on every point a pointer reads, because touch drivers give **raw** panel coordinates (`components/bsp_tab5/tab5_touch.c` says so). The test's virtual pointer gave logical coordinates, so the point was rotated twice: (639, 424) became (855, 639), inside the "Appareil" row; (86, 43) became (1236, 86), on nothing. A `grep rotation` on `lv_indev.c` finds nothing: the function is called `rotate_point`.
+
+**Solution.** `vers_brut()` in `main/autotest_reglages.cpp` gives the inverse rotation (90, 180, 270); after every press the test compares the point LVGL finally read with the aimed point and records a failure if they differ, so a test that misses cannot pass again. The screens were right; the test was wrong. **Seen on** Tab5 ST7121, commits `7b435eb` and `8f6c28d` (failing) and `176de0d` (fixed), 07/11/2026. **Evidence**: journal lines `GESTE … appui reçu 0, relâchement reçu 0, clic reçu 0` then `1, 1, 1`; 29 checks, 0 failures at `176de0d`. **Status**: resolved (in the test).
+
+#### Internal RAM down to 20 bytes while the settings are open, and the weather failing
+
+**Symptom.** With the settings open about 13 to 18 s after boot: `MEMOIRE … interne_libre=535 plus_gros_bloc=160 interne_min=20` and `mdns_send: Cannot allocate memory`. On the **normal** binary, settings never opened: `esp-aes: Failed to allocate memory for the array of DMA descriptors` then `meteo: essai raté (HTTP 0)`.
+
+**Cause (a reading, partly measured).** The weather's TLS handshake (about 65 to 76 KB of internal RAM) starts about 13 s after boot, with 96.8 KB free just before. The settings list takes about 21.5 KB of internal RAM (8.8 KB of objects and styles, 12.6 KB at the first draw) and about 22 KB of PSRAM once the glyph bitmaps go there (`e686310`). Together they empty the internal heap. My first reading, "the list alone takes 28 KB", came from a measure taken while the TLS was already running.
+
+**Solution.** Not done: TLS, `sdkconfig` and LVGL's allocation are not on the settings track. Proposed: mbedTLS in PSRAM (`4f6bd0a`, `jalon-1b` track), then measure again with the same `MEMOIRE` lines; if still too tight, put LVGL objects in PSRAM (custom allocation) or lower `SPIRAM_MALLOC_ALWAYSINTERNAL`. **Seen on** Tab5 ST7121, commits `8f6c28d` and `176de0d`, 07/11/2026. **Evidence**: `MEMOIRE` lines of the test journal and the `meteo` log lines ([mesures/6-reglages-appareil.md](mesures/6-reglages-appareil.md), section 4.3). **Status**: open (no crash or unexpected restart seen; zero margin).
+
 #### A mutation keeps the compiler busy for minutes
 
 **Cause.** The proof by mutation compiles the tests with one change in the core. A mutant that removes the exit condition of a `constexpr` loop (here `&& base < PERIODE_S` in `delai_avant_essai_s`) makes clang evaluate the loop up to its limit of 2 billion steps (`-fconstexpr-steps=2000000000`, set so that the tests which read a real response compile): 765 s of CPU measured before the compiler was stopped.
@@ -705,6 +741,42 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 #### Le parcours web demande le réseau
 
 `python web/tests/parcours.py` appelle vraiment Open-Meteo (recherche de lieu, météo) : sans Internet il échoue. Rejoué le 06/11/2026 par la session de coordination : 49/49 vérifications, code de sortie 0. La feuille de style utilise `:has()` : sur un téléphone ancien, seul le contour rouge d'un champ invalide manquerait (Safari iOS et Firefox : non vérifié).
+
+#### Écrans LVGL 9.5 : trois pièges trouvés en construisant les écrans de réglages
+
+**Symptôme → cause → solution.**
+- Un bouton désactivé (le « Continuer » de l'étape 1 tant qu'aucune langue n'est touchée) montrait le **gris du thème** au lieu de l'aspect désactivé de la palette → le thème par défaut dessine `LV_STATE_DISABLED` par-dessus le style de l'objet → l'aspect désactivé est dessiné à la main (`bouton_activer(false)`, `main/ui_commun.cpp` : couleurs propres, drapeau cliquable retiré).
+- Tester « est-ce un bouton ? » avec `LV_OBJ_FLAG_CLICKABLE` reconnaissait aussi de simples conteneurs → les objets de `lv_obj_create()` sont cliquables par défaut dans LVGL 9.5 → un bouton se reconnaît avec `lv_obj_check_type(o, &lv_button_class)`.
+- Un écran supprimé depuis l'un de ses propres rappels d'événement, ou un clavier ou un champ remplacé alors que son rappel `DELETE` le désigne encore, laissait un pointeur périmé → les objets sont cachés puis supprimés par `lv_obj_delete_async()`, et les rappels `DELETE` ne vident la variable globale que si l'objet supprimé est celui qu'elle tient.
+
+**Vu sur** banc de rendu PC (LVGL 9.5.0 logiciel, `tools/rendre.ps1`), branche `claude/reglages-ecran-aea4e2`, 06/11/2026. **Preuve** : planches rendues (bouton désactivé) et parcours de `tools/rendu/scenes/scene_parcours.cpp` (un « Continuer » désactivé ne fait rien ; le clavier et les champs survivent à un changement d'écran). **Statut** : résolu sur le PC ; non vu sur une carte.
+
+#### Zones tactiles LVGL 9.5 : zone du curseur, parents, indicateur de défilement
+
+**Symptôme → cause → solution.**
+- Des zones tactiles sous le minimum de 72 px (Retour 60, « Nouveau code » et « Tester » 60, pastilles de préréglage 64, « Quitter l'installation » 56) et un curseur de luminosité qu'on ne saisissait que sur une barre de 22 px → les boutons avaient leur hauteur écrasée après `creer_bouton()` ; pour le curseur, LVGL 9.5 n'accepte le toucher que sur la barre élargie de `LV_DPX(8)` (`lv_slider.c:250` pose l'élargissement, `lv_obj_pos.c:1195-1205` le lit), et le test « rond seul » de `lv_slider.c:269-277` ne tourne que si `LV_OBJ_FLAG_ADV_HITTEST` est posé, ce que le curseur ne fait pas (seul `lv_image.c:694` le pose) → les écrasements sont retirés, `creer_bouton` pose un `min_height` qu'aucun appelant ne peut passer sous, et la barre du curseur est élargie par `lv_obj_set_ext_click_area()` jusqu'à 72 px de haut (`rangee_curseur`, `main/ui_reglages.cpp`).
+- La zone élargie du curseur ne répondait pas près de son bord haut et de son bord bas → LVGL ne cherche dans les enfants d'un parent que si le point est dans les limites de ce parent (`lv_indev.c:636`) → le curseur est dans une rangée exactement aussi haute que sa zone tactile.
+- Une page coupée net en bas, sans signe qu'il y a une suite → la barre de défilement était `LV_SCROLLBAR_MODE_OFF` → `style_defilement()` (`main/ui_commun.cpp`) montre une barre (`LV_SCROLLBAR_MODE_AUTO`) tant que le contenu dépasse.
+- Un contrôle de rendu qui prenait un texte vide en `flex_grow` pour un « conteneur qui dépasse » → un texte vide annonce une ligne de contenu dans une boîte de 0 px → le contrôle ne regarde que les conteneurs ordinaires (`lv_obj_class`).
+- **Reste ouvert** : les touches du clavier mesurent 59 px de haut à 1280×720 (49 px à 1024×600) dans les langues à rangée d'accents (fr, nl, es, it) → six rangées ne peuvent pas dépasser 55 % de l'écran en paysage ; à cinq rangées (en, de, tr) elles font exactement 72 px.
+
+**Vu sur** banc de rendu PC (LVGL 9.5.0 logiciel, `tools/rendre.ps1`), branche `claude/reglages-ecran-aea4e2`, 06/11/2026. **Preuve** : parcours `zones-tactiles-reglages`, `zones-tactiles-installation` et `curseur-au-doigt` (`tools/rendu/scenes/scene_parcours.cpp` ; le dernier passe par un pointeur LVGL et `lv_indev_search_obj`, donc par la recherche d'objet de LVGL elle-même) dans 7 langues × 3 tailles ; quatre fautes sur cinq introduites exprès sont détectées (la cinquième, un bouton remis à 56 px, est neutralisée par `min_height`). **Statut** : résolu sur le PC pour les boutons, le curseur et l'indicateur de défilement ; touches du clavier : décision ouverte ; non vu sur une carte (doigt réel, taille physique de la cible : non vérifiés).
+
+#### Essai sur la carte : le doigt virtuel tombe sur le mauvais objet
+
+**Symptôme.** Aux deux premiers passages de l'essai des réglages sur la carte, un toucher au centre de « Affichage » ouvrait la page « Appareil », « Retour » ne faisait rien, et le bouton visé ne recevait ni appui, ni relâchement, ni clic (compteurs 0, 0, 0), alors que `lv_indev_search_obj()` trouvait ce bouton à ce point précis.
+
+**Cause.** `lv_indev.c:743` appelle `lv_display_rotate_point()` sur chaque point lu par un pointeur, parce que les pilotes tactiles donnent des coordonnées **brutes** de la dalle (`components/bsp_tab5/tab5_touch.c` le dit). Le pointeur virtuel de l'essai donnait des coordonnées logiques : le point était tourné deux fois. (639, 424) devenait (855, 639), dans la rangée « Appareil » ; (86, 43) devenait (1236, 86), sur rien. Un `grep rotation` sur `lv_indev.c` ne trouve rien : la fonction s'appelle `rotate_point`.
+
+**Solution.** `vers_brut()` dans `main/autotest_reglages.cpp` donne la rotation inverse (90, 180, 270) ; après chaque appui, l'essai compare le point que LVGL a fini par lire au point visé et note un échec s'ils diffèrent : un essai à côté ne peut plus passer. Les écrans étaient justes ; c'est l'essai qui avait tort. **Vu sur** Tab5 ST7121, commits `7b435eb` et `8f6c28d` (échec) et `176de0d` (corrigé), 07/11/2026. **Preuve** : lignes `GESTE … appui reçu 0, relâchement reçu 0, clic reçu 0` puis `1, 1, 1` ; 29 vérifications, 0 échec à `176de0d`. **Statut** : résolu (dans l'essai).
+
+#### RAM interne tombée à 20 octets pendant que les réglages sont ouverts, et la météo qui échoue
+
+**Symptôme.** Réglages ouverts 13 à 18 s après le démarrage : `MEMOIRE … interne_libre=535 plus_gros_bloc=160 interne_min=20` et `mdns_send: Cannot allocate memory`. Sur le binaire **normal**, réglages jamais ouverts : `esp-aes: Failed to allocate memory for the array of DMA descriptors` puis `meteo: essai raté (HTTP 0)`.
+
+**Cause (une lecture, en partie mesurée).** La poignée de main TLS de la météo (≈ 65 à 76 Ko de RAM interne) démarre vers 13 s après le démarrage, avec 96,8 Ko libres juste avant. La liste des réglages prend ≈ 21,5 Ko de RAM interne (8,8 Ko d'objets et de styles, 12,6 Ko au premier dessin) et ≈ 22 Ko de PSRAM depuis que les bitmaps de glyphes y vont (`e686310`). Ensemble ils vident le tas interne. Ma première lecture, « la liste seule prend 28 Ko », venait d'une mesure prise alors que le TLS tournait déjà.
+
+**Solution.** Non faite : le TLS, `sdkconfig` et l'allocation de LVGL ne sont pas sur la piste des réglages. Proposé : mbedTLS en PSRAM (`4f6bd0a`, piste `jalon-1b`), puis mesurer de nouveau avec les mêmes lignes `MEMOIRE` ; si c'est encore trop juste, mettre les objets LVGL en PSRAM (allocation personnalisée) ou baisser `SPIRAM_MALLOC_ALWAYSINTERNAL`. **Vu sur** Tab5 ST7121, commits `8f6c28d` et `176de0d`, 07/11/2026. **Preuve** : lignes `MEMOIRE` du journal de l'essai et lignes `meteo` ([mesures/6-reglages-appareil.md](mesures/6-reglages-appareil.md), section 4.3). **Statut** : ouvert (aucun plantage ni redémarrage inattendu vu ; marge nulle).
 
 #### Une mutation occupe le compilateur pendant des minutes
 

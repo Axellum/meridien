@@ -1,0 +1,130 @@
+"""Mutations de l'hôte de l'appareil (ecran/hote_appareil.hpp) et des lieux de la recherche (ecran/lieux_geocodage.hpp), lues par
+lancer.py --mutations.
+
+Même format que MUTATIONS dans lancer.py : (fichier du noyau, texte exact à remplacer — il doit apparaître UNE fois —,
+remplacement, test qui doit échouer, nom de la fonction de test qui doit être citée, ce que la mutation simule).
+
+Les tests de l'hôte n'ont pas de static_assert (classe à méthodes virtuelles) : ces mutations ne sont vues qu'en LANÇANT le test
+(voir executee_seulement dans lancer.py). Les règles visées sont celles dont une erreur se paie sur l'appareil : un écran noir
+par une luminosité nulle, un mot de passe qui ressort, un Wi-Fi retenu alors qu'il n'a pas répondu, une installation donnée pour
+terminée alors qu'elle ne l'est pas, une valeur gardée en double entre l'écran et la page web.
+"""
+
+HOTE = "test_hote_appareil.cpp"
+LIEUX = "test_lieux_geocodage.cpp"
+HPP_HOTE = "hote_appareil.hpp"
+HPP_LIEUX = "lieux_geocodage.hpp"
+
+MUTATIONS_HOTE_APPAREIL = [
+    # --- affichage : la source de la page web ---
+    (HPP_HOTE, "valeur >= (r->facultatif ? -1 : 0)", "valeur >= -1", HOTE, "choix_hors_liste_ou_inconnu_est_refuse",
+     "« pas encore choisi » est accepté sur un réglage obligatoire"),
+    (HPP_HOTE, "? registre::nombre_valide(*r, valeur)", "? true", HOTE, "luminosite_qui_eteindrait_l_ecran_est_refusee",
+     "une luminosité à zéro est transmise (écran noir)"),
+    (HPP_HOTE, "return p_.affichage().luminosite;", "return 75;", HOTE, "affichage_passe_par_la_porte_de_la_page_web",
+     "l'écran n'affiche plus la luminosité réelle (celle de la page web)"),
+    (HPP_HOTE, "p_.enregistrer_affichage(a); // la source de la page web",
+     'm_.ecrire_nombre(stockage::ESPACE_SERVICES, "copie", valeur);\n            p_.enregistrer_affichage(a); // la source de la page web',
+     HOTE, "affichage_passe_par_la_porte_de_la_page_web", "une seconde copie de l'affichage est gardée dans la mémoire de l'hôte"),
+    (HPP_HOTE, "a.luminosite = valeur;", "a.luminosite = valeur; a.theme = reglages::Theme::Sombre;", HOTE,
+     "un_seul_champ_change_a_la_fois", "régler la luminosité change aussi le thème"),
+    (HPP_HOTE, "? registre::choix_depuis_nvs(*r, valeur)", "? valeur", HOTE,
+     "valeur_abimee_en_memoire_donne_le_defaut", "une valeur de service abîmée en mémoire est rendue telle quelle"),
+    (HPP_HOTE, 'id.substr(0, 4) != "llm."', 'id.substr(0, 4) != "llx."', HOTE, "services_gardes_et_relus_apres_un_redemarrage",
+     "les réglages du service de langage ne sont plus gardés"),
+    # --- secrets ---
+    (HPP_HOTE, "if (r == nullptr || r->type == registre::Type::Secret) { // un secret ne se relit jamais",
+     "if (r == nullptr) { // un secret ne se relit jamais", HOTE, "un_secret_ne_ressort_jamais",
+     "une clé d'accès ou un mot de passe ressort en clair"),
+    (HPP_HOTE, "m_.longueur_texte(espace, cle) > 0;", "m_.longueur_texte(espace, cle) >= 0;", HOTE,
+     "reseau_ouvert_se_retient_sans_mot_de_passe", "un mot de passe vide est annoncé comme défini"),
+    (HPP_HOTE, "if (registre::valider_texte(*r, valeur) != registre::ErreurTexte::Aucune) {", "if (false) {", HOTE,
+     "texte_refuse_par_le_registre_n_est_jamais_enregistre", "un texte que le registre refuse est quand même enregistré"),
+    # --- Wi-Fi ---
+    (HPP_HOTE, "                m_.ecrire_texte(stockage::ESPACE_WIFI, stockage::CLE_WIFI_SSID, ssid_essai_);\n", "", HOTE,
+     "reseau_retenu_seulement_apres_une_connexion_reussie", "le réseau réussi n'est pas retenu pour le prochain démarrage"),
+    (HPP_HOTE, "                m_.ecrire_texte(stockage::ESPACE_WIFI, stockage::CLE_WIFI_MOT_DE_PASSE, mdp_essai_);\n", "", HOTE,
+     "reseau_retenu_seulement_apres_une_connexion_reussie", "le mot de passe du réseau réussi n'est pas retenu"),
+    (HPP_HOTE, "            switch (resultat) {\n            case wifi::Resultat::Connecte:",
+     "            m_.ecrire_texte(stockage::ESPACE_WIFI, stockage::CLE_WIFI_SSID, ssid_essai_);\n"
+     "            switch (resultat) {\n            case wifi::Resultat::Connecte:", HOTE,
+     "reseau_retenu_seulement_apres_une_connexion_reussie", "un réseau refusé (mauvais mot de passe) est retenu quand même"),
+    (HPP_HOTE, "        p_.wifi_abandonner();\n        recu_.store(false", "        recu_.store(false", HOTE,
+     "abandon_ne_retient_rien_meme_si_la_reponse_arrive_apres", "l'abandon ne rend pas l'ancien réseau (la couche réseau n'est pas prévenue)"),
+    (HPP_HOTE, "if (connexion_.etat == wifi::Etat::Connexion && recu_.load(std::memory_order_acquire)) {",
+     "if (recu_.load(std::memory_order_acquire)) {", HOTE, "abandon_ne_retient_rien_meme_si_la_reponse_arrive_apres",
+     "une réponse arrivée après l'abandon est prise en compte et le réseau retenu"),
+    (HPP_HOTE, "connexion_ = ConnexionWifi{wifi::Etat::Echec, wifi::Cause::Autre};\n            oublier_essai();\n        }\n    }",
+     "connexion_ = ConnexionWifi{wifi::Etat::Connexion, wifi::Cause::Autre};\n            oublier_essai();\n        }\n    }", HOTE,
+     "essai_impossible_a_demarrer_est_un_echec_tout_de_suite", "un essai qui n'a pas pu démarrer attend sans fin"),
+    (HPP_HOTE, "sortie[i].niveau = static_cast<std::int8_t>(api::niveau_wifi(vus[i].dbm));", "sortie[i].niveau = 0;", HOTE,
+     "reseaux_vus_en_barres_et_au_plus_seize", "tous les réseaux s'affichent sans barre"),
+    # --- recherche de lieu ---
+    (HPP_HOTE, "if (v.erreur != reglages::ErreurRecherche::Aucune) {", "if (false) {", HOTE,
+     "saisie_trop_courte_ou_illisible_ne_telecharge_rien", "une saisie de deux lettres part sur Internet"),
+    (HPP_HOTE, "p_.zone_enregistrer(lieux_[rang].zone);", "p_.zone_enregistrer(lieux_[0].zone);", HOTE,
+     "recherche_de_lieu_du_depart_au_choix", "le lieu touché n'est pas celui qui est enregistré"),
+    (HPP_HOTE, "if (rang < nb_lieux_) {", "if (rang <= nb_lieux_) {", HOTE, "choisir_un_rang_qui_n_existe_pas_ne_change_rien",
+     "un rang hors de la liste enregistre un lieu vide"),
+    (HPP_HOTE, "            default: // pas d'Internet, serveur injoignable, réponse refusée : l'écran ne distingue que « sans connexion »\n"
+     "                p_.telecharger_liberer();\n                recherche_ = RechercheLieu::SansConnexion;",
+     "            default: // pas d'Internet, serveur injoignable, réponse refusée : l'écran ne distingue que « sans connexion »\n"
+     "                p_.telecharger_liberer();\n                recherche_ = RechercheLieu::Terminee;", HOTE,
+     "recherche_sans_reponse_dit_sans_connexion_et_rend_la_memoire", "une recherche sans Internet affiche « aucun résultat »"),
+    (HPP_HOTE, "                p_.telecharger_liberer();\n                recherche_ = RechercheLieu::Terminee;\n                break;\n            default:",
+     "                recherche_ = RechercheLieu::Terminee;\n                break;\n            default:", HOTE,
+     "recherche_de_lieu_du_depart_au_choix", "la réponse du géocodage n'est jamais rendue (la mémoire fuit)"),
+    (HPP_HOTE, "const std::size_t n = nb_lieux_ < max ? nb_lieux_ : max;", "const std::size_t n = nb_lieux_ < max ? nb_lieux_ : nb_lieux_;", HOTE,
+     "recherche_de_lieu_du_depart_au_choix", "plus de lieux copiés que la place demandée"),
+    (HPP_HOTE, "reglages::adresse_geocodage(v.q, p_.affichage().langue_ecran, e);",
+     "reglages::adresse_geocodage(v.q, i18n::Langue::Fr, e);", HOTE, "langue_de_l_ecran_dicte_celle_de_la_recherche",
+     "la recherche de lieu ignore la langue de l'écran"),
+    (HPP_HOTE, "        nb_lieux_ = 0;\n        recherche_ = RechercheLieu::Terminee; // sans résultat, sauf si la recherche part",
+     "        recherche_ = RechercheLieu::Terminee; // sans résultat, sauf si la recherche part", HOTE,
+     "nouvelle_recherche_efface_l_ancienne", "les lieux de l'ancienne recherche restent proposés pendant la nouvelle"),
+    # --- météo, appareil, test de service ---
+    (HPP_HOTE, "reglages::copier_texte(i18n::tr(meteo::decrire(m.code_wmo, m.jour).libelle), a.libelle, sizeof a.libelle);",
+     "reglages::copier_texte(meteo::decrire(m.code_wmo, m.jour).libelle, a.libelle, sizeof a.libelle);", HOTE,
+     "apercu_meteo_dans_la_langue_de_l_ecran", "l'aperçu de la météo reste en français quelle que soit la langue"),
+    (HPP_HOTE, "if (!m.valide) {\n            return a;", "if (false) {\n            return a;", HOTE,
+     "apercu_meteo_dans_la_langue_de_l_ecran", "un aperçu est affiché sans météo connue"),
+    (HPP_HOTE, "r.etat = EtatTest::Echec;", "r.etat = EtatTest::Reussi;", HOTE,
+     "test_de_service_ne_se_dit_jamais_reussi_sans_avoir_eu_lieu", "un test de service qui n'a pas eu lieu s'affiche réussi"),
+    (HPP_HOTE, "if (w.connecte && w.ip[0] != '\\0') {", "if (w.ip[0] != '\\0') {", HOTE, "informations_de_l_appareil",
+     "l'adresse de la page reste affichée après une coupure du Wi-Fi"),
+    # --- installation guidée et réinitialisation ---
+    (HPP_HOTE, "return installation::Progression{}; // carte neuve : première installation, étape 1",
+     "return installation::terminer(installation::Progression{}); // carte neuve", HOTE,
+     "progression_se_reprend_apres_un_redemarrage", "une carte neuve est donnée pour « installation terminée »"),
+    (HPP_HOTE, "return installation::decoder(v); // un octet abîmé ne passe jamais pour « terminée »",
+     "return installation::Progression{installation::Etape::Langue, v != 0, installation::Mode::Premiere};", HOTE,
+     "octet_d_installation_abime_ne_passe_pas_pour_terminee", "un octet d'installation abîmé passe pour « terminée »"),
+    (HPP_HOTE, "installation::encoder(p));", "installation::encoder(p) & 0x0F);", HOTE, "progression_se_reprend_apres_un_redemarrage",
+     "le mode « refaire » n'est pas gardé : un redémarrage le perd"),
+    (HPP_HOTE, "        m_.effacer_espace(stockage::ESPACE_WIFI);\n", "", HOTE, "reinitialiser_efface_ce_que_l_hote_garde",
+     "« réinitialiser l'appareil » garde le Wi-Fi retenu"),
+    (HPP_HOTE, "        m_.effacer_espace(stockage::ESPACE_SERVICES);\n", "", HOTE, "reinitialiser_efface_ce_que_l_hote_garde",
+     "« réinitialiser l'appareil » garde les clés d'accès des services"),
+    (HPP_HOTE, "        p_.remettre_affichage_et_ville_par_defaut();\n        definir_progression", "        definir_progression", HOTE,
+     "reinitialiser_efface_ce_que_l_hote_garde", "« réinitialiser l'appareil » garde la langue, le thème et la ville"),
+    (HPP_HOTE, "definir_progression(installation::apres_reinitialisation());", "(void)0;", HOTE,
+     "reinitialiser_efface_ce_que_l_hote_garde", "après « réinitialiser l'appareil », l'installation n'est pas à refaire"),
+    # --- lieux de la recherche ---
+    (HPP_LIEUX, "!(lat >= -90.0 && lat <= 90.0)", "false", LIEUX, "liste_de_la_page_web_memes_lieux_ecartes",
+     "un lieu de latitude 95 est proposé"),
+    (HPP_LIEUX, "!(lon >= -180.0 && lon <= 180.0)", "false", LIEUX, "liste_de_la_page_web_memes_lieux_ecartes",
+     "un lieu de longitude 181 est proposé"),
+    (HPP_LIEUX, "fuseau[0] == '\\0' ||", "false ||", LIEUX, "liste_de_la_page_web_memes_lieux_ecartes",
+     "un lieu sans fuseau est proposé (l'heure serait fausse)"),
+    (HPP_LIEUX, "nom[0] == '\\0' ||", "false ||", LIEUX, "liste_de_la_page_web_memes_lieux_ecartes", "un lieu sans nom est proposé"),
+    (HPP_LIEUX, "const std::size_t limite = max < CANDIDATS_MAX ? max : CANDIDATS_MAX;", "const std::size_t limite = max;", LIEUX,
+     "au_plus_le_nombre_demande_et_huit_au_total", "plus de huit lieux gardés (dépassement du tableau de l'écran)"),
+    (HPP_LIEUX, "if (reglages::utf8_valide(region)) {", "if (true) {", LIEUX,
+     "region_ou_pays_invalides_sont_ignores_sans_perdre_le_lieu", "une région en octets invalides est gardée"),
+    (HPP_LIEUX, "        c = Candidat{};\n", "", LIEUX, "un_candidat_precedent_est_remis_a_zero",
+     "la région d'un ancien lieu reste dans le nouveau"),
+    (HPP_LIEUX, "if (!premier) {\n            e.brut(\", \");", "if (true) {\n            e.brut(\", \");", LIEUX,
+     "libelle_saute_les_parties_vides", "une virgule précède le premier élément du libellé"),
+    (HPP_LIEUX, "if (partie[0] == '\\0') {\n            continue;", "if (false) {\n            continue;", LIEUX,
+     "libelle_saute_les_parties_vides", "les parties vides du libellé laissent des virgules"),
+]
