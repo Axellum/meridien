@@ -4,7 +4,7 @@
 
 A non-obvious decision gets one numbered page here (next number), with the context, the choice, the alternatives that were
 rejected and what would reopen it. Read the relevant page **before** "fixing" something that looks wrong. The pages are
-written in French; each of 0001 to 0005, 0008, 0009 and 0010 opens with a short English summary. A summary says no more than the French text
+written in French; each of 0001 to 0005, 0008, 0009, 0010 and 0012 opens with a short English summary. A summary says no more than the French text
 below it, including its "proposed" status.
 
 | No. | Decision | Status |
@@ -19,6 +19,7 @@ below it, including its "proposed" status.
 | [0008](0008-ecran-principal-par-zones-themes-et-ciel-trame.md) | Main screen: one drawing object per zone, themes and decisions in the pure core, a dithered sky, original icons | proposed, awaiting the owner's validation (seen on PC renders only) |
 | [0009](0009-alertes-officielles-par-vigie.md) | Official weather alerts read from Vigie, shown only while one is in force, the issuer's words never rewritten | proposed, awaiting the owner's validation (checked on the PC only, not seen on a board) |
 | [0010](0010-source-meteo-par-pays-et-client-reseau-commun.md) | Weather source chosen by country (Open-Meteo national models), one common network client | proposed, awaiting the owner's validation (seen on PC only) |
+| [0012](0012-l-heure-affichee-est-celle-du-lieu-choisi.md) | The time on screen is the time of the chosen place: the clock, forecast hours, sunrise and sunset, day names and alert hours follow the saved zone's time zone | proposed, awaiting the owner's validation (seen on PC only, never on a board) |
 
 Status as of 2026-11-06. "Proposed" means written by the AI agent from the research notes and not yet settled by the owner;
 the code follows it in the meantime. The open questions (wake word, local STT/TTS, project name, repository, licence, ESP-IDF
@@ -29,7 +30,7 @@ summary at the top).
 
 ## Version française
 
-Une décision non évidente = une page numérotée ici (numéro suivant), avec le contexte, le choix, les alternatives écartées et ce qui la remettrait en cause. À lire **avant** de « corriger » quelque chose qui a l'air faux. Les pages sont en français ; chacune de 0001 à 0005, 0008, 0009 et 0010 commence par un court résumé en anglais, qui n'en dit pas plus que le texte français, statut « proposée » compris.
+Une décision non évidente = une page numérotée ici (numéro suivant), avec le contexte, le choix, les alternatives écartées et ce qui la remettrait en cause. À lire **avant** de « corriger » quelque chose qui a l'air faux. Les pages sont en français ; chacune de 0001 à 0005, 0008, 0009, 0010 et 0012 commence par un court résumé en anglais, qui n'en dit pas plus que le texte français, statut « proposée » compris.
 
 | N° | Décision | Statut |
 |---|---|---|
@@ -43,5 +44,6 @@ Une décision non évidente = une page numérotée ici (numéro suivant), avec l
 | [0008](0008-ecran-principal-par-zones-themes-et-ciel-trame.md) | Écran principal : un objet de dessin par zone, thèmes et décisions dans le noyau pur, un ciel tramé, des icônes originales | proposée, à valider par Axel (vue sur rendus PC seulement) |
 | [0009](0009-alertes-officielles-par-vigie.md) | Alertes officielles lues chez Vigie, montrées seulement quand elles sont en vigueur, mots de l'émetteur jamais réécrits | proposée, à valider par Axel (constatée sur le PC seulement, jamais vue sur une carte) |
 | [0010](0010-source-meteo-par-pays-et-client-reseau-commun.md) | Source de la météo choisie par pays (modèles nationaux d'Open-Meteo), un client réseau commun | proposée, à valider par Axel (vue sur le PC seulement) |
+| [0012](0012-l-heure-affichee-est-celle-du-lieu-choisi.md) | L'heure affichée est celle du lieu choisi : l'horloge, les heures de la prévision, le lever et le coucher du soleil, les noms de jours et les heures des alertes suivent le fuseau de la zone enregistrée | proposée, à valider par Axel (vue sur le PC seulement, jamais sur une carte) |
 
 Statut au 06/11/2026. « Proposée » = écrite par l'agent d'après les recherches, pas encore tranchée par Axel ; le code s'y conforme en attendant. Les questions ouvertes (mot d'activation, STT/TTS locaux, nom du projet, dépôt, licence, version d'ESP-IDF, fraîcheur du calendrier) sont listées dans [le plan](../plan.md#décisions-à-prendre-par-axel).

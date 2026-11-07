@@ -110,7 +110,7 @@ Copies, avec les `.elf` (pour décoder un plantage), dans le dossier de notes pa
 - Les mots de l'émetteur ne sont jamais réécrits ; un texte avec un caractère que la police ne dessine pas est écarté en entier.
 - Rouge pastel (`0xFF9A90`) pour le niveau rouge du thème « ciel » (un rouge franc tombait à 2,29:1).
 - Les traductions de l'allemand, du néerlandais, de l'espagnol, de l'italien et du turc sont écrites par l'agent, non relues.
-- L'horloge de l'appareil est codée sur Europe/Paris : les heures écrites sur la page seraient celles de Paris pour une ville d'un autre fuseau.
+- À l'époque de cette mesure, l'horloge de l'appareil était codée sur Europe/Paris : les heures écrites sur la page auraient été celles de Paris pour une ville d'un autre fuseau. **Corrigé** par ADR-0012 : ces heures passent par `horloge_heure_locale`, qui lit le fuseau de la zone enregistrée (essai sur PC : [fuseaux.md](fuseaux.md) ; effet sur la dalle non vérifié).
 
 ## 7. Notes pour Vigie
 
