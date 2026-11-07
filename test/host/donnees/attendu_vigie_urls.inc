@@ -1,0 +1,11 @@
+// FICHIER GÉNÉRÉ par test/host/controle_python_vigie.py : lieux de capturer_vigie.py, coordonnées e5 et adresse demandée (langue « fr »).
+{R"VG(la_palma)VG", 2865850, -1791820, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=28.659&lon=-17.918&lang=fr,en)VG"},
+{R"VG(eberswalde)VG", 5283490, 1380730, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=52.835&lon=13.807&lang=fr,en)VG"},
+{R"VG(oslo)VG", 5991390, 1075220, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=59.914&lon=10.752&lang=fr,en)VG"},
+{R"VG(bodo)VG", 6728040, 1440490, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=67.280&lon=14.405&lang=fr,en)VG"},
+{R"VG(londres)VG", 5150740, -12780, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=51.507&lon=-0.128&lang=fr,en)VG"},
+{R"VG(funchal)VG", 3266690, -1692410, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=32.667&lon=-16.924&lang=fr,en)VG"},
+{R"VG(ancona)VG", 4361580, 1351890, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=43.616&lon=13.519&lang=fr,en)VG"},
+{R"VG(hambourg)VG", 5355110, 999370, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=53.551&lon=9.994&lang=fr,en)VG"},
+{R"VG(valence)VG", 4493340, 489240, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=44.933&lon=4.892&lang=fr,en)VG"},
+{R"VG(tokyo)VG", 3567620, 13965030, R"VG(https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=35.676&lon=139.650&lang=fr,en)VG"},

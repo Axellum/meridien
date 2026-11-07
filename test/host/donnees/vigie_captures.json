@@ -1,0 +1,138 @@
+{
+ "ancona": {
+  "alertes": 0,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 1019,
+  "octets_sur_le_fil": 622,
+  "serveur_utc": 1794041573,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=43.616&lon=13.519&lang=fr,en"
+ },
+ "bodo": {
+  "alertes": 1,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 3185,
+  "octets_sur_le_fil": 1476,
+  "serveur_utc": 1794041561,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=67.280&lon=14.405&lang=fr,en"
+ },
+ "eberswalde": {
+  "alertes": 1,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 2797,
+  "octets_sur_le_fil": 1212,
+  "serveur_utc": 1794041555,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=52.835&lon=13.807&lang=fr,en"
+ },
+ "eberswalde_toutes_langues": {
+  "alertes": 1,
+  "http": 200,
+  "note": "capté à la main le 07/11/2026 à 08 h 41 UTC avec l'adresse de l'ébauche (4 décimales, SANS `lang`) : toutes les langues de l'émetteur ; conservé tel quel, ne se recapture pas à l'identique (les alertes changent d'une heure à l'autre)",
+  "octets_decompresses": 7623,
+  "serveur_utc": 1794040874,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=52.8349&lon=13.8073"
+ },
+ "funchal": {
+  "alertes": 0,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 1024,
+  "octets_sur_le_fil": 632,
+  "serveur_utc": 1794041570,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=32.667&lon=-16.924&lang=fr,en"
+ },
+ "hambourg": {
+  "alertes": 0,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": null,
+  "content_length": "426",
+  "http": 200,
+  "octets_decompresses": 426,
+  "octets_sur_le_fil": 426,
+  "serveur_utc": 1794041593,
+  "transfer_encoding": null,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=53.551&lon=9.994&lang=fr,en"
+ },
+ "la_palma": {
+  "alertes": 9,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 19238,
+  "octets_sur_le_fil": 1883,
+  "serveur_utc": 1794041552,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=28.659&lon=-17.918&lang=fr,en"
+ },
+ "la_palma_toutes_langues": {
+  "alertes": 9,
+  "http": 200,
+  "note": "capté à la main le 07/11/2026 à 08 h 41 UTC avec l'adresse de l'ébauche (4 décimales, SANS `lang`) : toutes les langues de l'émetteur ; conservé tel quel, ne se recapture pas à l'identique (les alertes changent d'une heure à l'autre)",
+  "octets_decompresses": 26190,
+  "serveur_utc": 1794040873,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=28.6585&lon=-17.9182"
+ },
+ "londres": {
+  "alertes": 1,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 3656,
+  "octets_sur_le_fil": 1699,
+  "serveur_utc": 1794041564,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=51.507&lon=-0.128&lang=fr,en"
+ },
+ "oslo": {
+  "alertes": 1,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 4516,
+  "octets_sur_le_fil": 1976,
+  "serveur_utc": 1794041558,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=59.914&lon=10.752&lang=fr,en"
+ },
+ "tokyo": {
+  "alertes": 0,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 713,
+  "octets_sur_le_fil": 365,
+  "serveur_utc": 1794041580,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=35.676&lon=139.650&lang=fr,en"
+ },
+ "valence": {
+  "alertes": 0,
+  "cache_control": "public, max-age=60, s-maxage=120",
+  "content_encoding": "gzip",
+  "content_length": null,
+  "http": 200,
+  "octets_decompresses": 1331,
+  "octets_sur_le_fil": 732,
+  "serveur_utc": 1794041596,
+  "transfer_encoding": "chunked",
+  "url": "https://vigie.auxfilsdesidees.fr/v1/vigilances?lat=44.933&lon=4.892&lang=fr,en"
+ }
+}

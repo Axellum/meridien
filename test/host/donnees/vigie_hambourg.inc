@@ -1,0 +1,2 @@
+// FICHIER GÉNÉRÉ par test/host/controle_python_vigie.py : ne pas modifier à la main.
+R"VG({"version":"1.0","server_utc":1794041593,"query":{"lat":53.551,"lon":9.994,"country":null,"river_radius_km":5.0},"countries":["DE"],"vigilances":[],"coverage":[{"source":"dwd","source_id":null,"country":"DE","status":"ok","warnings_in_feed":53,"warnings_not_matchable":0,"feed_updated_utc":1794041516,"fetched_age_s":37,"note":null}],"uncovered":[],"attribution":"Source: Deutscher Wetterdienst","disclaimer":null,"note":null})VG"
