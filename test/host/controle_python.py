@@ -178,8 +178,17 @@ def transitions(iana, annees):
 
 
 ZONES_TRANSITIONS = ["Europe/Paris", "America/New_York", "Asia/Kolkata", "Australia/Sydney", "Pacific/Chatham",
-                     "Europe/Dublin", "America/Godthab", "Australia/Lord_Howe"]
+                     "Europe/Dublin", "America/Godthab", "Australia/Lord_Howe",
+                     # ajoutées pour le lot « l'heure suit le lieu » (ADR-0012) : minutes non nulles, deux fuseaux sans changement d'heure
+                     # aux latitudes opposées, le nouvel an local (Auckland en premier, Honolulu en dernier) et la limite connue de la table
+                     "Asia/Kathmandu", "Africa/Casablanca", "America/Caracas", "Pacific/Auckland", "Pacific/Honolulu"]
 ANNEES = [2026, 2027, 2028]
+# Zones dont la chaîne POSIX de la table ne suit pas la base IANA : décalage que la TABLE donne toujours (secondes). Africa/Casablanca :
+# la table dit +1 h toute l'année, alors que zoneinfo (tzdata 2026c, lu le 07/11/2026) donne +0 h du 15/02 au 22/03/2026 (Ramadan,
+# règle non exprimable en POSIX) puis, sans autre changement jusqu'en 2028, +0 h à partir du 20/09/2026. Les instants où zoneinfo
+# donne autre chose sont écrits à part (ATTENDU_HEURE_LIMITES) : le test vérifie que l'écart est CELUI-LÀ, pour que la limite soit
+# documentée par un test et ne disparaisse pas sans bruit.
+LIMITES_POSIX = {"Africa/Casablanca": 3600}
 
 
 def points_pour_zone(iana):
@@ -197,6 +206,12 @@ def points_pour_zone(iana):
               instant(2027, 1, 1, 0, 0, 0), instant(2026, 11, 6, 10, 40, 0), instant(2000, 2, 29, 12, 0, 0),
               instant(2100, 2, 28, 23, 59, 59), instant(2100, 3, 1, 0, 0, 0), instant(2038, 1, 19, 3, 14, 7)):
         pts.add(t)
+    # le nouvel an LOCAL : minuit du 1er janvier sur place, la seconde d'avant et la seconde d'après (autres fuseaux que l'UTC)
+    z = ZoneInfo(iana)
+    for an in (2027, 2028):
+        minuit = int(datetime(an, 1, 1, tzinfo=z).timestamp())
+        for dt in (-1, 0, 1):
+            pts.add(minuit + dt)
     if iana == "America/Godthab":      # le Groenland a changé de règle en 2023 : pas de date d'avant 2024 pour cette zone
         pts = {t for t in pts if t >= instant(2024, 1, 1)}
     return sorted(pts)
@@ -207,20 +222,27 @@ def inc_attendu_heure():
     lignes = [ENTETE, "// Heures locales attendues, calculées par Python zoneinfo (indépendant de la chaîne POSIX).\n",
               "// ZONES : noms IANA ; LIGNES : {indice de zone, instant UTC, an, mois, jour, heure, minute, seconde,\n",
               "//         jour de semaine (0=dimanche), décalage UTC (s), heure d'été ?}\n",
+              "// LIMITES : mêmes colonnes, pour les instants où la table (POSIX) ne peut pas suivre zoneinfo (voir LIMITES_POSIX).\n",
               "#ifdef ATTENDU_HEURE_ZONES\n"]
     for iana in ZONES_TRANSITIONS:
         assert iana in posix, iana
         lignes.append("    %s,\n" % c_chaine(iana))
     lignes.append("#endif\n#ifdef ATTENDU_HEURE_LIGNES\n")
     total = 0
+    hors = []
     for k, iana in enumerate(ZONES_TRANSITIONS):
         for t in points_pour_zone(iana):
             a = attendu_zone(iana, t)
-            lignes.append("{%d, %dLL, %d, %d, %d, %d, %d, %d, %d, %d, %s},\n" % (
-                k, t, *a[:8], "true" if a[8] else "false"))
-            total += 1
+            ligne = "{%d, %dLL, %d, %d, %d, %d, %d, %d, %d, %d, %s},\n" % (k, t, *a[:8], "true" if a[8] else "false")
+            if iana in LIMITES_POSIX and a[7] != LIMITES_POSIX[iana]:
+                hors.append(ligne)
+            else:
+                lignes.append(ligne)
+                total += 1
+    lignes.append("#endif\n#ifdef ATTENDU_HEURE_LIMITES\n")
+    lignes += hors
     lignes.append("#endif\n")
-    return "".join(lignes), total
+    return "".join(lignes), total, len(hors)
 
 
 def main():
@@ -237,9 +259,9 @@ def main():
         sorties[f"attendu_meteo_{nom}.inc"] = inc_attendu_meteo(nom, doc)
         sorties[f"attendu_proba_{nom}.inc"] = inc_attendu_proba(nom, doc)
         resume.append(f"{nom}: {len(brut)} octets, {comptes[0]} nombres, {comptes[1]} chaînes, {comptes[2]} conteneurs, {comptes[3]} autres")
-    heure, total = inc_attendu_heure()
+    heure, total, hors = inc_attendu_heure()
     sorties["attendu_heure.inc"] = heure
-    resume.append(f"heure: {total} instants, {len(ZONES_TRANSITIONS)} zones")
+    resume.append(f"heure: {total} instants, {len(ZONES_TRANSITIONS)} zones, {hors} instants hors de portée de la table (limites connues)")
     ok = True
     for nom, texte in sorties.items():
         chemin = DONNEES / nom

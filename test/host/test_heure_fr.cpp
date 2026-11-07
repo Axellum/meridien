@@ -1,7 +1,10 @@
 // Tests du noyau pur : heure locale depuis une chaîne POSIX TZ + formats français (heure_fr.hpp).
 // Les heures attendues viennent de Python zoneinfo (donnees/attendu_heure.inc, généré par controle_python.py) pour
 // Europe/Paris, America/New_York, Asia/Kolkata, Australia/Sydney, Pacific/Chatham, Europe/Dublin, America/Godthab
-// et Australia/Lord_Howe, juste avant / pendant / juste après chaque changement d'heure de 2026 à 2028.
+// et Australia/Lord_Howe, puis (ADR-0012) Asia/Kathmandu, Africa/Casablanca, America/Caracas, Pacific/Auckland et Pacific/Honolulu,
+// juste avant / pendant / juste après chaque changement d'heure de 2026 à 2028 et à cheval sur le nouvel an LOCAL de 2027 et 2028.
+// Africa/Casablanca : la table dit +1 h en permanence, zoneinfo (tzdata 2026c) non (Ramadan 2026, puis +0 h dès le 20/09/2026) :
+// les instants où elles divergent sont à part (LIMITES).
 #include "ecran/fuseaux.hpp"
 #include "ecran/heure_fr.hpp"
 #include "mini.hpp"
@@ -30,14 +33,22 @@ constexpr Ligne LIGNES[] = {
 #undef ATTENDU_HEURE_LIGNES
 };
 constexpr std::size_t NOMBRE_LIGNES = sizeof(LIGNES) / sizeof(LIGNES[0]);
+// Les instants où zoneinfo ne suit pas la table (Casablanca pendant le Ramadan) : le test vérifie l'écart, pas l'égalité.
+constexpr Ligne LIMITES[] = {
+#define ATTENDU_HEURE_LIMITES
+#include "donnees/attendu_heure.inc"
+#undef ATTENDU_HEURE_LIMITES
+};
+constexpr std::size_t NOMBRE_LIMITES = sizeof(LIMITES) / sizeof(LIMITES[0]);
 
 constexpr sv texte(const char *tampon, std::size_t n) { return sv(tampon, n); }
 
 // ---- 1. les valeurs de Python ----------------------------------------------------------------------------------------
 
 constexpr int les_lignes_python_sont_la() {
-    VERIFIER(sizeof(ZONES) / sizeof(ZONES[0]) == 8);
-    VERIFIER(NOMBRE_LIGNES == 1093);
+    VERIFIER(sizeof(ZONES) / sizeof(ZONES[0]) == 13);
+    VERIFIER(NOMBRE_LIGNES == 1574);
+    VERIFIER(NOMBRE_LIMITES == 85);
     return 0;
 }
 
@@ -70,7 +81,9 @@ constexpr int heures_locales_identiques_a_zoneinfo(int zone) {
             return r;
         ++vues;
     }
-    VERIFIER(vues > 50); // la zone a bien ses lignes (grille + changements d'heure)
+    VERIFIER(
+        vues >=
+        30); // la zone a bien ses lignes (grille + changements d'heure ; Casablanca n'en garde que 30, voir LIMITES)
     return 0;
 }
 constexpr int heure_paris() { return heures_locales_identiques_a_zoneinfo(0); }
@@ -81,6 +94,69 @@ constexpr int heure_chatham() { return heures_locales_identiques_a_zoneinfo(4); 
 constexpr int heure_dublin() { return heures_locales_identiques_a_zoneinfo(5); }
 constexpr int heure_godthab() { return heures_locales_identiques_a_zoneinfo(6); }
 constexpr int heure_lord_howe() { return heures_locales_identiques_a_zoneinfo(7); }
+constexpr int heure_katmandou() { return heures_locales_identiques_a_zoneinfo(8); }
+constexpr int heure_casablanca_la_ou_la_table_suit_zoneinfo() { return heures_locales_identiques_a_zoneinfo(9); }
+constexpr int heure_caracas() { return heures_locales_identiques_a_zoneinfo(10); }
+constexpr int heure_auckland() { return heures_locales_identiques_a_zoneinfo(11); }
+constexpr int heure_honolulu() { return heures_locales_identiques_a_zoneinfo(12); }
+
+// Limite connue de la table (fuseaux.hpp) : Africa/Casablanca est à +1 h toute l'année, alors que zoneinfo (tzdata 2026c, installé sur
+// le PC) donne +0 h pendant le Ramadan 2026 (15/02 au 22/03) puis à partir du 20/09/2026, sans autre changement jusqu'en 2028. Ce test
+// fige le comportement ACTUEL pour qu'il soit écrit quelque part : à ces 85 instants le noyau donne +3600 s alors que zoneinfo donne
+// 0 s, soit une heure d'avance, et uniquement celle-là. Le jour où la table suivra la base IANA, ce test échouera et devra être
+// remplacé par une égalité.
+constexpr int casablanca_la_ou_la_table_ne_suit_pas_zoneinfo_elle_a_une_heure_d_avance() {
+    const AnalyseTz a = analyser_tz(fuseaux::posix_pour("Africa/Casablanca"));
+    VERIFIER(a.ok());
+    VERIFIER(a.fuseau.decalage_std_s == 3600 && !a.fuseau.a_heure_ete);
+    for (const Ligne &l : LIMITES) {
+        VERIFIER(ZONES[l.zone] == "Africa/Casablanca");
+        VERIFIER(l.decalage == 0); // zoneinfo : +00 ces jours-là
+        const HeureLocale h = en_heure_locale(l.instant, a.fuseau);
+        VERIFIER(h.decalage_s == 3600);
+        VERIFIER(h.heure == (l.heure + 1) % 24); // une heure d'avance, jamais autre chose
+        VERIFIER(h.minute == l.minute && h.seconde == l.seconde);
+    }
+    return 0;
+}
+
+// Le nouvel an LOCAL (minuit du 1er janvier sur place, à une seconde près) est dans les lignes de Python pour chaque zone ; les
+// comparaisons ci-dessus le vérifient. Ici on s'assure qu'il y est, surtout pour Auckland (UTC+13 : la veille en UTC) et
+// Honolulu (UTC-10 : le lendemain en UTC), où le jour civil local diffère du jour UTC.
+constexpr int le_nouvel_an_local_est_couvert() {
+    for (int zone = 0; zone < 13; ++zone) {
+        if (ZONES[zone] == "Africa/Casablanca") {
+            continue; // ses instants de 2027 et 2028 sont tous dans LIMITES (voir ci-dessus)
+        }
+        int veille = 0;
+        int minuit = 0;
+        for (const Ligne &l : LIGNES) {
+            if (l.zone != zone) {
+                continue;
+            }
+            if (l.mois == 12 && l.jour == 31 && l.heure == 23 && l.minute == 59 && l.seconde == 59) {
+                ++veille;
+            }
+            if (l.mois == 1 && l.jour == 1 && l.heure == 0 && l.minute == 0 && l.seconde == 0) {
+                ++minuit;
+            }
+        }
+        VERIFIER(veille >= 2 && minuit >= 2); // 2027 et 2028
+    }
+    // Auckland : minuit du 1er janvier 2027 sur place = 11:00 UTC le 31 décembre 2026
+    const AnalyseTz auckland = analyser_tz(fuseaux::posix_pour("Pacific/Auckland"));
+    VERIFIER(auckland.ok());
+    const HeureLocale nz = en_heure_locale(1798714800LL, auckland.fuseau);
+    VERIFIER(nz.an == 2027 && nz.mois == 1 && nz.jour == 1 && nz.heure == 0 && nz.decalage_s == 46800);
+    // Honolulu : minuit du 1er janvier 2027 sur place = 10:00 UTC le 1er janvier 2027
+    const AnalyseTz honolulu = analyser_tz(fuseaux::posix_pour("Pacific/Honolulu"));
+    VERIFIER(honolulu.ok());
+    const HeureLocale hi = en_heure_locale(1798797600LL, honolulu.fuseau);
+    VERIFIER(hi.an == 2027 && hi.mois == 1 && hi.jour == 1 && hi.heure == 0 && hi.decalage_s == -36000);
+    const HeureLocale veille_hi = en_heure_locale(1798797599LL, honolulu.fuseau);
+    VERIFIER(veille_hi.an == 2026 && veille_hi.mois == 12 && veille_hi.jour == 31 && veille_hi.heure == 23);
+    return 0;
+}
 
 constexpr int convertir_direct_depuis_la_chaine() {
     // Même chose par le raccourci `convertir` (chaîne -> résultat), sur toutes les lignes.
@@ -497,6 +573,13 @@ constexpr int temperature_arrondie_avec_le_signe_degre() {
     X(heure_dublin)                                                                                                    \
     X(heure_godthab)                                                                                                   \
     X(heure_lord_howe)                                                                                                 \
+    X(heure_katmandou)                                                                                                 \
+    X(heure_casablanca_la_ou_la_table_suit_zoneinfo)                                                                   \
+    X(heure_caracas)                                                                                                   \
+    X(heure_auckland)                                                                                                  \
+    X(heure_honolulu)                                                                                                  \
+    X(casablanca_la_ou_la_table_ne_suit_pas_zoneinfo_elle_a_une_heure_d_avance)                                        \
+    X(le_nouvel_an_local_est_couvert)                                                                                  \
     X(convertir_direct_depuis_la_chaine)                                                                               \
     X(le_cas_de_la_consigne_paris_11_h_40)                                                                             \
     X(paris_autour_du_changement_de_mars_2026)                                                                         \

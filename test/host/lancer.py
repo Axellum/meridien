@@ -153,6 +153,7 @@ MUTATIONS = [
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
 from mutations_fournisseurs import MUTATIONS_FOURNISSEURS  # noqa: E402  (sources météo : table, liste par pays, lien avec le lecteur)
+from mutations_fuseaux import MUTATIONS_FUSEAUX  # noqa: E402  (heure du lieu et lever/coucher du soleil : ADR-0012)
 from mutations_geocodage import MUTATIONS_GEOCODAGE  # noqa: E402  (recherche de lieu : lecture, ville choisie, état)
 from mutations_gzip import MUTATIONS_GZIP  # noqa: E402  (enveloppe gzip des réponses HTTP : en-tête, pied, CRC32, Content-Encoding)
 from mutations_hote_appareil import MUTATIONS_HOTE_APPAREIL  # noqa: E402  (hôte de l'appareil et lieux de la recherche : voir ce fichier)
@@ -187,6 +188,7 @@ MUTATIONS += MUTATIONS_HOTE_APPAREIL
 MUTATIONS += MUTATIONS_MATERIEL_TAB5
 MUTATIONS += MUTATIONS_VIGIE
 MUTATIONS += MUTATIONS_GZIP
+MUTATIONS += MUTATIONS_FUSEAUX
 
 
 @functools.lru_cache(maxsize=None)
