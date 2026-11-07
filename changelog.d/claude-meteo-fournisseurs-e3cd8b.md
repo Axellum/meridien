@@ -4,8 +4,8 @@
   **MET Norway (api.met.no)** for Norway, Finland, Iceland and Svalbard, and **NWS (weather.gov)** for the United States and Puerto
   Rico, next to Open-Meteo's national models. The answers are read by pure, tested readers into the same structure as Open-Meteo's,
   so the screens do not change. What a service does not give is **unknown, never 0**: the UV index is unknown for both, the NWS gives
-  no pressure and, most days, no daily rain total. Sunrise and sunset are computed on the device (within 81 s of MET Norway's own
-  "Sunrise 3.0" below 60° of latitude, 257 s above 66.5°). Each service has its own rhythm (at least 30 min for MET Norway, 60 min for the
+  no pressure and, most days, no daily rain total. Sunrise and sunset are computed on the device (with the device's single
+  sun calculation, within 60 s of MET Norway's own "Sunrise 3.0" on 69 days at every latitude). Each service has its own rhythm (at least 30 min for MET Norway, 60 min for the
   NWS, never before the `Expires` the service sends, at most 90 min, random spread, never on the round hour). When the chosen service
   fails (network, HTTP 404 outside its area, no grid), the weather comes from Open-Meteo "Automatic" in the meantime and the screen and the
   page say so; the credit shown is always the one of the service that really gave the weather (MET Norway: CC BY 4.0 and NLOD 2.0; NWS:

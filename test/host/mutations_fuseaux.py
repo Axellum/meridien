@@ -1,4 +1,5 @@
-"""Mutations du noyau « heure du lieu » (heure_lieu.hpp) et « lever et coucher du soleil » (soleil.hpp), lues par lancer.py --mutations.
+"""Mutations du noyau « heure du lieu » (heure_lieu.hpp) et « lever et coucher du soleil » (soleil.hpp, le seul calcul du soleil de
+l'appareil : écran principal et lecteurs de MET Norway et du NWS), lues par lancer.py --mutations.
 
 Même format que MUTATIONS dans lancer.py : (fichier du noyau, texte exact à remplacer — il doit apparaître UNE fois —,
 remplacement, test qui doit échouer, nom de la fonction de test qui doit être citée, ce que la mutation simule). Une
@@ -92,6 +93,33 @@ MUTATIONS_FUSEAUX = [
      SOLEIL, "le_calcul_est_celui_de_python_a_quelques_secondes_pres", "l'équation du temps vaut la moitié de sa valeur"),
     ("soleil.hpp", "    a.declinaison = arc_sinus(sinus(obliquite) * sinus(longitude_apparente));", "    a.declinaison = -arc_sinus(sinus(obliquite) * sinus(longitude_apparente));",
      SOLEIL, "le_calcul_est_celui_de_python_a_quelques_secondes_pres", "la déclinaison est de signe contraire (les saisons s'échangent)"),
+    # --- soleil.hpp : la forme en entiers (lecteurs de MET Norway et du NWS, ADR-0014) et la hauteur du soleil ---
+    ("soleil.hpp", "debut_jour_s + 43200);", "debut_jour_s);",
+     SOLEIL, "la_forme_en_entiers_est_celle_en_degres", "le jour solaire d'un jour local est choisi d'après son minuit, pas son milieu"),
+    ("soleil.hpp", "detail::degres_depuis_e5(latitude_e5),", "detail::degres_depuis_e5(longitude_e5),",
+     SOLEIL, "la_forme_en_entiers_est_celle_en_degres", "la longitude en e5 est prise pour la latitude"),
+    ("soleil.hpp", "return static_cast<double>(e5) / 100000.0;", "return static_cast<double>(e5) / 10000.0;",
+     SOLEIL, "les_degres_viennent_des_e5", "un e5 vaut dix fois trop de degrés"),
+    ("soleil.hpp", "const double temps_solaire_vrai_min = minutes_utc + a.equation_min + 4.0 * longitude_deg;",
+     "const double temps_solaire_vrai_min = minutes_utc + a.equation_min - 4.0 * longitude_deg;",
+     SOLEIL, "hauteur_du_soleil", "la hauteur du soleil compte la longitude dans le mauvais sens"),
+    ("soleil.hpp", "const double temps_solaire_vrai_min = minutes_utc + a.equation_min + 4.0 * longitude_deg;",
+     "const double temps_solaire_vrai_min = minutes_utc - a.equation_min + 4.0 * longitude_deg;",
+     SOLEIL, "la_hauteur_au_lever_et_au_coucher_est_le_seuil", "la hauteur du soleil retranche l'équation du temps au lieu de l'ajouter"),
+    ("soleil.hpp", "static_cast<double>(instant_s) / 86400.0 + 2440587.5);", "static_cast<double>(instant_s) / 86400.0 + 2440586.5);",
+     SOLEIL, "la_hauteur_au_lever_et_au_coucher_est_le_seuil", "la position du soleil de la hauteur est prise un jour trop tôt"),
+    ("soleil.hpp", "const double angle_horaire = (temps_solaire_vrai_min / 4.0 - 180.0) * detail::RAD;",
+     "const double angle_horaire = (temps_solaire_vrai_min / 4.0 - 90.0) * detail::RAD;",
+     SOLEIL, "hauteur_du_soleil", "l'angle horaire compte depuis 6 h au lieu de midi"),
+    ("soleil.hpp", "return hauteur_deg(instant_s, lat, lon) > 90.0 - detail::ZENITH_LEVER_DEG;",
+     "return hauteur_deg(instant_s, lat, lon) < 90.0 - detail::ZENITH_LEVER_DEG;",
+     SOLEIL, "hauteur_du_soleil", "le soleil est dit levé quand il est couché"),
+    ("soleil.hpp", "return hauteur_deg(instant_s, lat, lon) > 90.0 - detail::ZENITH_LEVER_DEG;",
+     "return hauteur_deg(instant_s, lat, lon) > 90.0;",
+     SOLEIL, "le_jour_et_la_nuit_suivent_le_lever_et_le_coucher", "le soleil est levé à l'horizon géométrique : rayon du disque et réfraction oubliés"),
+    ("soleil.hpp", "return hauteur_deg(instant_s, lat, lon) > 90.0 - detail::ZENITH_LEVER_DEG;",
+     "return hauteur_deg(instant_s, lon, lat) > 90.0 - detail::ZENITH_LEVER_DEG;",
+     SOLEIL, "hauteur_du_soleil", "la latitude et la longitude sont échangées pour savoir si le soleil est levé"),
     # --- soleil.hpp : les fonctions mathématiques écrites à la main ---
     ("soleil.hpp", "    for (int i = 0; i < 80; ++i) { // Newton", "    for (int i = 0; i < 2; ++i) { // Newton",
      SOLEIL, "la_racine_carree", "la racine carrée n'est pas convergée (deux tours de Newton)"),

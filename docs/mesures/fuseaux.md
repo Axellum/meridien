@@ -5,7 +5,7 @@
 > each « hour by hour » column (converted with the rules in force at its own instant, so a window across a clock change is right),
 > sunrise and sunset, day names, « today » and the hours of an official alert. The sky without weather uses sunrise and sunset
 > computed for the place (NOAA method, pure core): 8 s at most from Open-Meteo's real values over 63 days. Expected values come from
-> Python `zoneinfo` (tzdata 2026c), never typed by hand; 38 + 14 targeted mutations are all detected; 7 PC renders at 1024x600
+> Python `zoneinfo` (tzdata 2026c), never typed by hand; 48 + 14 targeted mutations are all detected; 7 PC renders at 1024x600
 > were looked at; the Tab5 and the 7B build with 0 compiler warning. **Not seen on a board** (nothing flashed): the panel, the web
 > page changing the zone, the cost of the sunrise computation on the ESP32-P4.
 
@@ -30,7 +30,7 @@ Compilés et lancés avec AddressSanitizer + UBSan (mode « complet (compilé + 
 |---|---|---|
 | `test_heure_fr.cpp` | 32 | 13 zones, 1 574 instants de `zoneinfo` (dont Katmandou, Caracas, Auckland, Honolulu) ; Casablanca gardée comme limite connue (85 lignes) |
 | `test_heure_lieu.cpp` | 15 | 408 colonnes d'une fenêtre, 73 jours, 98 levers et couchers réels en `hh:mm` local, New York (1er novembre 2026) et Sydney (4 octobre 2026), étiquettes, jours de 23 et 25 heures |
-| `test_soleil.cpp` | 11 | NOAA contre une réécriture Python indépendante (120 lignes) et contre 63 jours réels d'Open-Meteo ; jour et nuit polaires ; coordonnées invraisemblables |
+| `test_soleil.cpp` | 27 | NOAA contre une réécriture Python indépendante (120 lignes) et contre 63 jours réels d'Open-Meteo ; jour et nuit polaires ; coordonnées invraisemblables ; **depuis le 07/11/2026, le seul calcul du soleil de l'appareil** : forme en entiers (e5) des lecteurs de MET Norway et du NWS, hauteur du soleil, 79 jours de MET Norway « Sunrise 3.0 » et le second calcul Python « Almanac for Computers » (ADR-0012) |
 | `test_horloge.cpp` | 9 | le **vrai** `main/horloge.cpp` avec une zone fausse : 8 lieux × 13 instants, changement de zone entre deux appels, zone illisible, nom sans zéro final |
 | `test_vigie_heure_lieu.cpp` | 3 | `vigie::formater_instant` pour 8 lieux × 13 instants, en français et en anglais |
 
@@ -44,7 +44,7 @@ Compilés et lancés avec AddressSanitizer + UBSan (mode « complet (compilé + 
 
 | Cible | Mutations | Détectées | Commande |
 |---|---|---|---|
-| `heure_lieu.hpp`, `soleil.hpp` | 38 | 38 (0 problème) | `python test/host/lancer.py --mutations --seulement test_heure_lieu,test_soleil` |
+| `heure_lieu.hpp`, `soleil.hpp` | 48 (38 + 10 ajoutées le 07/11/2026 pour la forme en entiers et la hauteur du soleil) | 48 (0 problème) | `python test/host/lancer.py --mutations --seulement test_heure_lieu,test_soleil` |
 | `main/horloge.cpp` (hors du noyau) | 14 | 14 (0 problème) | `python test/host/mutations_horloge.py` |
 
 Trois mutations ont d'abord échappé et ont fait corriger le **test** : le jour de la semaine lu à minuit local (le test n'essayait que des minuits exacts : ajout de décalages de ±1 h et ±30 min), un drapeau impliqué par les règles du hachage (mutant équivalent, remplacé), et l'oubli du retour de `zone_lire` (le faux renvoyait une zone vide, donc `false` aussi : le faux remplit maintenant `*sortie` avant de répondre « faux »). Les mutations qui ne compilaient pas (`-Werror`) sont comptées comme un problème, pas comme une détection.

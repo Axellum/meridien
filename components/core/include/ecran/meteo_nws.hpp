@@ -1,6 +1,6 @@
 // Noyau pur : les réponses du NWS (National Weather Service des États-Unis, api.weather.gov) -> la météo du noyau (`AnalyseRiche`,
 // comme les lecteurs d'Open-Meteo et de MET Norway). C++17 standard, aucun include ESP-IDF, aucun flottant dans la lecture des
-// données (entiers en dixièmes) ; seul le calcul du soleil (soleil_calcule.hpp) emploie des `double`. Décision et mesures :
+// données (entiers en dixièmes) ; seul le calcul du soleil (soleil.hpp) emploie des `double`. Décision et mesures :
 // ADR-0014, docs/mesures/fournisseurs-meteo.md.
 //
 // DEUX RÉPONSES (meteo_requete_fournisseurs.hpp) :
@@ -24,7 +24,7 @@
 //     cumul sur des heures qu'il ne couvre pas à moitié (répartir = inventer).
 //   - INDICE UV, durée d'ensoleillement, nombre d'heures de pluie, direction dominante du vent d'un jour, pluie par quarts
 //     d'heure : non fournis.
-//   - lever et coucher du soleil : non fournis, calculés ici (soleil_calcule.hpp).
+//   - lever et coucher du soleil : non fournis, calculés ici (soleil.hpp).
 //   - minimum et maximum du jour : sur les intervalles de température qui touchent le jour local ; la couche `maxTemperature` /
 //     `minTemperature` du NWS porte sur des fenêtres de 9 à 15 heures qui ne sont pas des jours civils : non utilisée.
 //   - la probabilité de précipitations d'une heure est celle de l'intervalle qui la contient, si cet intervalle dure 6 heures au
@@ -52,7 +52,7 @@
 #include "ecran/meteo_requete_fournisseurs.hpp"
 #include "ecran/meteo_riche.hpp"
 #include "ecran/parcours_json.hpp"
-#include "ecran/soleil_calcule.hpp"
+#include "ecran/soleil.hpp"
 
 namespace ecran::meteo::nws {
 
@@ -558,7 +558,7 @@ constexpr AnalyseRiche analyser_nws(std::string_view texte, const Maille &maille
     r.temperature_dixiemes = temperature;
     r.ressentie_dixiemes = detail::valeur_dix(s.ressentie, maintenant);
     r.code_wmo = static_cast<std::int16_t>(code_courant);
-    r.jour = astro::soleil_leve(recu_a_s, latitude_e5, longitude_e5);
+    r.jour = soleil::est_leve_e5(recu_a_s, latitude_e5, longitude_e5);
     r.vent_dixiemes_kmh = detail::valeur_dix(s.vent, maintenant);
     r.rafales_dixiemes_kmh = detail::valeur_dix(s.rafales, maintenant);
     r.direction_vent_deg = detail::valeur_entier(s.direction, maintenant);
@@ -604,7 +604,7 @@ constexpr AnalyseRiche analyser_nws(std::string_view texte, const Maille &maille
             h.rafales_dixiemes_kmh = detail::valeur_dix(s.rafales, rel);
             h.direction_deg = detail::valeur_entier(s.direction, rel);
             h.uv_dixiemes = INCONNU_DIX; // le NWS ne donne pas d'indice UV
-            h.jour = astro::soleil_leve(t, latitude_e5, longitude_e5);
+            h.jour = soleil::est_leve_e5(t, latitude_e5, longitude_e5);
         }
         if (!bonne) {
             a.diag_heures = Diagnostic{Erreur::TableauxIncoherents, "hourly"};

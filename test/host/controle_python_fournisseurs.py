@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Contrôle INDÉPENDANT des tests de MET Norway et du NWS (components/core/include/ecran/meteo_metno.hpp, meteo_nws.hpp,
-soleil_calcule.hpp).
+"""Contrôle INDÉPENDANT des tests de MET Norway et du NWS (components/core/include/ecran/meteo_metno.hpp, meteo_nws.hpp)
+et du calcul du soleil qu'ils emploient (soleil.hpp, ADR-0012).
 
     python test/host/controle_python_fournisseurs.py              # (ré)génère donnees/*.inc
     python test/host/controle_python_fournisseurs.py --verifier   # ne modifie rien : échoue si un .inc n'est pas à jour
@@ -13,7 +13,9 @@ Sorties (générées, ne pas modifier à la main) :
                                                                    par ligne, dans l'ordre de `aplatir()` des tests (chaque
                                                                    ligne porte son rang et son nom ; un test qui échoue rend
                                                                    10000 + rang)
-  attendu_soleil_almanac.inc                                               lever et coucher du soleil par un AUTRE algorithme
+  attendu_soleil_almanac.inc                                       lever et coucher du soleil par un AUTRE algorithme
+  attendu_soleil_metno.inc                                         lever et coucher réels du produit « Sunrise 3.0 » de MET Norway
+                                                                   (lus dans soleil_metno_reference.json)
 
 Aucune ligne de C++ du noyau n'est reprise : les réponses sont lues avec json.loads(parse_float=Decimal), les instants avec
 datetime et zoneinfo (la base de fuseaux de Python, pas celle de fuseaux.hpp), le soleil avec l'algorithme « Almanac for
@@ -145,10 +147,17 @@ def e5(deg):
     return int(round(deg * 100000))
 
 
+def code_situation(cas):
+    """Le cas de `soleil()` (0 normal, 1 nuit polaire, 2 jour polaire) dans la numérotation de `ecran::soleil::Situation` :
+    0 normal, 1 jour polaire, 2 nuit polaire (celle de attendu_soleil.inc, que le test compare avec `static_cast<int>`)."""
+    return {0: 0, 1: 2, 2: 1}[cas]
+
+
 def inc_soleil():
     lignes = [ENTETE,
               "// Lever et coucher du soleil par l'algorithme « Almanac for Computers » (US Naval Observatory), sans rien du noyau.\n",
-              "// Une ligne par jour local : début du jour (UNIX), latitude e5, longitude e5, cas (0 normal, 1 nuit polaire, 2 jour polaire), lever, coucher.\n"]
+              "// Une ligne par jour local : début du jour (UNIX), latitude e5, longitude e5, cas (0 normal, 1 jour polaire, 2 nuit polaire :\n",
+              "// la numérotation de ecran::soleil::Situation), lever, coucher.\n"]
     n = 0
     for nom, fuseau, lat, lon, jours in LIEUX_SOLEIL:
         for jour in jours:
@@ -156,7 +165,7 @@ def inc_soleil():
             cas, lever, coucher, marge = soleil(debut, lat, lon)
             if marge < 0.02:  # lever à la limite de l'horizon : le résultat dépend de la façon dont chaque algorithme arrondit
                 continue
-            lignes.append(f"{debut}LL, {e5(lat)}LL, {e5(lon)}LL, {cas}LL, {lever}LL, {coucher}LL, // {nom} {jour}\n")
+            lignes.append(f"{debut}LL, {e5(lat)}LL, {e5(lon)}LL, {code_situation(cas)}LL, {lever}LL, {coucher}LL, // {nom} {jour}\n")
             n += 1
     return "".join(lignes), n
 
@@ -166,7 +175,7 @@ def inc_soleil_metno():
     ref = json.loads((DONNEES / "soleil_metno_reference.json").read_text(encoding="utf-8"))
     lignes = [ENTETE,
               "// Lever et coucher du soleil donnés par le produit Sunrise 3.0 de MET Norway (réponses réelles du 07/11/2026,\n",
-              "// donnees/soleil_metno_reference.json), à la minute. Mêmes colonnes que attendu_soleil_almanac.inc.\n"]
+              "// donnees/soleil_metno_reference.json), à la minute. Mêmes colonnes et même numérotation des cas que attendu_soleil_almanac.inc.\n"]
     n = 0
     for r in ref:
         if r["http"] != 200:
@@ -187,7 +196,7 @@ def inc_soleil_metno():
             coucher = int(dt.datetime.fromisoformat(p["sunset"]["time"]).timestamp())
             if not lever < coucher:
                 continue  # le coucher tombe après minuit local : le jour local suivant, hors du modèle « un lever, un coucher »
-        lignes.append(f"{r['debut_jour_s']}LL, {r['lat_e5']}LL, {r['lon_e5']}LL, {cas}LL, {lever}LL, {coucher}LL, "
+        lignes.append(f"{r['debut_jour_s']}LL, {r['lat_e5']}LL, {r['lon_e5']}LL, {code_situation(cas)}LL, {lever}LL, {coucher}LL, "
                       f"// {r['lieu']} {r['jour']}\n")
         n += 1
     return "".join(lignes), n

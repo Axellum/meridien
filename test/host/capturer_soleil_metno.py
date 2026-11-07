@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Capture les VRAIES réponses du produit « Sunrise 3.0 » de MET Norway pour vérifier le calcul du lever et du coucher du soleil
-fait sur l'appareil (components/core/include/ecran/soleil_calcule.hpp).
+fait sur l'appareil (components/core/include/ecran/soleil.hpp, ADR-0012).
 
     python test/host/capturer_soleil_metno.py           # écrit donnees/soleil_metno_reference.json
 
