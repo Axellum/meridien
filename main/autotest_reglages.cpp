@@ -74,6 +74,16 @@ void ecrire(const char *cle, std::int32_t v) {
     }
 }
 
+// L'installation guidée revient à « carte neuve » (aucun octet d'étape) : l'état d'avant tout essai.
+void effacer_etape_installation() {
+    nvs_handle_t h = 0;
+    if (nvs_open("installation", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_key(h, "etape");
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
+
 // ---- LVGL : verrou, attente, recherche d'objets ----------------------------------------------------------------------------------
 bool verrou() { return board_display_lock(3000); }
 
@@ -460,16 +470,6 @@ void phase_3() {
     const int echecs = lire("echecs", 0) + g_echecs;
     ESP_LOGI(TAG, "AUTOTEST FIN : %d vérification(s), %d échec(s)", verifs, echecs);
     ecrire("phase", 9); // fini : aucun démarrage suivant ne rejoue l'essai
-}
-
-// L'installation guidée revient à « carte neuve » (aucun octet d'étape) : l'état d'avant tout essai.
-void effacer_etape_installation() {
-    nvs_handle_t h = 0;
-    if (nvs_open("installation", NVS_READWRITE, &h) == ESP_OK) {
-        nvs_erase_key(h, "etape");
-        nvs_commit(h);
-        nvs_close(h);
-    }
 }
 
 // Un binaire d'essai compilé après le précédent rejoue tout : phase, essais et compteurs repartent de zéro et l'installation
