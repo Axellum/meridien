@@ -30,6 +30,7 @@
 #include "ecran/api_json.hpp"
 #include "ecran/appairage.hpp"
 #include "ecran/fuseaux.hpp"
+#include "ecran/geocodage.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/json_mini.hpp"
 #include "ecran/meteo_wmo.hpp"
@@ -39,6 +40,8 @@ namespace ecran::api {
 
 inline constexpr std::size_t CORPS_MAX = 4096; // octets (api-reglages.md §1 règle 8)
 inline constexpr int RESULTATS_GEOCODAGE_MAX = 8;
+// La page et l'écran de l'appareil affichent le même nombre de lieux (geocodage.hpp).
+static_assert(static_cast<std::size_t>(RESULTATS_GEOCODAGE_MAX) == geocodage::LIEUX_MAX);
 inline constexpr std::size_t ADRESSE_GEOCODAGE_MAX =
     1200; // 80 caractères de 4 octets, chacun encodé en %XX, plus le reste
 
@@ -128,99 +131,14 @@ constexpr void remplacer(std::string_view modele, std::string_view nom, std::str
     }
 }
 
-// Entier en texte décimal, dans `tampon`.
-constexpr std::string_view entier_en_texte(std::int64_t v, char (&tampon)[24]) noexcept {
-    Ecrivain e(tampon, sizeof tampon);
-    e.brut("");
-    std::uint64_t m = v < 0 ? (~static_cast<std::uint64_t>(v) + 1) : static_cast<std::uint64_t>(v);
-    char renverse[24] = {};
-    int n = 0;
-    do {
-        renverse[n++] = static_cast<char>('0' + m % 10);
-        m /= 10;
-    } while (m != 0);
-    if (v < 0)
-        e.octet('-');
-    while (n > 0)
-        e.octet(renverse[--n]);
-    return e.vue();
-}
+// « Lyon, Auvergne-Rhône-Alpes, France » : les parties non vides, séparées par « , » (aussi utilisé par la lecture de la ville).
+using geocodage::ecrire_libelle;
 
-// « Lyon, Auvergne-Rhône-Alpes, France » : les parties non vides, séparées par « , ».
-constexpr void ecrire_libelle(Ecrivain &e, std::string_view a, std::string_view b, std::string_view c) noexcept {
-    bool premier = true;
-    for (std::string_view p : {a, b, c}) {
-        if (p.empty())
-            continue;
-        if (!premier)
-            e.brut(", ");
-        e.brut(p);
-        premier = false;
-    }
-}
-
-// Réponse du géocodage d'Open-Meteo -> {"resultats":[...]} du contrat (api-reglages.md §5). Un lieu sans nom, sans fuseau ou aux
-// coordonnées invalides est écarté. Rend faux si le texte n'est pas un objet JSON, ou si `e` déborde.
+// Réponse du géocodage d'Open-Meteo -> {"resultats":[...]} du contrat (api-reglages.md §5). La lecture, les règles d'écart et
+// l'écriture vivent dans le noyau de la recherche de lieu (geocodage.hpp), partagé avec l'écran de l'appareil. Rend faux si le
+// texte n'est pas un objet JSON, ou si `e` déborde.
 constexpr bool convertir_geocodage(std::string_view texte, Ecrivain &e) noexcept {
-    const json::Resultat lu = json::lire(texte);
-    if (!lu.ok() || lu.valeur.genre() != json::Genre::Objet)
-        return false;
-    e.ouvrir_objet();
-    e.cle("resultats");
-    e.ouvrir_tableau();
-    const json::Valeur liste = lu.valeur.champ("results");
-    const std::size_t n = liste.taille();
-    int ecrits = 0;
-    for (std::size_t i = 0; i < n && ecrits < RESULTATS_GEOCODAGE_MAX; ++i) {
-        const json::Valeur v = liste.element(i);
-        char nom[81] = {};
-        char region[64] = {};
-        char pays[64] = {};
-        char code_pays[4] = {};
-        char fuseau[40] = {};
-        v.champ("name").copier_texte(nom, sizeof nom);
-        v.champ("timezone").copier_texte(fuseau, sizeof fuseau);
-        double lat = 0;
-        double lon = 0;
-        if (nom[0] == '\0' || fuseau[0] == '\0' || !reglages::utf8_valide(nom) || !v.champ("latitude").en_double(lat) ||
-            !v.champ("longitude").en_double(lon) || !(lat >= -90.0 && lat <= 90.0) ||
-            !(lon >= -180.0 && lon <= 180.0)) {
-            continue;
-        }
-        v.champ("admin1").copier_texte(region, sizeof region);
-        v.champ("country").copier_texte(pays, sizeof pays);
-        v.champ("country_code").copier_texte(code_pays, sizeof code_pays);
-        if (!reglages::utf8_valide(region))
-            region[0] = '\0';
-        if (!reglages::utf8_valide(pays))
-            pays[0] = '\0';
-        std::int64_t entier = 0;
-        double altitude = 0;
-        char texte_id[24] = {};
-        e.ouvrir_objet();
-        e.champ("id", v.champ("id").en_entier(entier) ? entier_en_texte(entier, texte_id) : std::string_view{});
-        e.champ("nom", nom);
-        e.champ("region", region);
-        e.champ("pays", pays);
-        e.champ("code_pays", code_pays);
-        e.champ_decimal("latitude", lat, 5);
-        e.champ_decimal("longitude", lon, 5);
-        if (v.champ("elevation").en_double(altitude))
-            e.champ_decimal("altitude", altitude, 0);
-        e.champ("fuseau", fuseau);
-        if (v.champ("population").en_entier(entier) && entier >= 0)
-            e.champ_entier("population", entier);
-        e.cle("libelle");
-        char libelle[256] = {};
-        Ecrivain l(libelle, sizeof libelle);
-        ecrire_libelle(l, nom, region, pays);
-        e.chaine(l.vue());
-        e.fermer_objet();
-        ++ecrits;
-    }
-    e.fermer_tableau();
-    e.fermer_objet();
-    return e.ok();
+    return geocodage::convertir(texte, e);
 }
 
 template <class Hote> class Api {

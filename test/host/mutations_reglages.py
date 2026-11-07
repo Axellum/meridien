@@ -166,10 +166,10 @@ MUTATIONS_REGLAGES = [
      T_API, "wifi_en_lecture_seule_sans_secret", "un Wi-Fi déconnecté affiche des barres"),
     (API, "if (dbm >= -55)\n        return 4;", "if (dbm >= -50)\n        return 4;", T_API, "niveaux_du_signal_wifi",
      "le seuil du niveau 4 change"),
-    (API, "i < n && ecrits < RESULTATS_GEOCODAGE_MAX", "i < n", T_API, "au_plus_huit_lieux", "plus de 8 lieux renvoyés"),
-    (API, "if (nom[0] == '\\0' || fuseau[0] == '\\0' ||", "if (nom[0] == '\\0' ||", T_API, "recherche_de_lieu_convertie_pour_la_page",
+    # La lecture de la réponse du géocodage vit dans geocodage.hpp (partagée avec l'écran, mutée dans mutations_geocodage.py) ; ces
+    # deux-là prouvent que les tests de la PAGE (GET /api/geocode) la voient aussi.
+    ("geocodage.hpp", "if (l.nom[0] == '\\0' || l.fuseau[0] == '\\0' ||", "if (l.nom[0] == '\\0' ||", T_API, "recherche_de_lieu_convertie_pour_la_page",
      "un lieu sans fuseau est proposé à la page (l'appareil ne saurait pas régler l'heure)"),
-    (API, "!(lat >= -90.0 && lat <= 90.0) ||\n            !(lon >= -180.0 && lon <= 180.0)) {\n            continue;",
-     "!(lon >= -180.0 && lon <= 180.0)) {\n            continue;", T_API, "recherche_de_lieu_convertie_pour_la_page",
+    ("geocodage.hpp", "|| !(lat >= -90.0 && lat <= 90.0) ||", "||", T_API, "recherche_de_lieu_convertie_pour_la_page",
      "un lieu de latitude 95 est proposé à la page"),
 ]
