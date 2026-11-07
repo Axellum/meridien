@@ -67,6 +67,10 @@ void essai(const char *nom, const char *ssid, const char *mot_de_passe, int aban
     const uint32_t coupures_avant = reseau_etat().deconnexions;
     g_fini = false;
     g_resultat = -1;
+    char avant[40];
+    const bool avait_ancien =
+        reseau_ssid_courant(avant, sizeof(avant)) > 0; // sans ancien réseau, aucune adresse IP à attendre
+    std::memset(avant, 0, sizeof(avant));
     const int64_t t0 = esp_timer_get_time();
     if (!reseau_connecter(ssid, mot_de_passe, sur_resultat, nullptr)) {
         ESP_LOGW(TAG, "WIFI_ESSAI mode=%s refuse", nom);
@@ -85,7 +89,7 @@ void essai(const char *nom, const char *ssid, const char *mot_de_passe, int aban
     const bool ip_au_rappel = reseau_etat().ip_obtenue;
     // Après un abandon, ou si le rappel est venu avant l'adresse IP : attendre le retour de l'ancien réseau pour le mesurer.
     int64_t ip_retrouvee_ms = -1;
-    while (depuis_ms(t0) < 100000) {
+    while ((avait_ancien || g_resultat == static_cast<int>(wifi::Resultat::Connecte)) && depuis_ms(t0) < 100000) {
         const EtatReseau e = reseau_etat();
         if (e.ip_obtenue && e.wifi_connecte) {
             ip_retrouvee_ms = depuis_ms(t0);
