@@ -135,7 +135,7 @@ struct Essai {
     int duree_ms = 0;
 };
 
-// Zone de travail en PSRAM, allouée une fois : la météo lue (1 312 octets sur le PC) et la copie du contrat v2 (2 080 octets) qui sert au journal.
+// Zone de travail en PSRAM, allouée une fois : la météo lue (1 312 octets sur le PC) et la copie du contrat v2 (2 088 octets) qui sert au journal.
 // Hors de la pile (12 Ko, dont le pic est la prise de contact TLS) et hors de la RAM interne, qui est rare.
 struct Travail {
     meteo::Meteo meteo;
@@ -441,13 +441,21 @@ void journaliser_detail(const char *quand) {
     } else {
         std::snprintf(proba, sizeof(proba), "%d", static_cast<int>(d.courant.proba_precip_pct));
     }
+    char tendance[12];
+    if (std::isnan(d.courant.tendance_pression_3h_hpa)) {
+        std::snprintf(tendance, sizeof(tendance),
+                      "?"); // moins de 3 h de relevés depuis le démarrage ou le changement de zone
+    } else {
+        dixiemes_de(d.courant.tendance_pression_3h_hpa, tendance, sizeof(tendance));
+    }
     ESP_LOGI(TAG_RESULTAT,
              "  courant : %s °C (ressentie %s), « %s », humidité %d %%, nuages %d %%, pluie %s mm, probabilité %s %%, "
              "vent %s "
-             "km/h (rafales %s) direction %d°, pression %d hPa",
+             "km/h (rafales %s) direction %d°, pression %d hPa (tendance sur 3 h : %s hPa)",
              t_c, res, d.courant.libelle, static_cast<int>(d.courant.humidite_pct),
              static_cast<int>(d.courant.nuages_pct), pluie_mm, proba, vent, raf,
-             static_cast<int>(d.courant.direction_vent_deg), static_cast<int>(std::lroundf(d.courant.pression_hpa)));
+             static_cast<int>(d.courant.direction_vent_deg), static_cast<int>(std::lroundf(d.courant.pression_hpa)),
+             tendance);
 
     if (d.heure_courante >= 0) {
         const MeteoHeure &h = d.heures[d.heure_courante];

@@ -4,8 +4,9 @@
 // fait que garder la météo sous verrou et appeler ces deux conversions.
 //
 // Mémoire : la météo (1 312 octets sur le PC) est en PSRAM, allouée à la première publication et jamais libérée (repli en RAM interne si la
-// PSRAM manque). En RAM interne il ne reste que le verrou (une centaine d'octets) et quelques entiers : la RAM interne est rare.
-// Verrou : un mutex FreeRTOS, pas une section critique : la conversion (2 080 octets écrits) ne doit pas couper les interruptions. Les
+// PSRAM manque). En RAM interne il ne reste que le verrou (une centaine d'octets), quelques entiers et l'historique des pressions
+// (~170 octets) : la RAM interne est rare.
+// Verrou : un mutex FreeRTOS, pas une section critique : la conversion (2 088 octets écrits) ne doit pas couper les interruptions. Les
 // lecteurs sont des tâches (jamais une interruption) ; le seul écrivain est la tâche météo (et `meteo_client_demarrer`, avant
 // qu'elle existe).
 #include "meteo_etat.h"
@@ -13,6 +14,7 @@
 #include <atomic>
 #include <cstring>
 #include <ctime>
+#include <limits>
 #include <new>
 
 #include "esp_heap_caps.h"
@@ -37,10 +39,11 @@ struct Etat {
     int echecs;                            // essais ratés de suite
     uint32_t compteur;                     // numéro de la dernière publication, jamais 0
     std::atomic<uint32_t> version_visible; // = compteur si une météo est connue, sinon 0
+    ecran::meteo::HistoPression histo;     // pressions mesurées, pour la tendance sur 3 h (~170 octets, RAM interne)
 
     Etat()
         : tampon_verrou(), verrou(xSemaphoreCreateMutexStatic(&tampon_verrou)), meteo(nullptr), a_meteo(false),
-          echecs(0), compteur(0), version_visible(0) {}
+          echecs(0), compteur(0), version_visible(0), histo() {}
 };
 
 Etat g_etat;
@@ -59,6 +62,7 @@ void mettre_a_zero(MeteoDetail *sortie) {
     sortie->heure_courante = -1;
     sortie->jour_courant = -1;
     sortie->quart_courant = -1;
+    sortie->courant.tendance_pression_3h_hpa = std::numeric_limits<float>::quiet_NaN(); // « inconnue », même sans météo
 }
 
 } // namespace
@@ -82,6 +86,7 @@ bool meteo_etat_publier(const meteo::Meteo &meteo) {
         g_etat.meteo = new (place) meteo::Meteo();
     }
     *g_etat.meteo = meteo;
+    ecran::meteo::tendance_noter(g_etat.histo, meteo.releve.instant_s, meteo.releve.pression_dixiemes_hpa);
     g_etat.a_meteo = true;
     g_etat.echecs = 0;
     if (++g_etat.compteur == 0) {
@@ -102,6 +107,7 @@ void meteo_etat_oublier() {
     Verrou v;
     g_etat.a_meteo = false;
     g_etat.echecs = 0;
+    g_etat.histo = ecran::meteo::HistoPression{}; // les pressions d'un autre lieu ne disent rien de la tendance d'ici
     // La version repasse à 0 : l'interface voit un changement et relit (valide = faux). La publication suivante prend un numéro
     // jamais utilisé, donc aussi différent de celui d'avant.
     g_etat.version_visible.store(0, std::memory_order_release);
@@ -126,7 +132,8 @@ bool meteo_detail_lire(MeteoDetail *sortie) {
         if (g_etat.a_meteo) {
             // La conversion se fait sous verrou, directement depuis la PSRAM vers `sortie` : pas de copie intermédiaire de 2 Ko
             // sur la pile. Elle dure quelques dizaines de microsecondes ; personne d'autre n'écrit qu'une fois par quart d'heure.
-            ecran::meteo::remplir_detail(*g_etat.meteo, g_etat.compteur, maintenant, g_etat.echecs, *sortie);
+            ecran::meteo::remplir_detail(*g_etat.meteo, g_etat.compteur, maintenant, g_etat.echecs, g_etat.histo,
+                                         *sortie);
             return true;
         }
     }

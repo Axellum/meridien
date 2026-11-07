@@ -166,10 +166,22 @@ constexpr Plat aplatir_detail(const MeteoDetail &d, long long proba_du_releve) n
 
 constexpr std::uint32_t VERSION_PAR_DEFAUT = 3;
 
-constexpr MeteoDetail convertir(const Meteo &m, std::int64_t maintenant_s = RECU, int echecs = 0) noexcept {
+constexpr MeteoDetail convertir(const Meteo &m, std::int64_t maintenant_s = RECU, int echecs = 0,
+                                const HistoPression &histo = HistoPression{}) noexcept {
     MeteoDetail d{};
-    remplir_detail(m, VERSION_PAR_DEFAUT, maintenant_s, echecs, d);
+    remplir_detail(m, VERSION_PAR_DEFAUT, maintenant_s, echecs, histo, d);
     return d;
+}
+
+// `__builtin_isnan` est évaluable à la compilation (`std::isnan` ne l'est pas en C++17).
+constexpr bool est_nan(float x) noexcept { return __builtin_isnan(x); }
+
+// Un historique où la mesure de `m` a été précédée, 3 h plus tôt, d'une pression plus basse de `ecart_dixiemes` (la pression monte).
+constexpr HistoPression historique_avant(const Meteo &m, int ecart_dixiemes) noexcept {
+    HistoPression h;
+    tendance_noter(h, m.releve.instant_s - 3 * 3600, m.releve.pression_dixiemes_hpa - ecart_dixiemes);
+    tendance_noter(h, m.releve.instant_s, m.releve.pression_dixiemes_hpa);
+    return h;
 }
 
 // Rend 0 si tout concorde, sinon 10000 + le rang de la première valeur fausse (voir le fichier attendu) ou 1 à 7.
@@ -392,7 +404,7 @@ constexpr int la_version_publiee_est_celle_qu_on_donne() {
     d.version = 7; // l'ancien contenu n'a aucune importance
     d.valide = true;
     d.nb_heures = 5;
-    remplir_detail(R_LYON.meteo, 42, RECU, 0, d);
+    remplir_detail(R_LYON.meteo, 42, RECU, 0, HistoPression{}, d);
     VERIFIER(d.version == 42);   // le numéro de publication appartient à l'état de l'appareil, qui le donne
     VERIFIER(d.nb_heures == 24); // et tout le reste est refait à neuf
     VERIFIER(convertir(R_LYON.meteo).version == VERSION_PAR_DEFAUT);
@@ -402,13 +414,15 @@ constexpr int la_version_publiee_est_celle_qu_on_donne() {
 constexpr int une_nouvelle_conversion_ne_garde_rien_de_l_ancienne() {
     // On convertit d'abord Seattle (tout est rempli, il pleut), puis dans la MÊME structure une météo sans heures, sans jours
     // et sans quarts d'heure : rien de Seattle ne doit rester (ni valeurs, ni indices, ni pluie).
-    MeteoDetail d = convertir(R_SEATTLE.meteo);
+    MeteoDetail d = convertir(R_SEATTLE.meteo, RECU, 0, historique_avant(R_SEATTLE.meteo, 25));
     VERIFIER(d.nb_jours == 7 && d.pluie.en_cours && d.quart_courant == 1);
+    VERIFIER(d.courant.tendance_pression_3h_hpa == 2.5F);
     Meteo m = R_LYON.meteo;
     m.riche.nb_heures = 0;
     m.riche.nb_jours = 0;
     m.riche.nb_quarts = 0;
-    remplir_detail(m, VERSION_PAR_DEFAUT, RECU, 0, d);
+    remplir_detail(m, VERSION_PAR_DEFAUT, RECU, 0, HistoPression{}, d);
+    VERIFIER(est_nan(d.courant.tendance_pression_3h_hpa)); // la tendance de Seattle ne reste pas
     VERIFIER(d.nb_heures == 0 && d.nb_jours == 0 && d.nb_quarts == 0);
     VERIFIER(d.heure_courante == -1 && d.jour_courant == -1 && d.quart_courant == -1);
     VERIFIER(!d.pluie.connue && !d.pluie.en_cours && d.pluie.cumul_mm == 0.0F);
@@ -512,6 +526,45 @@ constexpr int les_float_sont_exacts_au_dixieme() {
     return 0;
 }
 
+// ---- tendance de pression sur 3 h ---------------------------------------------------------------------------------------
+
+constexpr int la_tendance_de_pression_vient_de_l_historique() {
+    const Meteo &m = R_LYON.meteo;
+    const MeteoDetail monte = convertir(m, RECU, 0, historique_avant(m, 25)); // +2,5 hPa en 3 h
+    VERIFIER(monte.courant.tendance_pression_3h_hpa == 2.5F);
+    const MeteoDetail baisse = convertir(m, RECU, 0, historique_avant(m, -34)); // -3,4 hPa
+    VERIFIER(baisse.courant.tendance_pression_3h_hpa == -3.4F);
+    const MeteoDetail stable = convertir(m, RECU, 0, historique_avant(m, 0));
+    VERIFIER(stable.courant.tendance_pression_3h_hpa == 0.0F);
+    VERIFIER(!est_nan(stable.courant.tendance_pression_3h_hpa)); // « stable » n'est pas « inconnue »
+    // La pression du moment, elle, ne bouge pas.
+    VERIFIER(monte.courant.pression_hpa == convertir(m).courant.pression_hpa);
+    return 0;
+}
+
+constexpr int sans_historique_la_tendance_de_pression_est_inconnue() {
+    VERIFIER(est_nan(convertir(R_LYON.meteo).courant.tendance_pression_3h_hpa));
+    // Une seule mesure (celle du moment) : toujours inconnue.
+    HistoPression h;
+    tendance_noter(h, R_LYON.meteo.releve.instant_s, R_LYON.meteo.releve.pression_dixiemes_hpa);
+    VERIFIER(est_nan(convertir(R_LYON.meteo, RECU, 0, h).courant.tendance_pression_3h_hpa));
+    // Une mesure vieille de 2 h seulement : hors fenêtre, inconnue.
+    HistoPression court;
+    tendance_noter(court, R_LYON.meteo.releve.instant_s - 2 * 3600, R_LYON.meteo.releve.pression_dixiemes_hpa - 10);
+    VERIFIER(est_nan(convertir(R_LYON.meteo, RECU, 0, court).courant.tendance_pression_3h_hpa));
+    return 0;
+}
+
+constexpr int la_tendance_de_pression_ne_depend_pas_de_l_horloge_de_l_appareil() {
+    // Elle compare des instants de MESURE donnés par le serveur : horloge non réglée (0) ou très en retard, rien ne change.
+    const Meteo &m = R_SEATTLE.meteo;
+    const HistoPression h = historique_avant(m, -12);
+    VERIFIER(convertir(m, 0, 0, h).courant.tendance_pression_3h_hpa == -1.2F);
+    VERIFIER(convertir(m, RECU + 5 * 86400, 0, h).courant.tendance_pression_3h_hpa == -1.2F);
+    VERIFIER(convertir(m, RECU, 5, h).courant.tendance_pression_3h_hpa == -1.2F); // et des essais ratés non plus
+    return 0;
+}
+
 constexpr int la_duree_du_jour_est_arrondie_au_dixieme_d_heure() {
     VERIFIER(detail::dixiemes_d_heure_depuis_secondes(0) == 0);
     VERIFIER(detail::dixiemes_d_heure_depuis_secondes(-5) == 0);
@@ -558,6 +611,9 @@ constexpr int la_duree_du_jour_est_arrondie_au_dixieme_d_heure() {
     X(le_nom_du_fuseau_le_plus_long_tient)                                                                             \
     X(copier_texte_coupe_et_termine_toujours_par_zero)                                                                 \
     X(les_float_sont_exacts_au_dixieme)                                                                                \
+    X(la_tendance_de_pression_vient_de_l_historique)                                                                   \
+    X(sans_historique_la_tendance_de_pression_est_inconnue)                                                            \
+    X(la_tendance_de_pression_ne_depend_pas_de_l_horloge_de_l_appareil)                                                \
     X(la_duree_du_jour_est_arrondie_au_dixieme_d_heure)
 
 TESTS_A_LA_COMPILATION(LISTE)

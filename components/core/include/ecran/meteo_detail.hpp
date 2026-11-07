@@ -14,15 +14,19 @@
 //    `maintenant_s`, l'heure de l'appareil ; horloge non réglée (avant l'an 2000) : aucune plage de la réponse ne la contient, tous
 //    les indices valent -1 et la pluie proche n'est pas « connue » (aucun cas particulier : les fonctions du noyau le disent) ;
 //  - les `float` sont exacts au dixième : un dixième entier divisé par 10,0F est l'arrondi correct du nombre décimal (la division
-//    IEEE est correctement arrondie, comme le littéral 12,3F) ; seule exception, `ensoleillement_h`, à la MINUTE près (8,55 h).
+//    IEEE est correctement arrondie, comme le littéral 12,3F) ; seule exception, `ensoleillement_h`, à la MINUTE près (8,55 h) ;
+//  - `tendance_pression_3h_hpa` vient des pressions que l'appareil a lui-même mesurées (meteo_tendance.hpp) : NaN tant qu'il n'a
+//    pas de mesure d'il y a 2 h 30 à 3 h 30.
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string_view>
 
 #include "ecran/meteo_riche.hpp"
 #include "ecran/meteo_synthese.hpp"
+#include "ecran/meteo_tendance.hpp"
 #include "ecran/meteo_wmo.hpp"
 
 namespace ecran::meteo {
@@ -52,11 +56,12 @@ constexpr float heures_depuis_minutes(int minutes) noexcept { return static_cast
 } // namespace detail
 
 // Remplit `d` (type `MeteoDetail` du contrat) depuis `m`, pour l'heure `maintenant_s` de l'appareil et `echecs` essais ratés de
-// suite. `version` est le numéro de publication (que l'état de l'appareil connaît) ; tout le reste de `d` est refait à neuf, rien
-// de son contenu précédent n'a besoin d'être valide.
+// suite. `version` est le numéro de publication (que l'état de l'appareil connaît) ; `histo` les pressions déjà mesurées (pour la
+// tendance sur 3 h, voir meteo_tendance.hpp) ; tout le reste de `d` est refait à neuf, rien de son contenu précédent n'a besoin
+// d'être valide.
 template <class D>
 constexpr void remplir_detail(const Meteo &m, std::uint32_t version, std::int64_t maintenant_s, int echecs,
-                              D &d) noexcept {
+                              const HistoPression &histo, D &d) noexcept {
     d = D{};
     d.version = version;
     d.jour_courant = -1; // les autres indices sont calculés plus bas dans tous les cas
@@ -85,6 +90,11 @@ constexpr void remplir_detail(const Meteo &m, std::uint32_t version, std::int64_
     d.courant.code_wmo = r.code_wmo;
     d.courant.nuages_pct = q.nuages_pct;
     d.courant.pression_hpa = detail::vers_float(r.pression_dixiemes_hpa);
+    {
+        const Tendance t = tendance_3h(histo, r.instant_s, r.pression_dixiemes_hpa);
+        d.courant.tendance_pression_3h_hpa =
+            t.connue ? detail::vers_float(t.dixiemes_hpa) : std::numeric_limits<float>::quiet_NaN();
+    }
     d.courant.vent_kmh = detail::vers_float(r.vent_dixiemes_kmh);
     d.courant.direction_vent_deg = r.direction_vent_deg;
     d.courant.rafales_kmh = detail::vers_float(r.rafales_dixiemes_kmh);

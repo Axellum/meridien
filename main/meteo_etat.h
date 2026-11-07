@@ -74,6 +74,11 @@ struct MeteoCourant {
     float rafales_kmh;
     int16_t proba_precip_pct; // probabilité de précipitations de l'heure en cours, ou METEO_PROBA_INCONNUE
     char libelle[40];         // libellé français court de code_wmo/jour, terminé par un zéro
+    // Pression d'AUJOURD'HUI moins celle d'il y a ~3 h, en hPa (positif : la pression monte), mesurée par l'appareil lui-même (un
+    // relevé toutes les 15 min), pas fournie par Open-Meteo. NaN (tester avec std::isnan) tant que l'appareil n'a pas de relevé
+    // d'il y a 2 h 30 à 3 h 30 : les ~3 premières heures après un démarrage ou un changement de zone. Ajouté APRÈS les autres
+    // champs (07/11/2026) : leur ordre n'a pas changé.
+    float tendance_pression_3h_hpa;
 };
 
 // Une heure de prévision = l'intervalle [debut_epoch_s, debut_epoch_s + 3600) ; les heures se suivent de 3600 s.
@@ -163,7 +168,7 @@ struct MeteoDetail {
     MeteoPluieProche pluie;
 };
 
-// Copie atomique de la météo détaillée (environ 2 Ko : 2 080 octets sur le PC ; la mettre en statique ou en PSRAM, pas sur une petite pile). Rend `valide`
+// Copie atomique de la météo détaillée (environ 2 Ko : 2 088 octets sur le PC ; la mettre en statique ou en PSRAM, pas sur une petite pile). Rend `valide`
 // (faux tant qu'aucune météo n'est connue ; `*sortie` est alors remise à zéro, `heure_courante`, `jour_courant` et `quart_courant`
 // valent -1). `sortie` nul : rend faux sans rien écrire. Sûre depuis n'importe quelle tâche (jamais depuis une interruption : elle
 // prend un verrou, pour quelques dizaines de microsecondes).
