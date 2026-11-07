@@ -94,6 +94,9 @@ def lancer(cxx, mode):
     from controle_reglages import controle_reglages  # noqa: PLC0415  (contrat de l'API, pages et clavier contre leurs sources)
 
     echecs += controle_reglages()
+    from controle_python_vigie import controle_vigie  # noqa: PLC0415  (alertes : fichiers générés à jour, table de caractères dans la police)
+
+    echecs += controle_vigie()
 
     from controle_cartes import controle_cartes  # noqa: PLC0415  (cartes : partitions, broches du C6, hygiène des fichiers de la 7B)
 
@@ -160,6 +163,7 @@ from mutations_meteo_riche import MUTATIONS_METEO_RICHE  # noqa: E402  (météo 
 from mutations_meteo_tendance import MUTATIONS_METEO_TENDANCE  # noqa: E402  (tendance de pression sur 3 h)
 from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (page de réglages : JSON, valeurs, appairage, API)
 from mutations_wifi import MUTATIONS_WIFI  # noqa: E402  (Wi-Fi : essai avec retour arrière, classement des réseaux)
+from mutations_vigie import MUTATIONS_VIGIE  # noqa: E402  (alertes officielles de Vigie : requête, planning, gzip, lecture, vue, textes)
 from mutations_visuel import MUTATIONS_VISUEL  # noqa: E402  (écran principal : icônes, lune et soleil, échelles)
 from mutations_reglages_ecran import MUTATIONS_REGLAGES_ECRAN  # noqa: E402  (réglages sur l'écran et installation guidée : voir ce fichier)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
@@ -178,6 +182,7 @@ MUTATIONS += MUTATIONS_GEOCODAGE
 MUTATIONS += MUTATIONS_REGLAGES_ECRAN
 MUTATIONS += MUTATIONS_HOTE_APPAREIL
 MUTATIONS += MUTATIONS_MATERIEL_TAB5
+MUTATIONS += MUTATIONS_VIGIE
 
 
 @functools.lru_cache(maxsize=None)
