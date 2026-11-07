@@ -12,8 +12,10 @@
 #include <cstdint>
 
 #include "board.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "lvgl.h"
+#include "src/draw/lv_draw_buf_private.h" // la structure des gestionnaires de tampons (LVGL ne l'ouvre qu'avec LV_USE_PRIVATE_API)
 
 #include "hote_appareil_esp.h"
 
@@ -42,11 +44,32 @@ void fermer() {
     g_precedent = nullptr;
 }
 
+// Les bitmaps de glyphes de TinyTTF (un tampon A8 par lettre et par taille, gardés en cache) vont en PSRAM. Mesuré sur le Tab5
+// (essai du 07/11/2026) : sans cela, la liste des réglages seule (12 textes) prenait 28 Ko de mémoire INTERNE sur les ~28 Ko
+// libres après le démarrage ; il en restait 167 octets, le temps que les réglages soient ouverts (mdns, TLS et le Wi-Fi manquaient
+// alors de mémoire). Un bitmap de glyphe n'est lu que par le processeur, la PSRAM suffit. Même marge d'alignement que le
+// gestionnaire par défaut de LVGL, qui aligne ensuite le pointeur ; la libération reste lv_free(), valable pour la PSRAM aussi.
+void *glyphe_en_psram(size_t octets, lv_color_format_t) {
+    const size_t avec_marge = octets + LV_DRAW_BUF_ALIGN - 1;
+    void *p = heap_caps_malloc(avec_marge, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p != nullptr ? p : lv_malloc(avec_marge); // PSRAM pleine : la mémoire interne, comme avant
+}
+
+void glyphes_en_psram() {
+    static bool fait = false;
+    if (!fait) {
+        fait = true;
+        lv_draw_buf_get_font_handlers()->buf_malloc_cb =
+            glyphe_en_psram; // global : toutes les polices TinyTTF de l'appareil
+    }
+}
+
 // Crée l'écran à part, le charge et rend le contexte à remplir. Faux : déjà ouvert (un second appui ne fait rien).
 bool ouvrir_ecran(ecran::ContexteReglages &ctx) {
     if (g_ecran != nullptr) {
         return false;
     }
+    glyphes_en_psram();
     const board_info_t *carte = board_get_info();
     g_precedent = lv_screen_active();
     g_ecran = lv_obj_create(nullptr);
