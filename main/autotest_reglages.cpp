@@ -29,6 +29,7 @@
 #include "nvs.h"
 #include "reglages.h"
 #include "ui_reglages.h"
+#include "ui_reglages_interne.h"
 
 extern "C" void autotest_reglages_ancre() {} // référencée par l'éditeur de liens pour que ce fichier soit gardé
 
@@ -187,10 +188,53 @@ void poser(int32_t x, int32_t y, bool appuye) {
     lv_indev_read(g_doigt);
 }
 
-// Un appui court au point donné (coordonnées de l'écran), puis le relâchement, puis le temps de réagir.
-void toucher_point(int32_t x, int32_t y) {
+// Ce que reçoit l'objet visé pendant le geste : sert à distinguer « le toucher n'arrive pas » de « il arrive mais rien ne suit ».
+int g_recu_appui = 0;
+int g_recu_relache = 0;
+int g_recu_clic = 0;
+
+void espion(lv_event_t *e) {
+    switch (lv_event_get_code(e)) {
+    case LV_EVENT_PRESSED:
+        ++g_recu_appui;
+        break;
+    case LV_EVENT_RELEASED:
+        ++g_recu_relache;
+        break;
+    case LV_EVENT_CLICKED:
+        ++g_recu_clic;
+        break;
+    default:
+        break;
+    }
+}
+
+// Le sommet de la pile d'écrans des réglages, tel que le voit le code de l'écran (type, section ou étape).
+void pile_vue(const char *quand) {
+    const ecran::ui::Entree *haut = ecran::ui::nav_haut();
+    if (haut == nullptr) {
+        ESP_LOGI(TAG, "PILE %s : vide", quand);
+        return;
+    }
+    ESP_LOGI(TAG, "PILE %s : profondeur %d, dessus de type %d (a=%d b=%d)", quand, ecran::ui::nav_profondeur(),
+             static_cast<int>(haut->type), haut->a, haut->b);
+}
+
+// Un appui court au point donné (coordonnées de l'écran), puis le relâchement, puis le temps de réagir. Si `cible` est donnée,
+// on compte ce qu'elle reçoit (appui, relâchement, clic) et on le met au journal ; l'espion est retiré avant l'attente parce
+// que la cible peut être supprimée par le clic.
+void toucher_point(int32_t x, int32_t y, lv_obj_t *cible = nullptr, const char *nom = nullptr) {
+    g_recu_appui = g_recu_relache = g_recu_clic = 0;
+    if (cible != nullptr) {
+        lv_obj_add_event_cb(cible, espion, LV_EVENT_ALL, nullptr);
+    }
     poser(x, y, true);
     poser(x, y, false);
+    if (cible != nullptr) {
+        lv_obj_remove_event_cb(cible, espion);
+        ESP_LOGI(TAG, "GESTE sur « %s » en (%d, %d) : appui reçu %d, relâchement reçu %d, clic reçu %d", nom,
+                 static_cast<int>(x), static_cast<int>(y), g_recu_appui, g_recu_relache, g_recu_clic);
+    }
     attendre(400);
 }
 
@@ -220,7 +264,8 @@ bool toucher_objet(lv_obj_t *o, const char *nom) {
     std::snprintf(phrase, sizeof phrase, "le toucher au centre de « %s » (%d x %d px) arrive à l'objet visé", nom,
                   static_cast<int>(lv_area_get_width(&z)), static_cast<int>(lv_area_get_height(&z)));
     verifier(atteint, phrase);
-    toucher_point(centre.x, centre.y);
+    toucher_point(centre.x, centre.y, o, nom);
+    pile_vue(nom);
     return atteint;
 }
 
@@ -253,10 +298,11 @@ void phase_1() {
     memoire("avant ouverture");
 
     ui_reglages_ouvrir();
+    memoire("réglages construits, avant le premier dessin"); // objets et styles seuls
     attendre(600);
     verifier(lv_screen_active() != principal, "les réglages s'ouvrent sur un écran à part");
     ecran_vu("liste des réglages");
-    memoire("réglages ouverts");
+    memoire("réglages ouverts"); // + les bitmaps de glyphes dessinés (cache de TinyTTF)
 
     // La section « Affichage » au doigt, puis le curseur de luminosité à 40 % de sa course.
     toucher_texte("Affichage");
@@ -286,7 +332,26 @@ void phase_1() {
     // Revenir à la liste, puis la fermer par « Retour » : l'écran principal revient, la mémoire interne ne baisse pas.
     verifier(revenir_a(principal), "« Retour » ramène l'écran principal");
     attendre(600);
-    memoire("réglages fermés");
+    memoire("réglages fermés (1re fois)");
+
+    // Trois ouvertures/fermetures de plus : la mémoire interne ne doit plus baisser une fois les glyphes en cache.
+    unsigned apres_premiere = static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    for (int tour = 2; tour <= 4; ++tour) {
+        ui_reglages_ouvrir();
+        attendre(600);
+        const bool ouvert = lv_screen_active() != principal;
+        const bool ferme = revenir_a(principal);
+        attendre(600);
+        char nom[48];
+        std::snprintf(nom, sizeof nom, "réglages fermés (%de fois)", tour);
+        memoire(nom);
+        verifier(ouvert && ferme, "ouverture puis « Retour » : l'écran principal revient");
+    }
+    const unsigned apres_quatrieme = static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    std::snprintf(phrase, sizeof phrase,
+                  "pas de fuite de mémoire interne sur 3 ouvertures de plus : %u octets avant, %u après",
+                  apres_premiere, apres_quatrieme);
+    verifier(apres_quatrieme + 512 >= apres_premiere, phrase);
 
     // Un texte au clavier (modèle du service LLM), par l'éditeur réel.
     ui_reglages_ouvrir();
@@ -386,8 +451,9 @@ void phase_3() {
         texte[0] = '\0';
         hote.texte("llm.modele", texte, sizeof texte);
     }
-    verifier(ecran::reglages_affichage().luminosite == lum0 && texte[0] == '\0',
-             "luminosité et texte du service remis comme avant l'essai");
+    effacer_etape_installation(); // la progression d'installation aussi : la carte repart « neuve », comme avant l'essai
+    verifier(ecran::reglages_affichage().luminosite == lum0 && texte[0] == '\0' && !hote.progression().terminee,
+             "luminosité, texte du service et progression d'installation remis comme avant l'essai");
     memoire("fin");
 
     const int verifs = lire("verifs", 0) + g_verifs;
@@ -396,11 +462,48 @@ void phase_3() {
     ecrire("phase", 9); // fini : aucun démarrage suivant ne rejoue l'essai
 }
 
+// L'installation guidée revient à « carte neuve » (aucun octet d'étape) : l'état d'avant tout essai.
+void effacer_etape_installation() {
+    nvs_handle_t h = 0;
+    if (nvs_open("installation", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_key(h, "etape");
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
+
+// Un binaire d'essai compilé après le précédent rejoue tout : phase, essais et compteurs repartent de zéro et l'installation
+// guidée de « carte neuve ». Sans cela, un essai fini (phase 9) ne se rejouerait jamais.
+void repartir_si_binaire_neuf() {
+    static const char kBinaire[] = __DATE__ " " __TIME__;
+    char vu[40] = {};
+    nvs_handle_t h = 0;
+    if (nvs_open(kEspace, NVS_READWRITE, &h) != ESP_OK) {
+        return;
+    }
+    std::size_t taille = sizeof vu;
+    const bool connu = nvs_get_str(h, "binaire", vu, &taille) == ESP_OK && std::strcmp(vu, kBinaire) == 0;
+    if (!connu) {
+        nvs_set_i32(h, "phase", 0);
+        nvs_set_i32(h, "essais", 0);
+        nvs_set_i32(h, "echecs", 0);
+        nvs_set_i32(h, "verifs", 0);
+        nvs_set_str(h, "binaire", kBinaire);
+        nvs_commit(h);
+    }
+    nvs_close(h);
+    if (!connu) {
+        effacer_etape_installation();
+        ESP_LOGI(TAG, "AUTOTEST binaire neuf (%s) : l'essai repart de la phase 1", kBinaire);
+    }
+}
+
 void tache(void *) {
     vTaskDelay(pdMS_TO_TICKS(kDepartMs));
     for (int i = 0; i < 20 && board_get_display() == nullptr; ++i) {
         vTaskDelay(pdMS_TO_TICKS(500));
     }
+    repartir_si_binaire_neuf();
     const std::int32_t phase = lire("phase", 0);
     if (phase >= 9) {
         vTaskDelete(nullptr);
