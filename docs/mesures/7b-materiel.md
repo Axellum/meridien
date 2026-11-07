@@ -2,6 +2,8 @@
 
 > **Summary (EN)** — Board layer of the Waveshare ESP32-P4 7B, session of 2026-11-07, branch `claude/materiel-7b-b8f38e`. **Observed on the PC only**: the 7B firmware builds (ESP-IDF 5.5.5, `meridien.bin` 1,837,760 bytes, 56 % of the 4 MB application slot free); 414 core tests run with AddressSanitizer + UBSan, of which 34 are the 7B's; 33 mutations of the 7B source out of 33 detected; the physical-trial script passes its 52-check self-test (the whole trial, restoration included, replayed against a simulated flash; 11 mutations of the script out of 11 detected) and its otadata decoder agrees with the real otadata of an older backup of this unit. **Nothing was observed on the board**: the 7B was not plugged into the PC during the session, so the flash backup, the test flash, the screen/touch/backlight/audio/Wi-Fi tests, the ten resets and the restoration were **not done**. Every hardware value in the code is a reading of a source (see [carte-7b.md](../carte-7b.md)), not a measurement. The 7B column of the [compatibility table](../compatibilite.md) says “Written, not tested on a board” accordingly.
 
+> **Update, 2026-11-07 (noon) — first physical trial done** (four attempts, the last one complete). Meridien boots on the 7B and reaches every milestone in the serial log; ten resets out of ten succeed; ESPHome was restored and proved identical. The trial found and fixed one real bug (an `abort()` in the DSI clock setup, 11 boots out of 11) and one limit of the flash backup over USB-Serial/JTAG (a 256-byte block that never reads). **Not looked at**: the picture on the panel, a real finger on the touch panel, backlight levels, tone and microphone. Sections 1 to 4 below describe the state **before** the trial; the results are in section 5 and the story in section 6.
+
 Piste matériel, branche `claude/materiel-7b-b8f38e`, commits `52f6372` (couche carte), `fc96dd8` (tests), `c48c418` (script d'essai). Carte visée : Waveshare ESP32-P4-WIFI6-Touch-LCD-7B, l'écran en service chez l'auteur (firmware ESPHome).
 
 Règle de lecture : tout ce qui est écrit sans la mention « constaté » est une décision ou une lecture de source, pas une mesure. Ce qui n'a pas été observé est écrit **non vérifié** ou **non fait**.
@@ -20,7 +22,7 @@ Règle de lecture : tout ce qui est écrit sans la mention « constaté » est u
 | Script d'essai | `python tools/essai_7b.py autotest` : 52 contrôles sur 52 (décodage de l'otadata et de la table, découpe des lectures, empreintes, plages d'écriture, jalons du journal, garde-fous, et l'essai entier rejoué contre une **carte simulée** : secteur illisible avec le stub, flash qui change entre deux lectures, restauration qui échoue ou qui altère un octet, mauvaise MAC, heure limite passée) ; `python test/host/mutations_essai_7b.py` : 11 mutations du script sur 11 détectées | une flash **simulée** n'est pas la carte : la partie qui parle à la vraie 7B n'a **pas** été exécutée |
 | Décodeur d'otadata | confronté à l'otadata **réelle** d'une ancienne sauvegarde de cet exemplaire (20/10/2026, fichier d'en-tête de 64 Ko) : séquences 5 et 4, CRC valides toutes les deux, emplacement 0 choisi ; table lue : `app0` 0x10000 + 0xfc0000, `app1` 0xfd0000 + 0xfc0000, `nvs` 0x1f90000 + 0x70000 | lecture d'un **fichier**, pas de la carte ; l'état actuel de la flash est inconnu tant qu'une nouvelle sauvegarde n'est pas lue |
 
-## 2. Non constaté — tout ce qui touche la carte
+## 2. Non constaté — tout ce qui touche la carte (état avant l'essai du 07/11/2026 à midi)
 
 La 7B **n'était pas branchée** au PC pendant la session. Les trois ports série présents appartenaient à d'autres cartes (le Tab5 tenu par une autre session, une carte inconnue, un troisième port) : aucun n'a été ouvert ni touché, et aucun n'a été pris pour la 7B (la MAC se lit sur la puce, jamais ailleurs). Donc :
 
@@ -59,16 +61,32 @@ Avant : prendre le verrou de la 7B et celui du port (script de verrous propre au
 7. **Flash 32 Mo, DIO 80 MHz, PSRAM 200 MHz, CPU 400 MHz** (la mission supposait 16 Mo).
 8. **Tampon de dessin de 25 lignes** (100 Kio en RAM interne) au lieu des 50 lignes du Tab5.
 
-## 5. À remplir au premier essai physique
+## 5. Résultats du premier essai physique (07/11/2026, midi)
 
-| Mesure | Valeur | Vu sur (carte, révision d'écran, commit, date) |
+**Vu sur** : Waveshare ESP32-P4 7B (l'exemplaire de l'auteur, MAC non écrite ici), dalle EK79007 1024 × 600, `main` = `9c89ad5` + la correction `eac14d2`, binaire d'essai SHA-256 `CF28C4F0…` (2 815 744 octets, 33 % de l'emplacement libre), cinq appuis tactiles simulés, Wi-Fi compilé ; journal série par l'USB natif (USB-Serial/JTAG), 07/11/2026 de 12 h 28 à 12 h 33 (heure de Paris). « Journal » = ce que le firmware écrit, **pas** ce qu'un œil a vu.
+
+| Mesure | Valeur | Preuve |
 | --- | --- | --- |
-| Révision de la puce, taille de flash lues | — | — |
-| Table de partitions de la sauvegarde (NVS d'ESPHome) | — | — |
-| Contrôleur d'écran, image affichée, sens de l'image | — | — |
-| GT911 : adresse, identifiant produit, décalage moyen sur 5 points | — | — |
-| Rétroéclairage 0 / 50 / 100 %, dalle vraiment noire à 0 % | — | — |
-| Tonalité d'essai (≤ 75 %), niveau du microphone | — | — |
-| Lien C6, association Wi-Fi, adresse IP, horloge (temps depuis le démarrage) | — | — |
-| Dix remises à zéro de suite (réussies / 10) | — | — |
-| Restauration : `verify-flash`, SHA-256 de la relecture, démarrage, Home Assistant | — | — |
+| Révision de la puce, taille de flash lues | ESP32-P4 révision v3.2, flash 32 Mo (`flash-id`), PSRAM 32 Mo à 200 MHz, CPU 400 MHz | esptool 5.3.1 et journal de démarrage |
+| Table de partitions de la sauvegarde (NVS d'ESPHome) | `otadata` 0x9000 (+0x2000), `phy_init` 0xb000, `app0` 0x10000 (+0xfc0000), `app1` 0xfd0000 (+0xfc0000), `nvs` 0x1f90000 (+0x70000) ; otadata : séquences 3 (emplacement 0) et 2, CRC valides, **`app0` en service** | lue sur la carte, décodée par `tools/essai_7b.py` |
+| Contrôleur d'écran, image affichée, sens de l'image | EK79007 **annoncé, non détecté** ; DSI 2 voies à 900 Mbit/s, pixels à 52 MHz, 60,4 Hz, 1024 × 600 RGB565 ; rétroéclairage à 75 % et « première image affichée » à 685 ms (journal). **Image non regardée à l'œil**, sens non vu (rotation 0) | journal |
+| GT911 : adresse, identifiant produit, décalage moyen sur 5 points | adresse 0x5d, identifiant « 911 » (0x39 0x31 0x31), version de configuration 91 ; **4 appuis simulés sur 5 vus dans le journal** (la capture s'est arrêtée avant le cinquième), 4 « OK », décalage 0 aux quatre coins. Les appuis sont **injectés** (coordonnées brutes) : le chemin lecture du GT911 → coordonnées n'est pas éprouvé, **aucun doigt** | journal |
+| Rétroéclairage 0 / 50 / 100 %, dalle vraiment noire à 0 % | **non essayé** | — |
+| Tonalité d'essai (≤ 75 %), niveau du microphone | **non essayés** ; ES8311 et ES7210 répondent sur le bus I2C | journal |
+| Lien C6, association Wi-Fi, adresse IP, horloge (temps depuis le démarrage) | lien C6 à 2 422 ms (esp_hosted côté P4 2.12.12, micrologiciel du C6 non demandé : l'avertissement « Co-proc [0.0.0] » est attendu) ; association à 7 329 ms (canal 1) ; adresse IP à 10 389 ms ; horloge réglée +53 ms après le lancement de SNTP ; RSSI −31 dBm ; 0 coupure, 0 échec de transport | journal |
+| Mémoire interne libre | 316 Ko une fois l'heure reçue (minimum depuis le démarrage 309 Ko) | journal (`jalon_mem`) |
+| Dix remises à zéro de suite (réussies / 10) | **10 / 10**, chacune jusqu'à « Carte prête » sans `abort`. Ce sont des remises à zéro par RTS (USB natif), **pas une coupure de courant** | journal de chacune |
+| Restauration : `verify-flash`, SHA-256 de la relecture, démarrage, Home Assistant | écriture de 0x0 à 0x471000 (4 657 152 octets), « Hash of data verified » puis `verify-flash` de la puce identique (SHA-256 de l'image `c084c951…`). **Pas de relecture** (impossible, voir §6). ESPHome revenu : même MAC, version `3.9.0-main-9bb801e` et même heure de compilation qu'avant, 74 entités toutes avec un état, aucun réglage changé, aucun second redémarrage en 60 s ; Home Assistant revoit « Sens de l'écran » = « Upside down » | `tools/prouver_flash.py --apres`, Home Assistant |
+| Journal : lignes d'erreur restantes | `lcd_panel: esp_lcd_panel_swap_xy: swap_xy is not supported by this panel` (une fois, rotation 0 : sans effet vu) ; `system_api: 0 mac type is incorrect (not found)` (une fois, 12 s après le démarrage : **cause non cherchée**) | journal |
+
+## 6. Le récit de l'essai (quatre tentatives)
+
+1. **11 h 59 — sauvegarde refusée, rien d'écrit.** La copie complète de la flash est **impossible** par l'USB-Serial/JTAG : les 256 octets de `0xdcf00` ne se lisent jamais (`Packet content transfer stopped`, avec et sans stub), alors que 0x100 octets se lisent juste à côté (bissecté à la main). Le script a refusé d'écrire, comme prévu. Ce bloc est dans `app0`, et `app0` est prouvé identique à `firmware.ota.bin` du firmware en service par `verify-flash` (la puce calcule le MD5, « digest matched »).
+2. **Correction du script : sauvegarde « à portée limitée »** (`--reference`). Gardés et lus deux fois : `0x0`–`0x10000` (amorce, table, otadata, phy_init) et la NVS d'ESPHome (448 Ko, par précaution) ; l'application en service est remplacée par le fichier de référence, et la **puce** prouve que « début lu + fichier » est identique à la flash sur 0x0–0x471000. Les « restes » (octets de `app0` après la fin de l'image) ne sont ni gardés ni restaurés : aucun firmware ne les lit, et Meridien y écrit sa NVS (0x810000). Avant d'écrire, le script refuse tout essai qui entamerait une autre partition de l'ancien firmware. Autotest : 9 vérifications de plus.
+3. **12 h 11 — écriture réussie, essai refusé à tort.** `otadata` (0x9000) avait changé après le redémarrage : le nouveau firmware y inscrit son état. Le script le prenait pour un échec d'écriture (esptool l'avait pourtant vérifié) et a restauré : restauration prouvée, ESPHome revenu. Le contrôle d'`otadata` après redémarrage est retiré.
+4. **12 h 15 — Meridien plante 11 fois sur 11.** `abort()` dans `mipi_dsi_ll_set_phy_pllref_clock_source`, appelée par `esp_lcd_new_dsi_bus`, juste après « après la NVS et les réglages ». Cause : `ws7b_display.c` demandait la source d'horloge `MIPI_DSI_PHY_CLK_SRC_DEFAULT` (PLL_F20M, « réservée aux puces < v3.0 ») alors que le build de la 7B exige une puce ≥ v3.1. Correction `eac14d2` : source laissée au pilote (`phy_clk_src = 0`). Le Tab5 n'est pas touché (son build force les puces v1.x). Restauration prouvée, ESPHome revenu.
+5. **12 h 28 — essai complet réussi** (résultats au §5), ESPHome restauré et prouvé à 12 h 33.
+
+**Ce que ça change pour la suite.** La sauvegarde « complète » du plan n'existe pas pour cette carte par ce port : la preuve est le MD5 de la puce contre un fichier de référence **gardé** (`~/.tab5/elf/<version>/firmware.ota.bin`). Pour un autre firmware en service, il faut son fichier avant de commencer. La prise « USB TO UART » (pont série, **non essayée ici**) lirait peut-être tout ; à essayer si une copie complète devient nécessaire.
+
+**Non vérifié** : l'image sur la dalle (personne n'a regardé), le tactile réel, le rétroéclairage, la dalle noire à 0 %, la tonalité et le microphone, un démarrage après coupure de courant, la longue durée, la cause de l'erreur `mac type is incorrect`, le sens de l'image avec le montage à l'envers de l'exemplaire (rotation compilée 0 : à confirmer à l'œil).

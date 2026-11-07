@@ -55,7 +55,11 @@ esp_err_t ws7b_display_create(esp_lcd_panel_handle_t *panel, esp_lcd_panel_io_ha
     esp_lcd_dsi_bus_config_t bus_cfg = {0};
     bus_cfg.bus_id = 0;
     bus_cfg.num_data_lanes = WS7B_DSI_LANES;
-    bus_cfg.phy_clk_src = MIPI_DSI_PHY_CLK_SRC_DEFAULT;
+    // 0 = le pilote choisit selon la revision MINIMALE de puce du build (XTAL des v3.0, PLL_F20M avant). Ne pas ecrire
+    // MIPI_DSI_PHY_CLK_SRC_DEFAULT : c'est PLL_F20M, « reserve aux puces < v3.0 » ; sur la 7B (puce v3.2, build >= v3.1)
+    // le pilote fait abort() dans mipi_dsi_ll_set_phy_pllref_clock_source. Constate sur la carte le 07/11/2026 : 11 demarrages
+    // sur 11 plantes la, juste apres « apres la NVS et les reglages » (docs/mesures/7b-materiel.md).
+    bus_cfg.phy_clk_src = 0;
     bus_cfg.lane_bit_rate_mbps = WS7B_DSI_LANE_MBPS;
     esp_lcd_dsi_bus_handle_t dsi_bus = NULL;
     ESP_RETURN_ON_ERROR(esp_lcd_new_dsi_bus(&bus_cfg, &dsi_bus), TAG, "bus DSI");

@@ -308,8 +308,127 @@ def verifier_puce(port: str, fichier: Path, decalage: int = 0) -> bool:
     return ok
 
 
+# --- Sauvegarde « a portee limitee » -------------------------------------------------------------------------------------------
+# Sur l'USB-Serial/JTAG du P4, certains blocs de la flash ne se lisent JAMAIS : « Packet content transfer stopped », avec ou sans
+# stub, au meme octet a chaque essai (constate le 07/11/2026 sur la 7B a 0xdcf00 : 256 octets, alors que 0x100 octets se lisent juste
+# a cote). Une copie complete est alors impossible par ce port. On sauvegarde ce que l'essai peut toucher ET que la lecture sait
+# rendre (0x0-0x10000 : amorce, table, otadata, phy_init ; plus la NVS de l'ancien firmware, par precaution), et l'image de
+# l'application en service est remplacee par le fichier qui l'a produite (`--reference`), dont la PUCE prouve (verify-flash, MD5)
+# qu'il est identique a la flash. Les « restes » (octets de l'emplacement d'application apres la fin de l'image) ne sont pas
+# gardes : aucun firmware ne les lit, et ils sont dits comme tels dans la marque.
+DEBUT_APPLICATION = 0x10000  # l'image gardee est [0, 0x10000) + le fichier de reference : il faut que l'application commence la
+
+
+def partition_application_active(table: list[dict], otadata: dict) -> dict:
+    """Partition d'application que le bootloader lancerait : celle que designe otadata ; sinon factory, sinon ota_0."""
+    apps = [p for p in table if p["type"] == 0]
+    if not apps:
+        raise Refus("aucune partition d'application dans la table de la carte")
+    choisie = otadata.get("choisie")
+    voulu = 0x10 + choisie if choisie is not None else None
+    for p in apps:
+        if voulu is not None and p["sous_type"] == voulu:
+            return p
+    for sous in (0x00, 0x10):
+        for p in apps:
+            if p["sous_type"] == sous:
+                return p
+    raise Refus("partition d'application en service introuvable")
+
+
+def lire_deux_fois(port: str, adresse: int, longueur: int, nom: str) -> bytes:
+    """Lit la meme region deux fois ; refuse si les deux lectures different."""
+    compteur: dict = {}
+    premiere = lire_morceau(port, adresse, longueur, compteur)
+    seconde = lire_morceau(port, adresse, longueur, compteur)
+    print(f"[sauvegarde] {nom} : lecture 1 {empreinte(premiere)[:16]}…, lecture 2 {empreinte(seconde)[:16]}…")
+    if premiere != seconde:
+        raise Refus(f"{nom} : les deux lectures different, sauvegarde non fiable, rien n'est ecrit")
+    return premiere
+
+
+def etape_sauvegarde_portee(port: str, dossier: Path, reference: Path) -> dict:
+    taille = taille_flash(port)
+    dossier.mkdir(parents=True, exist_ok=True)
+    if not reference.is_file():
+        raise Refus(f"fichier de reference introuvable : {reference}")
+    debut = lire_deux_fois(port, 0, DEBUT_APPLICATION, "debut de flash 0x0-0x10000")
+    table = decoder_table(debut[DECALAGE_TABLE : DECALAGE_TABLE + TAILLE_TABLE])
+    if not table:
+        raise Refus("table de partitions illisible dans la sauvegarde du debut de flash")
+    otadata = decoder_otadata(debut[DECALAGE_OTADATA : DECALAGE_OTADATA + TAILLE_OTADATA])
+    active = partition_application_active(table, otadata)
+    if active["decalage"] != DEBUT_APPLICATION:
+        raise Refus(f"l'application en service ({active['nom']}) commence a {active['decalage']:#x}, pas a {DEBUT_APPLICATION:#x}")
+    octets = reference.read_bytes()
+    if not 0 < len(octets) <= active["taille"]:
+        raise Refus(f"le fichier de reference ({len(octets)} octets) ne tient pas dans {active['nom']} ({active['taille']} octets)")
+    image = debut + octets
+    fichier = dossier / "flash_portee.bin"
+    fichier.write_bytes(image)
+    # La preuve : la puce calcule le MD5 de [0, fin) et le compare a celui de l'image (debut lu + fichier de reference).
+    if not verifier_puce(port, fichier):
+        raise Refus("verify-flash : l'image (debut lu + fichier de reference) n'est PAS identique a la flash, sauvegarde non fiable")
+    nvs_info = None
+    nvs = next((p for p in table if p["type"] == 1 and p["sous_type"] == 2), None)
+    if nvs is not None:
+        contenu = lire_deux_fois(port, nvs["decalage"], nvs["taille"], f"NVS {nvs['decalage']:#x}")
+        (dossier / "nvs_ancien_firmware.bin").write_bytes(contenu)
+        nvs_info = {"decalage": nvs["decalage"], "taille": nvs["taille"], "sha256": empreinte(contenu), "fichier": "nvs_ancien_firmware.bin"}
+    sha = empreinte(image)
+    marque = {
+        "date": dt.datetime.now().isoformat(timespec="seconds"),
+        "taille": taille,
+        "sha256": sha,
+        "lectures_identiques": True,
+        "verify_flash_puce": True,
+        "fichier": fichier.name,
+        "table": table,
+        "otadata": otadata,
+        "portee": {
+            "debut": 0,
+            "fin": len(image),
+            "application": active["nom"],
+            "fin_emplacement": active["decalage"] + active["taille"],
+            "reference": reference.name,
+            "reference_sha256": empreinte(octets),
+            "nvs": nvs_info,
+            "restes": "octets de l'emplacement d'application apres la fin de l'image : non gardes, non restaures",
+        },
+    }
+    (dossier / "sauvegarde_ok.json").write_text(json.dumps(marque, indent=2, ensure_ascii=False), encoding="utf-8")
+    (dossier / "sha256.txt").write_text(f"{sha}  {fichier.name}\n", encoding="ascii")
+    print(
+        f"[sauvegarde] portee limitee : image 0x0-{len(image):#x} = debut lu + {reference.name} ({active['nom']}), "
+        "prouvee identique a la flash par la puce"
+    )
+    afficher_table(table, otadata)
+    return marque
+
+
+def verifier_portee(marque: dict, plages: list[tuple[str, int, int]], table_build: list[dict]) -> None:
+    """Refuse l'ecriture si l'essai peut toucher autre chose que ce que la sauvegarde a limitee couvre (rien n'est ecrit)."""
+    portee = marque["portee"]
+    fin_permise = portee["fin_emplacement"]
+    zones = [(nom, debut, fin) for nom, debut, fin in plages]
+    zones += [(f"partition {p['nom']} du build", p["decalage"], p["decalage"] + p["taille"]) for p in table_build]
+    protegees = [
+        p
+        for p in marque["table"]
+        if not (p["nom"] == portee["application"] or (p["type"] == 1 and p["sous_type"] in (0x00, 0x01)))  # ni app en service, ni otadata/phy_init
+    ]
+    for nom, debut, fin in zones:
+        if fin > fin_permise:
+            raise Refus(f"{nom} (0x{debut:x}-0x{fin:x}) depasse la fin de l'emplacement sauvegarde ({fin_permise:#x}) : aucune ecriture")
+        for p in protegees:
+            if debut < p["decalage"] + p["taille"] and p["decalage"] < fin:
+                raise Refus(f"{nom} (0x{debut:x}-0x{fin:x}) entame la partition {p['nom']} de l'ancien firmware, non couverte : aucune ecriture")
+
+
 # --- Etapes ------------------------------------------------------------------------------------------------------------------
-def etape_sauvegarde(port: str, dossier: Path) -> dict:
+def etape_sauvegarde(port: str, dossier: Path, reference: Path | None = None) -> dict:
+    if reference is not None:
+        return etape_sauvegarde_portee(port, dossier, reference)
     taille = taille_flash(port)
     dossier.mkdir(parents=True, exist_ok=True)
     f1, f2 = dossier / "flash_lecture1.bin", dossier / "flash_lecture2.bin"
@@ -360,12 +479,21 @@ def charger_marque(dossier: Path) -> dict:
     return marque
 
 
-def etape_flasher(port: str, build: Path, dossier: Path) -> None:
+def controler_avant_ecriture(build: Path, dossier: Path) -> None:
+    """Tout ce qui peut refuser l'ecriture, SANS toucher la carte : sauvegarde confirmee, et (portee limitee) essai couvert par elle."""
     marque = charger_marque(dossier)
     plages = plages_ecrites(build)
     gravees = chevauchements(marque["table"], plages)
     print("[flasher] regions ecrites : " + ", ".join(f"{n} 0x{d:x}-0x{f:x}" for n, d, f in plages))
     print("[flasher] partitions entamees : " + ("; ".join(gravees) if gravees else "aucune"))
+    if marque.get("portee"):
+        table_build = decoder_table((build / "partition_table" / "partition-table.bin").read_bytes())
+        verifier_portee(marque, plages, table_build)
+        print(f"[flasher] sauvegarde a portee limitee : l'essai reste dans 0x0-{marque['portee']['fin_emplacement']:#x}, couvert")
+
+
+def etape_flasher(port: str, build: Path, dossier: Path) -> None:
+    controler_avant_ecriture(build, dossier)
     args = ["write-flash", "--flash-mode", "dio", "--flash-size", "32MB", "--flash-freq", "80m"]
     for _nom, decalage, relatif in IMAGES:
         args += [hex(decalage), str(build / relatif)]
@@ -373,7 +501,11 @@ def etape_flasher(port: str, build: Path, dossier: Path) -> None:
     print(sortie.stdout[-500:])
     if sortie.returncode != 0:
         raise RuntimeError(f"write-flash a echoue ({sortie.returncode}) : {sortie.stderr[-400:]}")
-    for _nom, decalage, relatif in IMAGES:
+    for nom, decalage, relatif in IMAGES:
+        if nom == "otadata":
+            # `write-flash` a deja verifie ces octets (« Hash of data verified ») avant le redemarrage ; apres lui, le firmware qui
+            # demarre peut y inscrire son etat (retour arriere OTA) : constate le 07/11/2026, un verify-flash ici refusait un essai sain.
+            continue
         if not verifier_puce(port, build / relatif, decalage):
             raise RuntimeError(f"verify-flash different apres l'ecriture de {relatif}")
 
@@ -395,6 +527,9 @@ def etape_restaurer(port: str, dossier: Path, relire: bool = True) -> bool:
         return False
     if not verifier_puce(port, flash):
         return False
+    if relire and marque.get("portee"):
+        print("[restauration] sauvegarde a portee limitee : pas de relecture (certains blocs ne se lisent pas) ; la preuve est le MD5 de la puce")
+        relire = False
     if relire:
         with tempfile.TemporaryDirectory() as tmp:
             relu = Path(tmp) / "relecture.bin"
@@ -449,15 +584,17 @@ def capturer(port: str, secondes: float, sortie: Path | None, reinitialiser: boo
     return contenu
 
 
-def etape_essai(port: str, build: Path, dossier: Path, journaux: Path, limite: dt.datetime, resets: int) -> int:
+def etape_essai(
+    port: str, build: Path, dossier: Path, journaux: Path, limite: dt.datetime, resets: int, reference: Path | None = None
+) -> int:
     """Essai complet. La restauration est dans le `finally`. Rend le code de sortie du script."""
     code = 1
     rapport: dict = {"debut": dt.datetime.now().isoformat(timespec="seconds")}
     ecrit = False
     try:
         if not (dossier / "sauvegarde_ok.json").exists():
-            etape_sauvegarde(port, dossier)
-        charger_marque(dossier)
+            etape_sauvegarde(port, dossier, reference)
+        controler_avant_ecriture(build, dossier)
         if dt.datetime.now() >= limite:
             raise Refus("heure limite deja passee : aucune ecriture")
         ecrit = True  # des l'instant ou on lance l'ecriture, la restauration est obligatoire
@@ -530,6 +667,7 @@ class _FausseCarte:
         self.bruit_apres = None  # a partir de cet appel read-flash, les donnees LUES different de la flash (flash intacte)
         self.illisible = None  # un secteur que meme la lecture sans stub refuse
         self.corrompre_ecriture = False  # une ecriture a l'adresse 0 reussit mais altere un octet (la puce le verrait)
+        self.otadata_changee_au_demarrage = False  # le firmware ecrit puis demarre et inscrit son etat dans otadata (0x9000)
         self.appels = []
         self._lectures = 0
 
@@ -577,6 +715,8 @@ class _FausseCarte:
                 self.flash[adresse : adresse + len(donnees)] = donnees
                 if self.corrompre_ecriture and adresse == 0:
                     self.flash[len(donnees) - 1] ^= 0xFF
+                if self.otadata_changee_au_demarrage and adresse == DECALAGE_OTADATA:
+                    self.flash[DECALAGE_OTADATA + 4] ^= 0x01  # apres le redemarrage du nouveau firmware
             return self._reponse(args)
         return self._reponse(args, 2, f"commande inconnue {cmd}")
 
@@ -756,6 +896,116 @@ def _simulation(verifier) -> None:
         except Refus:
             verifier(carte.ecritures() == [], "simulation : flasher sans sauvegarde confirmee refuse, rien n'est ecrit")
 
+    # 8. Sauvegarde a portee limitee : un bloc de l'application ne se lit JAMAIS (cas reel de la 7B, 0xdcf00) ; le fichier de reference,
+    #    dont la puce prouve qu'il est identique a la flash, le remplace. L'essai complet restaure alors [0, fin de l'image).
+    def table_ancienne() -> bytes:
+        entrees = (
+            _entree_table("otadata", 1, 0, 0x9000, 0x2000)
+            + _entree_table("phy_init", 1, 1, 0xB000, 0x1000)
+            + _entree_table("ota_0", 0, 0x10, 0x10000, 0x200000)
+            + _entree_table("ota_1", 0, 0x11, 0x210000, 0x200000)
+            + _entree_table("nvs", 1, 2, 0x410000, 0x70000)
+        )
+        return entrees.ljust(TAILLE_TABLE, b"\xff")
+
+    def carte_a_table() -> _FausseCarte:
+        carte = _FausseCarte()
+        carte.flash[DECALAGE_TABLE : DECALAGE_TABLE + TAILLE_TABLE] = table_ancienne()
+        for entree, sequence in ((0, 3), (1, 2)):  # sequence 3 -> emplacement 0 (ota_0)
+            debut = DECALAGE_OTADATA + entree * SECTEUR
+            carte.flash[debut : debut + 32] = struct.pack("<I20sII", sequence, b"\0" * 20, 0, crc_otadata(sequence))
+        return carte
+
+    def build_portee(tmp, partitions: bytes):
+        build, dossier, journaux = dossiers(tmp)
+        (build / "partition_table" / "partition-table.bin").write_bytes(partitions.ljust(TAILLE_TABLE, b"\xff"))
+        return build, dossier, journaux
+
+    meridien_ok = (
+        _entree_table("otadata", 1, 0, 0x9000, 0x2000)
+        + _entree_table("phy_init", 1, 1, 0xB000, 0x1000)
+        + _entree_table("ota_0", 0, 0x10, 0x10000, 0x100000)
+        + _entree_table("nvs", 1, 2, 0x110000, 0x70000)
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = carte_a_table()
+        origine = bytes(carte.flash)
+        fin_image = DEBUT_APPLICATION + 0x120000
+        reference = Path(tmp) / "reference.ota.bin"
+        reference.write_bytes(origine[DEBUT_APPLICATION:fin_image])
+        carte.illisible = 0x10000 + 0x7F00  # un bloc a l'interieur de l'application : aucune lecture ne doit s'en approcher
+        build, dossier, journaux = build_portee(tmp, meridien_ok)
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 2, reference)
+        verifier(code == 0, "simulation (portee limitee) : essai nominal, code de sortie 0, malgre un bloc d'application illisible")
+        verifier(
+            bytes(carte.flash[:fin_image]) == origine[:fin_image],
+            "simulation (portee limitee) : [0, fin de l'image) est IDENTIQUE a l'origine apres l'essai",
+        )
+        verifier(
+            bytes(carte.flash[0x410000:0x480000]) == origine[0x410000:0x480000],
+            "simulation (portee limitee) : la NVS de l'ancien firmware n'a pas bouge",
+        )
+        lectures = [(int(a[1], 0), int(a[2], 0)) for a, _ in carte.appels if a[0] == "read-flash"]
+        verifier(
+            all(not (debut <= carte.illisible < debut + n) for debut, n in lectures),
+            "simulation (portee limitee) : aucune lecture ne touche le bloc illisible",
+        )
+        verifier(
+            not any(n > 0x80000 for _debut, n in lectures),
+            "simulation (portee limitee) : aucune lecture de la flash entiere, ni a la restauration",
+        )
+        marque = json.loads((dossier / "sauvegarde_ok.json").read_text(encoding="utf-8"))
+        verifier(
+            marque["portee"]["fin"] == fin_image and marque["portee"]["application"] == "ota_0",
+            "simulation (portee limitee) : la marque dit jusqu'ou va l'image et quelle application elle couvre",
+        )
+        verifier(marque["portee"]["nvs"]["sha256"] == empreinte(origine[0x410000:0x480000]), "simulation (portee limitee) : NVS gardee")
+        rapport = json.loads((journaux / "rapport_essai.json").read_text(encoding="utf-8"))
+        verifier(rapport["restauration_verifiee"] is True, "simulation (portee limitee) : restauration verifiee par la puce")
+
+    # 8a. Le nouveau firmware inscrit son etat dans otadata en demarrant (constate sur la 7B le 07/11/2026) : ce n'est pas un echec de
+    #     l'ecriture, l'essai continue ; la restauration remet quand meme l'otadata d'origine
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = carte_a_table()
+        carte.otadata_changee_au_demarrage = True
+        origine = bytes(carte.flash)
+        fin_image = DEBUT_APPLICATION + 0x120000
+        reference = Path(tmp) / "reference.ota.bin"
+        reference.write_bytes(origine[DEBUT_APPLICATION:fin_image])
+        build, dossier, journaux = build_portee(tmp, meridien_ok)
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 2, reference)
+        verifier(code == 0, "simulation (otadata changee au demarrage) : l'essai n'est pas refuse, code 0")
+        verifier(
+            bytes(carte.flash[:fin_image]) == origine[:fin_image],
+            "simulation (otadata changee au demarrage) : la restauration remet l'otadata d'origine",
+        )
+
+    # 8b. Le fichier de reference n'est pas ce qui tourne : verify-flash de la puce le voit, sauvegarde refusee, rien n'est ecrit
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = carte_a_table()
+        reference = Path(tmp) / "reference.ota.bin"
+        faux = bytearray(carte.flash[DEBUT_APPLICATION : DEBUT_APPLICATION + 0x120000])
+        faux[0x5000] ^= 0xFF
+        reference.write_bytes(bytes(faux))
+        build, dossier, journaux = build_portee(tmp, meridien_ok)
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 2, reference)
+        verifier(code == 2 and carte.ecritures() == [], "simulation (portee limitee) : une reference differente de la flash -> refus, AUCUNE ecriture")
+        verifier(not (dossier / "sauvegarde_ok.json").exists(), "simulation (portee limitee) : pas de sauvegarde_ok.json avec une reference fausse")
+
+    # 8c. L'essai entamerait ce que la sauvegarde ne couvre pas (la NVS de l'ancien firmware) : refus avant toute ecriture
+    with tempfile.TemporaryDirectory() as tmp:
+        carte = carte_a_table()
+        reference = Path(tmp) / "reference.ota.bin"
+        reference.write_bytes(bytes(carte.flash[DEBUT_APPLICATION : DEBUT_APPLICATION + 0x120000]))
+        gourmand = meridien_ok + _entree_table("stockage", 1, 0x80, 0x420000, 0x10000)  # recouvre la NVS de l'ancien firmware
+        build, dossier, journaux = build_portee(tmp, gourmand)
+        with _remplacer(esptool=carte.esptool, capturer=capture_ok), silence:
+            code = etape_essai("COMX", build, dossier, journaux, futur, 2, reference)
+        verifier(code == 2 and carte.ecritures() == [], "simulation (portee limitee) : une partition qui entame la NVS ancienne -> refus, AUCUNE ecriture")
+
 
 def autotest() -> int:
     """Verifie les fonctions pures avec des donnees fabriquees. Aucune carte, aucun port."""
@@ -901,6 +1151,13 @@ def principal(argv: list[str] | None = None) -> int:
         s = sous.add_parser(nom)
         s.add_argument("--port", required=True)
         s.add_argument("--dossier", required=True, type=Path, help="dossier de la sauvegarde de la flash")
+        if nom in ("sauvegarde", "essai"):
+            s.add_argument(
+                "--reference",
+                type=Path,
+                default=None,
+                help="sauvegarde a portee limitee : fichier de l'application en service (la puce prouve qu'il est identique a la flash)",
+            )
         if nom in ("flasher", "essai"):
             s.add_argument("--build", type=Path, default=Path("build"))
         if nom == "essai":
@@ -925,7 +1182,7 @@ def principal(argv: list[str] | None = None) -> int:
         if a.commande == "identifier":
             return 0
         if a.commande == "sauvegarde":
-            etape_sauvegarde(a.port, a.dossier)
+            etape_sauvegarde(a.port, a.dossier, a.reference)
             return 0
         if a.commande == "flasher":
             etape_flasher(a.port, a.build, a.dossier)
@@ -934,7 +1191,7 @@ def principal(argv: list[str] | None = None) -> int:
             return 0 if etape_restaurer(a.port, a.dossier) else 3
         if a.commande == "essai":
             journaux = a.journaux or (a.dossier / "essai")
-            return etape_essai(a.port, a.build, a.dossier, journaux, heure_limite(a.limite), a.resets)
+            return etape_essai(a.port, a.build, a.dossier, journaux, heure_limite(a.limite), a.resets, a.reference)
     except Refus as e:
         print(f"[REFUS] {e}")
         return 2
