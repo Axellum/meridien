@@ -206,6 +206,8 @@ def en_vigueur(a, maintenant, age):
     if debut >= 0 and maintenant < debut:
         return False
     fin = a["fin"] if a["fin"] >= 0 else a["expire"]
+    if fin >= 0 and (fin + 1) % 3600 == 0:  # « hh:59:59 » : la dernière seconde de l'heure fait encore partie de l'alerte
+        fin += 1
     return not (fin >= 0 and maintenant >= fin)
 
 

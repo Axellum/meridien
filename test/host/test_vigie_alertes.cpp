@@ -739,11 +739,36 @@ int la_palma_montre_plusieurs_niveaux_a_la_fois_du_plus_grave_au_moins_grave() {
     VERIFIER(v.vide() && v.pire == Niveau::Inconnu);
     v = composer(g_a, 1794085198, 1794085138, NiveauMin::Jaune); // deux secondes avant : seul le jaune « vent » est là
     VERIFIER(v.nombre == 1 && g_a.alertes[v.indices[0]].phenomene == Phenomene::Vent);
-    // À 1794085199 (= son `expires_utc`) il est fini : la fin est exclue. Les orangés, eux, commencent à ...200 : pendant UNE seconde l'écran se
-    // tait. Les émetteurs ne s'accordent pas sur la dernière seconde (l'AEMET finit à hh:59:59, le DWD à hh:00:00) : ce trou d'une seconde est
-    // connu et sans effet visible (ADR-0009).
+    // À 1794085199 (= hh:59:59, son `expires_utc`) il est encore là : les émetteurs ne s'accordent pas sur la dernière seconde (l'AEMET finit
+    // à hh:59:59, le DWD commence à hh:00:00), et cette seconde-là fait partie de l'alerte (`fin_exclue_s`, ADR-0009) : sans cela l'écran se
+    // tairait UNE seconde entre le jaune « vent » et les orangés. À ...200 il est fini, les orangés sont là.
     v = composer(g_a, 1794085199, 1794085139, NiveauMin::Jaune);
-    VERIFIER(v.vide());
+    VERIFIER(v.nombre == 1 && g_a.alertes[v.indices[0]].niveau == Niveau::Jaune &&
+             g_a.alertes[v.indices[0]].phenomene == Phenomene::Vent);
+    return 0;
+}
+
+int une_fin_a_hh_59_59_est_la_derniere_seconde_de_l_heure_et_toute_autre_fin_reste_exclue() {
+    // 1794002400 = hh:00:00 ; 1794002399 = hh:59:59 ; 1794001199 = hh:39:59 (même heure, 20 minutes plus tôt)
+    string s = remplacer(EBERSWALDE, "\"ends_utc\":null", "\"ends_utc\":1794002399");
+    VERIFIER(!s.empty() && analyser(s, "fr", g_a) == Statut::Ok);
+    VERIFIER(en_vigueur(g_a.alertes[0], 1794002398, 60));
+    VERIFIER(
+        en_vigueur(g_a.alertes[0], 1794002399, 60)); // la dernière seconde de l'heure fait encore partie de l'alerte
+    VERIFIER(!en_vigueur(g_a.alertes[0], 1794002400, 60));
+    s = remplacer(EBERSWALDE, "\"ends_utc\":null", "\"ends_utc\":1794001199"); // une fin ordinaire reste exclue
+    VERIFIER(!s.empty() && analyser(s, "fr", g_a) == Statut::Ok);
+    VERIFIER(en_vigueur(g_a.alertes[0], 1794001198, 60));
+    VERIFIER(!en_vigueur(g_a.alertes[0], 1794001199, 60));
+    s = remplacer(EBERSWALDE, "\"ends_utc\":null", "\"ends_utc\":1794002400"); // hh:00:00 (le DWD) : exclue aussi
+    VERIFIER(!s.empty() && analyser(s, "fr", g_a) == Statut::Ok);
+    VERIFIER(en_vigueur(g_a.alertes[0], 1794002399, 60));
+    VERIFIER(!en_vigueur(g_a.alertes[0], 1794002400, 60));
+    s = remplacer(EBERSWALDE, "\"expires_utc\":1794042000",
+                  "\"expires_utc\":1794002399"); // sans fin attendue, l'expiration suit la même règle
+    VERIFIER(!s.empty() && analyser(s, "fr", g_a) == Statut::Ok);
+    VERIFIER(en_vigueur(g_a.alertes[0], 1794002399, 60));
+    VERIFIER(!en_vigueur(g_a.alertes[0], 1794002400, 60));
     return 0;
 }
 
@@ -1182,6 +1207,7 @@ int l_empreinte_voit_chaque_champ_montre() {
     X(une_alerte_qui_commence_dans_le_futur_n_est_pas_montree)                                                         \
     X(la_palma_montre_plusieurs_niveaux_a_la_fois_du_plus_grave_au_moins_grave)                                        \
     X(la_fin_attendue_prime_sur_l_expiration_du_message)                                                               \
+    X(une_fin_a_hh_59_59_est_la_derniere_seconde_de_l_heure_et_toute_autre_fin_reste_exclue)                           \
     X(un_debut_inconnu_compte_comme_deja_commence_puis_l_effectif_sert_de_repli)                                       \
     X(sans_fin_connue_l_alerte_tient_tant_que_la_reponse_est_fraiche)                                                  \
     X(une_reponse_de_plus_de_six_heures_ne_montre_rien_meme_avec_une_fin_connue)                                       \
