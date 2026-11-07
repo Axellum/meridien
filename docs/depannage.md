@@ -22,6 +22,7 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 - [Memory and watchdog](#memory-and-watchdog)
 - [Wi-Fi](#wi-fi)
 - [Settings page and core](#settings-page-and-core)
+- [Main screen](#main-screen)
 
 ---
 
@@ -340,6 +341,52 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 **Solution.** `heure_courante`, `quart_courant` and the “rain soon” block are recomputed against the device clock; when no hour contains it the index is -1 and `courant.proba_precip_pct` is `METEO_PROBA_INCONNUE`, never the probability of the neighbouring hour. The contract says so (`main/meteo_etat.h`) and tests cover both zones.
 
 **Seen on** the author's PC, captures of 2026-11-07 00:12 (Paris time), no board. **Evidence**: `hourly.time[0] - current.time` = -2,700 s (Kathmandu), +1,800 s (Newfoundland), 0 (Lyon, Sydney, Singapore). **Status**: resolved in the core; the screen must accept `heure_courante == -1`.
+### Main screen
+
+#### The sky gradient shows visible bands
+
+**Symptom.** On a sky that goes from dark blue to a lighter blue, steps of colour show across the screen.
+
+**Cause.** The panel takes RGB565 (32 or 64 levels per channel) and LVGL 9.5 has no dithering; its gradient (at most two stops here, `LV_GRADIENT_MAX_STOPS 2`) is drawn straight into that format, so each level becomes a band.
+
+**Solution.** The sky is an RGB565 image built with an ordered 8 × 8 (Bayer) dither and set as the background image of the screen (`remplir_ciel_trame` and `appliquer_ciel` in `main/ui_principal.cpp`). It is rebuilt only when the moment of the day or the weather class changes, and its 1,843,200 bytes (1280 × 720) live in PSRAM. If the allocation fails, the screen falls back on LVGL's own vertical gradient (bands, but a working screen).
+- **Seen on**: PC render (LVGL 9.5.0, clang), branch `claude/ecran-visuel-ba722a`, 2026-11-07; and a Tab5 (ST7121 screen), commit `cd362eb`, 2026-11-07 (serial log only, see the next entry).
+- **Evidence**: renders before and after (the bands vanish). On the board: the screen is built (« 9 objets LVGL, 7 polices »), free PSRAM is 1.8 MB lower than with the old screen (compatible with the 1,843,200-byte sky, not isolated), no allocation error in the log; the first 10 s draw 3 images at 215 ms on average, then a minute change redraws one image of 10 zones in 82 ms (the old screen: about 24 ms). **Not verified**: the colours and the bands on the panel, by eye.
+- **Status**: *resolved on the PC render*; *on the board: allocated and drawn without error, not looked at by eye*.
+
+#### The board reboots about 14 s after start, at the first weather request
+
+**Symptom.** With the new main screen, the Tab5 reboots in a loop: the screen is built (« écran principal 1280x720 chargé »), then, at about 13.7 s, the log prints `abort() was called at PC …` and « Rebooting… », and the next boot reports « plantage (exception) » (code 4). The old main screen, built on the same base commit, does not do it.
+
+**Cause (probable, not isolated allocation by allocation).** Internal RAM runs out when the first weather request (TLS) and the web server start together. Free internal RAM just before that request: 109.2 KB with the old screen, 44.9 to 45.6 KB with the new one, on the same base (`4e7d8af`). ESP-IDF's default `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384` keeps every allocation under 16 KB in internal RAM; the new screen draws much larger digits (the clock and the temperature) than the old one. The two `abort()` call sites, decoded with the ELF, are `lock_init_generic` (`newlib/locks.c:77`) and `esp_aes_intr_alloc` (`mbedtls/port/aes/dma/esp_aes_dma_core.c:117`): both abort when an internal allocation fails.
+
+**Solution.** The memory settings of jalon 1b (commit `4f6bd0a`, branch `claude/jalon-1b-wifi-c2232d`, file `boards/tab5/sdkconfig.defaults.board`): `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256` and `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y`. They are **not** in the branch of the screen (they are another session's file and arrive with the merge). Measured with those two lines added in a separate build directory, never committed: 154.4 KB of internal RAM free before the first request, 105.9 KB at 154 s (minimum since start 96.0 KB), no abort over 156 s.
+- **Seen on**: Tab5, ST7121 screen (MAC read on the chip before writing, not copied here), ESP32-P4, commit `cd362eb` over `4e7d8af`, 2026-11-07 from 01:50 to 02:02; esptool 5.3.1, application only at `0x10000`; binaries `061A3E69…0A28` (without the settings) and `F317FCFD…FFCB` (with them).
+- **Evidence**: serial logs, counted from the files. The new screen without the settings: 9 boots seen, 6 aborts at about 13.7 s, 1 boot that lived 58 s with 38 KB free and a weather request refused by mbedTLS for lack of memory, 2 boots cut by the end of the capture before 13 s. With the settings: 2 boots, 0 aborts (70 s and 156 s). The old screen on the same base: 2 boots, 0 aborts (30 s and 66 s).
+- **Status**: *solved with the settings of jalon 1b*; *not committed on this branch*; to check again after the merge. The base itself is fragile: with the old screen, the minimum of free internal RAM since start was 1.7 to 1.8 KB on that base.
+
+#### Hourly strip, pressure trend and rain amounts are absent on the device
+
+**Symptom.** The main screen shows the weather now and the days, but neither the hourly strip, nor the pressure trend, nor the amount of rain, nor « rain in N min ».
+
+**Cause.** The device's weather client (`meteo_client.cpp`, session `meteo-appareil`) does not request or keep those fields yet; the screen shows only what is received and never invents a value (the zone disappears and the others take its place).
+
+**Solution.** A request listing the fields (hourly temperature, code and rain probability; pressure at three hours; rain amount; minutely precipitation) was written for the session that owns the client, in the shared notes folder (`ecran-visuel_besoins-meteo.md`). The owner published a contract (`MeteoDetail`, commit `f9537c5` of its branch) and, according to its message at 02:10 on 2026-11-07, committed the implementation and the pressure trend (commits `4489127` and `8f31fa0`; PC tests green and firmware compiled, never run on a board; not merged here). An adapter from that contract to the screen's view, tested on the PC against the real header, is in the shared notes folder (`ecran-visuel_branchement-meteo-v2.md`); it is not in this branch because it includes the owner's header.
+- **Seen on**: a Tab5 (commit `cd362eb`, 2026-11-07): the screen shows the weather and the days, without those zones. The PC render shows the same with the variant `donnees-minimales`.
+- **Status**: *open* (waiting for the client's implementation and for the adapter to be placed at the merge).
+
+#### Turkish: Sunday and Monday had the same abbreviation
+
+**Symptom.** In the week, both « Pazar » (Sunday) and « Pazartesi » (Monday) were written « Paz ».
+
+**Cause.** The first three letters of the two names are the same.
+
+**Solution.** The abbreviations are a table per language (`JOURS_COURTS` in `components/core/include/ecran/visuel_dates.hpp`), not a cut of the name; the test checks that the seven abbreviations of every language are distinct (« Paz » for Sunday, « Pzt » for Monday).
+- **Seen on**: PC render, `fr de tr`, 2026-11-07. **Status**: *resolved*.
+
+#### The render refuses to start: « a build is already running (ninja) »
+
+`toolsendre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy compilation on the PC. Wait for the other session's build to end (the `build` lock of `verrous.py`), or, if you know what you are doing, `-Forcer`.
 
 ---
 
@@ -365,6 +412,7 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 - [Mémoire et chien de garde](#mémoire-et-chien-de-garde)
 - [Wi-Fi](#wi-fi)
 - [Page de réglages et noyau](#page-de-réglages-et-noyau)
+- [Écran principal](#écran-principal)
 
 ---
 
@@ -683,3 +731,49 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 **Solution.** `heure_courante`, `quart_courant` et le bloc « pluie proche » sont recalculés avec l'heure de l'appareil ; quand aucune heure ne la contient, l'indice vaut -1 et `courant.proba_precip_pct` vaut `METEO_PROBA_INCONNUE`, jamais la probabilité de l'heure voisine. Le contrat le dit (`main/meteo_etat.h`) et les tests couvrent les deux fuseaux.
 
 **Vu sur** PC de l'auteur, captures du 2026-11-07 00 h 12 (heure de Paris), aucune carte. **Preuve** : `hourly.time[0] - current.time` = -2 700 s (Katmandou), +1 800 s (Terre-Neuve), 0 (Lyon, Sydney, Singapour). **Statut** : résolu dans le noyau ; l'écran doit accepter `heure_courante == -1`.
+### Écran principal
+
+#### Le dégradé du ciel montre des bandes visibles
+
+**Symptôme.** Sur un ciel qui va du bleu sombre à un bleu plus clair, des paliers de couleur se voient en travers de l'écran.
+
+**Cause.** La dalle prend du RGB565 (32 ou 64 niveaux par canal) et LVGL 9.5 n'a pas de tramage ; son dégradé (deux arrêts au plus ici, `LV_GRADIENT_MAX_STOPS 2`) est dessiné tel quel dans ce format, donc chaque niveau devient une bande.
+
+**Solution.** Le ciel est une image RGB565 construite avec un tramage ordonné 8 × 8 (Bayer) et posée en image de fond de l'écran (`remplir_ciel_trame` et `appliquer_ciel` dans `main/ui_principal.cpp`). Elle n'est refaite que quand le moment de la journée ou la classe de temps change, et ses 1 843 200 octets (1280 × 720) vivent en PSRAM. Si l'allocation échoue, l'écran retombe sur le dégradé vertical de LVGL (des bandes, mais un écran qui marche).
+- **Vu sur** : rendu PC (LVGL 9.5.0, clang), branche `claude/ecran-visuel-ba722a`, 07/11/2026 ; et un Tab5 (écran ST7121), commit `cd362eb`, 07/11/2026 (journal série seulement, voir l'entrée suivante).
+- **Preuve** : rendus avant et après (les bandes disparaissent). Sur la carte : l'écran est construit (« 9 objets LVGL, 7 polices »), la PSRAM libre est inférieure de 1,8 Mo à celle de l'ancien écran (compatible avec le ciel de 1 843 200 octets, non isolé), aucune erreur d'allocation dans le journal ; les 10 premières secondes dessinent 3 images à 215 ms en moyenne, puis un changement de minute redessine une image de 10 zones en 82 ms (l'ancien écran : environ 24 ms). **Non vérifié** : les couleurs et les bandes sur la dalle, à l'œil.
+- **Statut** : *résolu sur le rendu PC* ; *sur la carte : alloué et dessiné sans erreur, pas regardé à l'œil*.
+
+#### La carte redémarre environ 14 s après le démarrage, à la première requête météo
+
+**Symptôme.** Avec le nouvel écran principal, le Tab5 redémarre en boucle : l'écran est construit (« écran principal 1280x720 chargé »), puis, vers 13,7 s, le journal écrit `abort() was called at PC …` et « Rebooting… », et le démarrage suivant annonce « plantage (exception) » (code 4). L'ancien écran principal, construit sur le même commit de base, ne le fait pas.
+
+**Cause (probable, non isolée allocation par allocation).** La mémoire interne s'épuise quand la première requête météo (TLS) et le serveur web démarrent ensemble. Mémoire interne libre juste avant cette requête : 109,2 Ko avec l'ancien écran, 44,9 à 45,6 Ko avec le nouveau, sur la même base (`4e7d8af`). Le réglage par défaut d'ESP-IDF `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384` garde en mémoire interne toute allocation de moins de 16 Ko ; le nouvel écran dessine des chiffres bien plus grands (l'heure et la température) que l'ancien. Les deux sites d'`abort()`, décodés avec l'ELF, sont `lock_init_generic` (`newlib/locks.c:77`) et `esp_aes_intr_alloc` (`mbedtls/port/aes/dma/esp_aes_dma_core.c:117`) : tous deux arrêtent le programme quand une allocation interne échoue.
+
+**Solution.** Les réglages mémoire du jalon 1b (commit `4f6bd0a`, branche `claude/jalon-1b-wifi-c2232d`, fichier `boards/tab5/sdkconfig.defaults.board`) : `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256` et `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y`. Ils ne sont **pas** dans la branche de l'écran (fichier d'une autre session, ils arrivent avec la fusion). Mesuré avec ces deux lignes ajoutées dans un dossier de compilation à part, jamais commitées : 154,4 Ko de mémoire interne libres avant la première requête, 105,9 Ko à 154 s (minimum depuis le démarrage 96,0 Ko), aucun `abort()` sur 156 s.
+- **Vu sur** : Tab5, écran ST7121 (MAC lue sur la puce avant d'écrire, non recopiée ici), ESP32-P4, commit `cd362eb` sur `4e7d8af`, 07/11/2026 de 01 h 50 à 02 h 02 ; esptool 5.3.1, application seule à `0x10000` ; binaires `061A3E69…0A28` (sans les réglages) et `F317FCFD…FFCB` (avec).
+- **Preuve** : journaux série, comptés dans les fichiers. Le nouvel écran sans les réglages : 9 démarrages vus, 6 `abort()` vers 13,7 s, 1 démarrage qui a vécu 58 s avec 38 Ko libres et une requête météo refusée par mbedTLS faute de mémoire, 2 démarrages coupés par la fin de la capture avant 13 s. Avec les réglages : 2 démarrages, 0 `abort()` (70 s et 156 s). L'ancien écran sur la même base : 2 démarrages, 0 `abort()` (30 s et 66 s).
+- **Statut** : *résolu avec les réglages du jalon 1b* ; *non commité sur cette branche* ; à revérifier après la fusion. La base elle-même est fragile : avec l'ancien écran, le minimum de mémoire interne libre depuis le démarrage était de 1,7 à 1,8 Ko sur cette base.
+
+#### L'heure par heure, la tendance de pression et les cumuls de pluie sont absents sur l'appareil
+
+**Symptôme.** L'écran principal montre la météo du moment et les jours, mais ni la bande heure par heure, ni la tendance de pression, ni le cumul de pluie, ni « pluie dans N min ».
+
+**Cause.** Le client météo de l'appareil (`meteo_client.cpp`, session `meteo-appareil`) ne demande pas encore ces champs ni ne les garde ; l'écran ne montre que ce qu'il reçoit et n'invente jamais une valeur (la zone disparaît et les autres prennent sa place).
+
+**Solution.** Une demande qui liste les champs (température, code et probabilité de pluie par heure ; pression à trois heures ; cumul de pluie ; précipitations à la minute) a été écrite pour la session propriétaire du client, dans le dossier de notes partagé (`ecran-visuel_besoins-meteo.md`). Le propriétaire a publié un contrat (`MeteoDetail`, commit `f9537c5` de sa branche) et, d'après son message de 02 h 10 le 07/11/2026, commité l'implémentation et la tendance de pression (commits `4489127` et `8f31fa0` ; tests PC verts et firmware compilé, jamais lancé sur une carte ; non fusionné ici). Un adaptateur de ce contrat vers la vue de l'écran, testé sur le PC contre le vrai en-tête, est dans le dossier de notes partagé (`ecran-visuel_branchement-meteo-v2.md`) ; il n'est pas dans cette branche parce qu'il inclut l'en-tête du propriétaire.
+- **Vu sur** : un Tab5 (commit `cd362eb`, 07/11/2026) : l'écran montre la météo et les jours, sans ces zones. Le rendu PC montre la même chose avec la variante `donnees-minimales`.
+- **Statut** : *ouvert* (en attente de l'implémentation du client et de la pose de l'adaptateur à la fusion).
+
+#### Turc : dimanche et lundi avaient la même abréviation
+
+**Symptôme.** Dans la semaine, « Pazar » (dimanche) et « Pazartesi » (lundi) s'écrivaient tous deux « Paz ».
+
+**Cause.** Les trois premières lettres des deux noms sont les mêmes.
+
+**Solution.** Les abréviations sont une table par langue (`JOURS_COURTS` dans `components/core/include/ecran/visuel_dates.hpp`), pas une coupure du nom ; le test vérifie que les sept abréviations de chaque langue sont distinctes (« Paz » pour dimanche, « Pzt » pour lundi).
+- **Vu sur** : rendu PC, `fr de tr`, 07/11/2026. **Statut** : *résolu*.
+
+#### Le rendu refuse de démarrer : « une compilation tourne déjà (ninja) »
+
+`toolsendre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une seconde compilation lourde sur le PC. Attendre la fin de la compilation de l'autre session (verrou `build` de `verrous.py`) ou, en connaissance de cause, `-Forcer`.

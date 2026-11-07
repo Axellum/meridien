@@ -9,3 +9,8 @@
 
 // Ouvre l'écran des réglages. À appeler dans la tâche LVGL, verrou pris.
 void ui_reglages_ouvrir();
+
+// Reprend l'installation guidée au démarrage si l'hôte dit qu'elle n'est pas terminée (carte neuve, ou redémarrage au milieu).
+// À appeler UNE fois, juste après le chargement de l'écran principal, verrou LVGL pris. Ici : ne fait rien (le vrai corps est dans
+// la colle de `reglages-ecran`, main/ui_reglages_ouvrir.cpp).
+void ui_installation_ouvrir_si_necessaire();

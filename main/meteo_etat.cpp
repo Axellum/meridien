@@ -118,6 +118,23 @@ int meteo_etat_echecs() {
     return g_etat.echecs;
 }
 
+bool meteo_etat_lire_releve(meteo::Releve *sortie, int *echecs) {
+    if (sortie == nullptr) {
+        return false;
+    }
+    bool a_releve = false;
+    portENTER_CRITICAL(&g_verrou);
+    a_releve = g_a_releve;
+    if (a_releve) {
+        *sortie = g_releve; // même copie atomique que meteo_etat_lire()
+        if (echecs != nullptr) {
+            *echecs = g_echecs;
+        }
+    }
+    portEXIT_CRITICAL(&g_verrou);
+    return a_releve;
+}
+
 } // namespace ecran
 
 uint32_t meteo_detail_version() { return g_etat.version_visible.load(std::memory_order_acquire); }

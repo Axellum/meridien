@@ -22,6 +22,10 @@ void meteo_etat_compter_echec();
 void meteo_etat_oublier();
 // Nombre d'essais ratés de suite depuis la dernière réponse.
 int meteo_etat_echecs();
+// Copie du relevé complet (prévisions des jours, lever et coucher du soleil, vent, pression...) pour l'écran principal, qui
+// montre plus que MeteoEtat. Rend faux, sans rien écrire, s'il n'y a pas de relevé. `echecs` (peut être nul) : essais ratés de suite.
+// Ajout de la session ecran-visuel (le contrat meteo_etat.h, lui, ne change pas).
+bool meteo_etat_lire_releve(meteo::Releve *sortie, int *echecs);
 
 // ---- zone (meteo_zone.cpp), lue par le client ---------------------------------------------------------------------
 

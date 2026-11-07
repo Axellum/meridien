@@ -1,34 +1,25 @@
-// Scène « principal » : l'écran principal de la phase 2 (main/ui_principal.cpp), compilé tel quel. Grande horloge, date, bloc
-// météo, en paysage. Données fixées à la place du temps réel et de la météo.
+// Scène « principal » : l'écran principal (main/ui_principal.cpp), compilé tel quel, avec le thème par défaut (« Ciel »). Grande
+// horloge, date, météo du moment, grandeurs (vent, pluie, humidité, pression, UV, soleil, lune), heure par heure, sept jours,
+// alertes. Données fixées à la place du temps réel et de la météo (scene_principal_donnees.hpp).
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_principal.cpp main/horloge.cpp
-// rendu-langues: fr
-// rendu-tailles: 1280x720 1024x600
+// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp
+// rendu-langues: fr en de nl es it tr
+// rendu-langues-defaut: fr de tr
+// rendu-tailles: 1280x720 1024x600 720x1280
 // rendu-sequence: principal
 //
-// L'écran est dessiné pour le paysage 1280x720 (le Tab5 tourné par le PPA) et mis à l'échelle sur les autres tailles (1024x600 de la
-// 7B) : la 7B n'a pas encore été essayée, ce rendu n'est qu'une simulation de sa taille.
+// L'écran est dessiné pour 1280x720 (paysage) ou 720x1280 (portrait) et mis à l'échelle sur les autres tailles (1024x600 de la 7B) :
+// la 7B n'a pas été essayée, ce rendu n'est qu'une simulation de sa taille.
 //
-// Fixtures (inventées, pas des mesures) : la météo de chaque variante. Les libellés viennent du vrai noyau pur
-// (meteo_wmo.hpp puis tr()), comme ceux que la session météo met dans MeteoEtat::libelle ; l'heure et la date viennent du vrai
-// fuseau Europe/Paris (horloge.cpp) à partir de l'instant fixé par le banc. Les textes propres à l'écran (« Données périmées »,
-// « Météo indisponible »...) sont ceux de l'écran : on ne les recopie pas ici. L'écran n'est pas encore traduit (français).
-//
-// Les cas pires et la mention « Exemple » reprennent les variantes écrites par la session ecran-principal pour son écran ; son
-// essai d'un libellé sans zéro final (hors contrat) n'est pas rendu ici : ce n'est pas un état de l'écran à valider.
-#include <algorithm>
+// Fixtures (inventées, pas des mesures). « donnees-minimales » montre ce que l'appareil reçoit aujourd'hui du client météo (ni
+// heure par heure, ni tendance, ni cumul de pluie) ; les autres variantes, les données complètes demandées à la session météo.
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <string_view>
 
 #include "banc.h"
-#include "ecran/i18n.hpp"
-#include "ecran/meteo_wmo.hpp"
-#include "horloge.h"
 #include "lvgl.h"
+#include "scenes/scene_principal_donnees.hpp"
 #include "ui_principal.h"
 
 // La police du firmware (symboles posés par le banc, comme EMBED_FILES dans main/CMakeLists.txt).
@@ -37,93 +28,61 @@ extern const uint8_t roboto_700_end[] asm("_binary_roboto_700_ttf_end");
 
 namespace {
 
+using namespace donnees;
+
 constexpr int64_t kDouzeHeures = 12 * 3600;
-
-// Ce que la session météo écrirait dans MeteoEtat pour un code WMO : libellé court, déjà traduit, jamais un code.
-MeteoEtat meteo(int code_wmo, bool jour, float temperature_c, float min_c, float max_c, bool perime) {
-    MeteoEtat m = {};
-    m.valide = true;
-    m.perime = perime;
-    m.maj_epoch_s = 0;
-    m.temperature_c = temperature_c;
-    m.code_wmo = code_wmo;
-    m.jour = jour;
-    m.min_c = min_c;
-    m.max_c = max_c;
-    const std::string_view libelle = ecran::i18n::tr(ecran::meteo::decrire(code_wmo, jour).libelle);
-    const std::size_t n = std::min(libelle.size(), sizeof m.libelle - 1);
-    std::memcpy(m.libelle, libelle.data(), n);
-    m.libelle[n] = '\0';
-    return m;
-}
-
-// Ce que ecran_principal.cpp (le branchement sur l'appareil) prépare avant d'appeler l'écran, avec l'heure du réseau connue
-// (ou pas). `date` pointe sur un tampon statique : l'écran copie les textes pendant l'appel, le tampon n'a qu'à survivre jusque-là.
-ecran::EntreesPrincipal entrees(const banc::Contexte &contexte, int64_t decalage_s, const MeteoEtat &etat_meteo,
-                                bool heure_connue) {
-    static ecran::TexteHorloge horloge;
-    horloge = {};
-    const int64_t instant = contexte.instant_utc_s + decalage_s;
-    ecran::EntreesPrincipal e = {};
-    e.heure_connue = heure_connue && ecran::horloge_formater(instant, horloge) &&
-                     ecran::horloge_hhmm(instant, e.heure, sizeof e.heure);
-    e.date = horloge.date;
-    e.date_attente = nullptr; // la phrase d'attente de l'écran lui-même
-    e.meteo = etat_meteo;
-    e.meteo_exemple = false;
-    return e;
-}
 
 void afficher(const banc::Contexte &contexte, const ecran::EntreesPrincipal &e) {
     lv_obj_t *ecran_lvgl = lv_obj_create(nullptr);
-    const std::size_t taille_police = static_cast<std::size_t>(roboto_700_end - roboto_700_start);
-    if (!ecran::ui_principal_creer(ecran_lvgl, roboto_700_start, taille_police, contexte.largeur, contexte.hauteur)) {
+    const ecran::RessourcesPrincipal ressources = {roboto_700_start,
+                                                   static_cast<std::size_t>(roboto_700_end - roboto_700_start)};
+    if (!ecran::ui_principal_creer(ecran_lvgl, ressources, contexte.largeur, contexte.hauteur)) {
         return; // police non créée : l'écran reste vide, le PNG le montrera
     }
     ecran::ui_principal_mettre_a_jour(e);
     lv_screen_load(ecran_lvgl);
 }
 
-// Journée ordinaire : partiellement nuageux, 12 °C.
-void jour(const banc::Contexte &contexte) {
-    afficher(contexte, entrees(contexte, 0, meteo(2, true, 12.4F, 8.1F, 14.6F, false), true));
+void depuis(const banc::Contexte &c, const Cas &cas, int64_t decalage = 0) {
+    afficher(c, entrees(c, decalage, vue(cas, c.instant_utc_s + decalage)));
 }
 
-// Pluie modérée.
-void pluie(const banc::Contexte &contexte) {
-    afficher(contexte, entrees(contexte, 0, meteo(63, true, 8.2F, 6.5F, 9.8F, false), true));
-}
+void soleil(const banc::Contexte &c) { depuis(c, SOLEIL); }
+void pluie(const banc::Contexte &c) { depuis(c, PLUIE); }
+void neige(const banc::Contexte &c) { depuis(c, NEIGE); }
+void orage(const banc::Contexte &c) { depuis(c, ORAGE); }
+void brouillard(const banc::Contexte &c) { depuis(c, BROUILLARD); }
+void nuit(const banc::Contexte &c) { depuis(c, NUIT, kDouzeHeures); } // 23 h 40 locale
+void chaleur(const banc::Contexte &c) { depuis(c, CHALEUR); }
 
-// Le soir : l'heure locale passe à 23 h 40 (instant + 12 h), ciel dégagé, température négative pour voir le signe.
-void nuit(const banc::Contexte &contexte) {
-    afficher(contexte, entrees(contexte, kDouzeHeures, meteo(0, false, -2.6F, -4.0F, 3.4F, false), true));
-}
+// Ce que l'appareil reçoit aujourd'hui : pas d'heure par heure, pas de tendance de pression, pas de cumul ni de minutage de la pluie.
+void donnees_minimales(const banc::Contexte &c) { afficher(c, entrees(c, 0, vue(SOLEIL, c.instant_utc_s, false))); }
 
 // La dernière météo reçue est trop ancienne : l'écran la garde et le dit.
-void perimee(const banc::Contexte &contexte) {
-    afficher(contexte, entrees(contexte, 0, meteo(3, true, 11.0F, 7.0F, 13.0F, true), true));
+void perimee(const banc::Contexte &c) {
+    VueMeteo v = vue(PLUIE, c.instant_utc_s);
+    v.perimee = true;
+    afficher(c, entrees(c, 0, v));
+}
+
+// Ce que l'appareil montre tant que la météo vient du bouchon du contrat : l'écran le dit.
+void exemple(const banc::Contexte &c) {
+    VueMeteo v = vue(SOLEIL, c.instant_utc_s, false);
+    v.exemple = true;
+    afficher(c, entrees(c, 0, v));
 }
 
 // Aucune météo reçue (pas de zone choisie, ou réseau absent) : « Météo indisponible ».
-void meteo_absente(const banc::Contexte &contexte) { afficher(contexte, entrees(contexte, 0, MeteoEtat{}, true)); }
+void meteo_absente(const banc::Contexte &c) { afficher(c, entrees(c, 0, VueMeteo{})); }
 
 // Les premières secondes : pas d'heure du réseau (« --:-- » et phrase d'attente), pas de météo.
-void attente(const banc::Contexte &contexte) { afficher(contexte, entrees(contexte, 0, MeteoEtat{}, false)); }
+void attente(const banc::Contexte &c) { afficher(c, entrees(c, 0, VueMeteo{}, false)); }
 
-// Ce que l'appareil montre tant que la météo vient du bouchon du contrat (valeurs d'exemple) : l'écran le dit.
-void exemple(const banc::Contexte &contexte) {
-    ecran::EntreesPrincipal e = entrees(contexte, 0, meteo(2, true, 12.4F, 8.1F, 14.6F, false), true);
-    e.meteo_exemple = true;
-    afficher(contexte, e);
-}
-
-// Pires cas de largeur : chiffres larges, date la plus longue, libellé de 39 octets, températures négatives, météo périmée.
-void pires_cas(const banc::Contexte &contexte) {
-    ecran::EntreesPrincipal e = entrees(contexte, 0, meteo(2, true, -12.4F, -15.2F, -3.0F, true), true);
-    std::snprintf(e.heure, sizeof e.heure, "%s", "20:08");
-    e.date = "mercredi 30 septembre 2026";
-    std::snprintf(e.meteo.libelle, sizeof e.meteo.libelle, "%s", "Orage avec grêle et pluie verglaçante");
-    afficher(contexte, e);
+// Pires cas de largeur : ville très longue, températures négatives à deux chiffres, libellé le plus long, météo périmée.
+void pires_cas(const banc::Contexte &c) {
+    VueMeteo v = vue(PIRES_CAS, c.instant_utc_s);
+    v.perimee = true;
+    afficher(c, entrees(c, 0, v));
 }
 
 } // namespace
@@ -131,10 +90,19 @@ void pires_cas(const banc::Contexte &contexte) {
 namespace banc {
 
 const Scene kScenes[] = {
-    {"jour", "Jour : heure et météo à jour", jour},         {"pluie", "Pluie", pluie},
-    {"nuit", "Nuit, température négative", nuit},           {"perimee", "Météo périmée", perimee},
-    {"meteo-absente", "Aucune météo reçue", meteo_absente}, {"attente", "Au démarrage : heure en attente", attente},
-    {"exemple", "Météo d'exemple (bouchon)", exemple},      {"pires-cas", "Pires cas de largeur", pires_cas},
+    {"soleil", "Soleil, ciel clair", soleil},
+    {"pluie", "Pluie, vent, pression qui baisse", pluie},
+    {"neige", "Neige, gel", neige},
+    {"orage", "Orage, rafales", orage},
+    {"brouillard", "Brouillard", brouillard},
+    {"nuit", "Nuit, froid, lune", nuit},
+    {"chaleur", "Forte chaleur, UV extrême", chaleur},
+    {"donnees-minimales", "Données reçues aujourd'hui (sans heure par heure)", donnees_minimales},
+    {"perimee", "Météo périmée", perimee},
+    {"exemple", "Météo d'exemple (bouchon)", exemple},
+    {"meteo-absente", "Aucune météo reçue", meteo_absente},
+    {"attente", "Au démarrage : heure en attente", attente},
+    {"pires-cas", "Pires cas de largeur", pires_cas},
 };
 const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
 

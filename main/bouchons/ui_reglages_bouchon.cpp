@@ -57,3 +57,6 @@ void ui_reglages_ouvrir() {
     lv_timer_t *minuteur = lv_timer_create(retirer, kDureeMs, nullptr);
     lv_timer_set_repeat_count(minuteur, 1);
 }
+
+// Sans la colle de `reglages-ecran` il n'y a pas d'installation guidée à reprendre : rien à faire.
+void ui_installation_ouvrir_si_necessaire() {}

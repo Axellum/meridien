@@ -9,15 +9,22 @@
 #include "esp_log.h"
 #include "lvgl.h"
 
+#include "ecran/i18n.hpp"
+#include "ecran/meteo_synthese.hpp"
+#include "ecran/visuel_vue.hpp"
 #include "horloge.h"
 #include "meteo_etat.h"
+#include "meteo_interne.h"
+#include "meteo_zone.h"
+#include "reglages.h"
 #include "reseau.h"
 #include "textes_principal.h"
 #include "ui_bonjour.h"
 #include "ui_principal.h"
 #include "ui_reglages.h"
 
-// Police Roboto Bold embarquée (main/assets/roboto_700.ttf, EMBED_FILES de main/CMakeLists.txt).
+// Police Roboto Bold embarquée (main/assets/roboto_700.ttf) et jeu d'icônes météo (main/assets/icones_meteo.bin, lu par
+// ui_meteo_icones.cpp) : EMBED_FILES de main/CMakeLists.txt.
 extern const uint8_t roboto_700_start[] asm("_binary_roboto_700_ttf_start");
 extern const uint8_t roboto_700_end[] asm("_binary_roboto_700_ttf_end");
 
@@ -29,11 +36,13 @@ const char *TAG = "principal";
 
 constexpr uint32_t kPeriodeMs = 500;
 constexpr int kJournalToutesLesN = 120; // une minute à 500 ms
+constexpr int kZoneToutesLesN = 60;     // le nom de la ville est relu (NVS) toutes les 30 s, pas à chaque passage
 
 lv_obj_t *g_ecran_principal = nullptr;
 lv_obj_t *g_ecran_diagnostic = nullptr;
 int g_compteur = 0;
 bool g_heure_journalisee = false;
+char g_ville[sizeof(ZoneMeteo::nom)] = {};
 
 void vers_diagnostic() {
     if (g_ecran_diagnostic != nullptr) {
@@ -47,23 +56,55 @@ void vers_principal() {
     }
 }
 
+// Le réglage « thème » de la page de réglages (reglages.h) choisit l'habillage de l'écran principal : « auto » = ciel (suit l'heure
+// et le temps), « clair » = clair, « sombre » = tableau sombre. Le thème « horloge » (heure géante) n'a pas de valeur dans ce
+// réglage : il faudrait une quatrième valeur au registre des réglages (session reglages-ecran), donc il n'est pas atteignable.
+const visuel::ThemePrincipal &theme_du_reglage() {
+    switch (reglages_affichage().theme) {
+    case reglages::Theme::Clair:
+        return visuel::kThemeClair;
+    case reglages::Theme::Sombre:
+        return visuel::kThemeTableauSombre;
+    case reglages::Theme::Auto:
+        break;
+    }
+    return visuel::kThemeCiel;
+}
+
 // Appelé par LVGL (dans sa tâche, verrou pris) deux fois par seconde.
 void rafraichir(lv_timer_t *) {
+    ui_principal_changer_theme(theme_du_reglage()); // rien si le thème n'a pas changé depuis la page de réglages
     const EtatReseau etat = reseau_etat();
 
     EntreesPrincipal entrees = {};
-    TexteHorloge horloge = {};
     const int64_t instant = static_cast<int64_t>(std::time(nullptr));
-    entrees.heure_connue = etat.heure_synchronisee && horloge_formater(instant, horloge) &&
-                           horloge_hhmm(instant, entrees.heure, sizeof entrees.heure);
-    entrees.date = horloge.date;
+    entrees.maintenant_s = etat.heure_synchronisee ? instant : 0;
+    entrees.heure_connue = etat.heure_synchronisee && horloge_hhmm(instant, entrees.heure, sizeof entrees.heure);
+    char date[48] = {};
+    if (entrees.heure_connue && !horloge_date_localisee(instant, i18n::langue_courante(), date, sizeof date)) {
+        entrees.heure_connue = false;
+    }
+    entrees.date = date; // copiée par l'écran pendant l'appel
     entrees.date_attente = texte_principal::kDateAttente;
 
-    if (!meteo_etat_lire(&entrees.meteo)) {
-        entrees.meteo = MeteoEtat{}; // valide = faux : le bloc dit « météo indisponible »
+    // La ville : lue dans la zone enregistrée (NVS), pas à chaque passage.
+    if (g_compteur % kZoneToutesLesN == 0) {
+        ZoneMeteo zone = {};
+        if (zone_lire(&zone)) {
+            std::memcpy(g_ville, zone.nom, sizeof g_ville);
+            g_ville[sizeof g_ville - 1] = '\0';
+        }
+    }
+
+    // La météo : le relevé complet (prévisions, soleil...), jugé contre l'heure du moment comme meteo_etat_lire().
+    meteo::Releve releve = {};
+    int echecs = 0;
+    if (meteo_etat_lire_releve(&releve, &echecs)) {
+        entrees.meteo = visuel::vue_depuis_releve(releve, instant, g_ville);
+        entrees.meteo.perimee = meteo::est_perime(releve, instant, echecs);
     }
 #ifdef MERIDIEN_METEO_BOUCHON
-    entrees.meteo_exemple = true; // valeurs d'exemple du bouchon (main/bouchons/) : l'écran le dit
+    entrees.meteo.exemple = true; // valeurs d'exemple du bouchon (main/bouchons/) : l'écran le dit
 #endif
 
     ui_principal_mettre_a_jour(entrees);
@@ -72,7 +113,7 @@ void rafraichir(lv_timer_t *) {
     if (entrees.heure_connue && (!g_heure_journalisee || g_compteur % kJournalToutesLesN == 0)) {
         g_heure_journalisee = true;
         ESP_LOGI(TAG, "affichage : « %s » / « %s » ; météo %s ; utc=%lld", entrees.heure, entrees.date,
-                 entrees.meteo.valide ? (entrees.meteo.perime ? "périmée" : "à jour") : "indisponible",
+                 entrees.meteo.connue ? (entrees.meteo.perimee ? "périmée" : "à jour") : "indisponible",
                  static_cast<long long>(instant));
     }
     ++g_compteur;
@@ -92,8 +133,8 @@ void ecran_principal_creer(const BootInfo &boot) {
 
     g_ecran_principal = lv_obj_create(nullptr);
     const size_t libre_interne_avant = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    if (!ui_principal_creer(g_ecran_principal, roboto_700_start, static_cast<size_t>(roboto_700_end - roboto_700_start),
-                            carte->width, carte->height)) {
+    const RessourcesPrincipal ressources = {roboto_700_start, static_cast<size_t>(roboto_700_end - roboto_700_start)};
+    if (!ui_principal_creer(g_ecran_principal, ressources, carte->width, carte->height, theme_du_reglage())) {
         ESP_LOGE(TAG, "écran principal non créé (police TrueType) : l'écran de diagnostic reste affiché");
         lv_obj_delete(g_ecran_principal);
         g_ecran_principal = nullptr; // l'appui long de l'écran de diagnostic ne charge alors rien
@@ -106,13 +147,19 @@ void ecran_principal_creer(const BootInfo &boot) {
     // Une première mise à jour avant d'afficher : jamais d'écran vide, même une demi-seconde.
     rafraichir(nullptr);
     lv_screen_load(g_ecran_principal);
+    // Carte neuve ou redémarrage au milieu de l'installation guidée : elle reprend ici, par-dessus l'écran principal (demande de
+    // reglages-ecran ; sans cet appel les réglages marchent mais l'installation ne reprend pas au démarrage).
+    ui_installation_ouvrir_si_necessaire();
     lv_timer_create(rafraichir, kPeriodeMs, nullptr);
 
-    ESP_LOGI(
-        TAG,
-        "écran principal %dx%d chargé ; appui long (400 ms) : écran de diagnostic ; mémoire interne libre %u -> %u o",
-        static_cast<int>(carte->width), static_cast<int>(carte->height), static_cast<unsigned>(libre_interne_avant),
-        static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+    const CoutEcran cout = ui_principal_cout();
+    ESP_LOGI(TAG,
+             "écran principal %dx%d chargé (%d objets LVGL, %d polices) ; appui long (400 ms) : écran de diagnostic ; "
+             "mémoire "
+             "interne libre %u -> %u o",
+             static_cast<int>(carte->width), static_cast<int>(carte->height), cout.objets, cout.polices,
+             static_cast<unsigned>(libre_interne_avant),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
 }
 
 } // namespace ecran
