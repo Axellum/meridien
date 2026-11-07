@@ -391,6 +391,141 @@ int langue_de_l_ecran_dicte_celle_de_la_recherche() {
     return 0;
 }
 
+// ---- source de la météo ---------------------------------------------------------------------------------------------------
+
+// Choisit dans GEOCODAGE_LYON la ville de ce rang : 0 = Lyon (France), 1 = Lyon (Kentucky, États-Unis).
+void choisir_ville(Banc &b, std::size_t rang) {
+    b.hote.lieu_chercher("Lyon");
+    b.ports.corps = std::string(GEOCODAGE_LYON);
+    b.ports.dl = EtatTelechargement::Termine;
+    b.hote.lieu_recherche();
+    b.hote.lieu_choisir(rang);
+}
+
+void fixer_pays(Banc &b, sv code) {
+    reglages::copier_texte(code, b.ports.zone.code_pays, sizeof b.ports.zone.code_pays);
+}
+
+std::size_t position(sv id) { return meteo::fournisseurs::indice_de(id); }
+
+// Les identifiants de la liste proposée, séparés par une espace (« auto knmi noaa »).
+std::string propose(Banc &b) {
+    const meteo::fournisseurs::Liste l = b.hote.sources_meteo();
+    std::string s;
+    for (std::size_t i = 0; i < l.n; ++i) {
+        s += (i != 0 ? " " : "");
+        s += meteo::fournisseurs::TABLE[l.indices[i]].id;
+    }
+    return s;
+}
+
+int source_meteo_automatique_au_depart_et_liste_selon_le_pays() {
+    Banc b;
+    VERIFIER(b.hote.nombre("meteo.source") == 0 && b.ports.source == "auto");
+    VERIFIER(propose(b) == "auto noaa"); // ville sans pays connu : « Automatique » et le modèle mondial seulement
+    fixer_pays(b, "NL");
+    VERIFIER(propose(b) == "auto knmi noaa"); // le modèle national d'abord, puis le mondial
+    fixer_pays(b, "NO");
+    VERIFIER(propose(b) == "auto metno noaa");
+    fixer_pays(b, "FR");
+    VERIFIER(propose(b) == "auto noaa");
+    fixer_pays(
+        b,
+        "nl"); // la casse ne compte pas (le géocodage rend des majuscules, une ancienne mémoire peut avoir des minuscules)
+    VERIFIER(propose(b) == "auto knmi noaa");
+    fixer_pays(b, "NLD"); // trois lettres : pas un code de pays, donc pas la liste d'un autre
+    VERIFIER(propose(b) == "auto noaa");
+    b.ports.zone_connue = false; // la ville n'est pas lisible : on ne devine pas
+    VERIFIER(propose(b) == "auto noaa");
+    return 0;
+}
+
+int choisir_une_source_la_garde_par_la_porte_de_la_page_web() {
+    Banc b;
+    fixer_pays(b, "NL");
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("knmi")));
+    VERIFIER(b.ports.sources_enregistrees == 1 && b.ports.source == "knmi");
+    VERIFIER(b.hote.nombre("meteo.source") == static_cast<std::int32_t>(position("knmi")));
+    VERIFIER(b.magasin.nombres.empty() && b.magasin.textes.empty()); // l'hôte n'en garde aucune copie
+    HoteAppareil apres = b.redemarre(); // un redémarrage : la source est toujours celle de la page
+    VERIFIER(apres.nombre("meteo.source") == static_cast<std::int32_t>(position("knmi")));
+    b.hote.definir_nombre("meteo.source", 0); // retour à « Automatique »
+    VERIFIER(b.ports.source == "auto" && b.ports.sources_enregistrees == 2 && b.hote.nombre("meteo.source") == 0);
+    return 0;
+}
+
+int une_source_qui_ne_couvre_pas_le_pays_ou_hors_liste_est_refusee() {
+    Banc b;
+    fixer_pays(b, "NL");
+    b.hote.definir_nombre("meteo.source",
+                          static_cast<std::int32_t>(position("metno"))); // norvégien, ville néerlandaise
+    b.hote.definir_nombre("meteo.source",
+                          static_cast<std::int32_t>(position("dwd"))); // allemand, et que le lecteur refuse
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("meteofrance")));
+    b.hote.definir_nombre("meteo.source", -1); // « pas choisi » : « Automatique » est obligatoire, pas de vide
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(meteo::fournisseurs::NOMBRE));
+    b.hote.definir_nombre("meteo.source", 1000000);
+    VERIFIER(b.ports.sources_enregistrees == 0 && b.ports.source == "auto");
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("noaa"))); // mondial : proposé partout
+    VERIFIER(b.ports.sources_enregistrees == 1 && b.ports.source == "noaa");
+    return 0;
+}
+
+int une_ecriture_refusee_ne_change_pas_la_source() {
+    Banc b;
+    fixer_pays(b, "NL");
+    b.ports.source_refusee = true; // la mémoire permanente ne répond pas
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("knmi")));
+    VERIFIER(b.ports.source == "auto" && b.hote.nombre("meteo.source") == 0);
+    return 0;
+}
+
+int une_source_inconnue_en_memoire_se_lit_automatique() {
+    Banc b;
+    b.ports.source = "modele_d_un_autre_firmware";
+    VERIFIER(b.hote.nombre("meteo.source") == 0);
+    b.ports.source = "";
+    VERIFIER(b.hote.nombre("meteo.source") == 0);
+    return 0;
+}
+
+int changer_de_ville_hors_pays_remet_automatique_et_le_dit() {
+    Banc b;
+    fixer_pays(b, "NL");
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("knmi")));
+    VERIFIER(!b.hote.source_meteo_retablie());
+    choisir_ville(b, 0); // Lyon, France : KNMI ne couvre pas la France
+    VERIFIER(b.ports.source == "auto" && b.hote.nombre("meteo.source") == 0);
+    VERIFIER(b.hote.source_meteo_retablie()); // l'écran le dit : jamais un retour muet
+    // La liste proposée est déjà celle du nouveau pays.
+    VERIFIER(propose(b) == "auto noaa");
+    // Le message s'efface dès que la source est choisie...
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("noaa")));
+    VERIFIER(!b.hote.source_meteo_retablie() && b.ports.source == "noaa");
+    // ... ou que la ville change encore.
+    fixer_pays(b, "NL");
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("knmi")));
+    choisir_ville(b, 0);
+    VERIFIER(b.hote.source_meteo_retablie());
+    choisir_ville(b, 1);
+    VERIFIER(!b.hote.source_meteo_retablie());
+    return 0;
+}
+
+int changer_de_ville_garde_la_source_quand_elle_convient_encore() {
+    Banc b;
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("noaa"))); // mondiale
+    choisir_ville(b, 0);
+    VERIFIER(b.ports.source == "noaa" && !b.hote.source_meteo_retablie());
+    choisir_ville(b, 1);
+    VERIFIER(b.ports.source == "noaa" && !b.hote.source_meteo_retablie());
+    // « Automatique » ne se « rétablit » jamais : il n'y a rien à dire.
+    b.hote.definir_nombre("meteo.source", 0);
+    choisir_ville(b, 0);
+    VERIFIER(b.ports.source == "auto" && !b.hote.source_meteo_retablie());
+    return 0;
+}
+
 // ---- météo, appareil, test de service -------------------------------------------------------------------------------------
 
 int apercu_meteo_dans_la_langue_de_l_ecran() {
@@ -488,10 +623,13 @@ int reinitialiser_efface_ce_que_l_hote_garde() {
     b.hote.definir_progression(
         installation::terminer({registre::Etape::Recapitulatif, false, installation::Mode::Premiere}));
     b.hote.definir_nombre("affichage.luminosite", 20);
+    fixer_pays(b, "NL");
+    b.hote.definir_nombre("meteo.source", static_cast<std::int32_t>(position("knmi")));
     b.hote.tester_service("llm");
     b.hote.lieu_chercher("Lyon");
     VERIFIER(!b.magasin.vide_dans("services") && !b.magasin.vide_dans("wifi"));
     b.hote.reinitialiser();
+    VERIFIER(b.ports.source == "auto" && b.hote.nombre("meteo.source") == 0 && !b.hote.source_meteo_retablie());
     VERIFIER(b.magasin.vide_dans("services") && b.magasin.vide_dans("wifi"));
     VERIFIER(b.ports.remises_par_defaut == 1 && b.ports.etat_affichage.luminosite == reglages::LUMINOSITE_DEFAUT);
     VERIFIER(b.hote.progression() == installation::apres_reinitialisation() && !b.hote.progression().terminee);
@@ -532,6 +670,13 @@ int valeur_abimee_en_memoire_donne_le_defaut() {
     X(essai_impossible_a_demarrer_est_un_echec_tout_de_suite)                                                          \
     X(reseau_ouvert_se_retient_sans_mot_de_passe)                                                                      \
     X(recherche_de_lieu_du_depart_au_choix)                                                                            \
+    X(source_meteo_automatique_au_depart_et_liste_selon_le_pays)                                                       \
+    X(choisir_une_source_la_garde_par_la_porte_de_la_page_web)                                                         \
+    X(une_source_qui_ne_couvre_pas_le_pays_ou_hors_liste_est_refusee)                                                  \
+    X(une_ecriture_refusee_ne_change_pas_la_source)                                                                    \
+    X(une_source_inconnue_en_memoire_se_lit_automatique)                                                               \
+    X(changer_de_ville_hors_pays_remet_automatique_et_le_dit)                                                          \
+    X(changer_de_ville_garde_la_source_quand_elle_convient_encore)                                                     \
     X(choisir_un_rang_qui_n_existe_pas_ne_change_rien)                                                                 \
     X(saisie_trop_courte_ou_illisible_ne_telecharge_rien)                                                              \
     X(recherche_sans_reponse_dit_sans_connexion_et_rend_la_memoire)                                                    \

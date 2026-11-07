@@ -17,6 +17,8 @@
 // L'hôte (`Hote`) fournit (types plus bas) :
 //   reglages::Affichage affichage() const;                 bool enregistrer_affichage(const reglages::Affichage &);
 //   bool zone_lire(reglages::Zone &);                      bool zone_enregistrer(const reglages::Zone &);
+//   std::string_view source_meteo();                       bool source_meteo_enregistrer(std::string_view id);
+//   bool source_meteo_retablie();                          // source météo en service (« auto », « knmi »), ADR-0010
 //   bool meteo_lire(MeteoApercu &);                        InfoSysteme systeme();      InfoWifi wifi();
 //   Telechargement telecharger(std::string_view url, char *tampon, std::size_t capacite, std::size_t &taille);
 //   std::int64_t maintenant_ms();                          void aleatoire(std::uint8_t *sortie, std::size_t n);
@@ -29,6 +31,7 @@
 
 #include "ecran/api_json.hpp"
 #include "ecran/appairage.hpp"
+#include "ecran/fournisseurs_meteo.hpp"
 #include "ecran/fuseaux.hpp"
 #include "ecran/geocodage.hpp"
 #include "ecran/i18n.hpp"
@@ -383,7 +386,33 @@ template <class Hote> class Api {
         });
     }
 
-    static constexpr void ecrire_zone(Ecrivain &e, const reglages::Zone &z) noexcept {
+    // Le nom d'une source tel que la page l'affiche : « Automatique » dans la langue de l'écran, un nom de service tel quel.
+    constexpr std::string_view nom_de_source(const meteo::fournisseurs::Fournisseur &f) const noexcept {
+        return f.libelle_traduit ? tr(f.libelle) : f.libelle;
+    }
+
+    // Les champs de la source météo, ajoutés à la réponse de /api/location : celle en service, son nom, ce que le dernier changement
+    // de ville a fait d'elle, et la liste que le pays de la ville propose (« Automatique » en tête). Même liste que celle de l'écran.
+    constexpr void ecrire_source(Ecrivain &e, std::string_view code_pays) noexcept {
+        namespace fm = meteo::fournisseurs;
+        const std::size_t i = fm::indice_de(hote_.source_meteo());
+        const fm::Fournisseur &courante = fm::TABLE[i < fm::NOMBRE ? i : fm::INDICE_AUTO];
+        e.champ("source_meteo", courante.id);
+        e.champ("source_meteo_nom", nom_de_source(courante));
+        e.champ_booleen("source_meteo_retablie", hote_.source_meteo_retablie());
+        e.cle("sources_meteo");
+        e.ouvrir_tableau();
+        const fm::Liste l = fm::pour_pays(code_pays);
+        for (std::size_t k = 0; k < l.n; ++k) {
+            e.ouvrir_objet();
+            e.champ("id", fm::TABLE[l.indices[k]].id);
+            e.champ("nom", nom_de_source(fm::TABLE[l.indices[k]]));
+            e.fermer_objet();
+        }
+        e.fermer_tableau();
+    }
+
+    constexpr void ecrire_zone(Ecrivain &e, const reglages::Zone &z) noexcept {
         e.ouvrir_objet();
         e.champ("nom", z.nom);
         e.champ("region", z.region);
@@ -398,17 +427,22 @@ template <class Hote> class Api {
         Ecrivain l(libelle, sizeof libelle);
         ecrire_libelle(l, z.nom, z.region, z.pays);
         e.chaine(l.vue());
+        ecrire_source(e, z.code_pays);
+        e.fermer_objet();
+    }
+
+    // Pas de ville enregistrée : on le dit, et la source météo reste réglable (sans pays connu : « Automatique » et le modèle mondial).
+    constexpr void ecrire_zone_absente(Ecrivain &e) noexcept {
+        e.ouvrir_objet();
+        e.champ_booleen("definie", false);
+        ecrire_source(e, {});
         e.fermer_objet();
     }
 
     constexpr Reponse zone_lire(const Tampons &t) noexcept {
         reglages::Zone z;
         if (!hote_.zone_lire(z)) {
-            return corps_json(t, 200, [](Ecrivain &e) {
-                e.ouvrir_objet();
-                e.champ_booleen("definie", false);
-                e.fermer_objet();
-            });
+            return corps_json(t, 200, [&](Ecrivain &e) { ecrire_zone_absente(e); });
         }
         return corps_json(t, 200, [&](Ecrivain &e) { ecrire_zone(e, z); });
     }
@@ -418,23 +452,56 @@ template <class Hote> class Api {
         Reponse refus;
         if (!lire_objet(rq, t, objet, refus))
             return refus;
-        const reglages::ResultatZone v = reglages::valider_zone(objet);
-        switch (v.erreur) {
-        case reglages::ErreurZone::Nom:
-            return erreur(t, 422, "nom_invalide", "Le nom de la ville n’est pas valide.", "nom");
-        case reglages::ErreurZone::Coordonnees:
-            return erreur(t, 422, "coordonnees_invalides", "Ces coordonnées ne sont pas valides.", "latitude");
-        case reglages::ErreurZone::Fuseau:
-            return erreur(t, 422, "fuseau_inconnu", "Ce fuseau horaire n’est pas connu de l’appareil.", "fuseau");
-        case reglages::ErreurZone::Aucune:
-            break;
+        // `source_meteo` seul (sans `nom`) ne touche pas à la ville ; avec une ville, la source est jugée sur le pays de la NOUVELLE ville.
+        const json::Valeur source = objet.champ("source_meteo");
+        const bool source_seule = source.existe() && !objet.champ("nom").existe();
+        reglages::ResultatZone v;
+        if (source_seule) {
+            if (!hote_.zone_lire(v.zone))
+                v.zone =
+                    reglages::Zone{}; // pas de ville enregistrée : pas de pays, donc seulement les sources mondiales
+        } else {
+            v = reglages::valider_zone(objet);
+            switch (v.erreur) {
+            case reglages::ErreurZone::Nom:
+                return erreur(t, 422, "nom_invalide", "Le nom de la ville n’est pas valide.", "nom");
+            case reglages::ErreurZone::Coordonnees:
+                return erreur(t, 422, "coordonnees_invalides", "Ces coordonnées ne sont pas valides.", "latitude");
+            case reglages::ErreurZone::Fuseau:
+                return erreur(t, 422, "fuseau_inconnu", "Ce fuseau horaire n’est pas connu de l’appareil.", "fuseau");
+            case reglages::ErreurZone::Aucune:
+                break;
+            }
         }
-        if (!hote_.zone_enregistrer(v.zone))
+        std::size_t demandee = meteo::fournisseurs::NOMBRE; // NOMBRE : aucune source demandée
+        if (source.existe()) {
+            char id[16] = {};
+            bool tronque = false;
+            if (source.genre() == json::Genre::Chaine)
+                source.copier_texte(id, sizeof id, &tronque);
+            demandee = source.genre() == json::Genre::Chaine && !tronque ? meteo::fournisseurs::indice_de(id)
+                                                                         : meteo::fournisseurs::NOMBRE;
+            if (demandee >= meteo::fournisseurs::NOMBRE)
+                return erreur(t, 422, "source_inconnue", "Cette source météo n’existe pas.", "source_meteo");
+            if (!meteo::fournisseurs::propose_pour(id, v.zone.code_pays))
+                return erreur(t, 422, "source_indisponible", "Cette source météo ne couvre pas le pays de la ville.",
+                              "source_meteo");
+        }
+        if (!source_seule && !hote_.zone_enregistrer(v.zone))
+            return panne(t);
+        if (demandee < meteo::fournisseurs::NOMBRE &&
+            !hote_.source_meteo_enregistrer(meteo::fournisseurs::TABLE[demandee].id))
             return panne(t);
         reglages::Zone relue; // la zone relue, pas celle qu'on croit avoir écrite
-        if (!hote_.zone_lire(relue))
+        const bool definie = hote_.zone_lire(relue);
+        if (!definie && !source_seule)
             return panne(t);
-        return corps_json(t, 200, [&](Ecrivain &e) { ecrire_zone(e, relue); });
+        return corps_json(t, 200, [&](Ecrivain &e) {
+            if (definie)
+                ecrire_zone(e, relue);
+            else
+                ecrire_zone_absente(e);
+        });
     }
 
     constexpr Reponse affichage_lire(const Tampons &t) noexcept {

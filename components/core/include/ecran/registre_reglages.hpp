@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <string_view>
 
+#include "ecran/fournisseurs_meteo.hpp"
 #include "ecran/i18n.hpp"
 
 namespace ecran::registre {
@@ -120,6 +121,25 @@ inline constexpr std::int32_t RECHERCHE_LIEU_MAX = 80;
 
 namespace detail {
 
+// Les sources de la météo (ecran/fournisseurs_meteo.hpp) : une option par entrée de la table, dans le même ordre (la position est
+// l'indice du choix). `code` est l'identifiant stable (« auto », « knmi »), servi par l'API et gardé en mémoire permanente ;
+// seul « Automatique » est traduit, un nom de service est un nom propre. La liste PROPOSÉE pour une ville est plus courte que cette
+// liste : elle dépend du pays (fournisseurs::pour_pays), l'écran et l'API la filtrent.
+struct OptionsSourcesMeteo {
+    Option v[meteo::fournisseurs::NOMBRE] = {};
+};
+
+constexpr OptionsSourcesMeteo options_sources_meteo() noexcept {
+    OptionsSourcesMeteo o;
+    for (std::size_t i = 0; i < meteo::fournisseurs::NOMBRE; ++i) {
+        const meteo::fournisseurs::Fournisseur &f = meteo::fournisseurs::TABLE[i];
+        o.v[i] = {f.id, f.libelle, f.libelle_traduit};
+    }
+    return o;
+}
+
+inline constexpr OptionsSourcesMeteo OPTIONS_SOURCES_METEO = options_sources_meteo();
+
 // Les trois services (STT, LLM, TTS) ont la même forme de réglages : un préréglage, une adresse, un modèle, une clé.
 constexpr Reglage service_preset(std::string_view id, const Option *options, std::size_t nb) noexcept {
     return {id,
@@ -197,6 +217,11 @@ inline constexpr Reglage REGISTRE[] = {
     {"lieu.ville", Type::Lieu, Section::LieuMeteo, Etape::Lieu, "Ville", "L’écran en déduit la météo et l’heure.",
      RECHERCHE_LIEU_MIN, RECHERCHE_LIEU_MAX, 0, "", nullptr, 0, "", Longueur::Caracteres, false, "/api/location",
      "nom"},
+    // La source de la météo de cette ville : « Automatique » ou le service national du pays (ADR-0010). Liste filtrée par pays.
+    {"meteo.source", Type::Choix, Section::LieuMeteo, Etape::Aucune, "Source météo",
+     "Le service qui fournit la météo de la ville choisie.", 0,
+     static_cast<std::int32_t>(meteo::fournisseurs::NOMBRE) - 1, 0, "", detail::OPTIONS_SOURCES_METEO.v,
+     meteo::fournisseurs::NOMBRE, "", Longueur::Caracteres, false, "/api/location", "source_meteo"},
     // --- Langue ---
     {"langue.ecran", Type::Choix, Section::Langue, Etape::Langue, "Langue de l’écran", "", 0, 6, 0, "", OPTIONS_LANGUES,
      i18n::NOMBRE_LANGUES, "", Longueur::Caracteres, false, "/api/display", "langue_ecran"},
