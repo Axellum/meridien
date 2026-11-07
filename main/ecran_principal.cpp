@@ -147,6 +147,9 @@ void ecran_principal_creer(const BootInfo &boot) {
     // Une première mise à jour avant d'afficher : jamais d'écran vide, même une demi-seconde.
     rafraichir(nullptr);
     lv_screen_load(g_ecran_principal);
+    // Carte neuve ou redémarrage au milieu de l'installation guidée : elle reprend ici, par-dessus l'écran principal (demande de
+    // reglages-ecran ; sans cet appel les réglages marchent mais l'installation ne reprend pas au démarrage).
+    ui_installation_ouvrir_si_necessaire();
     lv_timer_create(rafraichir, kPeriodeMs, nullptr);
 
     const CoutEcran cout = ui_principal_cout();
