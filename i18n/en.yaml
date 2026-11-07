@@ -156,6 +156,17 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Ville enregistrée : {ville}": "City saved: {ville}"
 "Données météo : {lien} (licence CC BY 4.0)": "Weather data: {lien} (CC BY 4.0 license)"
 
+# --- Écran : source de la météo (07/11/2026) ---
+"Source météo": "Weather source"
+"Le service qui fournit la météo de la ville choisie.": "The service that provides the weather for the chosen city."
+"Automatique": "Automatic"
+"Seules les sources qui couvrent le pays de la ville sont proposées.": "Only sources that cover the city’s country are offered."
+"Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Source set back to “Automatic”: the previous one doesn’t cover this country."
+"Modèle : {modele}": "Model: {modele}"
+
+# --- Page de réglages : source de la météo (07/11/2026) ---
+"Source enregistrée : {source}": "Source saved: {source}"
+
 # --- Page de réglages : assistant vocal ---
 "Assistant vocal": "Voice assistant"
 "Trois services : comprendre votre voix, réfléchir, parler. Touchez-en un pour le régler.": "Three services: understand your voice, think, speak. Tap one to set it up."
@@ -321,6 +332,9 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "Back on version {version}."
 "Il n’y a pas de version précédente à remettre.": "There is no previous version to restore."
 "Cette page n’existe pas.": "This page doesn’t exist."
+
+"Cette source météo n’existe pas.": "This weather source doesn’t exist."
+"Cette source météo ne couvre pas le pays de la ville.": "This weather source doesn’t cover the city’s country."
 
 # --- Écran : réglages et installation guidée (06/11/2026) ---
 "Retour": "Back"

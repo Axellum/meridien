@@ -156,6 +156,17 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Ville enregistrée : {ville}": "Şehir kaydedildi: {ville}"
 "Données météo : {lien} (licence CC BY 4.0)": "Hava durumu verileri: {lien} (CC BY 4.0 lisansı)"
 
+# --- Écran : source de la météo (07/11/2026) ---
+"Source météo": "Hava durumu kaynağı"
+"Le service qui fournit la météo de la ville choisie.": "Seçilen şehrin hava durumunu sağlayan hizmet."
+"Automatique": "Otomatik"
+"Seules les sources qui couvrent le pays de la ville sont proposées.": "Yalnızca şehrin ülkesini kapsayan kaynaklar sunulur."
+"Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Kaynak “Otomatik” olarak sıfırlandı: önceki kaynak bu ülkeyi kapsamıyor."
+"Modèle : {modele}": "Model: {modele}"
+
+# --- Page de réglages : source de la météo (07/11/2026) ---
+"Source enregistrée : {source}": "Kaynak kaydedildi: {source}"
+
 # --- Page de réglages : assistant vocal ---
 "Assistant vocal": "Sesli asistan"
 "Trois services : comprendre votre voix, réfléchir, parler. Touchez-en un pour le régler.": "Üç hizmet: sesini anlamak, düşünmek, konuşmak. Ayarlamak için birine dokun."
@@ -321,6 +332,9 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "Sürüm {version} geri yüklendi."
 "Il n’y a pas de version précédente à remettre.": "Geri yüklenecek önceki sürüm yok."
 "Cette page n’existe pas.": "Bu sayfa yok."
+
+"Cette source météo n’existe pas.": "Bu hava durumu kaynağı mevcut değil."
+"Cette source météo ne couvre pas le pays de la ville.": "Bu hava durumu kaynağı şehrin ülkesini kapsamıyor."
 
 # --- Écran : réglages et installation guidée (06/11/2026) ---
 "Retour": "Geri"

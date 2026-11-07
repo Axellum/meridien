@@ -156,6 +156,17 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Ville enregistrée : {ville}": "Città salvata: {ville}"
 "Données météo : {lien} (licence CC BY 4.0)": "Dati meteo: {lien} (licenza CC BY 4.0)"
 
+# --- Écran : source de la météo (07/11/2026) ---
+"Source météo": "Fonte meteo"
+"Le service qui fournit la météo de la ville choisie.": "Il servizio che fornisce il meteo della città scelta."
+"Automatique": "Automatico"
+"Seules les sources qui couvrent le pays de la ville sont proposées.": "Sono proposte solo le fonti che coprono il paese della città."
+"Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Fonte riportata su «Automatico»: la precedente non copre questo paese."
+"Modèle : {modele}": "Modello: {modele}"
+
+# --- Page de réglages : source de la météo (07/11/2026) ---
+"Source enregistrée : {source}": "Fonte salvata: {source}"
+
 # --- Page de réglages : assistant vocal ---
 "Assistant vocal": "Assistente vocale"
 "Trois services : comprendre votre voix, réfléchir, parler. Touchez-en un pour le régler.": "Tre servizi: capire la tua voce, ragionare, parlare. Tocca un servizio per configurarlo."
@@ -321,6 +332,9 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Retour à la version {version} réussi.": "Tornato alla versione {version}."
 "Il n’y a pas de version précédente à remettre.": "Non c’è nessuna versione precedente da ripristinare."
 "Cette page n’existe pas.": "Questa pagina non esiste."
+
+"Cette source météo n’existe pas.": "Questa fonte meteo non esiste."
+"Cette source météo ne couvre pas le pays de la ville.": "Questa fonte meteo non copre il paese della città."
 
 # --- Écran : réglages et installation guidée (06/11/2026) ---
 "Retour": "Indietro"
