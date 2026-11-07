@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
-"""Contrôle avant publication : cherche dans les fichiers ce qui ne doit pas sortir du dépôt privé.
+"""Contrôle avant publication : cherche dans les fichiers (et, au choix, dans tout l'historique) ce qui ne doit pas sortir.
 
 gitleaks cherche des clés et des jetons ; il ne voit ni un mot de passe Wi-Fi, ni une adresse MAC, ni un chemin de PC.
 Ce contrôle regarde ces cas-là, dans le texte des fichiers ET dans leurs noms. Il rend deux sortes de trouvailles :
 
   BLOQUANT : une adresse MAC (hors adresses d'exemple), un chemin `<lecteur>:\\Users\\<nom>`, la valeur d'une variable
              secrète donnée par --env/--variable (jamais affichée : seul le nom de la variable l'est), une chaîne
-             donnée par --interdit, et, avec --historique, une identité de commit qui n'est pas une adresse `noreply`.
+             donnée par --interdit.
   À JUGER  : une adresse e-mail, une adresse IP privée (10.x, 172.16-31.x, 192.168.x), un chemin de lecteur Windows
-             (`H:\\...`). Listées par valeur, avec le nombre de fichiers : un exemple de test n'est pas une fuite, mais
+             (`H:\\...`). Listées par valeur, avec le nombre de lieux : un exemple de test n'est pas une fuite, mais
              c'est à un humain de le dire.
+
+Avec --historique, il lit en plus le texte ajouté ou retiré par CHAQUE commit de toutes les références
+(`git log --all -p`) avec les mêmes règles, et liste les identités (e-mails) des commits. Dans l'historique, qu'on ne
+peut plus changer sans réécrire tous les numéros de commit, seule la valeur d'une variable secrète est BLOQUANTE ; le
+reste (adresses MAC, chemins, IP, chaînes interdites) est « à juger » : c'est au propriétaire d'accepter ce qui y reste.
+Il ne lit ni les images, ni les noms des fichiers de l'historique, ni les commits de fusion (leur contenu est dans leurs
+parents).
 
 Code de sortie : 0 = rien de bloquant, 1 = au moins une trouvaille bloquante, 2 = mauvais emploi.
 
     python tools/controle_publication.py                       # fichiers suivis ou ajoutables du dépôt courant
-    python tools/controle_publication.py ../instantane         # un dossier quelconque (l'instantané à publier)
+    python tools/controle_publication.py ../copie              # un dossier quelconque
     python tools/controle_publication.py --env <.env> --variable MERIDIEN_WIFI_SSID --variable MERIDIEN_WIFI_MOT_DE_PASSE
     python tools/controle_publication.py --interdit 192.168.9.9 --historique
     python tools/controle_publication.py --autotest            # le contrôle se contrôle lui-même sur un dossier fabriqué
@@ -134,15 +141,39 @@ def controler(racine: Path, fichiers: list[Path], interdits: list[str], secrets:
 
 
 def identites_de_commits(racine: Path) -> list[Trouvaille]:
+    """Chaque e-mail d'auteur ou de validateur de l'historique, « à juger » (une `noreply` de GitHub est admise)."""
     sortie = subprocess.run(
         ["git", "-C", str(racine), "log", "--all", "--format=%ae%n%ce"], capture_output=True, text=True, check=True
     ).stdout
     courriels = sorted({c.strip() for c in sortie.splitlines() if c.strip()})
     return [
-        Trouvaille("BLOQUANT", "identité de commit", "(historique git)", 0, c)
+        Trouvaille("A JUGER", "identité de commit", "(historique git)", 0, c)
         for c in courriels
         if not c.lower().endswith(COURRIELS_ADMIS)
     ]
+
+
+def contenu_de_l_historique(racine: Path, interdits: list[str], secrets: list[tuple[str, str]]) -> tuple[list[Trouvaille], int]:
+    """Les mêmes règles que pour les fichiers, sur le texte ajouté ou retiré par chaque commit : (trouvailles, commits lus).
+
+    Le « lieu » d'une trouvaille est `commit <numéro court>`. Seule une valeur secrète reste BLOQUANTE (voir l'en-tête).
+    Tout l'historique est lu en mémoire d'un coup : voulu pour un dépôt de cette taille (quelques dizaines de Mo de texte).
+    """
+    sortie = subprocess.run(
+        ["git", "-C", str(racine), "log", "--all", "-p", "--no-color", "--no-ext-diff", "--format=\x01%h"],
+        capture_output=True,
+        check=True,
+    ).stdout.decode("utf-8", errors="replace")
+    entetes = ("--- a/", "--- /dev/null", "+++ b/", "+++ /dev/null")
+    trouvailles: list[Trouvaille] = []
+    blocs = sortie.split("\x01")[1:]
+    for bloc in blocs:
+        numero, _, corps = bloc.partition("\n")
+        lignes = [ligne[1:] for ligne in corps.split("\n") if ligne[:1] in ("+", "-") and not ligne.startswith(entetes)]
+        for t in analyser_texte(f"commit {numero}", "\n".join(lignes), interdits, secrets):
+            gravite = "BLOQUANT" if t.categorie == "valeur secrète" else "A JUGER"
+            trouvailles.append(Trouvaille(gravite, t.categorie, t.fichier, 0, t.extrait))
+    return trouvailles, len(blocs)
 
 
 def afficher(trouvailles: list[Trouvaille]) -> int:
@@ -155,9 +186,51 @@ def afficher(trouvailles: list[Trouvaille]) -> int:
         if t.gravite == "A JUGER":
             a_juger[(t.categorie, t.extrait)].add(t.fichier)
     for (categorie, extrait), fichiers in sorted(a_juger.items()):
-        print(f"A JUGER   {categorie}  {extrait}  ({len(fichiers)} fichier(s), ex. {sorted(fichiers)[0]})")
+        print(f"A JUGER   {categorie}  {extrait}  ({len(fichiers)} lieu(x), ex. {sorted(fichiers)[0]})")
     print(f"--- {len(bloquants)} trouvaille(s) bloquante(s), {len(a_juger)} valeur(s) à juger")
     return 1 if bloquants else 0
+
+
+def autotest_historique(tmp: Path, secrets: list[tuple[str, str]]) -> list[str]:
+    """Un dépôt git de deux commits : le premier ajoute une MAC et un secret, le second les retire.
+
+    Le contrôle des fichiers (arbre du dernier commit) ne doit rien voir ; celui de l'historique doit voir la MAC (« à
+    juger »), le secret (BLOQUANT, sans l'afficher) et l'identité des commits (« à juger »).
+    """
+    depot = tmp / "depot_historique"
+    depot.mkdir()
+
+    def git(*arguments: str) -> None:
+        reglages = ["-c", f"core.hooksPath={tmp / 'sans_crochets'}", "-c", "commit.gpgsign=false"]
+        reglages += ["-c", "user.name=Essai", "-c", "user.email=essai@exemple.fr"]
+        subprocess.run(["git", "-C", str(depot), *reglages, *arguments], capture_output=True, check=True)
+
+    git("init", "-q")
+    fichier = depot / "carte.txt"
+    fichier.write_text("carte " + "e8:f6:0a:" + "12:34:56\nmot_de_passe=MonReseauSecret\n", encoding="utf-8")
+    git("add", "carte.txt")
+    git("commit", "-q", "-m", "un")
+    fichier.write_text("propre\n", encoding="utf-8")
+    git("add", "carte.txt")
+    git("commit", "-q", "-m", "deux")
+
+    erreurs: list[str] = []
+    fichiers = lister_fichiers(depot)[1]
+    de_l_arbre, _ = controler(depot, fichiers, [], secrets)
+    if de_l_arbre:
+        erreurs.append(f"historique : l'arbre du dernier commit devait être propre, a donné {[t.categorie for t in de_l_arbre]}")
+    de_l_historique, commits = contenu_de_l_historique(depot, [], secrets)
+    vu = {(t.gravite, t.categorie) for t in de_l_historique}
+    if vu != {("A JUGER", "adresse MAC"), ("BLOQUANT", "valeur secrète")}:
+        erreurs.append(f"historique : vu {sorted(vu)}, attendu la MAC (à juger) et le secret (bloquant)")
+    if commits != 2:
+        erreurs.append(f"historique : {commits} commit(s) lu(s), attendu 2")
+    if any("MonReseauSecret" in t.extrait for t in de_l_historique):
+        erreurs.append("historique : la valeur du secret a été affichée")
+    identites = [(t.gravite, t.extrait) for t in identites_de_commits(depot)]
+    if identites != [("A JUGER", "essai@exemple.fr")]:
+        erreurs.append(f"historique : identités vues {identites}, attendu essai@exemple.fr (à juger)")
+    return erreurs
 
 
 def autotest() -> int:
@@ -197,9 +270,10 @@ def autotest() -> int:
             erreurs.append(f"lecture du .env : cherchées {[n for n, _ in cherchees]}, absentes {absentes}, courtes {courtes}")
         if any("MonReseauSecret" in t.extrait for t in trouvailles):
             erreurs.append("la valeur du secret a été affichée")
+        erreurs += autotest_historique(Path(tmp), [(n, v) for n, v in cherchees if n == "MON_MDP"])
     for erreur in erreurs:
         print("AUTOTEST ÉCHEC :", erreur)
-    print("autotest : " + ("échec" if erreurs else "ok (8 fichiers fabriqués, chaque cas vu, rien d'inventé)"))
+    print("autotest : " + ("échec" if erreurs else "ok (8 fichiers et un dépôt de 2 commits fabriqués, chaque cas vu, rien d'inventé)"))
     return 1 if erreurs else 0
 
 
@@ -209,7 +283,7 @@ def main() -> int:
     analyse.add_argument("--env", type=Path, help="fichier .env où lire les valeurs secrètes à chercher")
     analyse.add_argument("--variable", action="append", default=[], help="nom d'une variable de --env (répétable)")
     analyse.add_argument("--interdit", action="append", default=[], help="chaîne qui ne doit apparaître nulle part (répétable)")
-    analyse.add_argument("--historique", action="store_true", help="contrôler aussi les e-mails des commits (dépôt git)")
+    analyse.add_argument("--historique", action="store_true", help="lire aussi tout l'historique git et lister les identités de commit")
     analyse.add_argument("--autotest", action="store_true", help="contrôler le contrôle sur un dossier fabriqué")
     args = analyse.parse_args()
     if args.autotest:
@@ -227,9 +301,11 @@ def main() -> int:
             print(f"écartée(s), moins de {LONGUEUR_MIN_SECRET} caractères : {', '.join(courtes)}", file=sys.stderr)
     racine, fichiers = lister_fichiers(args.dossier)
     trouvailles, ignores = controler(racine, fichiers, args.interdit, secrets)
-    if args.historique:
-        trouvailles += identites_de_commits(racine)
     print(f"{len(fichiers)} fichier(s) regardé(s) dans {racine.name}, dont {ignores} binaire(s) ou trop gros (nom seulement)")
+    if args.historique:
+        de_l_historique, commits = contenu_de_l_historique(racine, args.interdit, secrets)
+        trouvailles += de_l_historique + identites_de_commits(racine)
+        print(f"historique : {commits} commit(s) lu(s), toutes références (images et noms de fichiers non lus)")
     return afficher(trouvailles)
 
 
