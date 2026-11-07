@@ -40,6 +40,7 @@ from PIL import Image, ImageDraw
 RACINE = Path(__file__).resolve().parents[2]
 BINAIRE = RACINE / "main" / "assets" / "icones_meteo.bin"
 TABLE = RACINE / "components" / "core" / "include" / "ecran" / "visuel_icones_table.inc"
+TABLE_UI = RACINE / "main" / "ui_meteo_icones_table.inc"
 
 GRILLE = 128  # unités du dessin
 SURECH = 8  # échantillons par pixel et par axe
@@ -570,6 +571,7 @@ class Entree:
     x0: int
     y0: int
     donnees: bytes
+    decalage: int = 0  # position des pixels dans le binaire (rempli par fabriquer)
 
 
 def rendre_piece(fonction, taille: int):
@@ -615,6 +617,7 @@ def fabriquer() -> tuple[bytes, list[Entree], list]:
     blob = bytearray(total)
     struct.pack_into("<4sHHI", blob, 0, b"MIC1", 1, len(entrees), total)
     for i, (e, dec) in enumerate(zip(entrees, decalages)):
+        e.decalage = dec
         struct.pack_into("<HHHHhhI", blob, en_tete + 16 * i, e.piece, e.taille, e.largeur, e.hauteur, e.x0, e.y0, dec)
         blob[dec : dec + len(e.donnees)] = e.donnees
     return bytes(blob), entrees, pieces
@@ -646,6 +649,19 @@ def ecrire_table(pieces) -> str:
         args = ", ".join(f"{c[0]}, {c[1]}" for c in couches)
         sentinelle = ", " + ", ".join(["AUCUNE, AUCUN"] * (3 - len(couches))) if len(couches) < 3 else ""
         L.append(f"    X({nom}, {len(couches)}, {args}{sentinelle}){' \\' if j + 1 < len(noms_icones) else ''}")
+    L.append("")
+    return "\n".join(L)
+
+
+def ecrire_table_ui(entrees: list[Entree]) -> str:
+    """Une ligne par image : de quoi bâtir, SANS RAM, le descripteur LVGL de chaque image (main/ui_meteo_icones.cpp)."""
+    L = [
+        "// FICHIER GÉNÉRÉ par tools/icones/generer_icones.py : ne pas modifier à la main (--verifier le détecterait).",
+        "// Une ligne par image A8 du binaire main/assets/icones_meteo.bin, triée par (pièce, taille) :",
+        "// ICONE_ENTREE(pièce, taille, largeur, hauteur, x0, y0, décalage des pixels dans le binaire).",
+    ]
+    for e in entrees:
+        L.append(f"ICONE_ENTREE({e.piece}, {e.taille}, {e.largeur}, {e.hauteur}, {e.x0}, {e.y0}, {e.decalage})")
     L.append("")
     return "\n".join(L)
 
@@ -737,12 +753,15 @@ def main():
         return
     blob, entrees, pieces = fabriquer()
     table = ecrire_table(pieces)
+    table_ui = ecrire_table_ui(entrees)
     if args.verifier:
         ok = BINAIRE.is_file() and BINAIRE.read_bytes() == blob and TABLE.is_file() and TABLE.read_text(encoding="utf-8") == table
+        ok = ok and TABLE_UI.is_file() and TABLE_UI.read_text(encoding="utf-8") == table_ui
         print("icônes à jour" if ok else "ECHEC : le binaire ou la table ne correspondent pas aux dessins (relancer sans --verifier)")
         sys.exit(0 if ok else 1)
     BINAIRE.write_bytes(blob)
     TABLE.write_text(table, encoding="utf-8", newline="\n")
+    TABLE_UI.write_text(table_ui, encoding="utf-8", newline="\n")
     print(f"{BINAIRE.relative_to(RACINE)} : {len(blob)} octets, {len(entrees)} images, SHA-256 {hashlib.sha256(blob).hexdigest()[:16]}…")
     print(f"{TABLE.relative_to(RACINE)} : {len(pieces)} pièces, {len(ICONES_METEO)} icônes météo")
 
