@@ -2,14 +2,20 @@
 // les coordonnées arrivent en CENTAINES DE MILLIÈMES de degré (« e5 » : 45,74906 ° = 4574906), ce qui donne 5 décimales,
 // soit environ un mètre.
 //
-// Paramètres : ceux de docs/recherche/03-meteo-heure-reglages-calendrier.md §1 et de l'en-tête de meteo_openmeteo.hpp, ceux
-// dont `analyser()` lit la réponse (current, hourly pour la probabilité de précipitations, daily sur 7 jours, fuseau
-// automatique, instants en secondes UNIX). Sans clé d'API. Réponse mesurée : 2 826 à 2 960 octets, non compressée (on n'envoie
-// pas `Accept-Encoding`).
+// Paramètres : ceux dont `analyser_riche()` (meteo_riche.hpp) lit la réponse — `current` (courant complet), `hourly` (24 heures,
+// +1 étiquette : voir ci-dessous), `daily` sur 7 jours, `minutely_15` (pluie par quarts d'heure), fuseau automatique, instants
+// en secondes UNIX. Sans clé d'API. Chaque nom de variable a été vérifié par un appel réel le 07/11/2026 (docs/mesures/meteo.md,
+// test/host/capturer_meteo_riche.py).
 //
-// Attention côté appareil : l'adresse fait 479 octets au plus (TAILLE_REQUETE_MAX - 1) et `esp_http_client` écrit toute la
-// requête (ligne, en-têtes) dans son tampon d'envoi, qui fait 512 octets par défaut : on demande `buffer_size_tx` = 1024
-// (voir le test de ce fichier).
+// Pourquoi `forecast_hours=25` et `forecast_minutely_15=9` : Open-Meteo donne un cumul (précipitations, probabilité, UV moyen)
+// pour l'intervalle qui PRÉCÈDE son étiquette ; pour garder 24 heures complètes (et 8 quarts d'heure à venir plus le dernier
+// quart écoulé) il faut une étiquette de plus : le noyau décale les cumuls d'une étiquette (voir meteo_riche.hpp).
+//
+// Attention côté appareil : l'adresse fait 863 octets au plus (TAILLE_REQUETE_MAX - 1). `esp_http_client` écrit la LIGNE de
+// requête (« GET /chemin?… HTTP/1.1 », 851 octets au plus) en une fois dans son tampon d'envoi, qui fait 512 octets par défaut :
+// on demande `buffer_size_tx` = 1024. Les en-têtes (Host, User-Agent…) partent ensuite par tranches du même tampon (lu dans
+// esp_http_client.c d'ESP-IDF 5.5.5, `esp_http_client_request_send`) : seule la première ligne doit y tenir (voir le test de ce
+// fichier). Réponse mesurée : voir docs/mesures/meteo.md (4 427 à 4 575 octets, non compressée : on n'envoie pas `Accept-Encoding`).
 #pragma once
 
 #include <cstddef>
@@ -26,11 +32,14 @@ namespace detail {
 inline constexpr std::string_view REQUETE_DEBUT = "https://api.open-meteo.com/v1/forecast?latitude=";
 inline constexpr std::string_view REQUETE_MILIEU = "&longitude=";
 inline constexpr std::string_view REQUETE_FIN =
-    "&current=temperature_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,"
-    "pressure_msl,relative_humidity_2m"
-    "&hourly=temperature_2m,weather_code,precipitation_probability,uv_index&forecast_hours=48"
-    "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_"
-    "max"
+    "&current=temperature_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m,"
+    "wind_direction_10m,wind_gusts_10m,pressure_msl,relative_humidity_2m"
+    "&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,"
+    "weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,is_day&forecast_hours=25"
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,"
+    "sunrise,sunset,sunshine_duration,uv_index_max,precipitation_sum,snowfall_sum,precipitation_hours,"
+    "precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant"
+    "&minutely_15=precipitation&forecast_minutely_15=9"
     "&forecast_days=7&timezone=auto&timeformat=unixtime";
 
 // Écrit dans un tampon borné, sans jamais déborder ; `trop` devient vrai à la première place manquante.

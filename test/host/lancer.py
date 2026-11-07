@@ -139,11 +139,13 @@ from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assist
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
 from mutations_meteo_appareil import MUTATIONS_METEO_APPAREIL  # noqa: E402  (météo sur l'appareil : requête, zone, cache)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
+from mutations_meteo_riche import MUTATIONS_METEO_RICHE  # noqa: E402  (météo riche : heures, quarts d'heure, pluie proche, cache v2)
 from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (page de réglages : JSON, valeurs, appairage, API)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
 MUTATIONS += MUTATIONS_METEO_APPAREIL
+MUTATIONS += MUTATIONS_METEO_RICHE
 MUTATIONS += MUTATIONS_ASSISTANT
 MUTATIONS += MUTATIONS_I18N
 MUTATIONS += MUTATIONS_REGLAGES
