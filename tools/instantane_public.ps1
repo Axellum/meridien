@@ -26,7 +26,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Git {
+function Invoke-Git {
     & git @args
     if ($LASTEXITCODE -ne 0) { throw "git $($args -join ' ') a echoue (code $LASTEXITCODE)" }
 }
@@ -51,7 +51,7 @@ $date = (& git -C $racine log -1 --format=%cs $sha).Trim()
 Write-Host "1/4 archive de $Reference ($($sha.Substring(0, 7)), $date) dans $Destination"
 $tar = Join-Path ([IO.Path]::GetTempPath()) ("instantane_" + [guid]::NewGuid().ToString('N') + '.tar')
 try {
-    Git -C $racine archive --format=tar -o $tar $sha
+    Invoke-Git -C $racine archive --format=tar -o $tar $sha
     & tar -xf $tar -C $Destination
     if ($LASTEXITCODE -ne 0) { throw "tar -x a echoue (code $LASTEXITCODE)" }
 } finally {
@@ -83,12 +83,12 @@ $fichierMessage = Join-Path ([IO.Path]::GetTempPath()) ("instantane_msg_" + [gui
 [IO.File]::WriteAllText($fichierMessage, ($message -replace "`r`n", "`n"), (New-Object Text.UTF8Encoding $false))
 Push-Location $Destination
 try {
-    Git init -b main
-    Git config user.name $Nom
-    Git config user.email $Courriel
+    Invoke-Git init -b main
+    Invoke-Git config user.name $Nom
+    Invoke-Git config user.email $Courriel
     # Le dossier ne contient QUE l'archive (comptee plus haut) : tout ajouter revient a ajouter la liste de la reference.
-    Git add --all
-    Git commit -q -F $fichierMessage
+    Invoke-Git add --all
+    Invoke-Git commit -q -F $fichierMessage
     Write-Host "4/4 identites de commit"
     & python $controle --historique
     if ($LASTEXITCODE -ne 0) { throw "Le controle de l'historique neuf a trouve du bloquant." }
