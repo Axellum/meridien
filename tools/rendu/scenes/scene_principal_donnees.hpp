@@ -17,6 +17,7 @@
 #include "banc.h"
 #include "ecran/visuel_vue.hpp"
 #include "horloge.h"
+#include "meteo_zone.h"
 #include "ui_principal.h"
 
 namespace donnees {
@@ -316,6 +317,12 @@ inline ecran::EntreesPrincipal entrees(const banc::Contexte &contexte, int64_t d
     e.date = date;
     e.date_attente = nullptr; // la phrase d'attente de l'écran lui-même
     e.maintenant_s = maintenant;
+    // Le lieu, comme le branchement de l'appareil le fait (main/ecran_principal.cpp) : la zone posée par le banc (Lyon par défaut).
+    ZoneMeteo zone = {};
+    e.fuseau_connu = ecran::horloge_fuseau(e.fuseau);
+    e.position_connue = zone_lire(&zone);
+    e.latitude_deg = zone.latitude;
+    e.longitude_deg = zone.longitude;
     e.meteo = meteo;
     return e;
 }

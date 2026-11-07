@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "ecran/heure_fr.hpp"
 #include "ecran/vigie_bandeau.hpp"
 #include "ecran/visuel_themes.hpp"
 #include "ecran/visuel_vue.hpp"
@@ -30,9 +31,17 @@ struct EntreesPrincipal {
         *date_attente; // phrase d'attente quand l'heure du réseau n'est pas encore là (nul : la phrase de l'écran)
     std::int64_t maintenant_s; // instant UTC du moment : position du soleil, lune, colonne « maintenant » (0 : inconnu)
     visuel::VueMeteo meteo;    // la météo ; `connue` faux : « Météo indisponible »
-    // Décalage à l'UTC du fuseau de l'horloge, en secondes. Sert au ciel (jour ou nuit) tant que la météo n'est pas lue : sans lui
-    // le ciel jugeait l'heure en UTC et restait « nuit » une heure ou deux de trop au démarrage. Ignoré dès que la météo est connue.
-    std::int32_t decalage_secours_s;
+    // Le LIEU choisi (ADR-0012). `fuseau` : les règles de son fuseau (décalage et changements d'heure), qui convertissent CHAQUE
+    // instant affiché en heure locale : étiquette de chaque colonne « heure par heure », lever et coucher du soleil, noms des jours,
+    // « aujourd'hui ». Un seul décalage pour toute la fenêtre serait faux dès qu'elle contient un changement d'heure.
+    // `fuseau_connu` faux : le nom du fuseau n'est pas dans la table ; l'écran garde alors le décalage de la réponse météo (fixe) et,
+    // sans météo, ne devine pas le ciel (nuit). `latitude_deg` / `longitude_deg` (`position_connue`) : le ciel (jour ou nuit) tant que la
+    // météo n'est pas lue est calculé au lever et au coucher du soleil du lieu (ecran/soleil.hpp), plus avec une plage d'heures fixe.
+    ecran::heure::Fuseau fuseau;
+    bool fuseau_connu;
+    bool position_connue;
+    double latitude_deg;
+    double longitude_deg;
     // L'alerte officielle de Vigie en vigueur (ADR-0009) : `present` faux = rien n'est dessiné à sa place (pas de bandeau permanent).
     // Quand elle est présente, sa pastille remplace celle de l'alerte déduite de la météo, dans la barre du haut.
     vigie::Bandeau bandeau;

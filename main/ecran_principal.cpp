@@ -43,7 +43,6 @@ const char *TAG = "principal";
 
 constexpr uint32_t kPeriodeMs = 500;
 constexpr int kJournalToutesLesN = 120; // une minute à 500 ms
-constexpr int kZoneToutesLesN = 60;     // le nom de la ville est relu (NVS) toutes les 30 s, pas à chaque passage
 
 lv_obj_t *g_ecran_principal = nullptr;
 lv_obj_t *g_ecran_diagnostic = nullptr;
@@ -140,7 +139,15 @@ void rafraichir(lv_timer_t *) {
     // démarrage, ou gardée à travers un redémarrage logiciel) : l'écran n'attend plus SNTP (≈ 13 s) pour l'heure et le ciel.
     const bool heure_vraie = rtc::heure_affichable(etat.heure_synchronisee, instant);
     entrees.maintenant_s = heure_vraie ? instant : 0;
-    entrees.decalage_secours_s = heure_vraie ? horloge_decalage_s(instant) : 0;
+    // Le LIEU choisi (ADR-0012) : relu à chaque passage, de sorte qu'une autre ville choisie sur l'écran ou sur la page web change
+    // l'heure, la date, les colonnes « heure par heure » et le ciel au passage suivant (500 ms), sans notification. zone_lire copie la
+    // zone gardée en RAM par meteo_zone.cpp (la NVS n'est lue qu'au premier appel).
+    ZoneMeteo zone = {};
+    const bool zone_connue = zone_lire(&zone);
+    entrees.fuseau_connu = horloge_fuseau(entrees.fuseau);
+    entrees.position_connue = zone_connue;
+    entrees.latitude_deg = zone.latitude;
+    entrees.longitude_deg = zone.longitude;
     entrees.heure_connue = heure_vraie && horloge_hhmm(instant, entrees.heure, sizeof entrees.heure);
     char date[48] = {};
     if (entrees.heure_connue && !horloge_date_localisee(instant, i18n::langue_courante(), date, sizeof date)) {
@@ -149,13 +156,10 @@ void rafraichir(lv_timer_t *) {
     entrees.date = date; // copiée par l'écran pendant l'appel
     entrees.date_attente = texte_principal::kDateAttente;
 
-    // La ville : lue dans la zone enregistrée (NVS), pas à chaque passage.
-    if (g_compteur % kZoneToutesLesN == 0) {
-        ZoneMeteo zone = {};
-        if (zone_lire(&zone)) {
-            std::memcpy(g_ville, zone.nom, sizeof g_ville);
-            g_ville[sizeof g_ville - 1] = '\0';
-        }
+    // La ville : celle de la zone enregistrée, lue plus haut.
+    if (zone_connue) {
+        std::memcpy(g_ville, zone.nom, sizeof g_ville);
+        g_ville[sizeof g_ville - 1] = '\0';
     }
 
     // La météo : d'abord la météo riche (contrat v2 : courant complet, 24 heures, 7 jours, pluie proche, tendance de pression),
@@ -193,7 +197,8 @@ void rafraichir(lv_timer_t *) {
     // Trace de ce qui est affiché : à la première heure valide puis chaque minute (l'écran n'est pas photographié).
     if (entrees.heure_connue && (!g_heure_journalisee || g_compteur % kJournalToutesLesN == 0)) {
         g_heure_journalisee = true;
-        ESP_LOGI(TAG, "affichage : « %s » / « %s » ; météo %s ; utc=%lld", entrees.heure, entrees.date,
+        ESP_LOGI(TAG, "affichage : « %s » / « %s » ; fuseau %s ; météo %s ; utc=%lld", entrees.heure, entrees.date,
+                 entrees.fuseau_connu ? zone.fuseau : "inconnu",
                  entrees.meteo.connue ? (entrees.meteo.perimee ? "périmée" : "à jour") : "indisponible",
                  static_cast<long long>(instant));
     }

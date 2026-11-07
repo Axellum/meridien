@@ -7,8 +7,10 @@
 #include <initializer_list>
 #include <string_view>
 
+#include "ecran/heure_lieu.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_wmo.hpp"
+#include "ecran/soleil.hpp"
 #include "ecran/visuel_astres.hpp"
 #include "ecran/visuel_dates.hpp"
 #include "ecran/visuel_echelles.hpp"
@@ -119,20 +121,28 @@ void fmt_dixieme(char *sortie, std::size_t n, int dix) {
     }
 }
 
-int minute_locale(std::int64_t epoch_s, int decalage_s) {
-    std::int64_t local = (epoch_s + decalage_s) % 3600;
-    if (local < 0) {
-        local += 3600;
+// ---- l'heure du lieu (ADR-0012) -----------------------------------------------------------------------------------------
+//
+// Chaque instant affiché est converti avec les règles du fuseau du lieu, au décalage en vigueur à CET instant (ecran/heure_lieu.hpp,
+// ecran/heure_fr.hpp) : pas un décalage unique pour toute la fenêtre de prévision.
+
+ecran::heure::Fuseau fuseau() {
+    if (g.e.fuseau_connu) {
+        return g.e.fuseau;
     }
-    return static_cast<int>(local / 60);
+    // Nom de fuseau absent de la table (enregistrement ancien) : on garde le décalage de la réponse météo, fixe, faute de mieux.
+    return ecran::heure::fuseau_fixe(g.e.meteo.connue ? g.e.meteo.decalage_utc_s : 0);
 }
 
-void fmt_hhmm(char *sortie, std::size_t n, std::int64_t epoch_s, int decalage_s) {
-    if (epoch_s <= 0) {
+ecran::heure::HeureLocale heure_du(std::int64_t instant_s) {
+    return ecran::heure::en_heure_locale(instant_s, fuseau());
+}
+
+// « 07:12 » ; « — » quand l'instant est inconnu.
+void fmt_hhmm(char *sortie, std::size_t n, std::int64_t epoch_s) {
+    if (epoch_s <= 0 || ecran::heure::formater_hhmm(heure_du(epoch_s), sortie, n) == 0) {
         std::snprintf(sortie, n, "%s", TIRET);
-        return;
     }
-    std::snprintf(sortie, n, "%02d:%02d", heure_locale(epoch_s, decalage_s), minute_locale(epoch_s, decalage_s));
 }
 
 // Libellé météo de l'instant, dans la langue de l'écran (le code WMO est la source, jamais un libellé déjà traduit).
@@ -199,7 +209,53 @@ struct Empreinte {
 
 // ---- données dérivées ---------------------------------------------------------------------------------------------------
 
-int decalage() { return g.e.meteo.connue ? g.e.meteo.decalage_utc_s : g.e.decalage_secours_s; }
+// Lever et coucher du soleil du jour LOCAL du lieu, calculés (NOAA, noyau pur). Le calcul coûte quelques dizaines de microsecondes et
+// l'empreinte du ciel le demande à chaque passage : le dernier résultat est gardé tant que le jour local, le lieu et le décalage
+// ne changent pas.
+soleil::LeverCoucher lever_coucher_du_lieu(const ecran::heure::HeureLocale &local) {
+    static struct {
+        bool valide = false;
+        std::int64_t numero_jour = 0;
+        double latitude = 0;
+        double longitude = 0;
+        std::int32_t decalage_s = 0;
+        soleil::LeverCoucher resultat;
+    } cache;
+    const std::int64_t numero = ecran::heure::numero_jour_local(g.e.maintenant_s, fuseau());
+    if (!cache.valide || cache.numero_jour != numero || cache.latitude != g.e.latitude_deg ||
+        cache.longitude != g.e.longitude_deg || cache.decalage_s != local.decalage_s) {
+        cache.resultat = soleil::lever_coucher(g.e.latitude_deg, g.e.longitude_deg, local.an, local.mois, local.jour,
+                                               local.decalage_s);
+        cache.numero_jour = numero;
+        cache.latitude = g.e.latitude_deg;
+        cache.longitude = g.e.longitude_deg;
+        cache.decalage_s = local.decalage_s;
+        cache.valide = true;
+    }
+    return cache.resultat;
+}
+
+// Jour, aube, crépuscule ou nuit SANS météo (démarrage, réseau absent). Avec la position du lieu : le lever et le coucher du soleil du
+// jour local, calculés. Sans position : la plage fixe 8 h à 18 h de l'heure locale (limite connue, docs/mesures/). Sans fuseau
+// connu on ne devine rien : nuit, comme quand l'heure n'est pas encore sûre.
+MomentJour moment_sans_meteo() {
+    if (g.e.maintenant_s <= 0 || !g.e.fuseau_connu) {
+        return MomentJour::NUIT;
+    }
+    const ecran::heure::HeureLocale local = heure_du(g.e.maintenant_s);
+    if (g.e.position_connue) {
+        const soleil::LeverCoucher lc = lever_coucher_du_lieu(local);
+        switch (lc.situation) {
+        case soleil::Situation::Normal:
+            return arc_soleil(g.e.maintenant_s, lc.lever_s, lc.coucher_s, true).moment;
+        case soleil::Situation::JourPolaire:
+            return MomentJour::JOUR;
+        case soleil::Situation::NuitPolaire:
+            return MomentJour::NUIT;
+        }
+    }
+    return (local.heure >= 8 && local.heure < 18) ? MomentJour::JOUR : MomentJour::NUIT;
+}
 
 MomentJour moment_du_jour() {
     const VueMeteo &m = g.e.meteo;
@@ -209,11 +265,7 @@ MomentJour moment_du_jour() {
     if (m.connue) {
         return m.jour ? MomentJour::JOUR : MomentJour::NUIT;
     }
-    if (g.e.maintenant_s > 0) { // pas de météo : l'heure locale décide
-        const int h = heure_locale(g.e.maintenant_s, decalage());
-        return (h >= 8 && h < 18) ? MomentJour::JOUR : MomentJour::NUIT;
-    }
-    return MomentJour::NUIT;
+    return moment_sans_meteo();
 }
 
 Ambiance ambiance_du_moment() {
@@ -280,11 +332,19 @@ int premiere_heure() {
     return m.nb_heures;
 }
 
-// Le premier jour à montrer : on saute ceux qui sont finis (relevé gardé en cache depuis la veille).
+// Le jour LOCAL d'un jour de prévision (`date_s` est son minuit local, calculé par la météo avec UN décalage) : on lit son midi, qu'un
+// changement d'heure d'une heure ne sort jamais du jour.
+std::int64_t numero_du_jour_prevu(const JourPrevu &j) {
+    return ecran::heure::numero_jour_local(j.date_s + 12 * 3600, fuseau());
+}
+
+// Le premier jour à montrer : on saute ceux qui sont finis (relevé gardé en cache depuis la veille). « Fini » se juge sur le jour
+// civil du lieu, pas sur 86 400 s : un jour de changement d'heure dure 23 ou 25 heures.
 int premier_jour() {
     const VueMeteo &m = g.e.meteo;
+    const std::int64_t aujourdhui = ecran::heure::numero_jour_local(g.e.maintenant_s, fuseau());
     for (int i = 0; i < m.nb_jours; ++i) {
-        if (m.jours[i].date_s + 86400 > g.e.maintenant_s) {
+        if (numero_du_jour_prevu(m.jours[i]) >= aujourdhui) {
             return i;
         }
     }
@@ -931,8 +991,8 @@ void tuile_soleil(const Ctx &c, const Rect &r) {
         }
     }
     char lever[16], coucher[16];
-    fmt_hhmm(lever, sizeof lever, connu_soleil ? m.lever_s : 0, decalage());
-    fmt_hhmm(coucher, sizeof coucher, connu_soleil ? m.coucher_s : 0, decalage());
+    fmt_hhmm(lever, sizeof lever, connu_soleil ? m.lever_s : 0);
+    fmt_hhmm(coucher, sizeof coucher, connu_soleil ? m.coucher_s : 0);
     const int y = r.y + r.h - pad - h_heure;
     const int moitie = (r.w - 2 * pad) / 2;
     dz::texte(c.pc, g.corps, lever, r.x + pad, y, moitie, LV_TEXT_ALIGN_LEFT, t.texte);
@@ -1028,8 +1088,10 @@ void dessiner_heures(const Ctx &c) {
         if (i > 0) { // un filet léger entre deux colonnes
             dz::rect(c.pc, x, c.y + pad + px(6), px(1), c.h - 2 * pad - px(12), 0, t.filet, 120);
         }
+        // L'heure locale de CETTE colonne, au décalage en vigueur à son instant (une fenêtre peut contenir un changement d'heure) ;
+        // « 7h » / « 7:00 » à l'heure pile, « 05:30 » sinon (fuseaux à demi-heure ou trois quarts d'heure).
         char libelle[16];
-        std::snprintf(libelle, sizeof libelle, francais ? "%dh" : "%d:00", heure_locale(h.instant_s, decalage()));
+        ecran::heure::formater_etiquette_heure(heure_du(h.instant_s), francais, libelle, sizeof libelle);
         int y = y_haut;
         dz::texte(c.pc, g.mini, libelle, x, y, col_w, LV_TEXT_ALIGN_CENTER, i == 0 ? t.accent : t.texte_2);
         y += dz::hauteur_ligne(g.mini) + px(2);
@@ -1058,7 +1120,7 @@ void nom_du_jour(char *sortie, std::size_t n, const JourPrevu &j, bool aujourdhu
         return;
     }
     // trois premiers points de code du nom du jour dans la langue de l'écran (« ven », « Fre », « Cum »)
-    jour_court(i18n::langue_courante(), jour_semaine_locale(j.date_s + 12 * 3600, decalage()), sortie, n);
+    jour_court(i18n::langue_courante(), ecran::heure::jour_semaine_du_jour(j.date_s, fuseau()), sortie, n);
 }
 
 void dessiner_semaine(const Ctx &c) {
@@ -1076,6 +1138,7 @@ void dessiner_semaine(const Ctx &c) {
         maxs[i] = m.jours[debut + i].max_dix;
     }
     const Echelle ech = echelle_semaine(mins, maxs, static_cast<std::size_t>(n));
+    const std::int64_t numero_aujourdhui = ecran::heure::numero_jour_local(g.e.maintenant_s, fuseau());
     const int pad = px(10);
     const bool lignes = g.portrait; // portrait : une ligne par jour ; paysage : une colonne par jour
     const int h_barre = px(8);
@@ -1085,7 +1148,7 @@ void dessiner_semaine(const Ctx &c) {
         dz::hauteur_ligne(g.petit) + px(2) + h_icone + px(2) + dz::hauteur_ligne(g.corps) + px(6) + h_barre;
     for (int i = 0; i < n; ++i) {
         const JourPrevu &j = m.jours[debut + i];
-        const bool aujourdhui = j.date_s <= g.e.maintenant_s && g.e.maintenant_s < j.date_s + 86400;
+        const bool aujourdhui = numero_du_jour_prevu(j) == numero_aujourdhui;
         char jour[24];
         nom_du_jour(jour, sizeof jour, j, aujourdhui);
         char bas[24], haut[24], proba[16];
@@ -1508,6 +1571,8 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
         e.u(static_cast<std::uint32_t>(langue));
         e.u(m.connue);
     };
+    // Le lieu change de fuseau (autre ville choisie sur l'écran ou sur la page web) : les heures, les jours et le soleil se redessinent.
+    const std::uint32_t cle_fuseau = ecran::heure::cle_du_fuseau(fuseau());
     std::uint32_t neuf[Z_NOMBRE];
     {
         Empreinte e;
@@ -1555,7 +1620,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
         e.u(m.pluie_dans_min);
         e.i(m.lever_s);
         e.i(m.coucher_s);
-        e.u(m.decalage_utc_s);
+        e.u(cle_fuseau); // le lever et le coucher s'écrivent en heure du lieu
         // la position du soleil et la phase de la lune changent avec l'heure : on les range par minute et par jour
         e.i(g.e.maintenant_s / 60);
         neuf[Z_METRIQUES] = e.h;
@@ -1563,7 +1628,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     {
         Empreinte e;
         base(e);
-        e.u(m.decalage_utc_s);
+        e.u(cle_fuseau); // l'étiquette de chaque colonne est l'heure locale de son instant
         e.u(premiere_heure());
         for (int i = 0; i < m.nb_heures; ++i) {
             e.i(m.heures[i].instant_s);
@@ -1577,9 +1642,10 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     {
         Empreinte e;
         base(e);
-        e.u(m.decalage_utc_s);
+        e.u(cle_fuseau); // les noms des jours sont ceux du lieu
         e.u(premier_jour());
-        e.i(g.e.maintenant_s / 3600); // « aujourd'hui » change avec le jour, pas à la minute
+        // « aujourd'hui » change à minuit LOCAL, pas à une heure ronde de l'UTC (Kolkata : 18 h 30 UTC) : on range le numéro du jour local
+        e.i(ecran::heure::numero_jour_local(g.e.maintenant_s, fuseau()));
         for (int i = 0; i < m.nb_jours; ++i) {
             e.i(m.jours[i].date_s);
             e.u(m.jours[i].code);

@@ -11,6 +11,7 @@
 #include "board.h"
 #include "ecran/i18n.hpp"
 #include "lvgl.h"
+#include "meteo_zone.h"
 
 namespace {
 
@@ -26,6 +27,8 @@ int32_t g_largeur = 0;
 int32_t g_hauteur = 0;
 std::vector<uint16_t> g_image; // RGB565, ce que LVGL envoie à la dalle
 lv_display_t *g_affichage = nullptr;
+
+ZoneMeteo g_zone = {"Lyon", 45.74906F, 4.84789F, "Europe/Paris"}; // la zone d'usine (main/meteo_zone.cpp)
 
 board_info_t g_carte = {"M5Stack Tab5", "ST7121", "Sitronix (version 1)", 0, 0};
 board_boot_timeline_t g_jalons = {0, 0, 0, 0, 612};
@@ -132,7 +135,23 @@ void definir_carte(const char *nom, const char *controleur_ecran, const char *co
 
 void definir_duree_demarrage_ms(int32_t ms) { g_jalons.lvgl_ready_ms = ms; }
 
+void definir_zone(const char *nom, float latitude, float longitude, const char *fuseau_iana) {
+    std::snprintf(g_zone.nom, sizeof g_zone.nom, "%s", nom);
+    g_zone.latitude = latitude;
+    g_zone.longitude = longitude;
+    std::snprintf(g_zone.fuseau, sizeof g_zone.fuseau, "%s", fuseau_iana);
+}
+
 } // namespace banc
+
+// meteo_zone.h : sur l'appareil, la zone vient de la NVS (main/meteo_zone.cpp) ; ici, celle que la scène a posée.
+bool zone_lire(ZoneMeteo *sortie) {
+    if (sortie == nullptr) {
+        return false;
+    }
+    *sortie = g_zone;
+    return true;
+}
 
 int main(int argc, char **argv) {
     const char *variante = nullptr;

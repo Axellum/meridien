@@ -38,4 +38,9 @@ void definir_carte(const char *nom, const char *controleur_ecran, const char *co
 // Durée de démarrage affichée par certains écrans (board_get_boot_timeline()->lvgl_ready_ms).
 void definir_duree_demarrage_ms(int32_t ms);
 
+// La zone que lit main/horloge.cpp (meteo_zone.h, zone_lire) : le LIEU dont l'écran montre l'heure (ADR-0012). Par défaut la zone
+// d'usine de l'appareil (Lyon, Europe/Paris), donc les scènes qui ne l'appellent pas rendent comme avant. `fuseau_iana` : un nom
+// de la table du noyau (« Asia/Tokyo »). À appeler au début de la scène, avant de construire l'écran.
+void definir_zone(const char *nom, float latitude, float longitude, const char *fuseau_iana);
+
 } // namespace banc
