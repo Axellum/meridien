@@ -2,8 +2,9 @@
 
 ## English · [Français](#version-française)
 
-> **Status.** Everything below is judged on **PC renders** (LVGL 9.5.0 software drawing, clang, no board). Nothing of it has
-> been seen on a panel: the look, the colours as the panel shows them and the speed on the ESP32-P4 are **not verified**.
+> **Status.** Everything below is judged on **PC renders** (LVGL 9.5.0 software drawing, clang). On 2026-11-07 the screen was
+> also flashed on a Tab5 and its serial log read (cost table below), but nobody has **looked at the panel**: the look, the
+> colours as the panel shows them and the legibility at 2 m are **not verified by eye**.
 > The scoring is the agent's reading of the renders and measurements; the decision is the owner's, by eye, from about 2 m.
 
 **What was asked.** A main screen that is very legible, clear, modern and complete, read mostly by sight: large time and
@@ -65,7 +66,7 @@ bedroom or a hallway (about 50 items, the best contrast); *Tableau sombre* and *
 theme, 10 pairs, `tools/rendu/verifier_bascule.py`). *Horloge* has no value in that setting: a fourth value in the settings
 registry (owned by the `reglages-ecran` session) is needed to reach it.
 
-**Cost** (compiled for ESP32-P4 with ESP-IDF 5.5.5; not measured on a board):
+**Cost** (compiled for ESP32-P4 with ESP-IDF 5.5.5; the rows marked *board* were read from the serial log of a Tab5):
 
 | Item | Value | Source |
 |---|---|---|
@@ -73,13 +74,21 @@ registry (owned by the `reglages-ecran` session) is needed to reach it.
 | Fonts | 7 TinyTTF sizes from the one embedded Roboto Bold | code |
 | Icon set | 825,032 bytes in flash, 0 bytes of RAM for the pixels | `main/assets/icones_meteo.bin` |
 | Sky image | 1,843,200 bytes at 1280 × 720 (RGB565), in PSRAM, rebuilt only when the moment or weather class changes; gradient fallback if the allocation fails | computed from the size |
-| Firmware | 2,721,520 bytes, 35 % of the 4 MB app partition free | `build/meridien.bin` |
+| Firmware | 2,722,192 bytes, 35 % of the 4 MB app partition free | `build/meridien.bin` |
 | PC redraw (relative, **not** the board) | construction 2–4 ms, first full render 2–4 ms at 1280 × 720 | `BANC_CHRONO=1`, 9800X3D |
+| Internal RAM taken by building the screen (*board*) | 4.9 KB (253,571 → 248,643 bytes free) | log line of `ecran_principal.cpp` |
+| Internal RAM free before the first weather request (*board*) | 154.4 KB with the memory settings of jalon 1b; 44.9 KB without them, and the board then reboots (see [depannage.md](../depannage.md)) | serial log |
+| Internal RAM free after 154 s (*board*) | 105.9 KB, minimum since start 96.0 KB, stable between 64 s and 154 s | `memoire` command |
+| Redraw on the board | first 10 s: 3 images at 215 ms on average (empty glyph cache); a minute change: 1 image, 10 zones, 82 ms. The old screen: about 24 ms | serial log, `tab5_orientation` line |
 
-The P4 is far slower than the PC; the first full redraw on the board is **not measured**. The design limits the damage: one
-drawing object per zone, redrawn only when its content changed (a hash per zone), so the clock alone is redrawn each minute.
+The P4 is far slower than the PC: a minute change costs 82 ms on the board, about three times the old screen, which is
+acceptable for a screen that changes once a minute (the touch response of the Settings button, which redraws only its own
+zone, is **not measured**). The design limits the damage: one drawing object per zone, redrawn only when its content changed (a
+hash per zone), so the clock alone is redrawn each minute.
 
-**Seen on:** PC render (clang 23.1.5, LVGL 9.5.0), no board, commits of branch `claude/ecran-visuel-ba722a`, 2026-11-07.
+**Seen on:** PC render (clang 23.1.5, LVGL 9.5.0), commits of branch `claude/ecran-visuel-ba722a`, 2026-11-07; the *board* rows:
+Tab5 with the ST7121 screen (MAC read on the chip, not copied here), ESP32-P4, commit `cd362eb` built with the memory settings of
+jalon 1b added in a separate build directory (never committed), 2026-11-07 from 01:57 to 02:02.
 
 **Reproduce:**
 
@@ -94,8 +103,9 @@ python test\host\lancer.py --seulement visuel --mutations   # pure core tests an
 
 ## Version française
 
-> **Statut.** Tout ce qui suit est jugé sur des **rendus PC** (dessin logiciel LVGL 9.5.0, clang, sans carte). Rien n'a été vu
-> sur une dalle : l'aspect, les couleurs telles que la dalle les montre et la vitesse sur l'ESP32-P4 sont **non vérifiés**. La
+> **Statut.** Tout ce qui suit est jugé sur des **rendus PC** (dessin logiciel LVGL 9.5.0, clang). Le 07/11/2026 l'écran a aussi
+> été flashé sur un Tab5 et son journal série lu (tableau du coût plus bas), mais personne n'a **regardé la dalle** : l'aspect,
+> les couleurs telles que la dalle les montre et la lisibilité à 2 m sont **non vérifiés à l'œil**. La
 > notation est la lecture que l'agent fait des rendus et des mesures ; la décision est celle d'Axel, à l'œil, à 2 m environ.
 
 **Ce qui était demandé.** Un écran principal très lisible, clair, moderne et complet, lu surtout du regard : grande heure et
@@ -159,7 +169,7 @@ l'écran basculé est identique pixel pour pixel à celui construit directement 
 `tools/rendu/verifier_bascule.py`). *Horloge* n'a pas de valeur dans ce réglage : il faut une quatrième valeur au registre des
 réglages (propriété de la session `reglages-ecran`) pour l'atteindre.
 
-**Coût** (compilé pour l'ESP32-P4 avec ESP-IDF 5.5.5 ; non mesuré sur carte) :
+**Coût** (compilé pour l'ESP32-P4 avec ESP-IDF 5.5.5 ; les lignes marquées *carte* sont lues dans le journal série d'un Tab5) :
 
 | Poste | Valeur | Source |
 |---|---|---|
@@ -167,14 +177,21 @@ réglages (propriété de la session `reglages-ecran`) pour l'atteindre.
 | Polices | 7 tailles TinyTTF du seul Roboto Bold embarqué | code |
 | Jeu d'icônes | 825 032 octets en flash, 0 octet de RAM pour les pixels | `main/assets/icones_meteo.bin` |
 | Image du ciel | 1 843 200 octets en 1280 × 720 (RGB565), en PSRAM, refaite seulement quand le moment ou la classe de temps change ; repli sur un dégradé si l'allocation échoue | calculé d'après la taille |
-| Firmware | 2 721 520 octets, 35 % de la partition d'application de 4 Mo libre | `build/meridien.bin` |
+| Firmware | 2 722 192 octets, 35 % de la partition d'application de 4 Mo libre | `build/meridien.bin` |
 | Redessin sur le PC (relatif, **pas** la carte) | construction 2 à 4 ms, premier rendu complet 2 à 4 ms en 1280 × 720 | `BANC_CHRONO=1`, 9800X3D |
+| RAM interne prise par la construction de l'écran (*carte*) | 4,9 Ko (253 571 → 248 643 octets libres) | ligne de journal de `ecran_principal.cpp` |
+| RAM interne libre avant la première requête météo (*carte*) | 154,4 Ko avec les réglages mémoire du jalon 1b ; 44,9 Ko sans eux, et la carte redémarre alors (voir [depannage.md](../depannage.md)) | journal série |
+| RAM interne libre après 154 s (*carte*) | 105,9 Ko, minimum depuis le démarrage 96,0 Ko, stable entre 64 s et 154 s | commande `memoire` |
+| Redessin sur la carte | 10 premières secondes : 3 images à 215 ms en moyenne (cache de glyphes vide) ; un changement de minute : 1 image, 10 zones, 82 ms. L'ancien écran : environ 24 ms | journal série, ligne `tab5_orientation` |
 
-Le P4 est bien plus lent que le PC ; le premier redessin complet sur la carte n'est **pas mesuré**. La conception limite les
-dégâts : un objet de dessin par zone, redessiné seulement si son contenu a changé (une empreinte par zone), donc seule l'heure
-est redessinée chaque minute.
+Le P4 est bien plus lent que le PC : un changement de minute coûte 82 ms sur la carte, environ trois fois l'ancien écran, ce qui
+est acceptable pour un écran qui change une fois par minute (la réponse au toucher du bouton Réglages, qui ne redessine que sa
+propre zone, n'est **pas mesurée**). La conception limite les dégâts : un objet de dessin par zone, redessiné seulement si son
+contenu a changé (une empreinte par zone), donc seule l'heure est redessinée chaque minute.
 
-**Vu sur :** rendu PC (clang 23.1.5, LVGL 9.5.0), sans carte, commits de la branche `claude/ecran-visuel-ba722a`, 07/11/2026.
+**Vu sur :** rendu PC (clang 23.1.5, LVGL 9.5.0), commits de la branche `claude/ecran-visuel-ba722a`, 07/11/2026 ; les lignes
+*carte* : Tab5 avec l'écran ST7121 (MAC lue sur la puce, non recopiée ici), ESP32-P4, commit `cd362eb` compilé avec les réglages
+mémoire du jalon 1b ajoutés dans un dossier de compilation à part (jamais commités), 07/11/2026 de 01 h 57 à 02 h 02.
 
 **Reproduire :**
 
