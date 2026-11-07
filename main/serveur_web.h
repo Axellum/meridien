@@ -9,7 +9,8 @@
 namespace ecran {
 
 // Lance la tâche du serveur et rend la main tout de suite. Elle attend l'adresse IP (reseau_etat().ip_obtenue), puis démarre le
-// serveur HTTP, mDNS, tire le code d'appairage (appairage_jeton()) et pose le bandeau « adresse + code » sur l'écran.
+// serveur HTTP, mDNS et tire le code d'appairage (appairage_jeton()), puis se termine. L'adresse et le code se lisent dans les
+// réglages à l'écran (« Réglages depuis un téléphone ») ; il n'y a plus de bandeau permanent.
 // À appeler une fois, après reseau_demarrer() et après la création de l'interface.
 void serveur_web_demarrer();
 

@@ -22,7 +22,7 @@ endif()
 
 idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp" "sntp_rapide.cpp" "commande_serie.cpp" "ui_bonjour.cpp"
                        "meteo_etat.cpp" "meteo_zone.cpp" "meteo_client.cpp"
-                       "appairage.cpp" "reglages.cpp" "serveur_web.cpp" "ui_appairage.cpp" "geocodage.cpp" "verrou_tls.cpp"
+                       "appairage.cpp" "reglages.cpp" "serveur_web.cpp" "geocodage.cpp" "verrou_tls.cpp"
                        INCLUDE_DIRS "."
                        PRIV_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
                        REQUIRES board_api core esp_event esp_netif esp_rom esp_system esp_timer esp_wifi freertos lwip nvs_flash

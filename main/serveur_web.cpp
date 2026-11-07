@@ -19,7 +19,6 @@
 #include <ctime>
 #include <string_view>
 
-#include "board.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
@@ -42,7 +41,6 @@
 #include "meteo_zone.h"
 #include "reglages.h"
 #include "reseau.h"
-#include "ui_appairage.h"
 #include "web_fichiers.h"
 
 namespace ecran {
@@ -58,10 +56,9 @@ constexpr size_t kTailleTravail = 16384; // réponse brute d'Open-Meteo (≈ 5 K
 // plus ≈ 4 Ko de tampons locaux de l'API). Ce TLS est maintenant dans la tâche de main/geocodage.cpp : la marge peut être réduite
 // (RAM interne rare), mais seulement après avoir mesuré la plus basse marge réelle de ce fil sur la carte, non faite ici.
 constexpr uint32_t kPileServeur = 20480;
-constexpr uint32_t kPileTache = 12288; // la tâche qui démarre le serveur crée aussi les polices du bandeau (TinyTTF)
+constexpr uint32_t kPileTache = 12288; // la tâche démarre le serveur puis se termine : sa pile est rendue
 constexpr UBaseType_t kPrioriteServeur = 3;
 constexpr uint32_t kPasAttenteIpMs = 1000;
-constexpr uint32_t kPasSurveillanceMs = 2000;
 
 char g_nom[16] = {};                   // « ecran-f6b6 »
 char g_corps[api::CORPS_MAX + 1] = {}; // corps de la requête en cours (un octet de plus : voir sur_api)
@@ -408,15 +405,6 @@ bool demarrer_mdns() {
     return true;
 }
 
-void afficher_bandeau(const char *ip) {
-    if (board_display_lock(2000)) {
-        ui_appairage_afficher(board_get_display(), ip, g_nom, appairage_jeton());
-        board_display_unlock();
-    } else {
-        ESP_LOGW(TAG, "bandeau d'appairage : verrou d'affichage non obtenu");
-    }
-}
-
 void tache_serveur(void *) {
     // 1. Attendre l'adresse IP (jalon 1b). Sans Wi-Fi, il n'y a pas de page.
     while (!reseau_etat().ip_obtenue) {
@@ -458,18 +446,12 @@ void tache_serveur(void *) {
     ESP_LOGI(TAG, "page de réglages servie : http://%s/ (port %u) ; mDNS %s%s ; %u fichiers, %u octets gzip", ip,
              static_cast<unsigned>(kPort), mdns ? g_nom : "non démarré", mdns ? ".local" : "",
              static_cast<unsigned>(kNombreFichiersWeb), static_cast<unsigned>(kPoidsGzipWeb));
-    afficher_bandeau(ip);
 
-    // 3. Si l'adresse change (bail DHCP renouvelé avec une autre adresse), le bandeau la suit.
-    for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(kPasSurveillanceMs));
-        const EtatReseau etat = reseau_etat();
-        if (etat.ip_obtenue && etat.ip[0] != '\0' && std::strncmp(etat.ip, ip, sizeof(ip)) != 0) {
-            std::memcpy(ip, etat.ip, sizeof(ip));
-            ESP_LOGI(TAG, "adresse changée : http://%s/", ip);
-            afficher_bandeau(ip);
-        }
-    }
+    // 3. L'adresse et le code d'appairage se lisent dans Réglages > « Réglages depuis un téléphone » (carte info.telephone de
+    //    ui_reglages.cpp, aussi dans l'installation guidée), relus à chaque ouverture : plus de bandeau permanent collé au bas de
+    //    tous les écrans (demande d'Axel, 07/11/2026), donc plus de boucle qui surveille l'adresse. Le serveur HTTP tourne dans sa
+    //    propre tâche : celle-ci a fini, elle se termine et rend sa pile de 12 Ko de mémoire interne.
+    vTaskDelete(nullptr);
 }
 
 } // namespace

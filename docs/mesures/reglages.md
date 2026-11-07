@@ -18,10 +18,10 @@ Règle de lecture : ce qui est écrit sans la mention « constaté » est une d�
 | Affichage | langue de l'écran, langue de l'assistant (indices fixes fr0 en1 de2 nl3 es4 it5 tr6), thème, luminosité 5 à 100 % en NVS (espace `reglages`, un blob de 5 octets) ; la luminosité est appliquée tout de suite et au démarrage | `main/reglages.cpp`, `main/main.cpp` |
 | Recherche de ville | l'appareil interroge lui-même le géocodage d'Open-Meteo en HTTPS (certificats vérifiés, délai de 8 s, réponse bornée à 16 Ko en PSRAM) ; seule cette adresse est autorisée dans le code. **Module commun à la page et à l'écran** (lecture et états dans le noyau pur, tâche d'arrière-plan à la demande, une recherche à la fois, la dernière demande gagne, verrou TLS partagé avec la météo) : voir la section 5 | `components/core/include/ecran/geocodage.hpp`, `main/geocodage.cpp`, `main/verrou_tls.cpp`, `main/serveur_web.cpp` |
 | mDNS | `ecran-xxxx.local` (xxxx = 4 derniers caractères hexadécimaux de l'adresse MAC Wi-Fi), service `_http._tcp` ; composant `espressif/mdns` **1.13.1** (registre, épinglé) | `main/idf_component.yml`, `dependencies.lock` |
-| Écran | bandeau provisoire en bas : adresse, nom `.local`, code ; posé sur la couche supérieure de LVGL, ne modifie pas l'écran principal | `main/ui_appairage.cpp`, `main/textes_reglages.h` |
+| Écran | ~~bandeau provisoire en bas~~ **retiré le 07/11/2026** (il restait affiché en permanence, sans moyen de le fermer — retour d'Axel sur la carte). L'adresse, le nom `.local` et le code se lisent dans **Réglages → « Réglages depuis un téléphone »** (le bouton « Nouveau code » en tire un autre) | `main/ui_reglages.cpp` (carte `info.telephone`) |
 | Hors périmètre (réponse `501`) | changer de Wi-Fi, services STT/LLM/TTS, export/import, mise à jour, retour arrière ; ni point d'accès ni portail captif | encadré de `docs/api-reglages.md` |
 
-Textes du bandeau : `main/textes_reglages.h`, **en français seulement et hors de la table `tr()`** (provisoires ; `ecran-principal` les remplace en plaçant le code dans son écran). Les phrases de l'API, elles, passent toutes par `tr()` dans les sept langues (garde `test/host/controle_i18n.py`).
+Les textes du bandeau (`main/textes_reglages.h`, français seulement) sont supprimés avec lui : la carte « Réglages depuis un téléphone » passe, elle, par `tr()`. Les phrases de l'API passent toutes par `tr()` dans les sept langues (garde `test/host/controle_i18n.py`).
 
 ## 2. Constaté sur le PC et à la compilation
 
@@ -42,7 +42,7 @@ Textes du bandeau : `main/textes_reglages.h`, **en français seulement et hors d
 - **Recherche de ville** : la requête de la page attend la réponse jusqu'à 30 s et garde donc l'unique fil du serveur ; pendant ce temps une autre requête de la page attend. La prise de contact TLS se fait dans la tâche du module de recherche, sous le verrou commun avec le client météo (jamais deux TLS ensemble). Que ce verrou et cette tâche tiennent en mémoire et sans alarme de surveillance sur la carte : **non vérifié** (jalon de mémoire de `jalon-1b` à attendre).
 - **Heure de l'écran** : l'horloge reste fixée sur Europe/Paris (`horloge.cpp`, non touché ici). Choisir une ville d'un autre fuseau enregistre bien la ville et son fuseau, mais l'heure affichée à l'écran ne suit pas encore.
 - **Thème et langue de l'écran** sont enregistrés et la langue courante du noyau est mise à jour, mais l'interface actuelle ne les utilise pas encore (textes de l'écran principal en français fixe, palette sombre fixe). Seule la **luminosité** a un effet visible tout de suite.
-- **Position du bandeau** : bas de l'écran (156 px de haut, 6 px de marge) ; il ne recouvre pas le bouton « Redémarrer » d'après les coordonnées lues, **non vérifié à l'écran**.
+- ~~**Position du bandeau**~~ : sans objet, le bandeau n'existe plus (07/11/2026).
 - `validee` (page « Appareil ») vaut toujours `true` : pas de retour arrière automatique.
 
 ## 4. Essai physique à faire par Axel (rien n'est constaté tant que ce n'est pas écrit ici)
@@ -51,11 +51,11 @@ Prérequis : le binaire de ce commit flashé **sur accord d'Axel pour ce binaire
 
 | # | Geste | On regarde | Résultat |
 | --- | --- | --- | --- |
-| 1 | Laisser l'écran démarrer, attendre l'adresse | un bandeau en bas de l'écran avec « Réglages depuis un téléphone », `http://…`, `ou http://ecran-….local` et « Code : 6 chiffres » | **non vérifié** |
-| 2 | Sur le téléphone, taper l'adresse du bandeau | la page « Appairage » s'ouvre (champ du code) | **non vérifié** |
-| 3 | Taper le code du bandeau | la page de réglages s'ouvre, ville affichée « Lyon » (défaut) | **non vérifié** |
+| 1 | Laisser l'écran démarrer, ouvrir Réglages | la carte « Réglages depuis un téléphone » : `http://…`, `ou http://ecran-….local` et « Code d’appairage » à 6 chiffres (plus de bandeau en bas de l'écran principal) | **non vérifié** |
+| 2 | Sur le téléphone, taper l'adresse de la carte | la page « Appairage » s'ouvre (champ du code) | **non vérifié** |
+| 3 | Taper le code de la carte | la page de réglages s'ouvre, ville affichée « Lyon » (défaut) | **non vérifié** |
 | 4 | Dans « Ville », taper `Marseille`, choisir « Marseille, Région Provence-Alpes-Côte d'Azur, France » (libellé tel que le service l'écrit, « Région » compris) | la ville affichée devient Marseille, une température apparaît | **non vérifié** |
-| 5 | Redémarrer l'écran (bouton « Redémarrer » de l'écran principal) | l'écran revient, le bandeau affiche un **nouveau code** | **non vérifié** |
+| 5 | Redémarrer l'écran (bouton « Redémarrer » de l'écran principal) | l'écran revient, la carte « Réglages depuis un téléphone » affiche un **nouveau code** | **non vérifié** |
 | 6 | Sur le téléphone, rouvrir l'adresse, taper le nouveau code | la ville affichée est toujours **Marseille** (relue après redémarrage) | **non vérifié** |
 | 7 | Choisir « Lyon » comme au point 4 | la ville affichée redevient Lyon | **non vérifié** |
 | 8 | Glisser la luminosité à 30 % | l'écran s'assombrit tout de suite | **non vérifié** |
@@ -65,8 +65,8 @@ Remarque : l'appareil a déjà « Lyon » par défaut (contrat `meteo_zone.h`) ;
 Rejouer le parcours automatique contre l'appareil (depuis le PC, même Wi-Fi) :
 
 ```powershell
-$env:URL_APPAREIL = "http://<adresse du bandeau>"
-$env:CODE_APPAIRAGE = "<code du bandeau>"
+$env:URL_APPAREIL = "http://<adresse lue dans Réglages>"
+$env:CODE_APPAIRAGE = "<code lu dans Réglages>"
 python web/tests/parcours.py
 ```
 
@@ -102,12 +102,12 @@ Les étapes que le firmware ne fait pas encore y sont affichées « SAUTÉE » a
 
 ### Gestes courts pour l'essai du matin (téléphone, même Wi-Fi) — à faire seulement quand le coordinateur dit que la carte est prête
 
-1. Lire le bandeau du bas ; ne pas dire le code à voix haute ni l'écrire ailleurs que sur le téléphone.
-2. Téléphone : ouvrir `http://` + l'adresse du bandeau, taper le code.
+1. Ouvrir Réglages et lire la carte « Réglages depuis un téléphone » ; ne pas dire le code à voix haute ni l'écrire ailleurs que sur le téléphone.
+2. Téléphone : ouvrir `http://` + l'adresse de la carte, taper le code.
 3. Dans « Ville », taper `Marseille` : des lieux apparaissent en quelques secondes (8 au plus) ; le premier doit se lire « Marseille, Région Provence-Alpes-Côte d'Azur, France ». Le choisir : la ville affichée devient Marseille.
 4. Taper `xqzvbnmwkj` : la page dit qu'aucun lieu n'est trouvé (ce n'est pas une erreur rouge).
 5. Taper `Saint-Étienne` (avec l'accent) : des lieux de France apparaissent.
-6. Redémarrer l'écran (bouton « Redémarrer »), retaper le nouveau code du bandeau : la ville est toujours Marseille.
+6. Redémarrer l'écran (bouton « Redémarrer »), relire le nouveau code dans Réglages et le retaper : la ville est toujours Marseille.
 7. Remettre « Lyon », puis la luminosité à 30 % : l'écran s'assombrit.
 
 Ce qu'on regarde, et rien d'autre : une réponse en moins de ~10 s, les accents lisibles, aucun redémarrage de l'écran, l'écran principal qui continue de bouger. Chaque geste ci-dessus reste **non vérifié** tant que son résultat n'est pas écrit ici avec la carte, le commit et la date.
