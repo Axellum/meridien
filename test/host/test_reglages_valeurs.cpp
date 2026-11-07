@@ -409,10 +409,13 @@ constexpr rg::ResultatZone zone_de(sv corps) {
 
 constexpr int zone_envoyee_par_la_page() {
     // Un résultat de recherche tel que la page le renvoie : champs en plus (id, altitude, population, libelle) ignorés.
-    const rg::ResultatZone r =
-        zone_de(R"({"id":"2996944","nom":"Lyon","region":"Auvergne-Rhône-Alpes","pays":"France",
-        "code_pays":"FR","latitude":45.74846,"longitude":4.84671,"altitude":173,"fuseau":"Europe/Paris",
-        "population":522250,"libelle":"Lyon, Auvergne-Rhône-Alpes, France"})");
+    // Trois littéraux bruts d'une ligne, concaténés : un littéral brut sur plusieurs lignes est mis en forme
+    // autrement par clang-format selon les fins de ligne (LF dans le dépôt et la CI, CRLF sur ce PC).
+    constexpr sv page = R"({"id":"2996944","nom":"Lyon","region":"Auvergne-Rhône-Alpes","pays":"France", )"
+                        R"("code_pays":"FR","latitude":45.74846,"longitude":4.84671,"altitude":173, )"
+                        R"("fuseau":"Europe/Paris","population":522250,)"
+                        R"("libelle":"Lyon, Auvergne-Rhône-Alpes, France"})";
+    const rg::ResultatZone r = zone_de(page);
     VERIFIER(r.erreur == rg::ErreurZone::Aucune);
     VERIFIER(sv(r.zone.nom) == "Lyon" && sv(r.zone.region) == "Auvergne-Rhône-Alpes" && sv(r.zone.pays) == "France");
     VERIFIER(sv(r.zone.code_pays) == "FR" && sv(r.zone.fuseau) == "Europe/Paris");
