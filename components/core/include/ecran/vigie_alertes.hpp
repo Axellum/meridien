@@ -377,11 +377,11 @@ constexpr void vider_alerte(Alerte &a) noexcept {
     a.niveau = Niveau::Inconnu;
     a.phenomene = Phenomene::Inconnu;
     a.etat = Etat::Inconnu;
-    a.envoi.reset();
-    a.effectif.reset();
-    a.debut.reset();
-    a.expire.reset();
-    a.fin.reset();
+    a.envoi = std::optional<std::int64_t>{};
+    a.effectif = std::optional<std::int64_t>{};
+    a.debut = std::optional<std::int64_t>{};
+    a.expire = std::optional<std::int64_t>{};
+    a.fin = std::optional<std::int64_t>{};
     a.pays[0] = '\0';
     a.niveau_original[0] = '\0';
     a.phenomene_original[0] = '\0';
@@ -447,7 +447,7 @@ constexpr void lire_textes(const json::Valeur &liste, std::string_view preferee,
 
 constexpr void vider(Alertes &s) noexcept {
     s.statut = Statut::Illisible;
-    s.serveur_s.reset();
+    s.serveur_s = std::optional<std::int64_t>{};
     s.nombre = 0;
     s.lues = 0;
     s.doublons = 0;
