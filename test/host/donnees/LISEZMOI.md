@@ -71,3 +71,26 @@ du mutant n'est pas lancé, donc les 71 mutations ne prouvent pas ce que fait `m
 exécutent : la lecture des deux réponses réelles, les tables Python, les cas limites écrits à la main ; rien n'a été essayé sur d'autres
 réponses d'Open-Meteo (par exemple le jour polaire, **non observé**). (3) Compilé pour Windows x86-64, pas pour le RISC-V de l'ESP32-P4
 (`size_t` et les pointeurs y font 32 bits au lieu de 64 ; les tests passent aussi le g++ croisé en `-fsyntax-only`). Aucun test n'a tourné sur une carte.
+
+## Réponses de la météo riche (07/11/2026)
+
+Sept vraies réponses d'Open-Meteo, captées le 07/11/2026 à 00 h 12 (heure de Paris) avec l'adresse EXACTE du firmware (lue dans
+`meteo_requete.hpp` par `test/host/capturer_meteo_riche.py`, jamais recopiée) : Lyon, Longyearbyen (nuit polaire), Seattle (pluie en
+cours), Singapour, Sydney (heure d'été), Katmandou (UTC+5:45) et Terre-Neuve (UTC-3:30). Chacune fait 4 427 à 4 575 octets.
+
+| Fichier | Contenu | Utilisé par |
+|---|---|---|
+| `openmeteo_riche_<lieu>.json` | la réponse telle que reçue | `controle_python_riche.py` |
+| `openmeteo_riche_<lieu>.inc` | la même, en littéral brut C++ (copie octet par octet du `.json`, générée) | `test_meteo_riche.cpp`, `test_meteo_detail.cpp` |
+| `attendu_riche_<lieu>.inc` | la météo que `analyser_riche()` doit produire, une valeur entière par ligne, rang et nom en commentaire (générée) | `*_identique_a_python` des deux tests |
+
+Les valeurs attendues sont calculées par `python test/host/controle_python_riche.py` (module `decimal`, arrondi « moitié loin de zéro »),
+**sans reprendre une ligne du noyau** ; le décalage d'une étiquette des cumuls y est écrit d'après la documentation d'Open-Meteo.
+`--verifier` ne modifie rien et échoue si un `.inc` n'est pas à jour. Ne relancer `capturer_meteo_riche.py` que pour renouveler les
+fixtures (il appelle le réseau) : les attendus sont alors à régénérer et les tests à relire (les horodatages changent).
+
+Résultat consigné (07/11/2026, PC d'Axel, clang++ 23.1.5 avec AddressSanitizer + UBSan, mode « complet (compilé + exécuté) ») :
+`test_meteo_riche.cpp` 56 tests, `test_meteo_detail.cpp` 32 tests, `test_meteo_tendance.cpp` 10 tests, `test_meteo_appareil.cpp` 25 tests, 0 échec ;
+`--mutations` : 40 + 37 + 17 + 39 mutations, toutes détectées. **Limites** : sept villes, une seule avec de la pluie
+(la seule qui départage les deux conventions d'étiquetage des cumuls) ; fuseaux +5:30, +3:30 et +10:30, jour polaire non captés ;
+compilé pour x86-64, pas pour le RISC-V de la carte. Données Open-Meteo, CC BY 4.0 (https://open-meteo.com), usage non commercial.
