@@ -9,7 +9,7 @@
 #   .\tools\rendre.ps1 -Nettoyer                    oublie le cache de compilation (LVGL compris : ~10 s la fois suivante)
 #
 # Une scene = UN fichier tools\rendu\scenes\scene_<nom>.cpp, decouvert tout seul (voir docs/outils.md).
-# Compile sur le PC (clang de H:\AuxFilsDesIdees\_outils, sans ESP-IDF) LVGL avec la configuration du firmware et les
+# Compile sur le PC (clang du dossier des outils, tools\trouver_outils.ps1, sans ESP-IDF) LVGL avec la configuration du firmware et les
 # MEMES fichiers main/ui_*.cpp que le firmware, puis ecrit un PNG par scene, variante, langue et taille.
 # Ce n'est PAS une photo de la carte : voir docs/outils.md, section "Rendu de l'ecran sur le PC".
 # Ne prend ni la carte ni le verrou `build` (aucune compilation ESP-IDF). Une seule compilation lourde a la fois sur le PC.
@@ -32,12 +32,15 @@ $ErrorActionPreference = 'Stop'
 $racine = (& git rev-parse --show-toplevel).Trim()
 Set-Location $racine
 
-$outils = 'H:\AuxFilsDesIdees\_outils'
-if (-not (Test-Path "$outils\env_hote.ps1")) {
-    Write-Host "ECHEC : outils absents ($outils). Voir docs/outils.md pour les reinstaller." -ForegroundColor Red
+. (Join-Path $PSScriptRoot 'trouver_outils.ps1')
+$outils = Trouver-Outils
+if (-not $outils) {
+    Write-Host "ECHEC : dossier des outils introuvable (MERIDIEN_OUTILS, `$Outils de tools\local.ps1, ou un dossier _outils a cote du depot). Voir docs/outils.md." -ForegroundColor Red
     exit 2
 }
 . "$outils\env_hote.ps1" | Out-Null
+# rendre.py retrouve ainsi le meme dossier (variable du processus seulement, rien n'est ecrit).
+$env:MERIDIEN_OUTILS = $outils
 
 # AGENTS.md : une seule compilation a la fois sur le PC (il a plante a 6 en parallele).
 $occupes = @(Get-Process -Name ninja, esphome, cc1plus, 'riscv32-esp-elf-g++' -ErrorAction SilentlyContinue)

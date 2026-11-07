@@ -4,7 +4,7 @@
 
 ---
 
-*Name chosen on 06/11/2026: the meridian fixes the time and the place, which is what the screen shows. The GitHub repository `Axellum/meridien` is **private** for now; making it public is the author's decision. The CMake project and the binary are called `meridien`.*
+*Name chosen on 06/11/2026: the meridian fixes the time and the place, which is what the screen shows. The CMake project and the binary are called `meridien`.*
 
 A touchscreen on an ESP32-P4 meant to work **on its own**: time and date, weather from an API, a voice assistant linked to an LLM of your choice (local or cloud), and a settings web page served by the device itself. **That is the goal, and the project is only at its beginning**: what exists, and what has been seen on a real board, is in [Status](#status).
 
@@ -22,11 +22,13 @@ A personal project, shared in case it is useful to someone, built with the help 
 
 ## Status
 
-As of 06/11/2026.
+As of 07/11/2026. What is described as running was seen on **one** board, the author's Tab5 (ST7121 display revision), through its serial log and by the author looking at it. The exact list, with commits and dates, is in **[docs/compatibilite.md](docs/compatibilite.md)**.
 
-- **Phase 0 (preparation) done**: research, audit of the Tab5 repository, build chain proven, plan and cost estimated.
-- **Phase 1 in progress** (proving the hardware, from the riskiest to the least risky): the display, the touch and an LVGL “Bonjour” have been tried on the Tab5 ST7121 (milestone 1a, [measurements](docs/mesures/1a.md)); one reservation stays open after a power cut ([troubleshooting](docs/depannage.md#open)). Wi-Fi through the C6, audio and the captive portal: planned, research notes written.
-- **Without a board**: the core (weather, time zones, time, voice assistant: states, stream, requests, sentence splitting) is written and checked on the PC (252 tests run with AddressSanitizer and UBSan, 206 mutations detected); the settings page and its fake device too (49 checks). None of this has been run on a board or served by the device.
+- **Runs on the Tab5 ST7121**: the display and the touch, Wi-Fi through the ESP32-C6 (with an automatic roll-back when a new network does not work), the time (network first, the hardware clock as a fallback), the weather from Open-Meteo (current conditions, 24 hours, 7 days, rain per quarter of an hour, kept across restarts), the main screen (a sky drawn from the time of day and the weather, themes) and the settings screens. What was not looked at or not measured is written as such in the compatibility table.
+- **Not running yet**: the voice assistant (its logic is written and checked on a PC, and no real speech or language service has been called; echo cancellation, the wake word and the speech-to-LLM-to-speech chain are not started), the Google calendar, the captive portal, and the Waveshare 7B (board layer written and compiled, **never run on the board**).
+- **Languages**: the screen texts exist in seven languages (French is the source, then English, German, Dutch, Spanish, Italian, Turkish). The German and Turkish texts have not been reviewed by a native speaker.
+- **Checked on a PC, without a board**: the core (weather, time zones, time, voice-assistant logic, settings) runs under AddressSanitizer and UBSan, with mutation testing (a change of the code that no test notices fails the check); the settings web page runs against a fake device. This says nothing about the behaviour on the board.
+- **Known limits**, written in [SECURITY.md](SECURITY.md): the Wi-Fi password and the settings are kept in the device's flash **without encryption**, and the settings page is served over plain local HTTP behind a 6-digit pairing code.
 
 What is tested on which board, with which version: **[docs/compatibilite.md](docs/compatibilite.md)**. Nothing is written “works” there without a board, a commit and a date.
 
@@ -42,6 +44,7 @@ What is tested on which board, with which version: **[docs/compatibilite.md](doc
 | [docs/api-reglages.md](docs/api-reglages.md) · [web/README.md](web/README.md) | contract of the settings API; the settings page and its fake device |
 | [docs/plan.md](docs/plan.md) · [docs/cout.md](docs/cout.md) | phases, criteria for “done”, risks; time, sessions, tokens (working documents, in French) |
 | [docs/decisions/](docs/decisions/README.md) · [docs/recherche/](docs/recherche/) | decisions (ADR); sourced facts and their “not verified” (working documents, in French) |
+| [SECURITY.md](SECURITY.md) | known security limits, and how to report a problem |
 | [AGENTS.md](AGENTS.md) | instructions for the AI agents that work on this repository |
 | [LICENSE](LICENSE) · [THIRD_PARTY.md](THIRD_PARTY.md) | the MIT licence; third-party components and their licences |
 
@@ -70,11 +73,13 @@ Flashing a board: only on the author's explicit request, after a full backup of 
 ## Layout
 
 ```
-main/                   application (a “Bonjour” screen for now)
+main/                   application: main screen, settings screens, Wi-Fi, weather, settings web server
 components/core/        pure C++ core, no ESP-IDF, testable on a PC
 components/board_api/   common board interface (pure C)
-components/bsp_tab5/    Tab5 board support: display, touch, I/O expander
-boards/tab5/            partitions and chip settings of the board
+components/bsp_tab5/    Tab5 board support: display, touch, I/O expander, backlight, clock, audio, power
+components/bsp_waveshare_7b/  Waveshare 7B board support (never run on the board)
+boards/                 partitions and chip settings, one folder per board
+i18n/                   screen texts in seven languages
 web/                    settings page, fake device (Node), browser tests
 test/host/              tests of the core, run on the PC
 docs/                   documentation, plan, decisions (ADR), research
@@ -92,7 +97,7 @@ tools/                  build launcher and checks
 
 ---
 
-*Nom retenu le 06/11/2026 : le méridien fixe l'heure et le lieu, ce que l'écran affiche. Le dépôt GitHub `Axellum/meridien` est **privé** pour l'instant ; le passer en public est une décision de l'auteur. Le projet CMake et le binaire s'appellent `meridien`.*
+*Nom retenu le 06/11/2026 : le méridien fixe l'heure et le lieu, ce que l'écran affiche. Le projet CMake et le binaire s'appellent `meridien`.*
 
 Un écran tactile ESP32-P4 conçu pour fonctionner **seul** : heure et date, météo par API, assistant vocal relié à un LLM au choix (local ou cloud), et une page web de réglages servie par l'appareil lui-même. **C'est l'objectif, et le projet n'en est qu'au début** : ce qui existe, et ce qui a été vu sur une vraie carte, est dans l'[État](#état).
 
@@ -110,11 +115,13 @@ Un projet personnel, partagé au cas où il servirait à quelqu'un, fait avec l'
 
 ## État
 
-Au 06/11/2026.
+Au 07/11/2026. Ce qui est décrit comme « tourne » a été vu sur **une** carte, le Tab5 de l'auteur (révision d'écran ST7121), par son journal série et par l'auteur qui le regardait. La liste exacte, avec commits et dates, est dans **[docs/compatibilite.md](docs/compatibilite.md#version-française)**.
 
-- **Phase 0 (préparation) faite** : recherches, audit du dépôt Tab5, chaîne de compilation prouvée, plan et coût chiffrés.
-- **Phase 1 en cours** (prouver le matériel, du plus risqué au moins risqué) : l'écran, le tactile et un « Bonjour » LVGL ont été essayés sur le Tab5 ST7121 (jalon 1a, [mesures](docs/mesures/1a.md)) ; une réserve reste ouverte après coupure de courant ([dépannage](docs/depannage.md#ouverts)). Wi-Fi par le C6, audio et portail captif : prévus, notes de recherche écrites.
-- **Sans carte** : le noyau (météo, fuseaux, heure, assistant vocal : états, flux, requêtes, découpe en phrases) est écrit et vérifié sur le PC (252 tests exécutés avec AddressSanitizer et UBSan, 206 mutations détectées) ; la page de réglages et son faux appareil aussi (49 vérifications). Rien de cela n'a été lancé sur une carte ni servi par l'appareil.
+- **Tourne sur le Tab5 ST7121** : l'écran et le tactile, le Wi-Fi par l'ESP32-C6 (avec un retour arrière automatique quand un nouveau réseau ne marche pas), l'heure (le réseau d'abord, l'horloge matérielle en secours), la météo d'Open-Meteo (conditions du moment, 24 heures, 7 jours, pluie par quarts d'heure, gardée d'un redémarrage à l'autre), l'écran principal (un ciel dessiné d'après l'heure et la météo, des thèmes) et les écrans de réglages. Ce qui n'a pas été regardé ou pas mesuré est écrit comme tel dans le tableau de compatibilité.
+- **Ne tourne pas encore** : l'assistant vocal (sa logique est écrite et vérifiée sur un PC, et aucun vrai service de voix ou de langage n'a été appelé ; l'annulation d'écho, le mot d'activation et la chaîne voix → LLM → voix ne sont pas commencés), le calendrier Google, le portail captif, et la Waveshare 7B (couche carte écrite et compilée, **jamais lancée sur la carte**).
+- **Langues** : les textes de l'écran existent en sept langues (le français est la source, puis anglais, allemand, néerlandais, espagnol, italien, turc). Les textes allemands et turcs n'ont pas été relus par un locuteur natif.
+- **Vérifié sur un PC, sans carte** : le noyau (météo, fuseaux, heure, logique de l'assistant vocal, réglages) tourne sous AddressSanitizer et UBSan, avec des mutations (un changement du code qu'aucun test ne remarque fait échouer le contrôle) ; la page web de réglages tourne contre un faux appareil. Cela ne dit rien du comportement sur la carte.
+- **Limites connues**, écrites dans [SECURITY.md](SECURITY.md#version-française) : le mot de passe Wi-Fi et les réglages sont gardés dans la flash de l'appareil **sans chiffrement**, et la page de réglages est servie en HTTP local simple derrière un code d'appairage à 6 chiffres.
 
 Ce qui est testé sur quelle carte, avec quelle version : **[docs/compatibilite.md](docs/compatibilite.md#version-française)**. Rien n'y est écrit « fonctionne » sans carte, commit et date.
 
@@ -130,6 +137,7 @@ Ce qui est testé sur quelle carte, avec quelle version : **[docs/compatibilite.
 | [docs/api-reglages.md](docs/api-reglages.md) · [web/README.md](web/README.md) | contrat de l'API de réglages ; la page de réglages et son faux appareil |
 | [docs/plan.md](docs/plan.md) · [docs/cout.md](docs/cout.md) | phases, critères de « fait », risques ; temps, sessions, tokens (documents de travail) |
 | [docs/decisions/](docs/decisions/README.md) · [docs/recherche/](docs/recherche/) | décisions (ADR) ; faits sourcés et leurs « non vérifié » (documents de travail) |
+| [SECURITY.md](SECURITY.md#version-française) | limites de sécurité connues, et comment signaler un problème |
 | [AGENTS.md](AGENTS.md) | consignes pour les agents IA qui travaillent sur ce dépôt |
 | [LICENSE](LICENSE) · [THIRD_PARTY.md](THIRD_PARTY.md) | la licence MIT ; composants tiers et leurs licences |
 
@@ -158,11 +166,13 @@ Flasher une carte : seulement sur demande explicite de l'auteur, après une sauv
 ## Structure
 
 ```
-main/                   application (un écran « Bonjour » pour l'instant)
+main/                   application : écran principal, écrans de réglages, Wi-Fi, météo, serveur web de réglages
 components/core/        noyau en C++ pur, sans ESP-IDF, testable sur le PC
 components/board_api/   interface commune des cartes (C pur)
-components/bsp_tab5/    support de la carte Tab5 : écran, tactile, expandeur d'E/S
-boards/tab5/            partitions et réglages de puce de la carte
+components/bsp_tab5/    support de la carte Tab5 : écran, tactile, expandeur d'E/S, rétroéclairage, horloge, audio, alimentation
+components/bsp_waveshare_7b/  support de la Waveshare 7B (jamais lancé sur la carte)
+boards/                 partitions et réglages de puce, un dossier par carte
+i18n/                   textes de l'écran en sept langues
 web/                    page de réglages, faux appareil (Node), tests dans le navigateur
 test/host/              tests du noyau, exécutés sur le PC
 docs/                   documentation, plan, décisions (ADR), recherches

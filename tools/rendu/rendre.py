@@ -41,7 +41,6 @@ SCENES_DIR = BANC / "scenes"
 CONFIG_LVGL = BANC / "sdkconfig_lvgl.h"
 CACHE = RACINE / ".cache" / "rendu"
 SORTIE_DEFAUT = RACINE / "docs" / "captures" / "ecran"
-LLVM_MINGW = Path(r"H:\AuxFilsDesIdees\_outils\llvm-mingw\bin")
 POLICE = RACINE / "main" / "assets" / "roboto_700.ttf"
 ICONES = RACINE / "main" / "assets" / "icones_meteo.bin"
 FICHIERS_COMMUNS = ["tools/rendu/banc.cpp"]
@@ -226,11 +225,24 @@ def version_verrouillee() -> str | None:
 # --- compilation ------------------------------------------------------------------------------------------------------
 
 
+def dossier_outils() -> Path | None:
+    """Le dossier des outils du PC : MERIDIEN_OUTILS (posée par tools/rendre.ps1), sinon un dossier `_outils` dans un parent du
+    dépôt. Même règle que tools/trouver_outils.ps1, moins le `local.ps1` que seul PowerShell sait lire."""
+    depuis_env = os.environ.get("MERIDIEN_OUTILS")
+    candidats = [Path(depuis_env)] if depuis_env else []
+    candidats += [parent / "_outils" for parent in RACINE.parents]
+    return next((c for c in candidats if (c / "env_hote.ps1").is_file()), None)
+
+
 def outil(nom: str) -> str:
-    chemin = shutil.which(nom) or str(LLVM_MINGW / f"{nom}.exe")
-    if not Path(chemin).exists() and not shutil.which(nom):
-        erreur(f"{nom} introuvable. Lancer `. H:\\AuxFilsDesIdees\\_outils\\env_hote.ps1` (voir docs/outils.md).")
-    return chemin
+    dans_le_path = shutil.which(nom)
+    if dans_le_path:
+        return dans_le_path
+    dossier = dossier_outils()
+    chemin = dossier / "llvm-mingw" / "bin" / f"{nom}.exe" if dossier else None
+    if not chemin or not chemin.exists():
+        erreur(f"{nom} introuvable. Lancer `.\\tools\\rendre.ps1` (il trouve le dossier des outils), voir docs/outils.md.")
+    return str(chemin)
 
 
 def empreinte(*morceaux: str) -> str:

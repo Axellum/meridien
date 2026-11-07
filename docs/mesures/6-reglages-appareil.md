@@ -120,7 +120,7 @@ Ce que ce jalon a fait pour la mémoire : `e686310` envoie les bitmaps de glyphe
 ## 7. Reproduire
 
 ```powershell
-. H:\AuxFilsDesIdees\_outils\env_hote.ps1 -Sanitizers
+. .\tools\trouver_outils.ps1; . "$(Trouver-Outils)\env_hote.ps1" -Sanitizers
 python test/host/lancer.py
 .\tools\rendre.ps1 -Scene hote_appareil -Langue fr,en,de,tr -Taille 1280x720,720x1280
 .\tools\idf.ps1 build

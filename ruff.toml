@@ -1,5 +1,5 @@
 # Contrôle Python du projet, autonome : sans ce fichier ruff héritait d'une configuration plus stricte trouvée
-# plus haut dans l'arborescence de H:\AuxFilsDesIdees (règles de sécurité et de style du dépôt Tab5).
+# plus haut dans l'arborescence du PC de l'auteur (règles de sécurité et de style d'un autre dépôt).
 line-length = 120
 target-version = "py313"
 
