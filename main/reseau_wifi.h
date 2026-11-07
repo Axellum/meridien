@@ -42,7 +42,7 @@ using SurResultatConnexion = void (*)(wifi::Resultat resultat, void *contexte);
 // Résultats : Connecte (adresse IP obtenue), MotDePasseRefuse (la radio a refusé l'authentification ou la poignée de main : même
 // cause sûre vue deux fois, ou dernière cause sûre vue au délai), ReseauIntrouvable (aucun point d'accès de ce nom, idem), Autre
 // (tout le reste, y compris le délai de ecran::wifi::DELAI_CONNEXION_MS écoulé sans aucune cause sûre : sur le point d'accès essayé,
-// un mot de passe faux n'a donné la raison 202 avant le délai qu'une fois sur six, voir docs/mesures/wifi-retour-arriere.md). Sur un échec,
+// un mot de passe faux n'a donné la raison 202 avant le délai qu'une fois sur neuf, voir docs/mesures/wifi-retour-arriere.md). Sur un échec,
 // l'ancien réseau est repris et le rappel n'est appelé qu'après son retour (adresse IP : ≈ 6 s mesurées) ou, s'il tarde, au bout de
 // ecran::wifi::DELAI_RETOUR_MS (le Wi-Fi continue de le chercher). Un échec que seul le délai a détecté arrive donc à ≈ 36 s, après
 // le compte à rebours de 30 s de l'écran. Sans ancien réseau (appareil neuf), le rappel est appelé tout de suite.
