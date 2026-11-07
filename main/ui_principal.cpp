@@ -182,7 +182,7 @@ struct Empreinte {
 
 // ---- données dérivées ---------------------------------------------------------------------------------------------------
 
-int decalage() { return g.e.meteo.decalage_utc_s; }
+int decalage() { return g.e.meteo.connue ? g.e.meteo.decalage_utc_s : g.e.decalage_secours_s; }
 
 MomentJour moment_du_jour() {
     const VueMeteo &m = g.e.meteo;

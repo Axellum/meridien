@@ -29,6 +29,9 @@ struct EntreesPrincipal {
         *date_attente; // phrase d'attente quand l'heure du réseau n'est pas encore là (nul : la phrase de l'écran)
     std::int64_t maintenant_s; // instant UTC du moment : position du soleil, lune, colonne « maintenant » (0 : inconnu)
     visuel::VueMeteo meteo;    // la météo ; `connue` faux : « Météo indisponible »
+    // Décalage à l'UTC du fuseau de l'horloge, en secondes. Sert au ciel (jour ou nuit) tant que la météo n'est pas lue : sans lui
+    // le ciel jugeait l'heure en UTC et restait « nuit » une heure ou deux de trop au démarrage. Ignoré dès que la météo est connue.
+    std::int32_t decalage_secours_s;
 };
 
 // Données du jeu d'icônes et de la police : octets embarqués, qui doivent vivre aussi longtemps que l'écran.

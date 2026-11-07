@@ -173,6 +173,15 @@ constexpr int plausibilite() {
     return 0;
 }
 
+constexpr int heure_affichable_avant_sntp_si_le_systeme_est_plausible() {
+    VERIFIER(heure_affichable(false, 1793924400));  // pile reprise ou heure gardée : on l'affiche sans attendre SNTP
+    VERIFIER(!heure_affichable(false, 0));          // ni réseau ni heure du système : « --:-- » comme avant
+    VERIFIER(!heure_affichable(false, 1767225599)); // avant 2026 : pas une heure vraie
+    VERIFIER(heure_affichable(true, 0));            // le réseau a répondu : toujours affichable
+    VERIFIER(heure_affichable(true, 1793924400));
+    return 0;
+}
+
 // ---- politique au démarrage ---------------------------------------------------------------------------------------------
 
 constexpr int demarrage_reprend_l_horloge_quand_le_systeme_est_vide() {
@@ -313,6 +322,7 @@ constexpr int un_ecart_de_plus_de_deux_secondes_recale_tout_de_suite() {
     X(trame_incoherente_refusee)                                                                                       \
     X(bits_de_commande_masques)                                                                                        \
     X(plausibilite)                                                                                                    \
+    X(heure_affichable_avant_sntp_si_le_systeme_est_plausible)                                                         \
     X(demarrage_reprend_l_horloge_quand_le_systeme_est_vide)                                                           \
     X(demarrage_n_ecrase_jamais_une_heure_plausible)                                                                   \
     X(demarrage_ignore_une_horloge_douteuse)                                                                           \

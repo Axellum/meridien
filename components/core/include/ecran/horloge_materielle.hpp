@@ -38,6 +38,14 @@ constexpr bool instant_plausible(std::int64_t s) noexcept {
     return s >= kInstantPlausibleMin && s <= kInstantPlausibleMax;
 }
 
+// L'écran peut montrer l'heure (et en tirer la place du soleil, donc le ciel) dès qu'elle est vraie : soit le réseau l'a donnée
+// (SNTP), soit l'heure du système est déjà plausible, reprise de l'horloge matérielle au démarrage par la couche carte ou gardée
+// à travers un redémarrage logiciel. Attendre SNTP (≈ 13 s après le démarrage) laissait « --:-- » et un ciel de nuit noir pendant ce
+// temps, alors que la pile du Tab5 donnait l'heure juste 2,6 s après la mise sous tension (journal du 07/11/2026).
+constexpr bool heure_affichable(bool reseau_synchronise, std::int64_t systeme_s) noexcept {
+    return reseau_synchronise || instant_plausible(systeme_s);
+}
+
 // ---- BCD -----------------------------------------------------------------------------------------------------------------
 
 constexpr bool bcd_valide(std::uint8_t v) noexcept { return (v >> 4) <= 9 && (v & 0x0F) <= 9; }

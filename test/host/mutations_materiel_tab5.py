@@ -134,6 +134,16 @@ MUTATIONS_MATERIEL_TAB5 = [
 
     # --- horloge_materielle.hpp ------------------------------------------------------------------------------
     ('horloge_materielle.hpp',
+     r'''    return reseau_synchronise || instant_plausible(systeme_s);''',
+     r'''    return reseau_synchronise;''',
+     H, 'heure_affichable_avant_sntp_si_le_systeme_est_plausible',
+     "l'écran attend SNTP même quand l'horloge matérielle a donné l'heure : « --:-- » et ciel noir pendant 13 s"),
+    ('horloge_materielle.hpp',
+     r'''    return reseau_synchronise || instant_plausible(systeme_s);''',
+     r'''    return instant_plausible(systeme_s);''',
+     H, 'heure_affichable_avant_sntp_si_le_systeme_est_plausible',
+     "l'heure venue du réseau n'est plus affichable quand l'horloge du système est vide"),
+    ('horloge_materielle.hpp',
      r'''constexpr std::int64_t kInstantPlausibleMin = 1767225600;''',
      r'''constexpr std::int64_t kInstantPlausibleMin = 1767225601;''',
      H, 'plausibilite',

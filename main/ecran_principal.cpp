@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "lvgl.h"
 
+#include "ecran/horloge_materielle.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_synthese.hpp"
 #include "ecran/visuel_vue.hpp"
@@ -79,8 +80,12 @@ void rafraichir(lv_timer_t *) {
 
     EntreesPrincipal entrees = {};
     const int64_t instant = static_cast<int64_t>(std::time(nullptr));
-    entrees.maintenant_s = etat.heure_synchronisee ? instant : 0;
-    entrees.heure_connue = etat.heure_synchronisee && horloge_hhmm(instant, entrees.heure, sizeof entrees.heure);
+    // L'heure est vraie dès que le réseau l'a donnée OU que celle du système est plausible (reprise de l'horloge matérielle au
+    // démarrage, ou gardée à travers un redémarrage logiciel) : l'écran n'attend plus SNTP (≈ 13 s) pour l'heure et le ciel.
+    const bool heure_vraie = rtc::heure_affichable(etat.heure_synchronisee, instant);
+    entrees.maintenant_s = heure_vraie ? instant : 0;
+    entrees.decalage_secours_s = heure_vraie ? horloge_decalage_s(instant) : 0;
+    entrees.heure_connue = heure_vraie && horloge_hhmm(instant, entrees.heure, sizeof entrees.heure);
     char date[48] = {};
     if (entrees.heure_connue && !horloge_date_localisee(instant, i18n::langue_courante(), date, sizeof date)) {
         entrees.heure_connue = false;
