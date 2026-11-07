@@ -374,6 +374,28 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Trop long : {n} caractères au plus.": "Te lang: maximaal {n} tekens."
 "Ce champ ne peut pas rester vide.": "Dit veld mag niet leeg blijven."
 
+# --- Écran : alertes officielles (07/11/2026) ---
+"Alertes officielles": "Officiële waarschuwingen"
+"Affiche sur l’écran les alertes météo officielles relayées par Vigie, tant qu’une est en vigueur.": "Toont de officiële weerwaarschuwingen van Vigie op het scherm, zolang er een van kracht is."
+"Oui": "Ja"
+"Non": "Nee"
+"Adresse de Vigie": "Vigie-adres"
+"Laissez vide pour utiliser le service public de Vigie. Une adresse commence par https://.": "Laat leeg voor de openbare dienst van Vigie. Een adres begint met https://."
+"Mise à jour des alertes": "Waarschuwingen verversen"
+"L’écran demande les alertes à Vigie à ce rythme : 15 minutes par défaut, 10 au minimum.": "Het scherm vraagt Vigie in dit tempo om waarschuwingen: standaard 15 minuten, minimaal 10."
+"Niveau minimal": "Minimaal niveau"
+"Les alertes moins graves ne s’affichent pas.": "Minder ernstige waarschuwingen worden niet getoond."
+"Jaune": "Geel"
+"Orange": "Oranje"
+"Rouge": "Rood"
+"Alertes": "Waarschuwingen"
+
+# --- Appareil : messages de l'API, alertes officielles (07/11/2026) ---
+"Les alertes doivent être activées ou désactivées.": "Waarschuwingen moeten aan of uit staan."
+"L’adresse de Vigie doit commencer par https://.": "Het Vigie-adres moet met https:// beginnen."
+"La période doit être un nombre entier de minutes, de 10 à 180.": "De periode moet een geheel aantal minuten zijn, van 10 tot 180."
+"Ce niveau d’alerte n’existe pas.": "Dit waarschuwingsniveau bestaat niet."
+
 # --- Écran : étapes de l'installation guidée, suite (06/11/2026) ---
 "Connectez-vous au Wi-Fi": "Maak verbinding met wifi"
 "Réglez l’affichage": "Stel het scherm in"

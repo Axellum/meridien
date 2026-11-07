@@ -103,6 +103,23 @@
 "ecran.luminosite": "Luminosité"
 "toast.enregistre": "Enregistré"
 
+# --- Page de réglages : alertes officielles ---
+"nav.alertes": "Alertes"
+"alertes.titre": "Alertes officielles"
+"alertes.actives": "Alertes officielles"
+"alertes.actives_aide": "Affiche sur l’écran les alertes météo officielles relayées par Vigie, tant qu’une est en vigueur."
+"alertes.oui": "Oui"
+"alertes.non": "Non"
+"alertes.adresse": "Adresse de Vigie"
+"alertes.adresse_aide": "Laissez vide pour utiliser le service public de Vigie. Une adresse commence par https://."
+"alertes.periode": "Mise à jour des alertes"
+"alertes.periode_aide": "L’écran demande les alertes à Vigie à ce rythme : 15 minutes par défaut, 10 au minimum."
+"alertes.niveau": "Niveau minimal"
+"alertes.niveau_aide": "Les alertes moins graves ne s’affichent pas."
+"alertes.jaune": "Jaune"
+"alertes.orange": "Orange"
+"alertes.rouge": "Rouge"
+
 # --- Page de réglages : Wi-Fi ---
 "wifi.titre": "Wi-Fi"
 "wifi.etat_connecte": "Connecté"

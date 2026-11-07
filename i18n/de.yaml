@@ -374,6 +374,28 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Trop long : {n} caractères au plus.": "Zu lang: höchstens {n} Zeichen."
 "Ce champ ne peut pas rester vide.": "Dieses Feld darf nicht leer bleiben."
 
+# --- Écran : alertes officielles (07/11/2026) ---
+"Alertes officielles": "Offizielle Warnungen"
+"Affiche sur l’écran les alertes météo officielles relayées par Vigie, tant qu’une est en vigueur.": "Zeigt die über Vigie weitergegebenen offiziellen Wetterwarnungen auf dem Bildschirm, solange eine in Kraft ist."
+"Oui": "Ja"
+"Non": "Nein"
+"Adresse de Vigie": "Vigie-Adresse"
+"Laissez vide pour utiliser le service public de Vigie. Une adresse commence par https://.": "Leer lassen, um den öffentlichen Dienst von Vigie zu nutzen. Eine Adresse beginnt mit https://."
+"Mise à jour des alertes": "Warnungen aktualisieren"
+"L’écran demande les alertes à Vigie à ce rythme : 15 minutes par défaut, 10 au minimum.": "Der Bildschirm fragt Vigie in diesem Takt nach Warnungen: standardmäßig 15 Minuten, mindestens 10."
+"Niveau minimal": "Mindeststufe"
+"Les alertes moins graves ne s’affichent pas.": "Weniger schwere Warnungen werden nicht angezeigt."
+"Jaune": "Gelb"
+"Orange": "Orange"
+"Rouge": "Rot"
+"Alertes": "Warnungen"
+
+# --- Appareil : messages de l'API, alertes officielles (07/11/2026) ---
+"Les alertes doivent être activées ou désactivées.": "Die Warnungen müssen ein- oder ausgeschaltet sein."
+"L’adresse de Vigie doit commencer par https://.": "Die Vigie-Adresse muss mit https:// beginnen."
+"La période doit être un nombre entier de minutes, de 10 à 180.": "Der Zeitraum muss eine ganze Zahl von Minuten sein, von 10 bis 180."
+"Ce niveau d’alerte n’existe pas.": "Diese Warnstufe gibt es nicht."
+
 # --- Écran : étapes de l'installation guidée, suite (06/11/2026) ---
 "Connectez-vous au Wi-Fi": "Verbinde dich mit dem WLAN"
 "Réglez l’affichage": "Stelle die Anzeige ein"

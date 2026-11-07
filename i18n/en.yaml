@@ -374,6 +374,28 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Trop long : {n} caractères au plus.": "Too long: {n} characters at most."
 "Ce champ ne peut pas rester vide.": "This field can’t be empty."
 
+# --- Écran : alertes officielles (07/11/2026) ---
+"Alertes officielles": "Official alerts"
+"Affiche sur l’écran les alertes météo officielles relayées par Vigie, tant qu’une est en vigueur.": "Shows the official weather alerts relayed by Vigie on the screen, as long as one is in force."
+"Oui": "Yes"
+"Non": "No"
+"Adresse de Vigie": "Vigie address"
+"Laissez vide pour utiliser le service public de Vigie. Une adresse commence par https://.": "Leave empty to use Vigie’s public service. An address starts with https://."
+"Mise à jour des alertes": "Alert refresh"
+"L’écran demande les alertes à Vigie à ce rythme : 15 minutes par défaut, 10 au minimum.": "The screen asks Vigie for alerts at this pace: 15 minutes by default, 10 at the very least."
+"Niveau minimal": "Minimum level"
+"Les alertes moins graves ne s’affichent pas.": "Less serious alerts are not shown."
+"Jaune": "Yellow"
+"Orange": "Orange"
+"Rouge": "Red"
+"Alertes": "Alerts"
+
+# --- Appareil : messages de l'API, alertes officielles (07/11/2026) ---
+"Les alertes doivent être activées ou désactivées.": "Alerts must be switched on or off."
+"L’adresse de Vigie doit commencer par https://.": "The Vigie address must start with https://."
+"La période doit être un nombre entier de minutes, de 10 à 180.": "The period must be a whole number of minutes, from 10 to 180."
+"Ce niveau d’alerte n’existe pas.": "This alert level doesn’t exist."
+
 # --- Écran : étapes de l'installation guidée, suite (06/11/2026) ---
 "Connectez-vous au Wi-Fi": "Connect to Wi-Fi"
 "Réglez l’affichage": "Set up the display"

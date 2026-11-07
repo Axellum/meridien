@@ -374,6 +374,28 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Trop long : {n} caractères au plus.": "Demasiado largo: máximo {n} caracteres."
 "Ce champ ne peut pas rester vide.": "Este campo no puede quedar vacío."
 
+# --- Écran : alertes officielles (07/11/2026) ---
+"Alertes officielles": "Alertas oficiales"
+"Affiche sur l’écran les alertes météo officielles relayées par Vigie, tant qu’une est en vigueur.": "Muestra en la pantalla los avisos meteorológicos oficiales transmitidos por Vigie, mientras haya uno en vigor."
+"Oui": "Sí"
+"Non": "No"
+"Adresse de Vigie": "Dirección de Vigie"
+"Laissez vide pour utiliser le service public de Vigie. Une adresse commence par https://.": "Déjalo vacío para usar el servicio público de Vigie. Una dirección empieza por https://."
+"Mise à jour des alertes": "Actualización de los avisos"
+"L’écran demande les alertes à Vigie à ce rythme : 15 minutes par défaut, 10 au minimum.": "La pantalla pide los avisos a Vigie con este ritmo: 15 minutos por defecto, 10 como mínimo."
+"Niveau minimal": "Nivel mínimo"
+"Les alertes moins graves ne s’affichent pas.": "Los avisos menos graves no se muestran."
+"Jaune": "Amarillo"
+"Orange": "Naranja"
+"Rouge": "Rojo"
+"Alertes": "Avisos"
+
+# --- Appareil : messages de l'API, alertes officielles (07/11/2026) ---
+"Les alertes doivent être activées ou désactivées.": "Los avisos deben estar activados o desactivados."
+"L’adresse de Vigie doit commencer par https://.": "La dirección de Vigie debe empezar por https://."
+"La période doit être un nombre entier de minutes, de 10 à 180.": "El periodo debe ser un número entero de minutos, de 10 a 180."
+"Ce niveau d’alerte n’existe pas.": "Este nivel de aviso no existe."
+
 # --- Écran : étapes de l'installation guidée, suite (06/11/2026) ---
 "Connectez-vous au Wi-Fi": "Conéctate al Wi-Fi"
 "Réglez l’affichage": "Ajusta la pantalla"

@@ -374,6 +374,28 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Trop long : {n} caractères au plus.": "Çok uzun: en fazla {n} karakter."
 "Ce champ ne peut pas rester vide.": "Bu alan boş bırakılamaz."
 
+# --- Écran : alertes officielles (07/11/2026) ---
+"Alertes officielles": "Resmî uyarılar"
+"Affiche sur l’écran les alertes météo officielles relayées par Vigie, tant qu’une est en vigueur.": "Yürürlükte bir uyarı olduğu sürece, Vigie üzerinden aktarılan resmî hava uyarılarını ekranda gösterir."
+"Oui": "Evet"
+"Non": "Hayır"
+"Adresse de Vigie": "Vigie adresi"
+"Laissez vide pour utiliser le service public de Vigie. Une adresse commence par https://.": "Vigie’nin herkese açık hizmetini kullanmak için boş bırak. Adres https:// ile başlar."
+"Mise à jour des alertes": "Uyarıları güncelleme"
+"L’écran demande les alertes à Vigie à ce rythme : 15 minutes par défaut, 10 au minimum.": "Ekran, Vigie’den uyarıları bu aralıkla ister: varsayılan 15 dakika, en az 10."
+"Niveau minimal": "En düşük seviye"
+"Les alertes moins graves ne s’affichent pas.": "Daha hafif uyarılar gösterilmez."
+"Jaune": "Sarı"
+"Orange": "Turuncu"
+"Rouge": "Kırmızı"
+"Alertes": "Uyarılar"
+
+# --- Appareil : messages de l'API, alertes officielles (07/11/2026) ---
+"Les alertes doivent être activées ou désactivées.": "Uyarılar açık ya da kapalı olmalıdır."
+"L’adresse de Vigie doit commencer par https://.": "Vigie adresi https:// ile başlamalıdır."
+"La période doit être un nombre entier de minutes, de 10 à 180.": "Süre, 10 ile 180 arasında tam sayı olarak dakika olmalıdır."
+"Ce niveau d’alerte n’existe pas.": "Böyle bir uyarı seviyesi yok."
+
 # --- Écran : étapes de l'installation guidée, suite (06/11/2026) ---
 "Connectez-vous au Wi-Fi": "Wi-Fi’ye bağlan"
 "Réglez l’affichage": "Ekranı ayarla"
