@@ -89,7 +89,7 @@ tools/                  build launcher and checks
 ## Licence and credits
 
 - Code: [MIT licence](LICENSE). Third-party components and their licences: [THIRD_PARTY.md](THIRD_PARTY.md).
-- **Weather data by [Open-Meteo.com](https://open-meteo.com/)**, under the [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) licence. Open-Meteo's free API is for non-commercial use only ([ADR-0003](docs/decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md)).
+- **Weather data by [Open-Meteo.com](https://open-meteo.com/)**, under the [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) licence. Open-Meteo's free API is for non-commercial use only ([ADR-0003](docs/decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md)). When you pick them as the source, the device reads **MET Norway** (api.met.no; CC BY 4.0 and NLOD 2.0, data adapted) or the **NWS** (api.weather.gov; public domain, not approved or sponsored by the NWS) itself, and shows the credit of the service that really gave the weather ([ADR-0014](docs/decisions/0014-met-norway-et-nws-comme-sources.md), [THIRD_PARTY.md](THIRD_PARTY.md)).
 
 ---
 
@@ -182,4 +182,4 @@ tools/                  lanceur de compilation et contrôles
 ## Licence et crédits
 
 - Code : [licence MIT](LICENSE). Composants tiers et leurs licences : [THIRD_PARTY.md](THIRD_PARTY.md).
-- **Données météo par [Open-Meteo.com](https://open-meteo.com/)**, sous licence [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). L'API gratuite d'Open-Meteo est réservée à un usage non commercial ([ADR-0003](docs/decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md)).
+- **Données météo par [Open-Meteo.com](https://open-meteo.com/)**, sous licence [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). L'API gratuite d'Open-Meteo est réservée à un usage non commercial ([ADR-0003](docs/decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md)). Quand vous les choisissez comme source, l'appareil lit lui-même **MET Norway** (api.met.no ; CC BY 4.0 et NLOD 2.0, données adaptées) ou le **NWS** (api.weather.gov ; domaine public, ni approuvé ni parrainé par le NWS) et montre la mention du service qui a réellement donné la météo ([ADR-0014](docs/decisions/0014-met-norway-et-nws-comme-sources.md), [THIRD_PARTY.md](THIRD_PARTY.md)).

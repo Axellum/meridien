@@ -35,6 +35,8 @@ How to read this file. **Read** = the licence file or the source headers of the 
 | [posix_tz_db](https://github.com/nayarsystems/posix_tz_db) (`zones.csv`) | commit `93447c0` (2025-09-29) | MIT | [`components/core/outils/posix_tz_db/LICENSE`](components/core/outils/posix_tz_db/LICENSE) | Source of the time-zone table `fuseaux_donnees.inc`. The upstream licence file leaves its copyright line unfilled (« [year] [fullname] »), so no holder is named. Details, and the 7 zones added from the tz database: [`components/core/ATTRIBUTION.md`](components/core/ATTRIBUTION.md). |
 | [tz database (IANA)](https://github.com/eggert/tz) | data read 2026-11-06 | public domain | upstream `LICENSE`: files are in the public domain, except `date.c`, `newstrftime.3`, `strftime.c` (BSD 3-clause), which this project does not use | Only data lines are used, for the 7 additions listed in [`components/core/ATTRIBUTION.md`](components/core/ATTRIBUTION.md). |
 | [Open-Meteo](https://open-meteo.com/) (weather API; no client library) | API v1 | **CC-BY-4.0** (API data) | <https://open-meteo.com/en/licence> and <https://open-meteo.com/en/terms>, both read 2026-11-06 | **Attribution is a condition**, see below. Also covers the real API responses kept as test fixtures in `test/host/donnees/` and the WMO weather-code table (`meteo_wmo.hpp`, codes as listed on <https://open-meteo.com/en/docs>). |
+| [MET Norway Locationforecast 2.0](https://api.met.no/weatherapi/locationforecast/2.0/documentation) (weather API, no key; no client library) | API 2.0 | **CC BY 4.0** and **NLOD 2.0** (Norwegian Licence for Open Government Data), "unless otherwise noted" | <https://api.met.no/doc/License> and <https://api.met.no/doc/TermsOfService>, read 2026-11-07 through a page summariser: **re-check the wording word for word before publication** | **Credit is a condition**, see below. Also covers the real API responses kept as test fixtures (`test/host/donnees/metno_*.json`) and the « Sunrise 3.0 » answers used to check the sunrise/sunset calculation (`soleil_metno_reference.json`). |
+| [NWS API](https://www.weather.gov/documentation/services-web-api) (`api.weather.gov`, no key; no client library) | — | NWS web pages: public domain "unless specifically noted otherwise"; the API page says only that the data are open and free to use. **No licence is named for the API itself.** | <https://www.weather.gov/disclaimer> and <https://www.weather.gov/documentation/services-web-api>, read 2026-11-07 through a page summariser: **re-check the wording word for word before publication** | No credit required for general use; the NWS name and logo must not suggest an endorsement, see below. Also covers the real API responses kept as test fixtures (`test/host/donnees/nws_*.json`). |
 
 ### Open-Meteo: what the licence asks, and where we stand
 
@@ -51,6 +53,31 @@ How to read this file. **Read** = the licence file or the source headers of the 
   the README carries it. The device's own screen has no link to follow; its « Place and weather » card shows « Weather
   data: Open-Meteo (CC BY 4.0 licence) » and, when a national model is chosen, « Model: <name> » (seen on PC renders only,
   not on a board). Whether a text without a link is enough for the licence page's wording is **not settled**.
+
+### MET Norway and the NWS: what they ask, and where we stand
+
+*Read 2026-11-07 through a page summariser (the quotation marks of its report are not guaranteed word for word); what was and was not read is in [docs/mesures/fournisseurs-meteo.md](docs/mesures/fournisseurs-meteo.md). Decision: [ADR-0014](docs/decisions/0014-met-norway-et-nws-comme-sources.md).*
+
+- **MET Norway, licence.** The licence page names NLOD 2.0 and CC BY 4.0 "unless otherwise noted" and asks for a credit to MET Norway
+  (suggested wording « Based on data from MET Norway »); a link to the source is appreciated. The terms page sums CC BY 4.0 up as:
+  credit, link to the licence, **indicate changes**. We do change the data (values rounded to tenths, conditions mapped onto WMO
+  codes, sunrise and sunset computed on the device), so the text shown says so. The two licence pages read do not repeat the
+  duty to indicate changes: whether our wording and a link on the service's name (not on the licence) are enough is **not settled**.
+  The full texts of CC BY 4.0 and NLOD 2.0 were **not opened**.
+- **MET Norway, rules of use that bind the device** (terms of service and Locationforecast documentation): an identifying
+  `User-Agent` (a request without one, or with a generic library name, is answered 403), fewer than 20 requests per second, never
+  repeat a request before the `Expires` time, coordinates truncated to at most 4 decimals, no schedule on the hour. Ours names the
+  application and the repository `github.com/Axellum/meridien`; **that repository is private today, so the contact is not reachable by
+  MET Norway until publication** ([docs/publication.md](docs/publication.md)). Anyone who redistributes a binary must put their own contact there.
+- **NWS, credit.** No credit is required for general use. The NWS asks that nothing suggests an endorsement or an affiliation (its
+  name and logo are protected); the screen and the page therefore add « This device is neither approved nor sponsored by the
+  National Weather Service. » next to the data. « Public domain » is the wording of the disclaimer page, which covers the NWS web pages; the
+  API page speaks of open data and names no licence: that the API data carry the same status is **not settled**.
+- **NWS, rules of use**: an identifying `User-Agent` (site or e-mail contact), a "reasonable" rate that is not published (an error
+  with a retry in about 5 seconds is documented), the `Cache-Control` headers are the guide for how long to keep an answer.
+- **Status in this repository (2026-11-07).** The screen's « Place and weather » card and the settings page show the credit of the
+  service that **really gave** the weather (and Open-Meteo's, not the failed service's, during a fallback). Seen on PC renders and a
+  browser run against a fake server only, **not on a board**.
 
 ## Planned, not in the build yet
 
@@ -102,6 +129,8 @@ nommée à chaque ligne). **Non vérifié** = non lu : ne pas s'y fier. Les vers
 | posix_tz_db (`zones.csv`) | commit `93447c0` (29/09/2025) | MIT | [`components/core/outils/posix_tz_db/LICENSE`](components/core/outils/posix_tz_db/LICENSE) | Source de la table des fuseaux. La ligne de copyright du dépôt d'origine n'est pas remplie (« [year] [fullname] ») : aucun titulaire nommé. Détail et 7 zones ajoutées depuis la base tz : [`components/core/ATTRIBUTION.md`](components/core/ATTRIBUTION.md). |
 | Base tz (IANA) | données lues le 06/11/2026 | domaine public | `LICENSE` d'origine : domaine public, sauf `date.c`, `newstrftime.3`, `strftime.c` (BSD 3 clauses), que ce projet n'utilise pas | Seules des lignes de données sont reprises (7 ajouts, voir `ATTRIBUTION.md`). |
 | Open-Meteo (API météo, sans bibliothèque) | API v1 | **CC-BY-4.0** (données de l'API) | <https://open-meteo.com/en/licence> et <https://open-meteo.com/en/terms>, lues le 06/11/2026 | **L'attribution est une condition**, voir ci-dessous. Couvre aussi les vraies réponses de l'API gardées comme données de test (`test/host/donnees/`) et la table des codes météo WMO. |
+| MET Norway Locationforecast 2.0 (API météo, sans clé ; pas de bibliothèque) | API 2.0 | **CC BY 4.0** et **NLOD 2.0** (licence norvégienne des données publiques), « sauf mention contraire » | <https://api.met.no/doc/License> et <https://api.met.no/doc/TermsOfService>, lues le 07/11/2026 par l'intermédiaire d'un résumeur de pages : **revérifier le texte mot pour mot avant publication** | **La mention de la source est une condition**, voir ci-dessous. Couvre aussi les vraies réponses de l'API gardées comme données de test (`test/host/donnees/metno_*.json`) et les réponses « Sunrise 3.0 » qui servent à contrôler le calcul du lever et du coucher (`soleil_metno_reference.json`). |
+| API du NWS (`api.weather.gov`, sans clé ; pas de bibliothèque) | — | pages web du NWS : domaine public « sauf mention contraire » ; la page de l'API dit seulement que les données sont ouvertes et libres d'usage. **Aucune licence n'est nommée pour l'API elle-même.** | <https://www.weather.gov/disclaimer> et <https://www.weather.gov/documentation/services-web-api>, lues le 07/11/2026 par l'intermédiaire d'un résumeur de pages : **revérifier le texte mot pour mot avant publication** | Aucune mention exigée pour un usage général ; le nom et le logo du NWS ne doivent pas suggérer une approbation, voir ci-dessous. Couvre aussi les vraies réponses de l'API gardées comme données de test (`test/host/donnees/nws_*.json`). |
 
 ### Open-Meteo : ce que la licence demande, et où on en est
 
@@ -120,6 +149,32 @@ nommée à chaque ligne). **Non vérifié** = non lu : ne pas s'y fier. Les vers
   montre « Données météo : Open-Meteo (licence CC BY 4.0) » et, quand un modèle national est choisi, « Modèle : <nom> » (vu
   sur des rendus PC seulement, pas sur une carte). Qu'un texte sans lien suffise à la formulation de la page de licence
   n'est **pas tranché**.
+
+### MET Norway et le NWS : ce qu'ils demandent, et où on en est
+
+*Lu le 07/11/2026 par l'intermédiaire d'un résumeur de pages (les guillemets de son compte rendu ne sont pas garantis mot pour mot) ; ce qui a été lu et ce qui ne l'a pas été : [docs/mesures/fournisseurs-meteo.md](docs/mesures/fournisseurs-meteo.md). Décision : [ADR-0014](docs/decisions/0014-met-norway-et-nws-comme-sources.md).*
+
+- **MET Norway, licence.** La page de licence nomme NLOD 2.0 et CC BY 4.0 « sauf mention contraire » et demande de créditer MET Norway
+  (formulation suggérée : « Based on data from MET Norway ») ; un lien vers la source est apprécié. La page des conditions résume
+  CC BY 4.0 ainsi : mention de la source, lien vers la licence, **indication des modifications**. Nous modifions bien les données
+  (valeurs arrondies au dixième, conditions ramenées aux codes WMO, lever et coucher du soleil calculés sur l'appareil) : le
+  texte affiché le dit. Les deux pages de licence lues ne répètent pas l'obligation d'indiquer les modifications : que notre
+  formulation et un lien sur le nom du service (et non sur la licence) suffisent n'est **pas tranché**. Les textes intégraux de
+  CC BY 4.0 et de NLOD 2.0 n'ont **pas été ouverts**.
+- **MET Norway, règles d'usage qui lient l'appareil** (conditions d'utilisation et documentation de Locationforecast) : un
+  `User-Agent` qui identifie (une requête sans lui, ou avec un nom de bibliothèque générique, reçoit 403), moins de 20 requêtes par
+  seconde, ne jamais répéter une requête avant l'heure d'`Expires`, coordonnées tronquées à 4 décimales au plus, aucune
+  planification à l'heure pile. Le nôtre nomme l'application et le dépôt `github.com/Axellum/meridien` ; **ce dépôt est privé
+  aujourd'hui, donc MET Norway ne peut pas joindre le contact avant la publication** ([docs/publication.md](docs/publication.md)). Qui redistribue un binaire y met son propre contact.
+- **NWS, mention.** Aucune mention n'est exigée pour un usage général. Le NWS demande que rien ne suggère une approbation ou une
+  affiliation (son nom et son logo sont protégés) : l'écran et la page ajoutent donc « Cet appareil n’est ni approuvé ni parrainé par le
+  National Weather Service. » à côté des données. « Domaine public » est la formulation de la page de mise en garde, qui vise les pages web du NWS ; la
+  page de l'API parle de données ouvertes sans nommer de licence : que les données de l'API aient le même statut n'est **pas tranché**.
+- **NWS, règles d'usage** : un `User-Agent` qui identifie (site ou contact e-mail), un débit « raisonnable » non publié (une erreur
+  avec nouvel essai possible en 5 secondes environ est documentée), les en-têtes `Cache-Control` indiquent combien de temps garder une réponse.
+- **État dans ce dépôt (07/11/2026).** La carte « Lieu et météo » de l'écran et la page de réglages montrent la mention du service
+  qui a **réellement donné** la météo (et celle d'Open-Meteo, pas celle du service en échec, pendant un repli). Vu sur des rendus PC
+  et un parcours de navigateur contre un faux serveur seulement, **pas sur une carte**.
 
 ## Prévus, pas encore dans la compilation
 
