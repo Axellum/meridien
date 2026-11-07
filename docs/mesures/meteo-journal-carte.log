@@ -11,7 +11,7 @@
 22:04:05.293 I (2582) tab5: Contrôleur d'écran détecté : ST7121 (tactile : Sitronix (version 1) ; détection en 30 ms)
 22:04:05.901 I (3216) meteo: pas de cache météo (NVS : ESP_ERR_NVS_NOT_FOUND)
 22:04:05.901 I (3216) METEO: contrat (au démarrage, depuis le cache) : meteo_etat_lire -> valide=0 (aucune météo connue pour la zone actuelle)
-22:04:15.530 I (12819) reseau: adresse IP obtenue : 192.168.0.52 à 11416 ms
+22:04:15.530 I (12819) reseau: adresse IP obtenue : 192.168.1.52 à 11416 ms
 22:04:15.530 I (12820) reseau: SNTP démarré (deux serveurs du pool, premier : fr.pool.ntp.org)
 22:04:16.760 I (13991) BOOT: BOOT 56 cause=11 rom=0x17 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3509 wifi_ms=8294 ip_ms=11416 ntp_ms=12583 coupures=0 echecs_transport=0 rssi=-44 utc=1793999056 local="vendredi 6 novembre 2026, 22 h 04"
 22:04:17.986 I (15217) METEO: contrat (réseau et heure prêts, avant la requête) : meteo_etat_lire -> valide=0 (aucune météo connue pour la zone actuelle)
@@ -36,7 +36,7 @@
 22:06:49.235 I (2584) tab5: Contrôleur d'écran détecté : ST7121 (tactile : Sitronix (version 1) ; détection en 30 ms)
 22:06:49.843 I (3218) meteo: cache relu : 9,4 °C, Plutôt dégagé, reçu à l'instant UNIX 1793999059 (marqué périmé tant que l'heure du réseau manque)
 22:06:49.843 I (3219) METEO: contrat (au démarrage, depuis le cache) : meteo_etat_lire -> valide=1 perime=0 maj=UNIX 1793999059 temperature=9,4 °C min=7,6 max=13,0 (du jour) code=1 jour=0 libellé=« Plutôt dégagé »
-22:06:59.404 I (12776) reseau: adresse IP obtenue : 192.168.0.52 à 11371 ms
+22:06:59.404 I (12776) reseau: adresse IP obtenue : 192.168.1.52 à 11371 ms
 22:06:59.404 I (12777) reseau: SNTP démarré (deux serveurs du pool, premier : fr.pool.ntp.org)
 22:07:03.254 I (16650) BOOT: BOOT 57 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3517 wifi_ms=8312 ip_ms=11371 ntp_ms=15240 coupures=0 echecs_transport=0 rssi=-41 utc=1793999222 local="vendredi 6 novembre 2026, 22 h 07"
 22:07:03.864 I (17219) METEO: contrat (réseau et heure prêts, avant la requête) : meteo_etat_lire -> valide=1 perime=0 maj=UNIX 1793999059 temperature=9,4 °C min=7,6 max=13,0 (du jour) code=1 jour=0 libellé=« Plutôt dégagé »
