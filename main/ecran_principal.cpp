@@ -22,6 +22,7 @@
 #include "ui_bonjour.h"
 #include "ui_principal.h"
 #include "ui_reglages.h"
+#include "vue_depuis_detail.h"
 
 // Police Roboto Bold embarquée (main/assets/roboto_700.ttf) et jeu d'icônes météo (main/assets/icones_meteo.bin, lu par
 // ui_meteo_icones.cpp) : EMBED_FILES de main/CMakeLists.txt.
@@ -96,12 +97,19 @@ void rafraichir(lv_timer_t *) {
         }
     }
 
-    // La météo : le relevé complet (prévisions, soleil...), jugé contre l'heure du moment comme meteo_etat_lire().
-    meteo::Releve releve = {};
-    int echecs = 0;
-    if (meteo_etat_lire_releve(&releve, &echecs)) {
-        entrees.meteo = visuel::vue_depuis_releve(releve, instant, g_ville);
-        entrees.meteo.perimee = meteo::est_perime(releve, instant, echecs);
+    // La météo : d'abord la météo riche (contrat v2 : courant complet, 24 heures, 7 jours, pluie proche, tendance de pression),
+    // sinon le relevé v1 (repli tant que la v2 n'est pas lue : cache absent ou première requête pas encore faite).
+    // `detail` pèse ≈ 2 Ko : static plutôt que la pile de la tâche LVGL, qui est seule à passer ici.
+    static MeteoDetail detail;
+    if (meteo_detail_lire(&detail) && detail.valide) {
+        entrees.meteo = visuel::vue_depuis_detail(detail, g_ville);
+    } else {
+        meteo::Releve releve = {};
+        int echecs = 0;
+        if (meteo_etat_lire_releve(&releve, &echecs)) {
+            entrees.meteo = visuel::vue_depuis_releve(releve, instant, g_ville);
+            entrees.meteo.perimee = meteo::est_perime(releve, instant, echecs);
+        }
     }
 #ifdef MERIDIEN_METEO_BOUCHON
     entrees.meteo.exemple = true; // valeurs d'exemple du bouchon (main/bouchons/) : l'écran le dit

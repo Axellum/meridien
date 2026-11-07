@@ -26,6 +26,7 @@
 #include "meteo_etat.h"
 #include "meteo_interne.h"
 #include "reseau.h"
+#include "verrou_tls.h"
 
 namespace ecran {
 
@@ -42,11 +43,12 @@ constexpr const char *kCleCache = "cache";
 // soit une marge de 3,5 ; une réponse plus grande est REFUSÉE (`Issue::TropGrand`), jamais lue à moitié. Pourquoi en PSRAM : un
 // tampon de plusieurs Ko en RAM interne mangerait le budget de la prise de contact TLS (voir jalon 1b).
 constexpr size_t kTailleTampon = 16 * 1024;
-constexpr int kDelaiHttpMs = 15000;          // connexion, TLS et lecture : au-delà, l'essai est un échec
-constexpr uint32_t kPasAttenteMs = 2000;     // contrôle de l'IP et de l'heure avant le premier essai
-constexpr uint32_t kAntiRebondZoneMs = 1500; // plusieurs changements de zone d'affilée = une seule requête
-constexpr int64_t kInstantMin = 946684800;   // 1er janvier 2000 : en dessous, l'horloge n'est pas réglée
-constexpr uint32_t kPileOctets = 12288;      // la prise de contact TLS demande plusieurs Ko de pile
+constexpr uint32_t kAttenteVerrouTlsMs = 40000; // une recherche de ville tient le verrou 8 s au plus (geocodage.cpp)
+constexpr int kDelaiHttpMs = 15000;             // connexion, TLS et lecture : au-delà, l'essai est un échec
+constexpr uint32_t kPasAttenteMs = 2000;        // contrôle de l'IP et de l'heure avant le premier essai
+constexpr uint32_t kAntiRebondZoneMs = 1500;    // plusieurs changements de zone d'affilée = une seule requête
+constexpr int64_t kInstantMin = 946684800;      // 1er janvier 2000 : en dessous, l'horloge n'est pas réglée
+constexpr uint32_t kPileOctets = 12288;         // la prise de contact TLS demande plusieurs Ko de pile
 // Priorité d'ARRIÈRE-PLAN : la prise de contact TLS calcule plusieurs secondes sans jamais s'endormir. À une priorité au-dessus de
 // celle de la tâche d'inactivité (0), la tâche IDLE du cœur qui l'exécute ne tourne plus et le chien de garde des tâches (5 s) se
 // déclenche. À la priorité 0 elle partage le cœur avec IDLE tranche par tranche (1 ms) : IDLE nourrit le chien de garde.
@@ -223,8 +225,19 @@ Essai interroger(const PositionE5 &position, meteo::Meteo &sortie) {
         1024; // ligne de requête (851 octets au plus, test_meteo_appareil.cpp) : 512 par défaut ne suffit pas
     config.keep_alive_enable = false;
 
+    // Un seul TLS à la fois dans tout le firmware (verrou_tls.h) : la poignée de main demande ≈ 65 Ko de RAM interne, et la carte
+    // n'en a pas assez pour deux (une recherche de ville et cette requête, par exemple). Le verrou couvre exactement
+    // esp_http_client_init -> esp_http_client_cleanup ; il n'est pas tenu pendant la lecture de la réponse.
+    if (!verrou_tls_prendre(kAttenteVerrouTlsMs)) {
+        ESP_LOGW(TAG, "verrou TLS occupé depuis plus de %u ms : essai reporté",
+                 static_cast<unsigned>(kAttenteVerrouTlsMs));
+        heap_caps_free(tampon);
+        e.issue = Issue::Reseau;
+        return e;
+    }
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == nullptr) {
+        verrou_tls_rendre();
         heap_caps_free(tampon);
         e.issue = Issue::Reseau;
         return e;
@@ -237,6 +250,7 @@ Essai interroger(const PositionE5 &position, meteo::Meteo &sortie) {
     e.statut_http = esp_http_client_get_status_code(client);
     const int erreur_socket = esp_http_client_get_errno(client);
     esp_http_client_cleanup(client);
+    verrou_tls_rendre();
     e.octets = rec.n;
 
     if (rec.connecte) {

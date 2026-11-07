@@ -122,17 +122,19 @@ bool meteo_etat_lire_releve(meteo::Releve *sortie, int *echecs) {
     if (sortie == nullptr) {
         return false;
     }
-    bool a_releve = false;
-    portENTER_CRITICAL(&g_verrou);
-    a_releve = g_a_releve;
-    if (a_releve) {
-        *sortie = g_releve; // même copie atomique que meteo_etat_lire()
-        if (echecs != nullptr) {
-            *echecs = g_echecs;
-        }
+    // L'état (météo en PSRAM, compteur d'échecs) est protégé par le même verrou que meteo_etat_lire() et meteo_detail_lire() :
+    // la copie du relevé est donc cohérente avec le nombre d'essais ratés lu juste après. (Le corps d'origine de cette fonction,
+    // écrit par ecran-visuel avec des variables globales, a été réécrit à l'intégration du 07/11/2026 : meteo-appareil avait
+    // remplacé ces variables par la structure Etat.)
+    Verrou v;
+    if (!g_etat.a_meteo || g_etat.meteo == nullptr) {
+        return false;
     }
-    portEXIT_CRITICAL(&g_verrou);
-    return a_releve;
+    *sortie = g_etat.meteo->releve;
+    if (echecs != nullptr) {
+        *echecs = g_etat.echecs;
+    }
+    return true;
 }
 
 } // namespace ecran
