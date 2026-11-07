@@ -37,13 +37,15 @@ std::size_t reseau_scanner_resultats(PointAcces *sortie, std::size_t max);
 using SurResultatConnexion = void (*)(wifi::Resultat resultat, void *contexte);
 
 // Essaie ce réseau ; `mot_de_passe` nul ou vide pour un réseau ouvert (8 à 63 caractères sinon). Rend faux si l'essai n'a pas pu
-// démarrer (un essai est déjà en cours, Wi-Fi pas démarré, SSID vide ou de plus de 32 octets, mot de passe de 1 à 7 ou de plus de
-// 63 caractères) : le rappel n'est alors pas appelé.
-// Résultats : Connecte (adresse IP obtenue), MotDePasseRefuse (la radio a refusé l'authentification ou la poignée de main, vue deux
-// fois de suite), ReseauIntrouvable (aucun point d'accès de ce nom, vu deux fois de suite), Autre (tout le reste, y compris le
-// délai de ecran::wifi::DELAI_CONNEXION_MS écoulé sans réponse claire). Sur un échec, l'ancien réseau est repris et le rappel n'est
-// appelé qu'après son retour (adresse IP) ou, s'il tarde, au bout de ecran::wifi::DELAI_RETOUR_MS (le Wi-Fi continue de le chercher).
-// Sans ancien réseau (appareil neuf), le rappel est appelé tout de suite.
+// démarrer (un essai est déjà en cours — le retour arrière compris, jusqu'au rappel —, Wi-Fi pas démarré, SSID vide ou de plus de 32
+// octets, mot de passe de 1 à 7 ou de plus de 63 caractères) : le rappel n'est alors pas appelé.
+// Résultats : Connecte (adresse IP obtenue), MotDePasseRefuse (la radio a refusé l'authentification ou la poignée de main : même
+// cause sûre vue deux fois, ou dernière cause sûre vue au délai), ReseauIntrouvable (aucun point d'accès de ce nom, idem), Autre
+// (tout le reste, y compris le délai de ecran::wifi::DELAI_CONNEXION_MS écoulé sans aucune cause sûre : sur le point d'accès essayé,
+// un mot de passe faux ne donne pas toujours la raison 202 avant le délai, voir docs/mesures/wifi-retour-arriere.md). Sur un échec,
+// l'ancien réseau est repris et le rappel n'est appelé qu'après son retour (adresse IP : ≈ 6 s mesurées) ou, s'il tarde, au bout de
+// ecran::wifi::DELAI_RETOUR_MS (le Wi-Fi continue de le chercher). Un échec que seul le délai a détecté arrive donc à ≈ 36 s, après
+// le compte à rebours de 30 s de l'écran. Sans ancien réseau (appareil neuf), le rappel est appelé tout de suite.
 bool reseau_connecter(const char *ssid, const char *mot_de_passe, SurResultatConnexion sur_resultat, void *contexte);
 
 // L'écran n'a pas eu de réponse dans son délai (ecran::wifi::DELAI_CONNEXION_MS, 30 s) ou la personne a touché « Retour » /
