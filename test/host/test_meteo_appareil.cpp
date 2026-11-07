@@ -79,9 +79,10 @@ constexpr int requete_coordonnees_negatives_et_chiffres_de_remplissage() {
 
 constexpr int requete_aux_bornes_et_refus_hors_bornes() {
     char t[TAILLE_REQUETE_MAX] = {};
-    // Les plus longues coordonnées remplissent exactement TAILLE_REQUETE_MAX.
-    VERIFIER(construire_requete(-9000000, -18000000, t, sizeof(t)) == TAILLE_REQUETE_MAX - 1);
-    VERIFIER(construire_requete(9000000, 18000000, t, sizeof(t)) == TAILLE_REQUETE_MAX - 3); // sans les deux signes
+    // Les plus longues coordonnées remplissent exactement TAILLE_REQUETE_SANS_MODELE_MAX (adresse « Automatique »).
+    VERIFIER(construire_requete(-9000000, -18000000, t, sizeof(t)) == TAILLE_REQUETE_SANS_MODELE_MAX - 1);
+    VERIFIER(construire_requete(9000000, 18000000, t, sizeof(t)) ==
+             TAILLE_REQUETE_SANS_MODELE_MAX - 3); // sans les deux signes
     VERIFIER(construire_requete(9000001, 0, t, sizeof(t)) == 0);
     VERIFIER(construire_requete(-9000001, 0, t, sizeof(t)) == 0);
     VERIFIER(construire_requete(0, 18000001, t, sizeof(t)) == 0);
@@ -114,11 +115,82 @@ constexpr int requete_et_ses_en_tetes_depassent_le_tampon_d_envoi_par_defaut() {
     // au plus, la première ligne 851 : 512 ne suffit pas, main/meteo_client.cpp demande buffer_size_tx = 1024.
     constexpr std::size_t SCHEMA_ET_HOTE = sv("https://api.open-meteo.com").size();
     constexpr std::size_t PREMIERE_LIGNE_MAX =
-        sv("GET ").size() + (TAILLE_REQUETE_MAX - 1 - SCHEMA_ET_HOTE) + sv(" HTTP/1.1\r\n").size();
-    VERIFIER(TAILLE_REQUETE_MAX == 863);
+        sv("GET ").size() + (TAILLE_REQUETE_SANS_MODELE_MAX - 1 - SCHEMA_ET_HOTE) + sv(" HTTP/1.1\r\n").size();
+    VERIFIER(TAILLE_REQUETE_SANS_MODELE_MAX == 863);
     VERIFIER(PREMIERE_LIGNE_MAX == 851);
     VERIFIER(PREMIERE_LIGNE_MAX > 512);         // le tampon par défaut ne suffit pas
     VERIFIER(PREMIERE_LIGNE_MAX + 100 <= 1024); // marge d'au moins 100 octets sous 1024 (en-têtes inclus dans la marge)
+    // Avec le plus long modèle de la table : « &models=italia_meteo_arpae_icon_2i » ajoute 34 caractères, la première ligne en
+    // fait 885, la marge sous 1024 reste de 139 octets (au moins 100 exigés).
+    VERIFIER(MODELES_PARAMETRE_MAX == 34);
+    VERIFIER(TAILLE_REQUETE_MAX == 897);
+    constexpr std::size_t PREMIERE_LIGNE_AVEC_MODELE_MAX = PREMIERE_LIGNE_MAX + MODELES_PARAMETRE_MAX;
+    VERIFIER(PREMIERE_LIGNE_AVEC_MODELE_MAX == 885);
+    VERIFIER(PREMIERE_LIGNE_AVEC_MODELE_MAX + 100 <= 1024);
+    // Et la VRAIE plus longue adresse, construite : coordonnées les plus longues et modèle le plus long.
+    char t[TAILLE_REQUETE_MAX] = {};
+    const std::size_t n = construire_requete(-9000000, -18000000, t, sizeof(t), "italia_meteo_arpae_icon_2i");
+    VERIFIER(n == TAILLE_REQUETE_MAX - 1);
+    VERIFIER(sv("GET ").size() + (n - SCHEMA_ET_HOTE) + sv(" HTTP/1.1\r\n").size() == PREMIERE_LIGNE_AVEC_MODELE_MAX);
+    return 0;
+}
+
+// ---- paramètre models= (source météo choisie) ---------------------------------------------------------------------------
+
+constexpr int requete_sans_modele_est_celle_d_avant_a_l_octet_pres() {
+    // « Automatique » (modèle vide) : exactement l'adresse écrite à la main ci-dessus, avec ou sans l'argument explicite.
+    char a[TAILLE_REQUETE_MAX] = {};
+    char b[TAILLE_REQUETE_MAX] = {};
+    const std::size_t na = construire_requete(4574906, 484789, a, sizeof(a));
+    const std::size_t nb = construire_requete(4574906, 484789, b, sizeof(b), sv{});
+    VERIFIER(na == URL_LYON.size() && nb == na);
+    VERIFIER(sv(a, na) == URL_LYON && sv(b, nb) == URL_LYON);
+    VERIFIER(sv(a, na).find("models") == sv::npos);
+    return 0;
+}
+
+constexpr int requete_avec_un_modele_ajoute_seulement_la_fin() {
+    char t[TAILLE_REQUETE_MAX] = {};
+    std::size_t n = construire_requete(4574906, 484789, t, sizeof(t), "meteoswiss_icon_seamless");
+    VERIFIER(n == URL_LYON.size() + 32);
+    // Tout ce qui précède est l'adresse d'avant, au caractère près ; le modèle est la dernière chose.
+    VERIFIER(sv(t, URL_LYON.size()) == URL_LYON);
+    VERIFIER(sv(t + URL_LYON.size(), 32) == sv("&models=meteoswiss_icon_seamless"));
+    VERIFIER(t[n] == '\0');
+    n = construire_requete(4574906, 484789, t, sizeof(t), "gfs_seamless");
+    VERIFIER(n == URL_LYON.size() + sv("&models=gfs_seamless").size());
+    VERIFIER(sv(t + URL_LYON.size(), n - URL_LYON.size()) == sv("&models=gfs_seamless"));
+    return 0;
+}
+
+constexpr int requete_refuse_un_modele_douteux() {
+    char t[TAILLE_REQUETE_MAX] = {};
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "a,b") == 0);   // deux modèles : variables renommées
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "a&b=c") == 0); // un paramètre glissé
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "gfs seamless") == 0); // espace
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "GFS_SEAMLESS") ==
+             0); // majuscules : jamais celles de l'API
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "gfs%5Fseamless") == 0); // « % »
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "gfs\n") == 0);
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "gfs-seamless") ==
+             0); // « - » n'est dans aucun identifiant
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "italia_meteo_arpae_icon_2ix") ==
+             0); // 27 caractères : trop long
+    VERIFIER(construire_requete(4574906, 484789, t, sizeof(t), "italia_meteo_arpae_icon_2i") !=
+             0); // 26 : le plus long permis
+    VERIFIER(modeles_valide(sv{}) && modeles_valide("gfs_seamless") && !modeles_valide("gfs_seamless,icon_seamless"));
+    return 0;
+}
+
+constexpr int requete_avec_un_modele_ne_deborde_pas() {
+    char t[TAILLE_REQUETE_MAX + 8] = {};
+    const std::size_t n = URL_LYON.size() + sv("&models=ecmwf_ifs025").size();
+    VERIFIER(construire_requete(4574906, 484789, t, n + 1, "ecmwf_ifs025") == n); // juste assez
+    VERIFIER(construire_requete(4574906, 484789, t, n, "ecmwf_ifs025") == 0);     // un octet de moins : refusé
+    VERIFIER(construire_requete(4574906, 484789, t, URL_LYON.size() + 1, "ecmwf_ifs025") ==
+             0); // la place de l'adresse seule
+    VERIFIER(construire_requete(4574906, 484789, t, URL_LYON.size() + 1) == URL_LYON.size()); // …suffit sans modèle
+    VERIFIER(construire_requete(9000001, 0, t, sizeof(t), "ecmwf_ifs025") == 0); // les bornes de coordonnées restent
     return 0;
 }
 
@@ -465,6 +537,10 @@ constexpr int cache_refuse_une_place_insuffisante() {
     X(requete_aux_bornes_et_refus_hors_bornes)                                                                         \
     X(requete_refuse_une_place_insuffisante_sans_deborder)                                                             \
     X(requete_et_ses_en_tetes_depassent_le_tampon_d_envoi_par_defaut)                                                  \
+    X(requete_sans_modele_est_celle_d_avant_a_l_octet_pres)                                                            \
+    X(requete_avec_un_modele_ajoute_seulement_la_fin)                                                                  \
+    X(requete_refuse_un_modele_douteux)                                                                                \
+    X(requete_avec_un_modele_ne_deborde_pas)                                                                           \
     X(degres_vers_e5_arrondi_et_bornes)                                                                                \
     X(degres_non_finis_refuses)                                                                                        \
     X(nom_de_zone_valide_ou_non)                                                                                       \
