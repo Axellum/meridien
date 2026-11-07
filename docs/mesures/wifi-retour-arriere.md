@@ -98,7 +98,7 @@ L'écran de réglages n'est pas encore fusionné : `main/banc_wifi.{h,cpp}` ajou
 
 ## 6. Mesures sur la carte
 
-Trois séries sur la même carte, avec le propre réseau d'Axel (aucun autre Wi-Fi n'existe) : la première avec le binaire du commit `5f17506` (règle « deux fois de suite »), la deuxième avec `fe54f8d` (règle finale, §2.3), la troisième avec `a244af0` (même règle, plus les deux corrections de l'appareil neuf `06b7afe` et `174b7a4`, §6 plus bas) ; la série 3 est le **binaire laissé sur la carte**. Les durées sont lues dans le journal série (`+N ms` depuis le début de l'essai) ; « retour » = temps entre la décision d'échec et l'adresse IP de l'ancien réseau. Journaux bruts conservés hors dépôt (ils contiennent l'adresse IP locale).
+Trois séries sur la même carte, avec le propre réseau d'Axel (aucun autre Wi-Fi n'existe) : la première avec le binaire du commit `5f17506` (règle « deux fois de suite »), la deuxième avec `fe54f8d` (règle finale, §2.3), la troisième avec `a244af0` (même règle, plus les deux corrections de l'appareil neuf `06b7afe` et `174b7a4`, §6 plus bas) ; la série 3 est le **binaire laissé sur la carte**. Les durées sont lues dans le journal série (`+N ms` depuis le début de l'essai) ; « retour » = temps entre la décision d'échec et l'adresse IP de l'ancien réseau. Journaux bruts conservés hors dépôt (ils contiennent l'adresse IP locale) ; extraits nettoyés (couche réseau et banc seulement, adresses masquées) dans [wifi-retour-arriere-journal-carte.log](wifi-retour-arriere-journal-carte.log).
 
 | Essai | Série | Décision d'échec | Rappel donné à l'écran | Résultat dit | Retour de l'ancien réseau |
 | --- | --- | --- | --- | --- | --- |

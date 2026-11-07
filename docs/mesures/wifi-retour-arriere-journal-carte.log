@@ -1,0 +1,264 @@
+# Journal de la carte, extraits nettoyés (07/11/2026, Tab5 ST7121) - voir wifi-retour-arriere.md
+# Seules les lignes de la couche réseau (reseau:), du banc (banc_wifi:), de la ligne BOOT, des commandes
+# 'piles' (sys_evt) et 'memoire' et de l'affichage principal sont gardées. Adresses IP masquées. Le nom et le mot de passe
+# du réseau ne figurent dans aucun journal (vérifié par comptage, voir la page de mesures).
+
+## Série 3 - binaire du commit a244af0 (laissé sur la carte)
+2026-11-07T01:54:40.055Z | I (3350) reseau: réseau Wi-Fi de départ : compilé
+2026-11-07T01:54:40.055Z | I (3350) reseau: lien avec le coprocesseur Wi-Fi : demandé à 1908 ms
+2026-11-07T01:54:42.287Z | I (5724) reseau: Wi-Fi démarré ; connexion au point d'accès
+2026-11-07T01:54:46.372Z | I (9769) reseau: associé au point d'accès à 8327 ms (canal 1)
+2026-11-07T01:54:49.420Z | I (12820) reseau: adresse IP obtenue : <ip> à 11378 ms
+2026-11-07T01:54:49.420Z | I (12820) reseau: SNTP démarré (deux serveurs du pool, premier : fr.pool.ntp.org)
+2026-11-07T01:54:49.624Z | I (12865) BOOT: BOOT 225 cause=11 rom=0x17 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8327 ip_ms=11378 ntp_ms=11410 coupures=0 echecs_transport=0 rssi=-51 utc=1794016488 local="samedi 7 novembre 2026, 2 h 54"
+2026-11-07T01:54:49.827Z | I (13179) principal: affichage : « 02:54 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794016488
+2026-11-07T01:55:08.890Z # >>> wifi_faux
+2026-11-07T01:55:09.092Z | I (32373) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:55:09.092Z | W (32414) reseau: Wi-Fi coupé (raison 8, coupure n° 1) à +41 ms de l'essai
+2026-11-07T01:55:16.001Z | W (39331) reseau: Wi-Fi coupé (raison 2, coupure n° 2) à +6958 ms de l'essai
+2026-11-07T01:55:20.497Z | W (43744) reseau: Wi-Fi coupé (raison 205, coupure n° 3) à +11370 ms de l'essai
+2026-11-07T01:55:29.031Z | W (52365) reseau: Wi-Fi coupé (raison 2, coupure n° 4) à +19992 ms de l'essai
+2026-11-07T01:55:33.528Z | W (56777) reseau: Wi-Fi coupé (raison 205, coupure n° 5) à +24404 ms de l'essai
+2026-11-07T01:55:39.018Z | W (62373) reseau: essai Wi-Fi : délai de 30 s écoulé à +30000 ms
+2026-11-07T01:55:39.018Z | W (62373) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +30000 ms
+2026-11-07T01:55:39.018Z | W (62404) reseau: Wi-Fi coupé (raison 3, coupure n° 6) à +30030 ms de l'essai
+2026-11-07T01:55:39.828Z | I (63186) principal: affichage : « 02:55 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794016538
+2026-11-07T01:55:42.059Z | I (65407) reseau: associé au point d'accès à 63965 ms (canal 1)
+2026-11-07T01:55:45.105Z | I (68501) reseau: adresse IP obtenue : <ip> à 67059 ms
+2026-11-07T01:55:45.105Z | I (68501) reseau: essai Wi-Fi terminé à +36128 ms : résultat 3, rappel appelé
+2026-11-07T01:55:45.105Z | I (68523) banc_wifi: WIFI_ESSAI mode=faux resultat=3 rappel_ms=36128 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=36149 coupures=6 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:56:04.016Z # >>> wifi_inconnu
+2026-11-07T01:56:04.219Z | I (87473) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:56:04.219Z | W (87516) reseau: Wi-Fi coupé (raison 8, coupure n° 7) à +43 ms de l'essai
+2026-11-07T01:56:06.867Z | W (90224) reseau: Wi-Fi coupé (raison 201, coupure n° 8) à +2750 ms de l'essai
+2026-11-07T01:56:11.334Z | W (94636) reseau: Wi-Fi coupé (raison 201, coupure n° 9) à +7162 ms de l'essai
+2026-11-07T01:56:11.334Z | W (94636) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +7163 ms
+2026-11-07T01:56:14.177Z | I (97600) reseau: associé au point d'accès à 96158 ms (canal 1)
+2026-11-07T01:56:17.415Z | I (100672) reseau: adresse IP obtenue : <ip> à 99230 ms
+2026-11-07T01:56:17.415Z | I (100672) reseau: essai Wi-Fi terminé à +13199 ms : résultat 2, rappel appelé
+2026-11-07T01:56:17.415Z | I (100673) banc_wifi: WIFI_ESSAI mode=inconnu resultat=2 rappel_ms=13199 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=13199 coupures=3 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:56:39.805Z | I (123200) principal: affichage : « 02:56 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794016598
+2026-11-07T01:56:59.117Z # >>> wifi_bon
+2026-11-07T01:56:59.319Z | I (142573) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:56:59.319Z | W (142614) reseau: Wi-Fi coupé (raison 8, coupure n° 10) à +41 ms de l'essai
+2026-11-07T01:57:02.174Z | I (145588) reseau: associé au point d'accès à 144145 ms (canal 1)
+2026-11-07T01:57:05.223Z | I (148637) reseau: adresse IP obtenue : <ip> à 147195 ms
+2026-11-07T01:57:05.223Z | I (148638) reseau: essai Wi-Fi terminé à +6064 ms : résultat 0, rappel appelé
+2026-11-07T01:57:05.424Z | I (148673) banc_wifi: WIFI_ESSAI mode=bon resultat=0 rappel_ms=6065 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=6099 coupures=1 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:57:39.855Z | I (183202) principal: affichage : « 02:57 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794016658
+2026-11-07T01:57:54.303Z # >>> wifi_faux_abandon
+2026-11-07T01:57:54.506Z | I (197773) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:57:54.507Z | W (197814) reseau: Wi-Fi coupé (raison 8, coupure n° 11) à +41 ms de l'essai
+2026-11-07T01:57:58.569Z | W (201823) reseau: essai Wi-Fi : abandon demandé à +4049 ms
+2026-11-07T01:57:58.569Z | W (201823) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +4049 ms
+2026-11-07T01:57:58.569Z | W (201854) reseau: Wi-Fi coupé (raison 3, coupure n° 12) à +4081 ms de l'essai
+2026-11-07T01:58:01.617Z | I (204866) reseau: associé au point d'accès à 203424 ms (canal 1)
+2026-11-07T01:58:04.665Z | I (207917) reseau: adresse IP obtenue : <ip> à 206475 ms
+2026-11-07T01:58:04.665Z | I (207917) reseau: essai Wi-Fi terminé à +10144 ms : résultat 3, rappel non appelé
+2026-11-07T01:58:04.665Z | I (207923) banc_wifi: WIFI_ESSAI mode=faux_abandon resultat=-1 rappel_ms=-1 abandon_ms=4049 ip_au_rappel=0 ip_retrouvee_ms=10149 coupures=2 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:58:39.967Z | I (243202) principal: affichage : « 02:58 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794016718
+2026-11-07T01:58:49.495Z # >>> wifi_scan
+2026-11-07T01:58:52.534Z | I (255817) reseau: recherche de réseaux terminée en 2839 ms : 2 point(s) d'accès, 1 réseau(x) listé(s)
+2026-11-07T01:58:52.534Z | I (255823) banc_wifi: WIFI_SCAN duree_ms=2849 reseaux=1 coupures_pendant=0 connecte_apres=1
+2026-11-07T01:58:52.534Z | I (255823) banc_wifi: WIFI_RESEAU rang=1 rssi=-51 securise=1 longueur=4 courant=1
+2026-11-07T01:59:39.862Z | I (303200) principal: affichage : « 02:59 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794016778
+2026-11-07T01:59:44.551Z # >>> memoire
+2026-11-07T01:59:44.753Z | I (308023) commande_serie: MEMOIRE t_s=306 interne_libre=123543 plus_gros_bloc=53248 interne_min=94812 psram_libre=31293768 dma_bloc=53248
+
+## Série 2 - binaire du commit fe54f8d
+2026-11-07T01:26:46.869Z | I (3349) reseau: réseau Wi-Fi de départ : compilé
+2026-11-07T01:26:46.869Z | I (3349) reseau: lien avec le coprocesseur Wi-Fi : demandé à 1908 ms
+2026-11-07T01:26:49.098Z | I (5723) reseau: Wi-Fi démarré ; connexion au point d'accès
+2026-11-07T01:26:53.186Z | I (9777) reseau: associé au point d'accès à 8335 ms (canal 1)
+2026-11-07T01:26:56.225Z | I (12825) reseau: adresse IP obtenue : <ip> à 11384 ms
+2026-11-07T01:26:56.225Z | I (12826) reseau: SNTP démarré (deux serveurs du pool, premier : fr.pool.ntp.org)
+2026-11-07T01:26:56.440Z | I (12884) BOOT: BOOT 222 cause=11 rom=0x17 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3619 wifi_ms=8335 ip_ms=11384 ntp_ms=11430 coupures=0 echecs_transport=0 rssi=-51 utc=1794014815 local="samedi 7 novembre 2026, 2 h 26"
+2026-11-07T01:26:56.655Z | I (13179) principal: affichage : « 02:26 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794014815
+2026-11-07T01:27:15.761Z # >>> wifi_faux
+2026-11-07T01:27:15.965Z | I (32422) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:27:15.965Z | W (32463) reseau: Wi-Fi coupé (raison 8, coupure n° 1) à +41 ms de l'essai
+2026-11-07T01:27:22.899Z | W (39380) reseau: Wi-Fi coupé (raison 2, coupure n° 2) à +6958 ms de l'essai
+2026-11-07T01:27:27.160Z | W (43793) reseau: Wi-Fi coupé (raison 205, coupure n° 3) à +11371 ms de l'essai
+2026-11-07T01:27:35.881Z | W (52414) reseau: Wi-Fi coupé (raison 2, coupure n° 4) à +19991 ms de l'essai
+2026-11-07T01:27:40.345Z | W (56826) reseau: Wi-Fi coupé (raison 205, coupure n° 5) à +24404 ms de l'essai
+2026-11-07T01:27:45.836Z | W (62422) reseau: essai Wi-Fi : délai de 30 s écoulé à +30000 ms
+2026-11-07T01:27:45.836Z | W (62422) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +30000 ms
+2026-11-07T01:27:45.836Z | W (62453) reseau: Wi-Fi coupé (raison 3, coupure n° 6) à +30030 ms de l'essai
+2026-11-07T01:27:46.646Z | I (63190) principal: affichage : « 02:27 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794014865
+2026-11-07T01:27:48.880Z | I (65463) reseau: associé au point d'accès à 64021 ms (canal 1)
+2026-11-07T01:27:51.939Z | I (68517) reseau: adresse IP obtenue : <ip> à 67076 ms
+2026-11-07T01:27:51.939Z | I (68517) reseau: essai Wi-Fi terminé à +36095 ms : résultat 3, rappel appelé
+2026-11-07T01:27:51.939Z | I (68522) banc_wifi: WIFI_ESSAI mode=faux resultat=3 rappel_ms=36095 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=36099 coupures=6 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:28:30.764Z # >>> wifi_inconnu
+2026-11-07T01:28:30.967Z | I (107422) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:28:30.967Z | W (107466) reseau: Wi-Fi coupé (raison 8, coupure n° 7) à +44 ms de l'essai
+2026-11-07T01:28:33.606Z | W (110174) reseau: Wi-Fi coupé (raison 201, coupure n° 8) à +2752 ms de l'essai
+2026-11-07T01:28:38.069Z | W (114586) reseau: Wi-Fi coupé (raison 201, coupure n° 9) à +7164 ms de l'essai
+2026-11-07T01:28:38.069Z | W (114586) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +7164 ms
+2026-11-07T01:28:40.933Z | I (117532) reseau: associé au point d'accès à 116091 ms (canal 1)
+2026-11-07T01:28:43.987Z | I (120598) reseau: adresse IP obtenue : <ip> à 119157 ms
+2026-11-07T01:28:43.987Z | I (120598) reseau: essai Wi-Fi terminé à +13176 ms : résultat 2, rappel appelé
+2026-11-07T01:28:43.987Z | I (120622) banc_wifi: WIFI_ESSAI mode=inconnu resultat=2 rappel_ms=13176 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=13199 coupures=3 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:28:46.636Z | I (123195) principal: affichage : « 02:28 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794014925
+2026-11-07T01:29:45.960Z # >>> wifi_bon
+2026-11-07T01:29:46.163Z | I (182622) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:29:46.163Z | W (182664) reseau: Wi-Fi coupé (raison 8, coupure n° 10) à +42 ms de l'essai
+2026-11-07T01:29:46.566Z | I (183195) principal: affichage : « 02:29 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794014985
+2026-11-07T01:29:49.001Z | I (185611) reseau: associé au point d'accès à 184170 ms (canal 1)
+2026-11-07T01:29:52.046Z | I (188670) reseau: adresse IP obtenue : <ip> à 187229 ms
+2026-11-07T01:29:52.046Z | I (188670) reseau: essai Wi-Fi terminé à +6048 ms : résultat 0, rappel appelé
+2026-11-07T01:29:52.046Z | I (188672) banc_wifi: WIFI_ESSAI mode=bon resultat=0 rappel_ms=6048 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=6049 coupures=1 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:30:46.605Z | I (243194) principal: affichage : « 02:30 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015045
+2026-11-07T01:31:01.019Z # >>> wifi_faux_abandon
+2026-11-07T01:31:01.221Z | I (257672) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:31:01.221Z | W (257715) reseau: Wi-Fi coupé (raison 8, coupure n° 11) à +43 ms de l'essai
+2026-11-07T01:31:05.093Z | W (261722) reseau: essai Wi-Fi : abandon demandé à +4049 ms
+2026-11-07T01:31:05.093Z | W (261722) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +4050 ms
+2026-11-07T01:31:05.309Z | W (261754) reseau: Wi-Fi coupé (raison 3, coupure n° 12) à +4081 ms de l'essai
+2026-11-07T01:31:08.152Z | I (264766) reseau: associé au point d'accès à 263324 ms (canal 1)
+2026-11-07T01:31:11.202Z | I (267805) reseau: adresse IP obtenue : <ip> à 266364 ms
+2026-11-07T01:31:11.202Z | I (267805) reseau: essai Wi-Fi terminé à +10133 ms : résultat 3, rappel non appelé
+2026-11-07T01:31:11.203Z | I (267822) banc_wifi: WIFI_ESSAI mode=faux_abandon resultat=-1 rappel_ms=-1 abandon_ms=4049 ip_au_rappel=0 ip_retrouvee_ms=10149 coupures=2 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:31:46.590Z | I (303201) principal: affichage : « 02:31 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015105
+2026-11-07T01:32:16.100Z # >>> wifi_scan
+2026-11-07T01:32:19.142Z | I (335621) reseau: recherche de réseaux terminée en 2843 ms : 2 point(s) d'accès, 1 réseau(x) listé(s)
+2026-11-07T01:32:19.142Z | I (335622) banc_wifi: WIFI_SCAN duree_ms=2849 reseaux=1 coupures_pendant=0 connecte_apres=1
+2026-11-07T01:32:19.142Z | I (335622) banc_wifi: WIFI_RESEAU rang=1 rssi=-52 securise=1 longueur=4 courant=1
+2026-11-07T01:32:46.590Z | I (363200) principal: affichage : « 02:32 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015165
+2026-11-07T01:33:31.103Z # >>> piles
+2026-11-07T01:33:31.304Z | I (407776) commande_serie: PILE nom=sys_evt base=0x4ff8b910 libre_min=2512 priorite=20
+2026-11-07T01:33:46.623Z | I (423200) principal: affichage : « 02:33 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015225
+2026-11-07T01:34:46.251Z # >>> memoire
+2026-11-07T01:34:46.456Z | I (482927) commande_serie: MEMOIRE t_s=481 interne_libre=121919 plus_gros_bloc=53248 interne_min=94812 psram_libre=31276036 dma_bloc=53248
+2026-11-07T01:34:46.657Z | I (483200) principal: affichage : « 02:34 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015285
+2026-11-07T01:35:46.620Z | I (543200) principal: affichage : « 02:35 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015345
+
+## Série 2 (suite) - quatre essais 'wifi_faux' de suite, même binaire fe54f8d
+2026-11-07T01:36:46.756Z | I (603200) principal: affichage : « 02:36 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015405
+2026-11-07T01:36:52.232Z # >>> wifi_faux
+2026-11-07T01:36:52.433Z | I (608878) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:36:52.433Z | W (608920) reseau: Wi-Fi coupé (raison 8, coupure n° 13) à +42 ms de l'essai
+2026-11-07T01:36:59.364Z | W (615839) reseau: Wi-Fi coupé (raison 2, coupure n° 14) à +6961 ms de l'essai
+2026-11-07T01:37:03.641Z | W (620253) reseau: Wi-Fi coupé (raison 205, coupure n° 15) à +11375 ms de l'essai
+2026-11-07T01:37:12.396Z | W (628879) reseau: Wi-Fi coupé (raison 2, coupure n° 16) à +20000 ms de l'essai
+2026-11-07T01:37:16.673Z | W (633291) reseau: Wi-Fi coupé (raison 205, coupure n° 17) à +24413 ms de l'essai
+2026-11-07T01:37:22.378Z | W (638878) reseau: essai Wi-Fi : délai de 30 s écoulé à +30000 ms
+2026-11-07T01:37:22.378Z | W (638878) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +30000 ms
+2026-11-07T01:37:22.378Z | W (638910) reseau: Wi-Fi coupé (raison 3, coupure n° 18) à +30031 ms de l'essai
+2026-11-07T01:37:25.437Z | I (641922) reseau: associé au point d'accès à 640480 ms (canal 1)
+2026-11-07T01:37:28.485Z | I (644976) reseau: adresse IP obtenue : <ip> à 643535 ms
+2026-11-07T01:37:28.485Z | I (644977) reseau: essai Wi-Fi terminé à +36098 ms : résultat 3, rappel appelé
+2026-11-07T01:37:28.485Z | I (644978) banc_wifi: WIFI_ESSAI mode=faux resultat=3 rappel_ms=36099 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=36099 coupures=6 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:37:46.563Z | I (663201) principal: affichage : « 02:37 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015465
+2026-11-07T01:37:47.375Z # >>> wifi_faux
+2026-11-07T01:37:47.577Z | I (664028) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:37:47.577Z | W (664069) reseau: Wi-Fi coupé (raison 8, coupure n° 19) à +41 ms de l'essai
+2026-11-07T01:37:54.509Z | W (670988) reseau: Wi-Fi coupé (raison 2, coupure n° 20) à +6960 ms de l'essai
+2026-11-07T01:37:58.772Z | W (675401) reseau: Wi-Fi coupé (raison 205, coupure n° 21) à +11373 ms de l'essai
+2026-11-07T01:38:07.509Z | W (684026) reseau: Wi-Fi coupé (raison 2, coupure n° 22) à +19998 ms de l'essai
+2026-11-07T01:38:11.981Z | W (688439) reseau: Wi-Fi coupé (raison 205, coupure n° 23) à +24411 ms de l'essai
+2026-11-07T01:38:17.457Z | W (694028) reseau: essai Wi-Fi : délai de 30 s écoulé à +30000 ms
+2026-11-07T01:38:17.457Z | W (694028) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +30000 ms
+2026-11-07T01:38:17.457Z | W (694059) reseau: Wi-Fi coupé (raison 3, coupure n° 24) à +30031 ms de l'essai
+2026-11-07T01:38:20.495Z | I (697075) reseau: associé au point d'accès à 695634 ms (canal 1)
+2026-11-07T01:38:23.551Z | I (700167) reseau: adresse IP obtenue : <ip> à 698726 ms
+2026-11-07T01:38:23.551Z | I (700167) reseau: essai Wi-Fi terminé à +36139 ms : résultat 3, rappel appelé
+2026-11-07T01:38:23.551Z | I (700178) banc_wifi: WIFI_ESSAI mode=faux resultat=3 rappel_ms=36139 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=36149 coupures=6 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:38:42.434Z # >>> wifi_faux
+2026-11-07T01:38:42.636Z | I (719078) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:38:42.636Z | W (719119) reseau: Wi-Fi coupé (raison 8, coupure n° 25) à +41 ms de l'essai
+2026-11-07T01:38:46.690Z | I (723201) principal: affichage : « 02:38 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015525
+2026-11-07T01:38:49.535Z | W (726037) reseau: Wi-Fi coupé (raison 2, coupure n° 26) à +6959 ms de l'essai
+2026-11-07T01:38:54.003Z | W (730450) reseau: Wi-Fi coupé (raison 205, coupure n° 27) à +11372 ms de l'essai
+2026-11-07T01:39:02.526Z | W (739074) reseau: Wi-Fi coupé (raison 2, coupure n° 28) à +19996 ms de l'essai
+2026-11-07T01:39:06.986Z | W (743487) reseau: Wi-Fi coupé (raison 205, coupure n° 29) à +24409 ms de l'essai
+2026-11-07T01:39:12.492Z | W (749078) reseau: essai Wi-Fi : délai de 30 s écoulé à +30000 ms
+2026-11-07T01:39:12.492Z | W (749078) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +30000 ms
+2026-11-07T01:39:12.492Z | W (749110) reseau: Wi-Fi coupé (raison 3, coupure n° 30) à +30031 ms de l'essai
+2026-11-07T01:39:15.547Z | I (752123) reseau: associé au point d'accès à 750681 ms (canal 1)
+2026-11-07T01:39:18.591Z | I (755169) reseau: adresse IP obtenue : <ip> à 753728 ms
+2026-11-07T01:39:18.591Z | I (755170) reseau: essai Wi-Fi terminé à +36091 ms : résultat 3, rappel appelé
+2026-11-07T01:39:18.591Z | I (755178) banc_wifi: WIFI_ESSAI mode=faux resultat=3 rappel_ms=36092 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=36099 coupures=6 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:39:37.497Z # >>> wifi_faux
+2026-11-07T01:39:37.704Z | I (774178) reseau: essai Wi-Fi démarré (ancien réseau : oui ; délai 30 s)
+2026-11-07T01:39:37.704Z | W (774219) reseau: Wi-Fi coupé (raison 8, coupure n° 31) à +41 ms de l'essai
+2026-11-07T01:39:44.616Z | W (781139) reseau: Wi-Fi coupé (raison 2, coupure n° 32) à +6961 ms de l'essai
+2026-11-07T01:39:46.649Z | I (783198) principal: affichage : « 02:39 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794015585
+2026-11-07T01:39:49.083Z | W (785552) reseau: Wi-Fi coupé (raison 205, coupure n° 33) à +11374 ms de l'essai
+2026-11-07T01:39:57.630Z | W (794174) reseau: Wi-Fi coupé (raison 2, coupure n° 34) à +19996 ms de l'essai
+2026-11-07T01:40:02.112Z | W (798588) reseau: Wi-Fi coupé (raison 205, coupure n° 35) à +24410 ms de l'essai
+2026-11-07T01:40:07.604Z | W (804178) reseau: essai Wi-Fi : délai de 30 s écoulé à +30000 ms
+2026-11-07T01:40:07.604Z | W (804178) reseau: essai Wi-Fi : retour arrière vers l'ancien réseau, à +30000 ms
+2026-11-07T01:40:07.604Z | W (804209) reseau: Wi-Fi coupé (raison 3, coupure n° 36) à +30031 ms de l'essai
+2026-11-07T01:40:10.646Z | I (807225) reseau: associé au point d'accès à 805784 ms (canal 1)
+2026-11-07T01:40:13.688Z | I (810291) reseau: adresse IP obtenue : <ip> à 808850 ms
+2026-11-07T01:40:13.688Z | I (810291) reseau: essai Wi-Fi terminé à +36113 ms : résultat 3, rappel appelé
+2026-11-07T01:40:13.688Z | I (810328) banc_wifi: WIFI_ESSAI mode=faux resultat=3 rappel_ms=36113 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=36149 coupures=6 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+
+## Appareil neuf - binaire LOCAL non commité (réseau de la compilation ignoré), code des commits 06b7afe et 174b7a4
+2026-11-07T01:48:53.940Z | I (3351) reseau: réseau Wi-Fi de départ : aucun
+2026-11-07T01:48:53.940Z | I (3351) reseau: lien avec le coprocesseur Wi-Fi : demandé à 1910 ms
+2026-11-07T01:48:56.175Z | I (5688) BOOT: BOOT 224 cause=11 rom=0x17 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3608 wifi_ms=-1 ip_ms=-1 ntp_ms=-1 coupures=0 echecs_transport=0 rssi=0 utc=-1 local="-, -"
+2026-11-07T01:48:56.175Z | I (5709) reseau: Wi-Fi démarré sans réseau connu : pas de connexion
+2026-11-07T01:49:22.748Z # >>> wifi_scan
+2026-11-07T01:49:25.182Z | I (34744) reseau: recherche de réseaux terminée en 2417 ms : 2 point(s) d'accès, 1 réseau(x) listé(s)
+2026-11-07T01:49:25.386Z | I (34774) banc_wifi: WIFI_SCAN duree_ms=2449 reseaux=1 coupures_pendant=0 connecte_apres=0
+2026-11-07T01:49:25.386Z | I (34774) banc_wifi: WIFI_RESEAU rang=1 rssi=-51 securise=1 longueur=4 courant=1
+2026-11-07T01:50:12.794Z # >>> wifi_faux
+2026-11-07T01:50:12.996Z | I (82374) reseau: essai Wi-Fi démarré (ancien réseau : non ; délai 30 s)
+2026-11-07T01:50:19.893Z | W (89315) reseau: Wi-Fi coupé (raison 2, coupure n° 1) à +6941 ms de l'essai
+2026-11-07T01:50:24.352Z | W (93727) reseau: Wi-Fi coupé (raison 205, coupure n° 2) à +11353 ms de l'essai
+2026-11-07T01:50:32.893Z | W (102348) reseau: Wi-Fi coupé (raison 2, coupure n° 3) à +19974 ms de l'essai
+2026-11-07T01:50:37.369Z | W (106761) reseau: Wi-Fi coupé (raison 205, coupure n° 4) à +24387 ms de l'essai
+2026-11-07T01:50:42.854Z | W (112374) reseau: essai Wi-Fi : délai de 30 s écoulé à +30000 ms
+2026-11-07T01:50:42.854Z | I (112387) reseau: essai Wi-Fi terminé à +30013 ms : résultat 3, rappel appelé
+2026-11-07T01:50:42.855Z | W (112390) reseau: Wi-Fi coupé (raison 3, coupure n° 5)
+2026-11-07T01:50:42.855Z | I (112424) banc_wifi: WIFI_ESSAI mode=faux resultat=3 rappel_ms=30013 abandon_ms=-1 ip_au_rappel=0 ip_retrouvee_ms=-1 coupures=5 ssid_courant_longueur=0 ssid_courant_egal_compile=0
+2026-11-07T01:51:02.969Z # >>> wifi_bon
+2026-11-07T01:51:03.171Z | I (132574) reseau: essai Wi-Fi démarré (ancien réseau : non ; délai 30 s)
+2026-11-07T01:51:06.211Z | I (135616) reseau: associé au point d'accès à 134174 ms (canal 1)
+2026-11-07T01:51:09.258Z | I (138699) reseau: adresse IP obtenue : <ip> à 137258 ms
+2026-11-07T01:51:09.258Z | I (138699) reseau: SNTP démarré (deux serveurs du pool, premier : fr.pool.ntp.org)
+2026-11-07T01:51:09.258Z | I (138700) reseau: essai Wi-Fi terminé à +6126 ms : résultat 0, rappel appelé
+2026-11-07T01:51:09.258Z | I (138724) banc_wifi: WIFI_ESSAI mode=bon resultat=0 rappel_ms=6126 abandon_ms=-1 ip_au_rappel=1 ip_retrouvee_ms=6149 coupures=0 ssid_courant_longueur=4 ssid_courant_egal_compile=1
+2026-11-07T01:51:09.660Z | I (139195) principal: affichage : « 02:51 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794016268
+2026-11-07T01:51:53.148Z # >>> wifi_scan
+2026-11-07T01:51:53.755Z | I (183195) principal: affichage : « 02:51 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794016312
+2026-11-07T01:51:56.186Z | I (185568) reseau: recherche de réseaux terminée en 2839 ms : 2 point(s) d'accès, 1 réseau(x) listé(s)
+2026-11-07T01:51:56.186Z | I (185574) banc_wifi: WIFI_SCAN duree_ms=2849 reseaux=1 coupures_pendant=0 connecte_apres=1
+2026-11-07T01:51:56.186Z | I (185574) banc_wifi: WIFI_RESEAU rang=1 rssi=-51 securise=1 longueur=4 courant=1
+
+## Appareil neuf AVANT la correction 06b7afe (binaire LOCAL non commité) - tentatives de connexion sans fin après la recherche
+2026-11-07T01:42:54.204Z | I (3350) reseau: réseau Wi-Fi de départ : aucun
+2026-11-07T01:42:54.204Z | I (3350) reseau: lien avec le coprocesseur Wi-Fi : demandé à 1909 ms
+2026-11-07T01:42:56.454Z | I (5688) BOOT: BOOT 223 cause=11 rom=0x17 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3619 wifi_ms=-1 ip_ms=-1 ntp_ms=-1 coupures=0 echecs_transport=0 rssi=0 utc=-1 local="-, -"
+2026-11-07T01:42:56.454Z | I (5709) reseau: Wi-Fi démarré sans réseau connu : pas de connexion
+2026-11-07T01:43:23.101Z # >>> wifi_scan
+2026-11-07T01:43:25.744Z | I (34893) reseau: recherche de réseaux terminée en 2416 ms : 2 point(s) d'accès, 1 réseau(x) listé(s)
+2026-11-07T01:43:25.744Z | I (34923) banc_wifi: WIFI_SCAN duree_ms=2449 reseaux=1 coupures_pendant=0 connecte_apres=0
+2026-11-07T01:43:25.744Z | I (34923) banc_wifi: WIFI_RESEAU rang=1 rssi=-51 securise=1 longueur=4 courant=1
+2026-11-07T01:43:28.384Z | W (37606) reseau: Wi-Fi coupé (raison 201, coupure n° 1) ; nouvelle tentative dans 2 s
+2026-11-07T01:43:32.876Z | W (42018) reseau: Wi-Fi coupé (raison 201, coupure n° 2) ; nouvelle tentative dans 2 s
+2026-11-07T01:43:37.145Z | W (46430) reseau: Wi-Fi coupé (raison 201, coupure n° 3) ; nouvelle tentative dans 2 s
+2026-11-07T01:43:41.631Z | W (50842) reseau: Wi-Fi coupé (raison 201, coupure n° 4) ; nouvelle tentative dans 2 s
+2026-11-07T01:43:46.103Z | W (55254) reseau: Wi-Fi coupé (raison 201, coupure n° 5) ; nouvelle tentative dans 2 s
+2026-11-07T01:43:50.370Z | W (59666) reseau: Wi-Fi coupé (raison 201, coupure n° 6) ; nouvelle tentative dans 2 s
+2026-11-07T01:43:54.831Z | W (64078) reseau: Wi-Fi coupé (raison 201, coupure n° 7) ; nouvelle tentative dans 2 s
+2026-11-07T01:43:59.302Z | W (68490) reseau: Wi-Fi coupé (raison 201, coupure n° 8) ; nouvelle tentative dans 2 s
+2026-11-07T01:44:03.771Z | W (72902) reseau: Wi-Fi coupé (raison 201, coupure n° 9) ; nouvelle tentative dans 2 s
+2026-11-07T01:44:08.028Z | W (77314) reseau: Wi-Fi coupé (raison 201, coupure n° 10) ; nouvelle tentative dans 2 s
+2026-11-07T01:44:12.503Z | W (81726) reseau: Wi-Fi coupé (raison 201, coupure n° 11) ; nouvelle tentative dans 2 s
+2026-11-07T01:44:13.112Z # >>> wifi_faux
+2026-11-07T01:44:13.313Z | I (82473) reseau: essai Wi-Fi démarré (ancien réseau : non ; délai 30 s)
+2026-11-07T01:44:20.233Z | W (89414) reseau: Wi-Fi coupé (raison 2, coupure n° 12) à +6940 ms de l'essai
+2026-11-07T01:44:24.698Z | W (93826) reseau: Wi-Fi coupé (raison 205, coupure n° 13) à +11353 ms de l'essai
+2026-11-07T01:44:33.244Z | W (102446) reseau: Wi-Fi coupé (raison 2, coupure n° 14) à +19973 ms de l'essai
+2026-11-07T01:44:37.712Z | W (106858) reseau: Wi-Fi coupé (raison 205, coupure n° 15) à +24385 ms de l'essai
+2026-11-07T01:44:43.196Z | W (112473) reseau: essai Wi-Fi : délai de 30 s écoulé à +30000 ms
+2026-11-07T01:44:43.196Z | I (112486) reseau: essai Wi-Fi terminé à +30013 ms : résultat 3, rappel appelé
+2026-11-07T01:44:43.196Z | W (112489) reseau: Wi-Fi coupé (raison 3, coupure n° 16)
+2026-11-07T01:45:03.120Z # >>> wifi_bon
+2026-11-07T01:45:03.322Z | W (132473) banc_wifi: un essai du banc est deja en cours
+2026-11-07T01:45:53.176Z # >>> wifi_scan
+2026-11-07T01:45:53.379Z | W (182523) banc_wifi: un essai du banc est deja en cours
+2026-11-07T01:45:53.379Z | I (182523) banc_wifi: WIFI_ESSAI mode=faux resultat=3 rappel_ms=30013 abandon_ms=-1 ip_au_rappel=0 ip_retrouvee_ms=-1 coupures=5 ssid_courant_longueur=0 ssid_courant_egal_compile=0
