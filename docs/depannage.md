@@ -21,6 +21,7 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 - [Flash, serial port and backup](#flash-serial-port-and-backup)
 - [Memory and watchdog](#memory-and-watchdog)
 - [Wi-Fi](#wi-fi)
+- [Alerts (Vigie)](#alerts-vigie)
 - [Audio, expanders and power](#audio-expanders-and-power)
 - [Settings page and core](#settings-page-and-core)
 - [Main screen](#main-screen)
@@ -329,6 +330,68 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 ---
 
+### Alerts (Vigie)
+
+#### A small Vigie answer is not gzip: the decoder refuses it
+
+**Symptom.** With `Accept-Encoding: gzip` sent, Hamburg's answer (426 bytes, no alert) has no `Content-Encoding` and starts with `{`, not with the gzip bytes `1f 8b`: a client that always inflates rejects it as “invalid header”.
+
+**Cause.** The public instance compresses only bodies of about 500 bytes or more (the 9 other real answers are gzip, chunked, 365 to 1 976 bytes on the wire).
+
+**Solution.** `main/vigie_client.cpp` decides from the first two bytes (`gzip_flux::est_gzip`), never from the length or from the header alone; a plain body is read as it is. A body that is neither JSON nor valid gzip is refused and counted as a failure (back-off), never half-read.
+
+**Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Evidence**: `test/host/donnees/vigie_hambourg.json` (426 bytes, read by the core tests) and `vigie_captures.json` (`content_encoding: null`). **Status**: handled on the PC; the board has not received any answer yet.
+
+#### Without a `lang` filter, one warning weighs 26 kB
+
+**Symptom.** La Palma without filter: 26 190 bytes of JSON for 9 warnings; Eberswalde: 7 623 bytes for one.
+
+**Cause.** A German or Spanish service gives its text in up to eight languages; Vigie returns them all unless it is told which to keep.
+
+**Solution.** The request always carries `lang=<screen language>,en` (`lang=en` for English): 19 238 and 2 797 bytes. The issuer's words are not touched, only filtered by language. The receive and text buffers are 64 kB each, in PSRAM, freed after each attempt; an answer that does not fit is refused, not cut.
+
+**Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Evidence**: `vigie_la_palma_toutes_langues.json` (26 190) against `vigie_la_palma.json` (19 238). **Status**: handled on the PC.
+
+#### The screen goes quiet for one second at the change of the hour
+
+**Symptom.** When two alerts follow each other, the first ending at `hh:59:59` (AEMET) and the second starting at `hh:00:00` (DWD) or the reverse, nothing is “in force” for one second: the pill can disappear and come back.
+
+**Cause.** The end of an alert is exclusive and issuers do not agree on the last second.
+
+**Solution.** None yet: the core test `test_vigie_alertes.cpp` (instant 1794085199) pins the behaviour. A hysteresis (keeping the pill 2 s) would hide the gap but also keep an alert 2 s after its end; to decide with the owner if the case shows up.
+
+**Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Status**: known, not fixed, never seen on a board.
+
+#### An issuer text disappears from the screen
+
+**Symptom.** A warning is shown with Vigie's own words (“Orange level, rain”) instead of the issuer's title, or a description is missing.
+
+**Cause.** The core never rewrites an issuer's text: a text containing a character the embedded font (`main/assets/roboto_700.ttf`) cannot draw is dropped as a whole, and the next language is tried (screen language, then English, then the first text). The table of drawable characters (790) is checked against the font by `test/host/controle_python_vigie.py`.
+
+**Solution.** None needed: this is the intended behaviour (a square box in the middle of a warning is worse than Vigie's words). If a real issuer's text is dropped for a character that should be drawn, add the character to the font and to `PLAGES_POLICE` in `vigie_alertes.hpp`, then rerun the tests.
+
+**Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Status**: by design.
+
+#### An alert time is cut in two lines (“00:” then “59”)
+
+**Symptom.** On the alerts page, the end of an alert written as “dimanche 8 novembre · 00:59” wrapped after the colon: “00:” on one line, “59” on the next (PC render, 720×1280, La Palma, French).
+
+**Cause.** The text engine of the screen (LVGL) treats a colon as a place where a line may break, like a space, so a time at the end of a long line can be cut inside the number.
+
+**Solution.** The time now comes first: “00:59 · dimanche 8 novembre” (`vigie::formater_instant`, `components/core/include/ecran/vigie_textes.hpp`). At the start of a line a time cannot be cut. Tested by `test_vigie_textes.cpp` (exact text in the five languages, the truncated buffers) and its mutations.
+
+**Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07. **Not seen on a board.** **Status**: fixed on the PC render; to be checked by eye on the panel.
+
+#### Hooks and tools: traps met while writing the alerts
+
+- **`robocopy … /E` is refused** by the guard of the `E:` disk (false positive on the `/E` option): use `Copy-Item -Recurse`.
+- **A mutation that no longer compiles is not a detection.** `-Werror,-Wunused-but-set-variable` turned `if (false)` into a compile error counted as “detected by something else”: the mutation list must show 0 such lines, so the mutation was rewritten (`if (n == 0 && b.autres > 100)`).
+- **A new header's formatting is checked at commit time**, not before: run `clang-format -i --style=file <file>` on new C/C++ files before `git commit`, then check that the mutation anchors still appear once (formatting can re-wrap a line). The pre-commit hook was refused once on 14 differences in two new files.
+
+**Seen on** the PC, branch `claude/alertes-vigie-9b13fe`, 2026-11-07.
+
+---
+
 ### Wi-Fi
 
 #### A wrong Wi-Fi password is almost never recognised as such: the radio says 2 and 205
@@ -515,7 +578,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### The render refuses to start: « a build is already running (ninja) »
 
-`toolsendre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy compilation on the PC. Wait for the other session's build to end (the `build` lock of `verrous.py`), or, if you know what you are doing, `-Forcer`.
+`tools
+endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy compilation on the PC. Wait for the other session's build to end (the `build` lock of `verrous.py`), or, if you know what you are doing, `-Forcer`.
 
 ---
 
@@ -540,6 +604,7 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 - [Flash, port série et sauvegarde](#flash-port-série-et-sauvegarde)
 - [Mémoire et chien de garde](#mémoire-et-chien-de-garde)
 - [Wi-Fi](#wi-fi)
+- [Alertes (Vigie)](#alertes-vigie)
 - [Audio, expandeurs et alimentation](#audio-expandeurs-et-alimentation)
 - [Page de réglages et noyau](#page-de-réglages-et-noyau)
 - [Écran principal](#écran-principal)
@@ -848,6 +913,68 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 ---
 
+### Alertes (Vigie)
+
+#### Une petite réponse de Vigie n'est pas en gzip : le décodeur la refuse
+
+**Symptôme.** Avec `Accept-Encoding: gzip` envoyé, la réponse de Hambourg (426 octets, aucune alerte) n'a pas de `Content-Encoding` et commence par `{`, pas par les octets gzip `1f 8b` : un client qui décompresse toujours la rejette comme « en-tête invalide ».
+
+**Cause.** L'instance publique ne compresse que les corps d'environ 500 octets ou plus (les 9 autres réponses réelles sont en gzip, chunked, de 365 à 1 976 octets sur le fil).
+
+**Solution.** `main/vigie_client.cpp` décide d'après les deux premiers octets (`gzip_flux::est_gzip`), jamais d'après la longueur ni l'en-tête seul ; un corps en clair est lu tel quel. Un corps qui n'est ni du JSON ni du gzip valide est refusé et compté comme un échec (éloignement), jamais lu à moitié.
+
+**Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Preuve** : `test/host/donnees/vigie_hambourg.json` (426 octets, lu par les tests du noyau) et `vigie_captures.json` (`content_encoding: null`). **Statut** : géré sur le PC ; la carte n'a pas encore reçu de réponse.
+
+#### Sans filtre `lang`, un avertissement pèse 26 Ko
+
+**Symptôme.** La Palma sans filtre : 26 190 octets de JSON pour 9 avertissements ; Eberswalde : 7 623 octets pour un seul.
+
+**Cause.** Un service allemand ou espagnol donne son texte en jusqu'à huit langues ; Vigie les renvoie toutes si on ne lui dit pas lesquelles garder.
+
+**Solution.** La requête porte toujours `lang=<langue de l'écran>,en` (`lang=en` pour l'anglais) : 19 238 et 2 797 octets. Les mots de l'émetteur ne sont pas touchés, seulement filtrés par langue. Les tampons de réception et de texte font 64 Ko chacun, en PSRAM, rendus après chaque essai ; une réponse qui ne tient pas est refusée, pas coupée.
+
+**Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Preuve** : `vigie_la_palma_toutes_langues.json` (26 190) contre `vigie_la_palma.json` (19 238). **Statut** : géré sur le PC.
+
+#### L'écran se tait une seconde au changement d'heure
+
+**Symptôme.** Quand deux alertes se suivent, la première finissant à `hh:59:59` (AEMET) et la seconde commençant à `hh:00:00` (DWD) ou l'inverse, rien n'est « en vigueur » pendant une seconde : la pastille peut disparaître puis revenir.
+
+**Cause.** La fin d'une alerte est exclue et les émetteurs ne s'accordent pas sur la dernière seconde.
+
+**Solution.** Aucune pour l'instant : le test du noyau `test_vigie_alertes.cpp` (instant 1794085199) fige le comportement. Une hystérésis (garder la pastille 2 s) cacherait le trou mais garderait aussi une alerte 2 s après sa fin ; à décider avec Axel si le cas se présente.
+
+**Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Statut** : connu, non corrigé, jamais vu sur une carte.
+
+#### Un texte d'émetteur disparaît de l'écran
+
+**Symptôme.** Un avertissement est montré avec les mots de Vigie (« niveau orange, pluie ») au lieu du titre de l'émetteur, ou une description manque.
+
+**Cause.** Le noyau ne réécrit jamais le texte d'un émetteur : un texte qui contient un caractère que la police embarquée (`main/assets/roboto_700.ttf`) ne dessine pas est écarté en entier, et la langue suivante est essayée (langue de l'écran, puis anglais, puis le premier texte). La table des caractères dessinables (790) est comparée à la police par `test/host/controle_python_vigie.py`.
+
+**Solution.** Aucune : c'est voulu (un carré au milieu d'un avertissement est pire que les mots de Vigie). Si le texte d'un vrai émetteur est écarté pour un caractère qui devrait se dessiner, ajouter le caractère à la police et à `PLAGES_POLICE` dans `vigie_alertes.hpp`, puis rejouer les tests.
+
+**Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Statut** : voulu.
+
+#### Une heure d'alerte est coupée en deux lignes (« 00: » puis « 59 »)
+
+**Symptôme.** Sur la page des alertes, la fin d'une alerte écrite « dimanche 8 novembre · 00:59 » passait à la ligne après les deux-points : « 00: » sur une ligne, « 59 » sur la suivante (rendu PC, 720×1280, La Palma, français).
+
+**Cause.** Le moteur de texte de l'écran (LVGL) traite les deux-points comme un endroit où une ligne peut se couper, comme une espace : une heure en bout de ligne longue peut donc être coupée au milieu du nombre.
+
+**Solution.** L'heure passe en premier : « 00:59 · dimanche 8 novembre » (`vigie::formater_instant`, `components/core/include/ecran/vigie_textes.hpp`). Au début d'une ligne, une heure ne peut pas être coupée. Couvert par `test_vigie_textes.cpp` (texte exact dans les cinq langues, tampons tronqués) et ses mutations.
+
+**Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026. **Non vu sur une carte.** **Statut** : corrigé sur le rendu PC ; à vérifier à l'œil sur la dalle.
+
+#### Crochets et outils : pièges rencontrés en écrivant les alertes
+
+- **`robocopy … /E` est refusé** par la garde du disque `E:` (faux positif sur l'option `/E`) : utiliser `Copy-Item -Recurse`.
+- **Une mutation qui ne compile plus n'est pas une détection.** `-Werror,-Wunused-but-set-variable` a transformé `if (false)` en erreur de compilation comptée « détectée par autre chose » : la liste des mutations doit en montrer 0, la mutation a donc été réécrite (`if (n == 0 && b.autres > 100)`).
+- **La mise en forme d'un nouvel en-tête n'est contrôlée qu'au commit** : passer `clang-format -i --style=file <fichier>` sur les nouveaux fichiers C/C++ avant `git commit`, puis vérifier que les ancres des mutations apparaissent encore une seule fois (la mise en forme peut recouper une ligne). Le crochet a refusé un commit une fois pour 14 écarts dans deux fichiers neufs.
+
+**Vu sur** le PC, branche `claude/alertes-vigie-9b13fe`, 07/11/2026.
+
+---
+
 ### Wi-Fi
 
 #### Un mauvais mot de passe Wi-Fi n'est presque jamais reconnu comme tel : la radio dit 2 et 205
@@ -1034,4 +1161,5 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### Le rendu refuse de démarrer : « une compilation tourne déjà (ninja) »
 
-`toolsendre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une seconde compilation lourde sur le PC. Attendre la fin de la compilation de l'autre session (verrou `build` de `verrous.py`) ou, en connaissance de cause, `-Forcer`.
+`tools
+endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une seconde compilation lourde sur le PC. Attendre la fin de la compilation de l'autre session (verrou `build` de `verrous.py`) ou, en connaissance de cause, `-Forcer`.

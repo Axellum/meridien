@@ -4,7 +4,7 @@
 
 **L'anglais d'abord, puis le français (« Français », plus bas).** Le texte français est l'original ; le texte anglais en est une traduction, écrite par une IA et non relue par un locuteur. Il dit la même chose : en cas de différence, **le français fait foi**. Rien dans l'anglais ne doit affirmer plus que le français (en particulier chaque « non vérifié » reste « non vérifié »).
 
-Contents / Sommaire — English: 1 Rules · 2 Pairing · 3 Device · 4 Wi-Fi · 5 Weather zone · 6 Display and languages · 7 STT/LLM/TTS services · 8 Third-party error sentences · 9 Error format · 10 Export/import · 11 Update · 12 Static files · 13 Languages. Français : mêmes numéros, dans la partie « Français ».
+Contents / Sommaire — English: 1 Rules · 2 Pairing · 3 Device · 4 Wi-Fi · 5 Weather zone · 6 Display and languages · 7 STT/LLM/TTS services · 8 Third-party error sentences · 9 Error format · 10 Export/import · 11 Update · 12 Static files · 13 Languages · 14 Official alerts · 13 Languages. Français : mêmes numéros, dans la partie « Français ».
 
 ---
 
@@ -15,7 +15,7 @@ Written on 06/11/2026 (track B), languages added on 06/11/2026. **Design contrac
 Original decisions: [ADR-0002](decisions/0002-assistant-vocal-en-cascade.md) (three services), [ADR-0003](decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md) (page served by the device, local HTTP, pairing token, secrets, update), [ADR-0006](decisions/0006-ecran-en-sept-langues.md) (seven languages).
 
 > **Firmware status — milestone “réglages”, 06/11/2026: subset V1, Wi-Fi station mode only (no access point, no captive portal).** Served by `main/serveur_web.cpp` on port 80; the logic is in the pure core (`components/core/include/ecran/api_reglages.hpp`), tested on the PC with mutations. **Compiled, not yet observed on a board** (see [mesures/reglages.md](mesures/reglages.md)).
-> - **Real**: `GET /api/status`, `POST` and `DELETE /api/pair`, `GET /api/system`, `GET` and `PUT /api/location`, `GET` and `PUT /api/display`, `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (read-only), the static files (gzip).
+> - **Real**: `GET /api/status`, `POST` and `DELETE /api/pair`, `GET /api/system`, `GET` and `PUT /api/location`, `GET` and `PUT /api/display`, `GET` and `PUT /api/alerts` (§14), `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (read-only), the static files (gzip).
 > - **Empty, without error** (the page opens without a red message): `GET /api/services` (nothing configured), `GET /api/presets` (none), `GET /api/update` (`inactif`).
 > - **`501` `non_disponible`**, with the sentence “This function is not available on this screen yet.” in the screen language: Wi-Fi scan and change, saving and testing the STT / LLM / TTS services, export / import, update and rollback.
 > - **Known gaps with the text below**: `GET /api/geocode` is **synchronous for the page** (the request waits up to 30 s for the answer, so it holds the server's single task: rule 7 is not kept for this one route), but the network work is done by the search module's own low-priority task, never by the server's task or the screen's; beyond 5 open connections the oldest is closed instead of answering `503` (rule 8); `validee` is always `true` (no rollback yet); `compile_le` is the local time of the build PC, without “Z”; the `fuseau` reported is the saved city's, **not** the zone the on-screen clock uses (the clock is still fixed on Europe/Paris).
@@ -290,6 +290,31 @@ Seven languages (ADR-0006), in this fixed order and with these **indices, which 
 - **Who wrote the translations**: French is the author's language and the only one he reviews. The six others (en, de, nl, es, it, tr) were written by an AI (Claude) from French and English, **not reviewed by a speaker**; the dates and a few labels are reused as they are from the Tab5 project's language files, which have been used on a real screen. German and Dutch text length on the real screen, and rendering on a board, are **not verified**.
 - **Open-Meteo attribution.** Open-Meteo's data are under CC BY 4.0 (research note 03: licence read, attribution wording "not specified"; the plan makes the credit a condition of the licence). The page therefore always shows, in the page's language, "Weather data: Open-Meteo (CC BY 4.0 license)" with a link to `https://open-meteo.com/` (text id `meteo.attribution` in `i18n/page.yaml`). Whether and where the **device's own screen** must show it is not decided in this document.
 
+## 14. Official alerts (Vigie)
+
+Written on 07/11/2026 with [ADR-0009](decisions/0009-alertes-officielles-par-vigie.md). The screen shows the official weather alerts of the author's own service, Vigie, **only while one is in force**; these four settings drive it. They are one group, like the display.
+
+`GET /api/alerts` →
+```json
+{"actives": true, "adresse": "", "periode_min": 15, "niveau_min": "yellow",
+ "adresse_publique": "https://vigie.auxfilsdesidees.fr",
+ "niveaux": ["yellow", "orange", "red"]}
+```
+`PUT /api/alerts` accepts the four modifiable fields (`actives`, `adresse`, `periode_min`, `niveau_min`), each optional (absent = unchanged), and answers like `GET` with the saved values. **All or nothing**: if one value is refused, nothing is saved.
+
+| Field | Rule |
+|---|---|
+| `actives` | `true` (default) or `false`. `false`: no request at all, no banner, and the answer in memory is forgotten. A string or a number is refused. |
+| `adresse` | the base address of the Vigie service, **`https://` required** (`http://` is refused: a warning read in clear could be forged). Empty or blank = the public instance (`adresse_publique`, the default; `adresse` is then returned as `""`). At most 80 bytes, ASCII only, no space, no `?`, `#`, `@` or `\`; a port and a path are allowed; spaces and a trailing `/` around it are removed and the scheme is lower-cased. |
+| `periode_min` | whole minutes **from 10 to 180**, default 15. `15.5` is refused, not rounded. The public instance is rate-limited and "not meant to build a service on": the device sends **one request per period**, never a burst at start-up, and backs off after an error. |
+| `niveau_min` | `yellow` (default), `orange` or `red`: the lowest level shown on the screen. |
+
+What is sent to the Vigie address: the chosen city's position rounded to three decimals (about 110 m) and the screen language (`GET <adresse>/v1/vigilances?lat=…&lon=…&lang=<screen language>,en`). Nothing else, no key, no device identifier.
+
+`422` errors (field in `champ`): `actives_invalide` ("Alerts must be switched on or off."), `adresse_invalide` ("The Vigie address must start with https://."), `periode_invalide` ("The period must be a whole number of minutes, from 10 to 180."), `niveau_inconnu` ("This alert level doesn't exist.").
+
+Changing a value reaches the network client within about 5 s; it then asks Vigie at once if the request changed, but never twice within one minute.
+
 ---
 
 # Français
@@ -299,7 +324,7 @@ Rédigé le 06/11/2026 (piste B), langues ajoutées le 06/11/2026. **Contrat de 
 Décisions d'origine : [ADR-0002](decisions/0002-assistant-vocal-en-cascade.md) (trois services), [ADR-0003](decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md) (page servie par l'appareil, HTTP local, jeton d'appairage, secrets, mise à jour), [ADR-0006](decisions/0006-ecran-en-sept-langues.md) (sept langues).
 
 > **État du firmware — jalon « réglages », 06/11/2026 : sous-ensemble V1, mode station Wi-Fi seulement (ni point d'accès, ni portail captif).** Servi par `main/serveur_web.cpp` sur le port 80 ; la logique est dans le noyau pur (`components/core/include/ecran/api_reglages.hpp`), testée sur le PC avec des mutations. **Compilé, pas encore constaté sur une carte** (voir [mesures/reglages.md](mesures/reglages.md)).
-> - **Réel** : `GET /api/status`, `POST` et `DELETE /api/pair`, `GET /api/system`, `GET` et `PUT /api/location`, `GET` et `PUT /api/display`, `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (lecture seule), les fichiers statiques (gzip).
+> - **Réel** : `GET /api/status`, `POST` et `DELETE /api/pair`, `GET /api/system`, `GET` et `PUT /api/location`, `GET` et `PUT /api/display`, `GET` et `PUT /api/alerts` (§14), `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (lecture seule), les fichiers statiques (gzip).
 > - **Vide, sans erreur** (la page s'ouvre sans message rouge) : `GET /api/services` (rien de réglé), `GET /api/presets` (aucun), `GET /api/update` (`inactif`).
 > - **`501` `non_disponible`**, avec la phrase « Cette fonction n’est pas encore disponible sur cet écran. » dans la langue de l'écran : scan et changement de Wi-Fi, enregistrement et test des services STT / LLM / TTS, export / import, mise à jour et retour arrière.
 > - **Écarts connus avec le texte ci-dessous** : `GET /api/geocode` est **synchrone pour la page** (la requête attend la réponse jusqu'à 30 s, donc garde l'unique tâche du serveur : la règle 7 n'est pas tenue pour cette seule route), mais le travail réseau est fait par la tâche d'arrière-plan du module de recherche, jamais par celle du serveur ni par celle de l'écran ; au-delà de 5 connexions ouvertes, la plus ancienne est fermée au lieu de répondre `503` (règle 8) ; `validee` vaut toujours `true` (pas encore de retour arrière) ; `compile_le` est l'heure locale du PC de compilation, sans « Z » ; le `fuseau` rendu est celui de la ville enregistrée, **pas** celui que l'horloge de l'écran utilise (l'horloge est encore fixée sur Europe/Paris).
@@ -573,3 +598,28 @@ Sept langues (ADR-0006), dans cet ordre figé et avec ces **indices qui ne chang
 - **Repli**, sur l'appareil comme sur la page : la langue demandée, puis l'anglais, puis le texte français lui-même. Une phrase n'est donc jamais vide ni remplacée par un code. Si un fichier de langue ne se charge pas, la page prend l'anglais, puis le français ; si aucun ne se charge, elle montre les identifiants de texte (visible et facile à repérer).
 - **Qui a écrit les traductions** : le français est la langue de l'auteur et la seule qu'il relit. Les six autres (en, de, nl, es, it, tr) sont écrites par une IA (Claude) depuis le français et l'anglais, **non relues par un locuteur** ; les dates et quelques libellés sont repris tels quels des fichiers de langue du projet Tab5, qui ont servi sur un vrai écran. La longueur des textes allemands et néerlandais sur l'écran réel, et le rendu sur une carte, sont **non vérifiés**.
 - **Attribution d'Open-Meteo.** Les données d'Open-Meteo sont sous licence CC BY 4.0 (note de recherche 03 : licence lue, formulation d'attribution « non précisée » ; le plan fait de la mention une condition de la licence). La page affiche donc toujours, dans la langue de la page, « Données météo : Open-Meteo (licence CC BY 4.0) » avec un lien vers `https://open-meteo.com/` (identifiant de texte `meteo.attribution` dans `i18n/page.yaml`). Si et où **l'écran de l'appareil** doit la montrer n'est pas décidé dans ce document.
+
+## 14. Alertes officielles (Vigie)
+
+Écrit le 07/11/2026 avec l'[ADR-0009](decisions/0009-alertes-officielles-par-vigie.md). L'écran montre les alertes météo officielles du service de l'auteur, Vigie, **seulement tant qu'une est en vigueur** ; ces quatre réglages le pilotent. Ils forment un groupe, comme l'affichage.
+
+`GET /api/alerts` →
+```json
+{"actives": true, "adresse": "", "periode_min": 15, "niveau_min": "yellow",
+ "adresse_publique": "https://vigie.auxfilsdesidees.fr",
+ "niveaux": ["yellow", "orange", "red"]}
+```
+`PUT /api/alerts` accepte les quatre champs modifiables (`actives`, `adresse`, `periode_min`, `niveau_min`), chacun facultatif (absent = inchangé), et répond comme `GET` avec les valeurs enregistrées. **Tout ou rien** : si une valeur est refusée, rien n'est enregistré.
+
+| Champ | Règle |
+|---|---|
+| `actives` | `true` (défaut) ou `false`. `false` : aucune requête, aucun bandeau, et la réponse gardée en mémoire est oubliée. Un texte ou un nombre est refusé. |
+| `adresse` | l'adresse de base du service Vigie, **`https://` obligatoire** (`http://` est refusé : un avertissement lu en clair pourrait être falsifié). Vide ou faite d'espaces = l'instance publique (`adresse_publique`, le défaut ; `adresse` est alors rendue `""`). Au plus 80 octets, ASCII seulement, ni espace, ni `?`, `#`, `@` ou `\` ; un port et un chemin sont permis ; les espaces autour et un `/` final sont retirés et le schéma est mis en minuscules. |
+| `periode_min` | minutes entières **de 10 à 180**, 15 par défaut. `15.5` est refusé, pas arrondi. L'instance publique est limitée et « n'est pas faite pour bâtir un service dessus » : l'appareil envoie **une requête par période**, jamais de rafale au démarrage, et s'éloigne après une erreur. |
+| `niveau_min` | `yellow` (défaut), `orange` ou `red` : le niveau le plus bas montré à l'écran. |
+
+Ce qui part vers l'adresse de Vigie : la position de la ville choisie arrondie à trois décimales (environ 110 m) et la langue de l'écran (`GET <adresse>/v1/vigilances?lat=…&lon=…&lang=<langue de l'écran>,en`). Rien d'autre, aucune clé, aucun identifiant de l'appareil.
+
+Erreurs `422` (champ dans `champ`) : `actives_invalide` (« Les alertes doivent être activées ou désactivées. »), `adresse_invalide` (« L’adresse de Vigie doit commencer par https://. »), `periode_invalide` (« La période doit être un nombre entier de minutes, de 10 à 180. »), `niveau_inconnu` (« Ce niveau d’alerte n’existe pas. »).
+
+Un changement arrive au client réseau en 5 s environ ; il interroge alors Vigie tout de suite si la requête a changé, mais jamais deux fois en moins d'une minute.

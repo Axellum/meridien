@@ -4,7 +4,7 @@
 
 A non-obvious decision gets one numbered page here (next number), with the context, the choice, the alternatives that were
 rejected and what would reopen it. Read the relevant page **before** "fixing" something that looks wrong. The pages are
-written in French; each of 0001 to 0005 and 0008 opens with a short English summary. A summary says no more than the French text
+written in French; each of 0001 to 0005, 0008 and 0009 opens with a short English summary. A summary says no more than the French text
 below it, including its "proposed" status.
 
 | No. | Decision | Status |
@@ -17,6 +17,7 @@ below it, including its "proposed" status.
 | [0006](0006-ecran-en-sept-langues.md) | The screen speaks seven languages, with the Tab5's translation system | principle decided by the owner (2026-11-06), details proposed |
 | [0007](0007-reglages-a-l-ecran-et-installation-guidee.md) | Every setting on the screen, the web page as a second way, a replayable guided first-start set-up | principle decided by the owner (2026-11-06), details proposed |
 | [0008](0008-ecran-principal-par-zones-themes-et-ciel-trame.md) | Main screen: one drawing object per zone, themes and decisions in the pure core, a dithered sky, original icons | proposed, awaiting the owner's validation (seen on PC renders only) |
+| [0009](0009-alertes-officielles-par-vigie.md) | Official weather alerts read from Vigie, shown only while one is in force, the issuer's words never rewritten | proposed, awaiting the owner's validation (checked on the PC only, not seen on a board) |
 
 Status as of 2026-11-06. "Proposed" means written by the AI agent from the research notes and not yet settled by the owner;
 the code follows it in the meantime. The open questions (wake word, local STT/TTS, project name, repository, licence, ESP-IDF
@@ -39,5 +40,6 @@ Une décision non évidente = une page numérotée ici (numéro suivant), avec l
 | [0006](0006-ecran-en-sept-langues.md) | L'écran parle sept langues, avec le système de traduction du Tab5 | principe décidé par Axel (06/11/2026), détails proposés |
 | [0007](0007-reglages-a-l-ecran-et-installation-guidee.md) | Tous les réglages à l'écran, la page web en second chemin, installation guidée au premier démarrage et rejouable | principe décidé par Axel (06/11/2026), détails proposés |
 | [0008](0008-ecran-principal-par-zones-themes-et-ciel-trame.md) | Écran principal : un objet de dessin par zone, thèmes et décisions dans le noyau pur, un ciel tramé, des icônes originales | proposée, à valider par Axel (vue sur rendus PC seulement) |
+| [0009](0009-alertes-officielles-par-vigie.md) | Alertes officielles lues chez Vigie, montrées seulement quand elles sont en vigueur, mots de l'émetteur jamais réécrits | proposée, à valider par Axel (constatée sur le PC seulement, jamais vue sur une carte) |
 
 Statut au 06/11/2026. « Proposée » = écrite par l'agent d'après les recherches, pas encore tranchée par Axel ; le code s'y conforme en attendant. Les questions ouvertes (mot d'activation, STT/TTS locaux, nom du projet, dépôt, licence, version d'ESP-IDF, fraîcheur du calendrier) sont listées dans [le plan](../plan.md#décisions-à-prendre-par-axel).
