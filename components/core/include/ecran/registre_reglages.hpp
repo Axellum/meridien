@@ -103,6 +103,12 @@ inline constexpr Option OPTIONS_PRESETS_TTS[4] = {{"openai", "OpenAI", false},
                                                   {"kokoro", "Kokoro (mon PC)", true},
                                                   {"personnalise", "Personnalisé", true}};
 
+// Alertes officielles de Vigie (ADR-0009, docs/api-reglages.md §14). « Oui » vient en premier : le défaut est l'indice 0, et
+// l'indice du niveau minimal est celui de vigie::NiveauMin (un test le compare, ce fichier n'inclut pas les en-têtes de Vigie).
+inline constexpr Option OPTIONS_OUI_NON[2] = {{"true", "Oui", true}, {"false", "Non", true}};
+inline constexpr Option OPTIONS_NIVEAUX_ALERTE[3] = {
+    {"yellow", "Jaune", true}, {"orange", "Orange", true}, {"red", "Rouge", true}};
+
 // ---- bornes (docs/api-reglages.md) --------------------------------------------------------------------------------------
 
 inline constexpr std::int32_t LUMINOSITE_MIN = 5; // §6 : un plancher évite un écran rendu illisible
@@ -117,6 +123,11 @@ inline constexpr std::int32_t CLE_MAX =
     256; // clés d'accès connues : de 40 à ~170 caractères ; la limite du corps JSON est 4 Ko
 inline constexpr std::int32_t RECHERCHE_LIEU_MIN = 3; // §5
 inline constexpr std::int32_t RECHERCHE_LIEU_MAX = 80;
+// §14. Les mêmes nombres que vigie::PERIODE_*_MIN et vigie::ADRESSE_MAX (test/host/test_registre_reglages.cpp les compare).
+inline constexpr std::int32_t ALERTES_PERIODE_MIN = 10; // minutes entre deux requêtes : l'instance publique est limitée
+inline constexpr std::int32_t ALERTES_PERIODE_MAX = 180;
+inline constexpr std::int32_t ALERTES_PERIODE_DEFAUT = 15;
+inline constexpr std::int32_t ALERTES_ADRESSE_MAX = 80; // octets
 
 namespace detail {
 
@@ -197,6 +208,20 @@ inline constexpr Reglage REGISTRE[] = {
     {"lieu.ville", Type::Lieu, Section::LieuMeteo, Etape::Lieu, "Ville", "L’écran en déduit la météo et l’heure.",
      RECHERCHE_LIEU_MIN, RECHERCHE_LIEU_MAX, 0, "", nullptr, 0, "", Longueur::Caracteres, false, "/api/location",
      "nom"},
+    // --- Lieu et météo : alertes officielles (hors installation guidée : les défauts conviennent) ---
+    {"alertes.actives", Type::Choix, Section::LieuMeteo, Etape::Aucune, "Alertes officielles",
+     "Affiche sur l’écran les alertes météo officielles relayées par Vigie, tant qu’une est en vigueur.", 0, 1, 0, "",
+     OPTIONS_OUI_NON, 2, "", Longueur::Caracteres, false, "/api/alerts", "actives"},
+    {"alertes.niveau", Type::Choix, Section::LieuMeteo, Etape::Aucune, "Niveau minimal",
+     "Les alertes moins graves ne s’affichent pas.", 0, 2, 0, "", OPTIONS_NIVEAUX_ALERTE, 3, "", Longueur::Caracteres,
+     false, "/api/alerts", "niveau_min"},
+    {"alertes.periode", Type::Nombre, Section::LieuMeteo, Etape::Aucune, "Mise à jour des alertes",
+     "L’écran demande les alertes à Vigie à ce rythme : 15 minutes par défaut, 10 au minimum.", ALERTES_PERIODE_MIN,
+     ALERTES_PERIODE_MAX, ALERTES_PERIODE_DEFAUT, "", nullptr, 0, "min", Longueur::Caracteres, false, "/api/alerts",
+     "periode_min"},
+    {"alertes.adresse", Type::Texte, Section::LieuMeteo, Etape::Aucune, "Adresse de Vigie",
+     "Laissez vide pour utiliser le service public de Vigie. Une adresse commence par https://.", 0,
+     ALERTES_ADRESSE_MAX, 0, "", nullptr, 0, "", Longueur::Octets, true, "/api/alerts", "adresse"},
     // --- Langue ---
     {"langue.ecran", Type::Choix, Section::Langue, Etape::Langue, "Langue de l’écran", "", 0, 6, 0, "", OPTIONS_LANGUES,
      i18n::NOMBRE_LANGUES, "", Longueur::Caracteres, false, "/api/display", "langue_ecran"},

@@ -12,6 +12,9 @@
 // Seuls les réglages que la page web ne sait pas (encore) enregistrer sont gardés ici : les trois services de l'assistant (leurs
 // préréglages, adresses, modèles, voix et clés), le Wi-Fi retenu pour le prochain démarrage et la progression de l'installation.
 //
+// Les alertes officielles (activées, adresse de Vigie, période, niveau minimal) suivent la même règle : leur source est
+// main/reglages_alertes.* (ce que lit `/api/alerts`), elles passent par `PortsAppareil::alertes / enregistrer_alertes`.
+//
 // Format en mémoire permanente (une clé NVS de 15 octets au plus ; l'espace « services » reçoit l'identifiant du registre tel quel) :
 //   espace « services »     : « stt.preset » … « tts.cle »     nombre (préréglages) ou texte (adresse, modèle, voix, clé)
 //   espace « wifi »         : « ssid », « mdp »                 textes ; écrits SEULEMENT quand la connexion a réussi
@@ -36,6 +39,7 @@
 #include "ecran/lieux_geocodage.hpp"
 #include "ecran/meteo_wmo.hpp"
 #include "ecran/registre_reglages.hpp"
+#include "ecran/reglages_alertes.hpp"
 #include "ecran/reglages_valeurs.hpp"
 
 namespace ecran {
@@ -98,6 +102,11 @@ class PortsAppareil {
     virtual void remettre_affichage_et_ville_par_defaut() = 0;
     virtual MeteoVue meteo() = 0;
 
+    // ---- alertes officielles de Vigie : la source de la page web (main/reglages_alertes.*), comme l'affichage
+    virtual reglages::Alertes alertes() = 0;
+    // Enregistre PUIS applique (le client réseau est prévenu). Faux : rien n'a changé.
+    virtual bool enregistrer_alertes(const reglages::Alertes &nouveau) = 0;
+
     // ---- Wi-Fi (main/reseau_wifi.h) : rien n'est bloquant
     virtual void wifi_scanner_lancer() = 0;
     virtual bool wifi_scanner_en_cours() = 0;
@@ -153,6 +162,15 @@ class HoteAppareil final : public HoteReglages {
         if (id == "affichage.luminosite") {
             return p_.affichage().luminosite;
         }
+        if (id == "alertes.actives") {
+            return p_.alertes().actives ? 0 : 1; // « Oui » est l'indice 0
+        }
+        if (id == "alertes.niveau") {
+            return static_cast<std::int32_t>(p_.alertes().niveau_min);
+        }
+        if (id == "alertes.periode") {
+            return p_.alertes().periode_min;
+        }
         char cle[16];
         std::int32_t valeur = 0;
         if ((r->type == registre::Type::Choix || r->type == registre::Type::Nombre) && cle_services(id, cle) &&
@@ -192,6 +210,19 @@ class HoteAppareil final : public HoteReglages {
             p_.enregistrer_affichage(a); // la source de la page web : elle applique la langue et le rétroéclairage
             return;
         }
+        if (id == "alertes.actives" || id == "alertes.niveau" || id == "alertes.periode") {
+            // La source de la page web : elle enregistre et prévient le client réseau.
+            reglages::Alertes a = p_.alertes();
+            if (id == "alertes.actives") {
+                a.actives = valeur == 0;
+            } else if (id == "alertes.niveau") {
+                a.niveau_min = vigie::niveau_min_depuis_indice(valeur);
+            } else {
+                a.periode_min = valeur;
+            }
+            p_.enregistrer_alertes(a);
+            return;
+        }
         char cle[16];
         if (cle_services(id, cle)) {
             m_.ecrire_nombre(stockage::ESPACE_SERVICES, cle, valeur);
@@ -210,6 +241,21 @@ class HoteAppareil final : public HoteReglages {
         if (id == "lieu.ville") {
             reglages::Zone z;
             return p_.zone_lire(z) ? lieux::libelle(z, sortie, capacite) : 0;
+        }
+        if (id == "alertes.adresse") { // vide = l'instance publique de Vigie
+            const reglages::Alertes a = p_.alertes();
+            std::size_t n = 0;
+            while (a.adresse[n] != '\0') {
+                ++n;
+            }
+            if (n + 1 > capacite) { // jamais rendue à moitié : comme les autres textes, rien
+                return 0;
+            }
+            for (std::size_t i = 0; i < n; ++i) {
+                sortie[i] = a.adresse[i];
+            }
+            sortie[n] = '\0';
+            return n;
         }
         const char *espace = nullptr;
         char cle[16];
@@ -231,6 +277,14 @@ class HoteAppareil final : public HoteReglages {
         }
         if (registre::valider_texte(*r, valeur) != registre::ErreurTexte::Aucune) {
             return; // l'écran valide avant ; ce garde-fou empêche d'enregistrer ce que l'API web refuserait
+        }
+        if (id == "alertes.adresse") {
+            // https:// obligatoire, vide = instance publique : les règles de l'API (reglages_alertes.hpp).
+            const reglages::ResultatAlertes v = reglages::appliquer_adresse(p_.alertes(), valeur);
+            if (v.erreur == reglages::ErreurAlertes::Aucune) {
+                p_.enregistrer_alertes(v.valeur);
+            }
+            return;
         }
         const char *espace = nullptr;
         char cle[16];
@@ -444,6 +498,10 @@ class HoteAppareil final : public HoteReglages {
         m_.effacer_espace(stockage::ESPACE_SERVICES);
         m_.effacer_espace(stockage::ESPACE_WIFI);
         p_.remettre_affichage_et_ville_par_defaut();
+        // Les alertes aussi : activées, instance publique, 15 min, dès le jaune. Déjà le cas : rien à écrire.
+        if (!(p_.alertes() == reglages::Alertes{})) {
+            p_.enregistrer_alertes(reglages::Alertes{});
+        }
         definir_progression(installation::apres_reinitialisation());
         nb_lieux_ = 0;
         recherche_ = RechercheLieu::Inactive;

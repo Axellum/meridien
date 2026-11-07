@@ -4,8 +4,8 @@
 // sur le PC avec un faux « hôte » (test/host/test_api_reglages.cpp).
 //
 // SOUS-ENSEMBLE V1 (premier firmware qui sert la page, jalon « réglages ») :
-//   réel   : /api/status, /api/pair (POST, DELETE), /api/system, /api/location (GET, PUT), /api/display (GET, PUT), /api/weather,
-//            /api/geocode, /api/wifi (GET en lecture seule)
+//   réel   : /api/status, /api/pair (POST, DELETE), /api/system, /api/location (GET, PUT), /api/display (GET, PUT), /api/alerts (GET, PUT),
+//            /api/weather, /api/geocode, /api/wifi (GET en lecture seule)
 //   vide   : /api/services (rien de réglé), /api/presets (aucun), /api/update (inactif) : la page s'affiche sans erreur
 //   501    : changer de réseau Wi-Fi, enregistrer ou tester un service, export / import, mise à jour, retour arrière.
 //            Ces routes existent dans le contrat ; elles répondent « pas encore disponible » dans la langue de l'écran.
@@ -16,6 +16,7 @@
 //
 // L'hôte (`Hote`) fournit (types plus bas) :
 //   reglages::Affichage affichage() const;                 bool enregistrer_affichage(const reglages::Affichage &);
+//   reglages::Alertes alertes() const;                     bool enregistrer_alertes(const reglages::Alertes &);
 //   bool zone_lire(reglages::Zone &);                      bool zone_enregistrer(const reglages::Zone &);
 //   bool meteo_lire(MeteoApercu &);                        InfoSysteme systeme();      InfoWifi wifi();
 //   Telechargement telecharger(std::string_view url, char *tampon, std::size_t capacite, std::size_t &taille);
@@ -34,6 +35,7 @@
 #include "ecran/i18n.hpp"
 #include "ecran/json_mini.hpp"
 #include "ecran/meteo_wmo.hpp"
+#include "ecran/reglages_alertes.hpp"
 #include "ecran/reglages_valeurs.hpp"
 
 namespace ecran::api {
@@ -179,6 +181,10 @@ template <class Hote> class Api {
             return affichage_lire(t);
         if (est(rq, Methode::Put, "/api/display"))
             return affichage_ecrire(rq, t);
+        if (est(rq, Methode::Get, "/api/alerts"))
+            return alertes_lire(t);
+        if (est(rq, Methode::Put, "/api/alerts"))
+            return alertes_ecrire(rq, t);
         if (est(rq, Methode::Get, "/api/weather"))
             return meteo(t);
         if (est(rq, Methode::Get, "/api/geocode"))
@@ -489,6 +495,50 @@ template <class Hote> class Api {
         if (!(v.valeur == avant) && !hote_.enregistrer_affichage(v.valeur))
             return panne(t);
         return affichage_lire(t);
+    }
+
+    // Alertes officielles de Vigie (docs/api-reglages.md §14). `adresse` est vide tant que l'instance publique est utilisée.
+    constexpr Reponse alertes_lire(const Tampons &t) noexcept {
+        const reglages::Alertes a = hote_.alertes();
+        return corps_json(t, 200, [&](Ecrivain &e) {
+            e.ouvrir_objet();
+            e.champ_booleen("actives", a.actives);
+            e.champ("adresse", std::string_view(a.adresse));
+            e.champ_entier("periode_min", a.periode_min);
+            e.champ("niveau_min", reglages::code(a.niveau_min));
+            e.champ("adresse_publique", vigie::ADRESSE_PUBLIQUE);
+            e.cle("niveaux");
+            e.ouvrir_tableau();
+            for (std::string_view niveau : reglages::CODES_NIVEAU_MIN)
+                e.chaine(niveau);
+            e.fermer_tableau();
+            e.fermer_objet();
+        });
+    }
+
+    constexpr Reponse alertes_ecrire(const Requete &rq, const Tampons &t) noexcept {
+        json::Valeur objet;
+        Reponse refus;
+        if (!lire_objet(rq, t, objet, refus))
+            return refus;
+        const reglages::Alertes avant = hote_.alertes();
+        const reglages::ResultatAlertes v = reglages::valider_alertes(objet, avant);
+        switch (v.erreur) {
+        case reglages::ErreurAlertes::Actives:
+            return erreur(t, 422, "actives_invalide", "Les alertes doivent être activées ou désactivées.", "actives");
+        case reglages::ErreurAlertes::Adresse:
+            return erreur(t, 422, "adresse_invalide", "L’adresse de Vigie doit commencer par https://.", "adresse");
+        case reglages::ErreurAlertes::Periode:
+            return erreur(t, 422, "periode_invalide", "La période doit être un nombre entier de minutes, de 10 à 180.",
+                          "periode_min");
+        case reglages::ErreurAlertes::NiveauMin:
+            return erreur(t, 422, "niveau_inconnu", "Ce niveau d’alerte n’existe pas.", "niveau_min");
+        case reglages::ErreurAlertes::Aucune:
+            break;
+        }
+        if (!(v.valeur == avant) && !hote_.enregistrer_alertes(v.valeur))
+            return panne(t);
+        return alertes_lire(t);
     }
 
     constexpr Reponse meteo(const Tampons &t) noexcept {

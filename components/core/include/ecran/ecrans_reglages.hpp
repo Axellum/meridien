@@ -60,6 +60,12 @@ inline constexpr Rangee RANGEES_LIEU[] = {
     {Genre::Reglage, "lieu.ville", Editeur::RechercheVille, true},
     {Genre::Info, "info.meteo", Editeur::Aucun, true},
 };
+inline constexpr Rangee RANGEES_ALERTES[] = {
+    {Genre::Reglage, "alertes.actives", Editeur::Pastilles, true},
+    {Genre::Reglage, "alertes.niveau", Editeur::Pastilles, true},
+    {Genre::Reglage, "alertes.periode", Editeur::Curseur, true},
+    {Genre::Reglage, "alertes.adresse", Editeur::Clavier, true},
+};
 inline constexpr Rangee RANGEES_LANGUE[] = {
     {Genre::Reglage, "langue.ecran", Editeur::Pastilles, true},
     {Genre::Reglage, "langue.assistant", Editeur::Pastilles, true},
@@ -109,6 +115,7 @@ constexpr Page page(std::string_view id, Section section, std::string_view titre
 inline constexpr Page PAGES[] = {
     detail::page("reseau", Section::Reseau, "Wi-Fi", detail::RANGEES_RESEAU),
     detail::page("lieu", Section::LieuMeteo, "Ville", detail::RANGEES_LIEU),
+    detail::page("alertes", Section::LieuMeteo, "Alertes", detail::RANGEES_ALERTES),
     detail::page("langue", Section::Langue, "Langue", detail::RANGEES_LANGUE),
     detail::page("affichage", Section::Affichage, "Affichage", detail::RANGEES_AFFICHAGE),
     detail::page("assistant_stt", Section::AssistantVocal, "Comprendre ma voix", detail::RANGEES_STT),

@@ -187,4 +187,39 @@ constexpr ResultatAlertes valider_alertes(const json::Valeur &corps, const Alert
     return r;
 }
 
+// ---- l'adresse saisie sur l'écran de l'appareil ----------------------------------------------------------------------------
+
+// Rien, ou seulement des espaces et des tabulations : sur l'écran, c'est « remettre l'instance publique ».
+constexpr bool saisie_blanche(std::string_view saisie) noexcept {
+    for (const char c : saisie) {
+        if (c != ' ' && c != '\t')
+            return false;
+    }
+    return true;
+}
+
+// `actuel` avec l'adresse tapée au clavier de l'appareil : les mêmes règles que `valider_alertes` pour le champ « adresse »
+// (l'écran ne passe pas par l'API). Une saisie blanche remet l'instance publique ; sinon c'est la forme normalisée qui est gardée,
+// ou `erreur == Adresse` et `valeur` reste l'état actuel (https:// obligatoire, rien d'autre n'est accepté).
+constexpr ResultatAlertes appliquer_adresse(const Alertes &actuel, std::string_view saisie) noexcept {
+    ResultatAlertes r;
+    r.valeur = actuel;
+    Alertes n = actuel;
+    if (saisie_blanche(saisie)) {
+        n.adresse[0] = '\0';
+    } else {
+        char propre[vigie::ADRESSE_MAX + 1] = {};
+        const std::size_t n_octets = vigie::normaliser_adresse(saisie, propre, sizeof propre);
+        if (n_octets == 0) {
+            r.erreur = ErreurAlertes::Adresse;
+            return r;
+        }
+        for (std::size_t i = 0; i < n_octets; ++i)
+            n.adresse[i] = propre[i];
+        n.adresse[n_octets] = '\0';
+    }
+    r.valeur = n;
+    return r;
+}
+
 } // namespace ecran::reglages

@@ -14,10 +14,13 @@
 #include "ecran/i18n.hpp"
 #include "ecran/presets_services.hpp"
 #include "ecran/registre_reglages.hpp"
+#include "ecran/reglages_alertes.hpp"
 #include "mini.hpp"
 
 using namespace ecran::registre;
 using ecran::i18n::est_une_cle;
+namespace vigie = ecran::vigie;
+namespace regl = ecran::reglages;
 
 namespace {
 
@@ -48,6 +51,10 @@ constexpr ChampApi CONTRAT_API[] = {
     {"/api/display", "langue_assistant", Couverture::Direct},
     {"/api/display", "theme", Couverture::Direct},
     {"/api/display", "luminosite", Couverture::Direct},
+    {"/api/alerts", "actives", Couverture::Direct},
+    {"/api/alerts", "adresse", Couverture::Direct},
+    {"/api/alerts", "periode_min", Couverture::Direct},
+    {"/api/alerts", "niveau_min", Couverture::Direct},
     {"/api/services/{id}", "preset", Couverture::Direct},
     {"/api/services/{id}", "url", Couverture::Direct},
     {"/api/services/{id}", "modele", Couverture::Direct},
@@ -103,7 +110,7 @@ constexpr int identifiants_uniques_et_bien_formes() {
         for (std::size_t j = i + 1; j < NOMBRE_REGLAGES; ++j)
             VERIFIER(REGISTRE[i].id != REGISTRE[j].id);
     }
-    VERIFIER(NOMBRE_REGLAGES == 20);
+    VERIFIER(NOMBRE_REGLAGES == 24);
     return 0;
 }
 
@@ -174,7 +181,7 @@ constexpr int chaque_nombre_a_une_plage_et_un_defaut_sur() {
         VERIFIER(r.defaut >= r.min && r.defaut <= r.max);
         VERIFIER(!r.unite.empty());
     }
-    VERIFIER(nombres == 1); // la luminosité
+    VERIFIER(nombres == 2); // la luminosité et la période des alertes
     const Reglage *lum = chercher("affichage.luminosite");
     VERIFIER(lum->min == 5 && lum->max == 100); // docs/api-reglages.md §6
     VERIFIER(lum->defaut == LUMINOSITE_DEFAUT && LUMINOSITE_DEFAUT == 75);
@@ -287,15 +294,17 @@ constexpr int les_libelles_et_les_aides_sont_des_cles_de_traduction() {
 }
 
 constexpr int les_sections_et_les_etapes_sont_coherentes() {
-    // Réseau 2, Lieu 1, Langue 2, Affichage 2, Assistant 13, Appareil 0 : l'appareil n'a que des actions et des informations
-    VERIFIER(compter_section(Section::Reseau) == 2 && compter_section(Section::LieuMeteo) == 1);
+    // Réseau 2, Lieu et météo 5 (la ville et les 4 alertes), Langue 2, Affichage 2, Assistant 13, Appareil 0 : l'appareil n'a que
+    // des actions et des informations
+    VERIFIER(compter_section(Section::Reseau) == 2 && compter_section(Section::LieuMeteo) == 5);
     VERIFIER(compter_section(Section::Langue) == 2 && compter_section(Section::Affichage) == 2);
     VERIFIER(compter_section(Section::AssistantVocal) == 13 && compter_section(Section::Appareil) == 0);
     // L'installation : langue, Wi-Fi, lieu, affichage, assistant ont des réglages ; téléphone et récapitulatif n'en ont pas.
     VERIFIER(compter_etape(Etape::Langue) == 1 && compter_etape(Etape::Wifi) == 2 && compter_etape(Etape::Lieu) == 1);
     VERIFIER(compter_etape(Etape::Affichage) == 2 && compter_etape(Etape::Assistant) == 14);
-    VERIFIER(compter_etape(Etape::Telephone) == 0 && compter_etape(Etape::Recapitulatif) == 0 &&
-             compter_etape(Etape::Aucune) == 0);
+    VERIFIER(compter_etape(Etape::Telephone) == 0 && compter_etape(Etape::Recapitulatif) == 0);
+    VERIFIER(compter_etape(Etape::Aucune) ==
+             4); // les quatre alertes : hors de l'installation, leurs défauts conviennent
     VERIFIER(NOMBRE_ETAPES == 7);
     return 0;
 }
@@ -402,6 +411,9 @@ constexpr int chaque_section_a_une_page_et_les_pages_suivent_l_ordre_des_section
     VERIFIER(PAGES[page_de_section(Section::Reseau, 0)].id == "reseau" &&
              page_de_section(Section::Reseau, 1) == NOMBRE_PAGES);
     VERIFIER(PAGES[page_de_section(Section::Appareil, 0)].id == "appareil");
+    VERIFIER(pages_de_section(Section::LieuMeteo) == 2); // la ville, puis les alertes
+    VERIFIER(PAGES[page_de_section(Section::LieuMeteo, 0)].id == "lieu" &&
+             PAGES[page_de_section(Section::LieuMeteo, 1)].id == "alertes");
     for (std::size_t p = 1; p < NOMBRE_PAGES; ++p)
         VERIFIER(static_cast<int>(PAGES[p - 1].section) <= static_cast<int>(PAGES[p].section));
     for (std::size_t p = 0; p < NOMBRE_PAGES; ++p) {
@@ -566,6 +578,49 @@ constexpr int le_catalogue_des_presets_est_coherent() {
     return 0;
 }
 
+// ---- les alertes officielles (ADR-0009) ---------------------------------------------------------------------------------
+
+constexpr int les_reglages_d_alertes_suivent_le_noyau_des_alertes() {
+    // Les mêmes nombres que le noyau des alertes : le registre n'inclut pas ses en-têtes, ce test est le seul lien.
+    VERIFIER(ALERTES_PERIODE_MIN == vigie::PERIODE_MIN_MIN && ALERTES_PERIODE_MAX == vigie::PERIODE_MAX_MIN);
+    VERIFIER(ALERTES_PERIODE_DEFAUT == vigie::PERIODE_DEFAUT_MIN);
+    VERIFIER(ALERTES_ADRESSE_MAX == static_cast<std::int32_t>(vigie::ADRESSE_MAX));
+    const Reglage &periode = *chercher("alertes.periode");
+    VERIFIER(periode.min == 10 && periode.max == 180 && periode.defaut == 15 && periode.unite == "min");
+    VERIFIER(!nombre_valide(periode, 9) && nombre_valide(periode, 10) && nombre_valide(periode, 180) &&
+             !nombre_valide(periode, 181));
+    VERIFIER(nombre_depuis_nvs(periode, 1) == 15 && nombre_depuis_nvs(periode, 60) == 60); // un NVS abîmé : le défaut
+    // Le niveau minimal : l'indice de l'option est celui de vigie::NiveauMin, son code celui de l'API.
+    const Reglage &niveau = *chercher("alertes.niveau");
+    VERIFIER(niveau.nb_options == vigie::NOMBRE_NIVEAUX_MIN);
+    VERIFIER(niveau.defaut == static_cast<std::int32_t>(vigie::NiveauMin::Jaune));
+    for (std::size_t i = 0; i < niveau.nb_options; ++i) {
+        VERIFIER(niveau.options[i].code == regl::code(static_cast<vigie::NiveauMin>(i)));
+        VERIFIER(niveau.options[i].traduire);
+    }
+    // « Oui » vient en premier : défaut = indice 0 = « true » dans l'API.
+    const Reglage &actives = *chercher("alertes.actives");
+    VERIFIER(actives.nb_options == 2 && actives.defaut == 0);
+    VERIFIER(actives.options[0].code == "true" && actives.options[1].code == "false");
+    // L'adresse : facultative (vide = instance publique), comptée en octets, au plus vigie::ADRESSE_MAX.
+    const Reglage &adresse = *chercher("alertes.adresse");
+    VERIFIER(adresse.type == Type::Texte && adresse.facultatif && adresse.longueur == Longueur::Octets);
+    VERIFIER(adresse.max == 80 && adresse.min == 0);
+    char texte[82] = {};
+    for (int i = 0; i < 81; ++i)
+        texte[i] = 'a';
+    VERIFIER(valider_texte(adresse, "") == ErreurTexte::Aucune);
+    VERIFIER(valider_texte(adresse, std::string_view(texte, 80)) == ErreurTexte::Aucune);
+    VERIFIER(valider_texte(adresse, std::string_view(texte, 81)) == ErreurTexte::TropLong);
+    // Les quatre : dans « Lieu et météo », hors de l'installation guidée (les défauts conviennent), sur la route /api/alerts.
+    for (const char *id : {"alertes.actives", "alertes.niveau", "alertes.periode", "alertes.adresse"}) {
+        const Reglage *r = chercher(id);
+        VERIFIER(r != nullptr && r->section == Section::LieuMeteo && r->etape == Etape::Aucune);
+        VERIFIER(r->route == "/api/alerts");
+    }
+    return 0;
+}
+
 #define LISTE(X)                                                                                                       \
     X(identifiants_uniques_et_bien_formes)                                                                             \
     X(la_recherche_par_identifiant_retrouve_chaque_reglage)                                                            \
@@ -596,7 +651,8 @@ constexpr int le_catalogue_des_presets_est_coherent() {
     X(la_saisie_d_un_texte_est_controlee)                                                                              \
     X(les_options_de_chaque_service_sont_les_presets_qui_le_documentent)                                               \
     X(google_n_a_pas_d_audio_et_lm_studio_non_plus)                                                                    \
-    X(le_catalogue_des_presets_est_coherent)
+    X(le_catalogue_des_presets_est_coherent)                                                                           \
+    X(les_reglages_d_alertes_suivent_le_noyau_des_alertes)
 
 TESTS_A_LA_COMPILATION(LISTE)
 

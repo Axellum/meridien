@@ -29,6 +29,9 @@ struct FauxHote {
     std::size_t nom_max = 0; // > 0 : le « NVS » garde au plus ce nombre d'octets du nom
     int enreg_affichage = 0;
     int enreg_zone = 0;
+    rg::Alertes al{};
+    int enreg_alertes = 0;
+    bool alertes_ecriture_ok = true;
     api::MeteoApercu meteo{};
     bool meteo_dispo = false;
     api::InfoSysteme sys{};
@@ -69,6 +72,14 @@ struct FauxHote {
     constexpr bool enregistrer_affichage(const rg::Affichage &a) {
         aff = a;
         ++enreg_affichage;
+        return true;
+    }
+    constexpr rg::Alertes alertes() const { return al; }
+    constexpr bool enregistrer_alertes(const rg::Alertes &a) {
+        ++enreg_alertes;
+        if (!alertes_ecriture_ok)
+            return false;
+        al = a;
         return true;
     }
     constexpr bool zone_lire(rg::Zone &z) {
@@ -248,6 +259,8 @@ constexpr Route ROUTES_PROTEGEES[] = {
     {Methode::Put, "/api/location"},
     {Methode::Get, "/api/display"},
     {Methode::Put, "/api/display"},
+    {Methode::Get, "/api/alerts"},
+    {Methode::Put, "/api/alerts"},
     {Methode::Get, "/api/weather"},
     {Methode::Get, "/api/geocode"},
     {Methode::Get, "/api/wifi"},
@@ -278,6 +291,7 @@ constexpr int sans_jeton_valide_tout_est_refuse_en_401() {
         VERIFIER(r.statut == 401);
     }
     VERIFIER(b.hote.enreg_zone == 0 && b.hote.enreg_affichage == 0 && b.hote.telechargements == 0);
+    VERIFIER(b.hote.enreg_alertes == 0);
     return 0;
 }
 
@@ -609,6 +623,91 @@ constexpr int affichage_refuse_tout_ou_rien() {
     return 0;
 }
 
+// ---- alertes officielles (docs/api-reglages.md §14) --------------------------------------------------------------------
+
+constexpr int alertes_lues_avec_les_valeurs_par_defaut_et_les_niveaux() {
+    Banc b;
+    VERIFIER(b.connecter());
+    const api::Reponse r = b.avec_jeton(Methode::Get, "/api/alerts");
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(booleen_est(r, "actives", true) && texte_est(r, "adresse", "") && entier_est(r, "periode_min", 15));
+    VERIFIER(texte_est(r, "niveau_min", "yellow"));
+    VERIFIER(
+        texte_est(r, "adresse_publique", "https://vigie.auxfilsdesidees.fr")); // pour l'afficher à côté d'un champ vide
+    VERIFIER(taille_de(r, "niveaux") == 3 && texte_est(r, "niveaux[0]", "yellow") &&
+             texte_est(r, "niveaux[1]", "orange") && texte_est(r, "niveaux[2]", "red"));
+    return 0;
+}
+
+constexpr int alertes_modifiees_champ_par_champ() {
+    Banc b;
+    VERIFIER(b.connecter());
+    auto put = [&](sv corps) { return b.avec_jeton(Methode::Put, "/api/alerts", {}, corps); };
+    api::Reponse r = put(R"({"periode_min":30})");
+    VERIFIER(r.statut == 200 && entier_est(r, "periode_min", 30) && booleen_est(r, "actives", true));
+    VERIFIER(b.hote.al.periode_min == 30 && b.hote.enreg_alertes == 1);
+    r = put(R"({"actives":false,"niveau_min":"red"})");
+    VERIFIER(r.statut == 200 && booleen_est(r, "actives", false) && texte_est(r, "niveau_min", "red"));
+    VERIFIER(entier_est(r, "periode_min", 30) && b.hote.enreg_alertes == 2);
+    r = put(
+        R"({"adresse":"  HTTPS://vigie.exemple.fr/  "})"); // normalisée avant d'être gardée, et c'est elle qui est rendue
+    VERIFIER(r.statut == 200 && texte_est(r, "adresse", "https://vigie.exemple.fr") && b.hote.enreg_alertes == 3);
+    VERIFIER(texte_est(r, "adresse_publique", "https://vigie.auxfilsdesidees.fr")); // le défaut ne change pas
+    r = put(R"({"adresse":""})");                                                   // vide : l'instance publique
+    VERIFIER(r.statut == 200 && texte_est(r, "adresse", "") && b.hote.al.adresse[0] == '\0' &&
+             b.hote.enreg_alertes == 4);
+    r = b.avec_jeton(Methode::Get, "/api/alerts");
+    VERIFIER(booleen_est(r, "actives", false) && texte_est(r, "niveau_min", "red") && entier_est(r, "periode_min", 30));
+    return 0;
+}
+
+constexpr int alertes_inchangees_n_ecrivent_rien() {
+    Banc b;
+    VERIFIER(b.connecter());
+    VERIFIER(b.avec_jeton(Methode::Put, "/api/alerts", {}, R"({"actives":true,"periode_min":15,"niveau_min":"yellow"})")
+                 .statut == 200);
+    VERIFIER(b.avec_jeton(Methode::Put, "/api/alerts", {}, "{}").statut == 200);
+    VERIFIER(b.avec_jeton(Methode::Put, "/api/alerts", {}, R"({"adresse":"   "})").statut == 200); // vide = déjà le cas
+    VERIFIER(b.hote.enreg_alertes ==
+             0); // pas d'écriture en mémoire permanente, et le client réseau n'est pas réveillé pour rien
+    return 0;
+}
+
+constexpr int alertes_refusees_tout_ou_rien() {
+    Banc b;
+    VERIFIER(b.connecter());
+    auto put = [&](sv corps) { return b.avec_jeton(Methode::Put, "/api/alerts", {}, corps); };
+    VERIFIER(est_erreur(put(R"({"actives":"oui"})"), 422, "actives_invalide", "actives"));
+    VERIFIER(est_erreur(put(R"({"actives":1})"), 422, "actives_invalide", "actives"));
+    VERIFIER(est_erreur(put(R"({"adresse":"http://vigie.exemple.fr"})"), 422, "adresse_invalide", "adresse"));
+    VERIFIER(est_erreur(put(R"({"adresse":"vigie.exemple.fr"})"), 422, "adresse_invalide", "adresse"));
+    VERIFIER(est_erreur(put(R"({"adresse":12})"), 422, "adresse_invalide", "adresse"));
+    VERIFIER(est_erreur(put(R"({"periode_min":9})"), 422, "periode_invalide", "periode_min"));
+    VERIFIER(est_erreur(put(R"({"periode_min":181})"), 422, "periode_invalide", "periode_min"));
+    VERIFIER(
+        est_erreur(put(R"({"periode_min":15.5})"), 422, "periode_invalide", "periode_min")); // refusée, pas arrondie
+    VERIFIER(est_erreur(put(R"({"periode_min":"15"})"), 422, "periode_invalide", "periode_min"));
+    VERIFIER(est_erreur(put(R"({"niveau_min":"vert"})"), 422, "niveau_inconnu", "niveau_min"));
+    VERIFIER(est_erreur(put(R"({"niveau_min":"Red"})"), 422, "niveau_inconnu", "niveau_min")); // les codes sont exacts
+    VERIFIER(est_erreur(put(R"({"actives":false,"niveau_min":"vert"})"), 422, "niveau_inconnu",
+                        "niveau_min")); // rien d'appliqué
+    VERIFIER(est_erreur(put("[]"), 400, "illisible"));
+    VERIFIER(est_erreur(put("pas du json"), 400, "illisible"));
+    VERIFIER(b.hote.enreg_alertes == 0 && b.hote.al == rg::Alertes{});
+    return 0;
+}
+
+constexpr int echec_d_ecriture_des_alertes_donne_500() {
+    Banc b;
+    VERIFIER(b.connecter());
+    b.hote.alertes_ecriture_ok = false;
+    const api::Reponse r = b.avec_jeton(Methode::Put, "/api/alerts", {}, R"({"periode_min":30})");
+    VERIFIER(est_erreur(r, 500, "interne"));
+    VERIFIER(b.hote.enreg_alertes == 1 &&
+             b.hote.al.periode_min == 15); // l'ancien état reste, et la réponse ne dit pas 30
+    return 0;
+}
+
 // ---- météo --------------------------------------------------------------------------------------------------------------
 
 constexpr int meteo_absente_ou_invalide() {
@@ -797,7 +896,7 @@ constexpr int jamais_de_secret_dans_les_reponses() {
     b.hote.meteo_dispo = true;
     b.hote.meteo.valide = true;
     b.hote.reponse_geocodage = GEOCODAGE_LYON;
-    constexpr sv GET[] = {"/api/system", "/api/location", "/api/display", "/api/weather",
+    constexpr sv GET[] = {"/api/system", "/api/location", "/api/display", "/api/alerts", "/api/weather",
                           "/api/wifi",   "/api/services", "/api/presets", "/api/update"};
     for (sv chemin : GET) {
         const api::Reponse r = b.avec_jeton(Methode::Get, chemin);
@@ -853,6 +952,10 @@ constexpr sv PHRASES[] = {
     "Connecté à « {ssid} ».",
     "Connexion en cours…",
     "La connexion a échoué.",
+    "Les alertes doivent être activées ou désactivées.",
+    "L’adresse de Vigie doit commencer par https://.",
+    "La période doit être un nombre entier de minutes, de 10 à 180.",
+    "Ce niveau d’alerte n’existe pas.",
 };
 
 constexpr int chaque_phrase_existe_dans_les_sept_langues() {
@@ -870,7 +973,7 @@ constexpr int chaque_phrase_existe_dans_les_sept_langues() {
     return 0;
 }
 
-constexpr int NB_SCENARIOS = 22;
+constexpr int NB_SCENARIOS = 26;
 
 // Un scénario d'erreur ou de message par numéro ; `chemin` dit où lire la phrase dans la réponse.
 constexpr api::Reponse scenario(Banc &b, int k, sv &chemin) {
@@ -923,12 +1026,20 @@ constexpr api::Reponse scenario(Banc &b, int k, sv &chemin) {
                             : k == 19 ? api::EtatWifi::Echec
                                       : api::EtatWifi::Deconnecte;
         return b.avec_jeton(Methode::Get, "/api/wifi");
-    default: { // 21 : verrou de l'appairage (un essai raté a déjà eu lieu au scénario 3)
+    case 21: { // verrou de l'appairage (un essai raté a déjà eu lieu au scénario 3)
         api::Reponse r;
         for (int i = 0; i < 6 && r.statut != 429; ++i)
             r = b.appeler(Methode::Post, "/api/pair", {}, R"({"code":"000000"})");
         return r;
     }
+    case 22:
+        return put("/api/alerts", R"({"actives":"oui"})");
+    case 23:
+        return put("/api/alerts", R"({"adresse":"http://vigie.exemple.fr"})");
+    case 24:
+        return put("/api/alerts", R"({"periode_min":9})");
+    default: // 25
+        return put("/api/alerts", R"({"niveau_min":"vert"})");
     }
 }
 
@@ -984,6 +1095,11 @@ constexpr int chaque_message_de_l_api_est_traduit_dans_chaque_langue() {
     X(affichage_modifie_champ_par_champ)                                                                               \
     X(affichage_inchange_n_ecrit_rien)                                                                                 \
     X(affichage_refuse_tout_ou_rien)                                                                                   \
+    X(alertes_lues_avec_les_valeurs_par_defaut_et_les_niveaux)                                                         \
+    X(alertes_modifiees_champ_par_champ)                                                                               \
+    X(alertes_inchangees_n_ecrivent_rien)                                                                              \
+    X(alertes_refusees_tout_ou_rien)                                                                                   \
+    X(echec_d_ecriture_des_alertes_donne_500)                                                                          \
     X(meteo_absente_ou_invalide)                                                                                       \
     X(meteo_valide_avec_libelle_dans_la_langue_de_l_ecran)                                                             \
     X(recherche_de_lieu_convertie_pour_la_page)                                                                        \

@@ -94,6 +94,10 @@ class PortsFaux final : public PortsAppareil {
     // la source de la page web
     reglages::Affichage etat_affichage;
     int enregistrements = 0;
+    // les alertes officielles : la source de la page web (main/reglages_alertes.*)
+    reglages::Alertes etat_alertes;
+    int enregistrements_alertes = 0;
+    bool alertes_ecriture_ok = true;
     int tentatives = 0; // appels, acceptés ou non
     reglages::Zone zone;
     bool zone_connue = true;
@@ -148,6 +152,15 @@ class PortsFaux final : public PortsAppareil {
         }
         ++enregistrements;
         etat_affichage = nouveau;
+        return true;
+    }
+    reglages::Alertes alertes() override { return etat_alertes; }
+    bool enregistrer_alertes(const reglages::Alertes &nouveau) override {
+        if (!alertes_ecriture_ok) {
+            return false;
+        }
+        ++enregistrements_alertes;
+        etat_alertes = nouveau;
         return true;
     }
     bool zone_lire(reglages::Zone &z) override {

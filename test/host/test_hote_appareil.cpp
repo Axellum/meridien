@@ -516,6 +516,94 @@ int valeur_abimee_en_memoire_donne_le_defaut() {
     return 0;
 }
 
+// ---- alertes officielles : la source de la page web ----------------------------------------------------------------------
+
+int alertes_passent_par_la_porte_de_la_page_web() {
+    Banc b;
+    VERIFIER(b.hote.nombre("alertes.actives") == 0 && b.hote.nombre("alertes.niveau") == 0); // Oui, jaune
+    VERIFIER(b.hote.nombre("alertes.periode") == 15);
+    b.hote.definir_nombre("alertes.actives", 1); // Non
+    VERIFIER(!b.ports.etat_alertes.actives && b.ports.enregistrements_alertes == 1);
+    b.hote.definir_nombre("alertes.niveau", 2); // rouge
+    VERIFIER(b.ports.etat_alertes.niveau_min == vigie::NiveauMin::Rouge && !b.ports.etat_alertes.actives);
+    b.hote.definir_nombre("alertes.periode", 45);
+    VERIFIER(b.ports.etat_alertes.periode_min == 45 && b.ports.etat_alertes.niveau_min == vigie::NiveauMin::Rouge);
+    VERIFIER(b.hote.nombre("alertes.actives") == 1 && b.hote.nombre("alertes.niveau") == 2);
+    VERIFIER(b.hote.nombre("alertes.periode") == 45 && b.ports.enregistrements_alertes == 3);
+    b.hote.definir_nombre("alertes.actives", 0);
+    VERIFIER(b.ports.etat_alertes.actives && b.hote.nombre("alertes.actives") == 0);
+    // Un changement fait ailleurs (la page web) se voit tout de suite : l'hôte n'en garde aucune copie.
+    b.ports.etat_alertes.periode_min = 90;
+    b.ports.etat_alertes.niveau_min = vigie::NiveauMin::Orange;
+    VERIFIER(b.hote.nombre("alertes.periode") == 90 && b.hote.nombre("alertes.niveau") == 1);
+    // Rien de ces réglages ne va dans la mémoire permanente de l'hôte : la source est une seule.
+    VERIFIER(b.magasin.nombres.empty() && b.magasin.textes.empty());
+    return 0;
+}
+
+int alertes_hors_plage_ou_hors_liste_sont_refusees() {
+    Banc b;
+    for (std::int32_t v : {-1, 2, 99})
+        b.hote.definir_nombre("alertes.actives", v); // deux options : 0 et 1 ; « pas choisi » n'existe pas ici
+    for (std::int32_t v : {-1, 3, 99})
+        b.hote.definir_nombre("alertes.niveau", v); // trois niveaux : 0 à 2
+    for (std::int32_t v : {-5, 0, 9, 181, 100000})  // la période : de 10 à 180
+        b.hote.definir_nombre("alertes.periode", v);
+    VERIFIER(b.ports.enregistrements_alertes == 0 && b.ports.etat_alertes == reglages::Alertes{});
+    b.hote.definir_nombre("alertes.periode", 10);
+    b.hote.definir_nombre("alertes.periode", 180);
+    VERIFIER(b.ports.enregistrements_alertes == 2 && b.ports.etat_alertes.periode_min == 180);
+    return 0;
+}
+
+int adresse_des_alertes_saisie_sur_l_ecran() {
+    Banc b;
+    char t[96];
+    VERIFIER(b.hote.texte("alertes.adresse", t, sizeof t) == 0 && t[0] == '\0'); // vide : l'instance publique
+    b.hote.definir_texte("alertes.adresse", "HTTPS://vigie.exemple.fr/");        // normalisée avant d'être gardée
+    VERIFIER(b.ports.enregistrements_alertes == 1);
+    VERIFIER(b.hote.texte("alertes.adresse", t, sizeof t) == sv("https://vigie.exemple.fr").size());
+    VERIFIER(sv(t) == "https://vigie.exemple.fr");
+    VERIFIER(sv(b.ports.etat_alertes.adresse) == "https://vigie.exemple.fr");
+    // Ce que l'API refuserait n'est pas enregistré non plus : http://, pas de schéma, mot de passe dans l'adresse, trop long.
+    for (sv refusee : {sv("http://vigie.exemple.fr"), sv("vigie.exemple.fr"), sv("https://moi:mdp@vigie.exemple.fr"),
+                       sv("https://vigie.exemple.fr/?a=b"), sv("https://")}) {
+        b.hote.definir_texte("alertes.adresse", refusee);
+    }
+    b.hote.definir_texte("alertes.adresse", "https://" + std::string(73, 'a')); // 81 octets : plus que le maximum
+    b.hote.definir_texte("alertes.adresse", "https://vigie\n.exemple.fr");      // octet de contrôle
+    VERIFIER(b.ports.enregistrements_alertes == 1 && sv(b.ports.etat_alertes.adresse) == "https://vigie.exemple.fr");
+    // Une adresse trop grande pour le tampon n'est jamais rendue à moitié.
+    char court[8];
+    VERIFIER(b.hote.texte("alertes.adresse", court, sizeof court) == 0 && court[0] == '\0');
+    // Vide, ou faite d'espaces : l'instance publique.
+    b.hote.definir_texte("alertes.adresse", "   ");
+    VERIFIER(b.ports.enregistrements_alertes == 2 && b.ports.etat_alertes.adresse[0] == '\0');
+    VERIFIER(b.hote.texte("alertes.adresse", t, sizeof t) == 0 && t[0] == '\0');
+    // Une adresse change seule : le reste des alertes reste ce qu'il était.
+    b.hote.definir_nombre("alertes.periode", 60);
+    b.hote.definir_texte("alertes.adresse", "https://vigie.exemple.fr:8443/vigie");
+    VERIFIER(b.ports.etat_alertes.periode_min == 60 &&
+             sv(b.ports.etat_alertes.adresse) == "https://vigie.exemple.fr:8443/vigie");
+    VERIFIER(b.magasin.textes.empty()); // la source est une seule
+    return 0;
+}
+
+int reinitialiser_remet_les_alertes_par_defaut() {
+    Banc b;
+    b.hote.reinitialiser(); // déjà par défaut : rien à écrire, le client réseau n'est pas réveillé pour rien
+    VERIFIER(b.ports.enregistrements_alertes == 0);
+    b.hote.definir_nombre("alertes.actives", 1);
+    b.hote.definir_nombre("alertes.niveau", 2);
+    b.hote.definir_nombre("alertes.periode", 120);
+    b.hote.definir_texte("alertes.adresse", "https://vigie.exemple.fr");
+    VERIFIER(b.ports.enregistrements_alertes == 4 && !(b.ports.etat_alertes == reglages::Alertes{}));
+    b.hote.reinitialiser();
+    VERIFIER(b.ports.enregistrements_alertes == 5 && b.ports.etat_alertes == reglages::Alertes{});
+    VERIFIER(b.hote.nombre("alertes.actives") == 0 && b.hote.nombre("alertes.periode") == 15);
+    return 0;
+}
+
 #define LISTE(X)                                                                                                       \
     X(affichage_passe_par_la_porte_de_la_page_web)                                                                     \
     X(un_seul_champ_change_a_la_fois)                                                                                  \
@@ -544,7 +632,11 @@ int valeur_abimee_en_memoire_donne_le_defaut() {
     X(progression_se_reprend_apres_un_redemarrage)                                                                     \
     X(octet_d_installation_abime_ne_passe_pas_pour_terminee)                                                           \
     X(reinitialiser_efface_ce_que_l_hote_garde)                                                                        \
-    X(valeur_abimee_en_memoire_donne_le_defaut)
+    X(valeur_abimee_en_memoire_donne_le_defaut)                                                                        \
+    X(alertes_passent_par_la_porte_de_la_page_web)                                                                     \
+    X(alertes_hors_plage_ou_hors_liste_sont_refusees)                                                                  \
+    X(adresse_des_alertes_saisie_sur_l_ecran)                                                                          \
+    X(reinitialiser_remet_les_alertes_par_defaut)
 
 } // namespace
 

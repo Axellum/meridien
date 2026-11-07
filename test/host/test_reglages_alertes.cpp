@@ -1,6 +1,7 @@
 // Tests du noyau pur : les quatre réglages des alertes officielles (reglages_alertes.hpp) : ce que l'API accepte, refuse, et ce que
 // la NVS relue devient quand elle est abîmée.
 #include <cstddef>
+#include <initializer_list>
 #include <string_view>
 
 #include "ecran/json_mini.hpp"
@@ -312,6 +313,61 @@ constexpr int l_egalite_regarde_chaque_champ_et_ignore_ce_qui_suit_le_zero() {
     return 0;
 }
 
+// L'écran de l'appareil et l'API rendent le même verdict pour une même adresse (même état de départ, même résultat).
+constexpr bool meme_verdict_que_l_api(std::string_view saisie) {
+    char corps[200] = {};
+    std::size_t n = 0;
+    for (const char c : std::string_view(R"({"adresse":")"))
+        corps[n++] = c;
+    for (const char c : saisie)
+        corps[n++] = c;
+    for (const char c : std::string_view(R"("})"))
+        corps[n++] = c;
+    const ResultatAlertes api = valider(std::string_view(corps, n), autre_etat());
+    const ResultatAlertes ecran = appliquer_adresse(autre_etat(), saisie);
+    return api.erreur == ecran.erreur && api.valeur == ecran.valeur;
+}
+
+constexpr int l_adresse_saisie_sur_l_ecran_suit_les_regles_de_l_api() {
+    // Une saisie blanche remet l'instance publique et ne touche à rien d'autre.
+    for (const std::string_view blanche : {"", " ", "   ", "\t", " \t "}) {
+        VERIFIER(saisie_blanche(blanche));
+        const ResultatAlertes r = appliquer_adresse(autre_etat(), blanche);
+        VERIFIER(r.erreur == ErreurAlertes::Aucune && r.valeur.adresse[0] == '\0');
+        VERIFIER(!r.valeur.actives && r.valeur.periode_min == 60 && r.valeur.niveau_min == vigie::NiveauMin::Rouge);
+    }
+    VERIFIER(!saisie_blanche("a") && !saisie_blanche(" a ") && !saisie_blanche("\n"));
+    // Une adresse valide est gardée sous sa forme normalisée.
+    const ResultatAlertes bonne = appliquer_adresse(Alertes{}, "  HTTPS://vigie.exemple.fr/  ");
+    VERIFIER(bonne.erreur == ErreurAlertes::Aucune && egal(bonne.valeur.adresse, "https://vigie.exemple.fr"));
+    VERIFIER(bonne.valeur.actives && bonne.valeur.periode_min == 15 &&
+             bonne.valeur.niveau_min == vigie::NiveauMin::Jaune);
+    // Ce que Vigie refuse est refusé, et l'état reste ce qu'il était (tout ou rien).
+    for (const std::string_view refusee :
+         {"http://vigie.exemple.fr", "vigie.exemple.fr", "https://", "https://u:p@vigie.exemple.fr",
+          "https://vigie.exemple.fr/?a=1", "https://vigie.exemple.fr/#a", "https://vigie exemple.fr"}) {
+        const ResultatAlertes r = appliquer_adresse(autre_etat(), refusee);
+        VERIFIER(r.erreur == ErreurAlertes::Adresse && r.valeur == autre_etat());
+    }
+    // Le maximum : 81 octets refusés, jamais coupés ; 80 octets : le verdict de l'API.
+    char longue[96] = {};
+    const std::string_view schema = "https://";
+    for (std::size_t i = 0; i < schema.size(); ++i)
+        longue[i] = schema[i];
+    for (std::size_t i = schema.size(); i < 81; ++i)
+        longue[i] = 'a';
+    const ResultatAlertes trop = appliquer_adresse(autre_etat(), std::string_view(longue, 81));
+    VERIFIER(trop.erreur == ErreurAlertes::Adresse && trop.valeur == autre_etat());
+    VERIFIER(meme_verdict_que_l_api(std::string_view(longue, 80)));
+    // Même verdict que l'API sur tout un échantillon, valides ou non.
+    for (const std::string_view s :
+         {"", "   ", "https://vigie.exemple.fr", "HTTPS://A.fr/", " https://x.fr ", "https://x.fr:8443/vigie",
+          "http://x.fr", "vigie.fr", "https://", "https://u:p@x.fr", "https://x.fr/?a", "https://x.fr/#a", "ftp://x.fr",
+          "https://x.fr//", "https://x y.fr"})
+        VERIFIER(meme_verdict_que_l_api(s));
+    return 0;
+}
+
 } // namespace
 
 #define LISTE(X)                                                                                                       \
@@ -331,7 +387,8 @@ constexpr int l_egalite_regarde_chaque_champ_et_ignore_ce_qui_suit_le_zero() {
     X(la_nvs_abimee_retombe_sur_les_valeurs_par_defaut)                                                                \
     X(l_adresse_utilisee_est_celle_des_reglages_ou_l_instance_publique)                                                \
     X(les_codes_de_niveau_vont_et_viennent)                                                                            \
-    X(l_egalite_regarde_chaque_champ_et_ignore_ce_qui_suit_le_zero)
+    X(l_egalite_regarde_chaque_champ_et_ignore_ce_qui_suit_le_zero)                                                    \
+    X(l_adresse_saisie_sur_l_ecran_suit_les_regles_de_l_api)
 
 TESTS_A_LA_COMPILATION(LISTE)
 
