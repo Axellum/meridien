@@ -19,6 +19,7 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 - [Tools and build](#tools-and-build)
 - [Chip, display and touch](#chip-display-and-touch)
 - [Flash, serial port and backup](#flash-serial-port-and-backup)
+- [Memory and watchdog](#memory-and-watchdog)
 - [Settings page and core](#settings-page-and-core)
 
 ---
@@ -241,6 +242,30 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 ---
 
+### Memory and watchdog
+
+#### The weather request fails: `esp-aes: Failed to allocate memory…` or `PK verify failed with error 0x4290`
+
+**Symptom.** `esp-aes: Failed to allocate memory for the array of DMA descriptors` (or `… for start alignment buffer`) about 80 ms after an HTTPS request starts, or, on later attempts, `esp-x509-crt-bundle: PK verify failed with error 0x4290` after 14 s, then `esp-tls: Failed to open new connection`. The weather stays “unavailable”; free internal RAM is below 20 kB (700 B at the lowest).
+
+**Cause.** The ESP32-P4 has about 455 kB of internal heap. By default (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384`) every `malloc()` up to 16 kB is served from it first, and mbedTLS takes its buffers from it too (16 kB in, 4 kB out, certificates). With the display buffers (216 kB), about 106 kB of task stacks and the objects of the screens, 111.6 kB were left before the first request and 74 kB once the web server was up. A handshake needs about 51 kB, and the hardware AES always needs a DMA-capable *internal* block for its descriptor array (`esp_aes_dma_core.c:458`). When one allocation fails the handshake aborts (0x4290 is the RSA public operation failing on an allocation).
+
+**Solution.** In `boards/tab5/sdkconfig.defaults.board`: `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256` (objects of 256 B and more go to PSRAM: +65.9 kB free before the first request) and `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y` (TLS buffers in PSRAM: about 29 kB less internal RAM during a handshake; the handshake lasts 2.8 s instead of 1.5 s). Task stacks cannot go to PSRAM here: `spi_flash/cache_utils.c:127` asserts that a task writing the flash (the NVS) has its stack in internal RAM.
+
+**Seen on** Tab5 ST7121, integrated build `4e7d8af`, fix `4f6bd0a`, 06–07/11/2026. **Evidence**: per-stage log lines and the serial commands `memoire`, `blocs` and `piles`; before, 3 failed requests out of 3; after, 29 of 30 boots observed to the end with a successful request (27 in a row), 0 watchdog, 0 allocation failure; details in [mesures/memoire-interne.md](mesures/memoire-interne.md). **Status**: resolved on the Tab5 ST7121; other boards not tried.
+
+#### The task watchdog fires: `IDLE0 (CPU 0)` … `CPU 0: meteo`
+
+**Symptom.** `task_wdt: Task watchdog got triggered … IDLE0 (CPU 0) … CPU 0: meteo`, every 5 s while a TLS handshake runs.
+
+**Cause.** A handshake computes for seconds without ever sleeping. The weather task was at priority 3, above the idle task (0): on the core it runs on, the idle task never gets the CPU and stops feeding the watchdog (`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`, timeout 5 s).
+
+**Solution.** The weather task runs at `tskIDLE_PRIORITY` (0) and shares the core with the idle task slice by slice (1 ms). The watchdog stays enabled and unchanged: do not disable it or lengthen it to hide this symptom.
+
+**Seen on** Tab5 ST7121, `2a05811`, 07/11/2026. **Evidence**: the temporary serial commands `tourner3` and `tourner0` (a task pinned to core 0 computes for 8 s): the watchdog fires 5.0 s after the start at priority 3 and does not fire at priority 0. **Status**: resolved.
+
+---
+
 ### Settings page and core
 
 #### No host compiler on the PC: the core tests do not run
@@ -292,6 +317,7 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 - [Outils et compilation](#outils-et-compilation)
 - [Puce, écran et tactile](#puce-écran-et-tactile)
 - [Flash, port série et sauvegarde](#flash-port-série-et-sauvegarde)
+- [Mémoire et chien de garde](#mémoire-et-chien-de-garde)
 - [Page de réglages et noyau](#page-de-réglages-et-noyau)
 
 ---
@@ -511,6 +537,30 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 - Un USB-C mal enfoncé laisse la tablette allumée **sur batterie, sans port série** (Windows : `Present = False` pour la MAC) : aucun journal, donc aucune cause lisible pour ce qui se passe pendant ce temps.
 
 **Vu sur** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Statut** : contourné.
+
+---
+
+### Mémoire et chien de garde
+
+#### La requête météo échoue : `esp-aes: Failed to allocate memory…` ou `PK verify failed with error 0x4290`
+
+**Symptôme.** `esp-aes: Failed to allocate memory for the array of DMA descriptors` (ou `… for start alignment buffer`) environ 80 ms après le début d'une requête HTTPS, ou, aux essais suivants, `esp-x509-crt-bundle: PK verify failed with error 0x4290` après 14 s, puis `esp-tls: Failed to open new connection`. La météo reste « indisponible » ; la RAM interne libre passe sous 20 Ko (700 o au plus bas).
+
+**Cause.** L'ESP32-P4 a environ 455 Ko de tas interne. Par défaut (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384`) tout `malloc()` jusqu'à 16 Ko y est servi en premier, et mbedTLS y prend ses tampons (16 Ko en entrée, 4 Ko en sortie, certificats). Avec les tampons d'écran (216 Ko), environ 106 Ko de piles de tâches et les objets des écrans, il restait 111,6 Ko avant la première requête et 74 Ko une fois le serveur web lancé. Une prise de contact en demande environ 51 Ko, et l'AES matériel exige toujours un bloc *interne* compatible DMA pour son tableau de descripteurs (`esp_aes_dma_core.c:458`). Quand une allocation échoue, la prise de contact s'interrompt (0x4290 est l'opération publique RSA qui échoue sur une allocation).
+
+**Solution.** Dans `boards/tab5/sdkconfig.defaults.board` : `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256` (les objets de 256 o et plus vont en PSRAM : +65,9 Ko libres avant la première requête) et `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y` (tampons TLS en PSRAM : environ 29 Ko de moins en interne pendant une prise de contact ; elle dure 2,8 s au lieu de 1,5 s). Les piles de tâches ne peuvent pas aller en PSRAM ici : `spi_flash/cache_utils.c:127` vérifie qu'une tâche qui écrit en flash (la NVS) a sa pile en RAM interne.
+
+**Vu sur** Tab5 ST7121, build intégré `4e7d8af`, correctif `4f6bd0a`, 06–07/11/2026. **Preuve** : lignes de journal par étape et commandes série `memoire`, `blocs` et `piles` ; avant, 3 requêtes sur 3 ratées ; après, 29 démarrages sur 30 suivis jusqu'au bout avec une requête réussie (27 de suite), 0 chien de garde, 0 échec d'allocation ; détail dans [mesures/memoire-interne.md](mesures/memoire-interne.md). **Statut** : résolu sur le Tab5 ST7121 ; autres cartes non essayées.
+
+#### Le chien de garde des tâches se déclenche : `IDLE0 (CPU 0)` … `CPU 0: meteo`
+
+**Symptôme.** `task_wdt: Task watchdog got triggered … IDLE0 (CPU 0) … CPU 0: meteo`, toutes les 5 s pendant une prise de contact TLS.
+
+**Cause.** Une prise de contact calcule des secondes sans jamais s'endormir. La tâche météo était à la priorité 3, au-dessus de la tâche d'inactivité (0) : sur le cœur qu'elle occupe, la tâche d'inactivité n'obtient plus le processeur et cesse de nourrir le chien de garde (`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`, délai de 5 s).
+
+**Solution.** La tâche météo tourne à `tskIDLE_PRIORITY` (0) et partage le cœur avec la tâche d'inactivité tranche par tranche (1 ms). Le chien de garde reste actif et inchangé : ne pas le désactiver ni l'allonger pour masquer ce symptôme.
+
+**Vu sur** Tab5 ST7121, `2a05811`, 07/11/2026. **Preuve** : les commandes série provisoires `tourner3` et `tourner0` (une tâche épinglée sur le cœur 0 calcule 8 s) : le chien de garde se déclenche 5,0 s après le début à la priorité 3 et ne se déclenche pas à la priorité 0. **Statut** : résolu.
 
 ---
 

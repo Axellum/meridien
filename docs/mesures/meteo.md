@@ -98,6 +98,8 @@ Lecture : la connexion TLS emprunte 33 à 37 Ko de RAM interne le temps de la re
 
 **Point ouvert.** La RAM interne libre est passée de 199 159 o (après la requête de 22 h 07 min 08) à 155 503 o (avant celle de 22 h 22 min 50), soit -43 656 o en 15 min 42 s, **sans requête météo entre les deux** ; minimum depuis le démarrage 104 696 o. Rien ne l'attribue à la tâche météo (elle dort entre deux requêtes) ni ne l'en exclut : ce binaire ne relève le tas qu'autour des requêtes. À mesurer sur une durée plus longue avant de conclure.
 
+**Suite du point ouvert (07/11/2026, build intégré, Tab5 ST7121).** Mesuré sur le binaire final du lot « budget de mémoire interne » (`2a05811`) : relevé chaque minute pendant 30 min, −202,6 o/min brut et −172,4 o/min après 5 min, soit **−152 o à chaque changement de minute de l'horloge** (PSRAM stable après 00 h 13), plus −368 à −384 o par requête météo. La baisse de 43,7 Ko en 15 min d'ici (≈ 2,8 Ko/min) **n'est pas retrouvée** sur ce binaire (≈ 0,17 Ko/min en régime) et **reste non expliquée** ; les −152 o/min restants sont **non résolus**. Détail, tableau et limites : [memoire-interne.md](memoire-interne.md) §8.
+
 **Journal trompeur, corrigé (non revu sur la carte).** Après le redémarrage logiciel la ligne `cache relu` disait « marqué périmé tant que l'heure du réseau manque » alors que la ligne `contrat` suivante rendait `perime=0`. Le texte renvoie désormais à la ligne `contrat` (commit `53ee733`, compilé, non flashé).
 
 **Non fait ou non vérifié.**
