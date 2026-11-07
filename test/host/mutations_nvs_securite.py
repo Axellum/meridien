@@ -1,0 +1,140 @@
+"""Mutations du noyau « sécurité de la NVS » (nvs_securite.hpp), lues par lancer.py --mutations.
+
+Même format que MUTATIONS dans lancer.py : (fichier du noyau, texte exact à remplacer — il doit apparaître UNE fois —,
+remplacement, test qui doit échouer, nom de la fonction de test qui doit être citée, ce que la mutation simule).
+Une mutation « non détectée » ou « détectée par autre chose » fait échouer le lanceur.
+
+Deux fichiers de test : test_nvs_securite.cpp (format des pages, classement, table de décision : évalué à la compilation par
+static_assert) et test_nvs_migration.cpp (instantané et migration avec une doublure de la carte : seulement en LANÇANT le programme).
+Chaque mutation simule une erreur qui, sur la carte, ferait perdre les réglages (ouvrir dans le mauvais mode : la NVS efface en
+silence), brûler une clé sans ordre, ou laisser un secret lisible dans la flash en croyant l'avoir chiffré.
+Non couvert : tout ce qui touche à la vraie flash, à la vraie NVS, au vrai chiffrement et aux eFuse (rien de cela n'est dans le
+noyau), l'effacement du tampon de relecture (écriture volatile), et la probabilité qu'une entrée chiffrée ait par hasard une somme
+de contrôle juste.
+"""
+
+NVS = "nvs_securite.hpp"
+T_SEC = "test_nvs_securite.cpp"
+T_MIG = "test_nvs_migration.cpp"
+
+MUTATIONS_NVS_SECURITE = [
+    # --- format : constantes lues dans ESP-IDF, somme de contrôle ---
+    (NVS, "inline constexpr std::uint32_t PAGE_ACTIVE = 0xFFFFFFFEu;", "inline constexpr std::uint32_t PAGE_ACTIVE = 0xFFFFFFFDu;",
+     T_SEC, "constantes_du_format_lues_dans_idf", "l'état d'une page active n'est plus le bon"),
+    (NVS, "inline constexpr std::size_t ENTREES_PAR_PAGE = 126;", "inline constexpr std::size_t ENTREES_PAR_PAGE = 125;", T_SEC,
+     "constantes_du_format_lues_dans_idf", "une page compterait 125 entrées au lieu de 126"),
+    (NVS, "    return ~crc;\n}", "    return crc;\n}", T_SEC, "crc_de_nvs_n_est_pas_le_crc32_usuel", "la somme de contrôle oublie son inversion finale"),
+    (NVS, "    std::uint32_t crc = 0;\n    for (std::size_t i = 0; i < nombre; ++i) {", "    std::uint32_t crc = 0xFFFFFFFFu;\n    for (std::size_t i = 0; i < nombre; ++i) {",
+     T_SEC, "crc_de_nvs_n_est_pas_le_crc32_usuel", "la somme de contrôle prend le CRC-32 usuel au lieu de celui de NVS"),
+    (NVS, "? 0xEDB88320u : 0u", "? 0xEDB88321u : 0u", T_SEC, "crc_de_nvs_n_est_pas_le_crc32_usuel", "polynôme de la somme de contrôle faux d'un bit"),
+    (NVS, "(static_cast<std::uint32_t>(p[3]) << 24)", "(static_cast<std::uint32_t>(p[3]) << 23)", T_SEC, "en_tete_de_l_outil_est_valide_meme_chiffre",
+     "lecture d'un mot de 32 bits fausse (poids fort)"),
+    (NVS, "    return crc_nvs(page + 4, 24) == detail::lire_u32(page + 28);", "    return true;", T_SEC, "en_tete_de_l_outil_est_valide_meme_chiffre",
+     "un en-tête abîmé est pris pour valide"),
+    (NVS, "    if (etat != PAGE_ACTIVE && etat != PAGE_PLEINE && etat != PAGE_EN_LIBERATION && etat != PAGE_ABIMEE) {", "    if (false) {", T_SEC,
+     "en_tete_de_l_outil_est_valide_meme_chiffre", "un état de page inconnu est accepté"),
+    (NVS, "    for (std::size_t i = 0; i < 4; ++i) {\n        crc = detail::crc_octet(crc, entree[i]);", "    for (std::size_t i = 0; i < 3; ++i) {\n        crc = detail::crc_octet(crc, entree[i]);",
+     T_SEC, "page_en_clair_de_l_outil_officiel", "la somme de contrôle d'une entrée oublie son quatrième octet"),
+    (NVS, "    for (std::size_t i = 8; i < TAILLE_ENTREE; ++i) {", "    for (std::size_t i = 9; i < TAILLE_ENTREE; ++i) {", T_SEC,
+     "page_en_clair_de_l_outil_officiel", "la somme de contrôle d'une entrée oublie le premier octet de sa clé"),
+    (NVS, "(2 * (rang % 4))", "(2 * (rang % 3))", T_SEC, "etat_d_une_entree_est_sur_deux_bits", "l'état d'une entrée est lu au mauvais endroit de la table"),
+    # --- classement des pages ---
+    (NVS, "        if (page[i] != 0xFF) {\n            return false;", "        if (page[i] != 0xFF && i < TAILLE_PAGE - 1) {\n            return false;", T_SEC,
+     "page_etrangere_ou_a_demi_vierge_est_inconnue", "une page dont le dernier octet n'est pas 0xFF est prise pour vierge"),
+    (NVS, "    if (!entete_valide(page)) {\n        b.pages_inconnues = 1;", "    if (false) {\n        b.pages_inconnues = 1;", T_SEC,
+     "page_etrangere_ou_a_demi_vierge_est_inconnue", "une page étrangère est lue comme une page NVS"),
+    (NVS, "        if (etat != ENTREE_ECRITE && etat != ENTREE_EFFACEE) {", "        if (etat != ENTREE_ECRITE) {", T_SEC,
+     "un_secret_efface_reste_lisible_dans_la_flash", "les entrées effacées ne sont pas regardées : un secret effacé passe pour disparu"),
+    (NVS, "                ++b.restes_lisibles;", "                ++b.entrees_lisibles;", T_SEC, "un_secret_efface_reste_lisible_dans_la_flash",
+     "un reste effacé est compté comme une entrée vivante"),
+    (NVS, "        } else if (etat == ENTREE_ECRITE) {\n            ++b.entrees_illisibles;", "        } else {\n            ++b.entrees_illisibles;", T_SEC,
+     "un_secret_efface_reste_lisible_dans_la_flash", "une entrée effacée et inintelligible est comptée comme illisible vivante"),
+    (NVS, "        rang += (lisible && entree[2] > 0) ? entree[2] : 1;", "        rang += 1;", T_SEC, "page_en_clair_de_l_outil_officiel",
+     "la valeur d'un texte est prise pour des entrées (elle ne passe pas la somme de contrôle)"),
+    (NVS, "    total.restes_lisibles += page.restes_lisibles;", "    (void)page;", T_SEC, "un_secret_efface_reste_lisible_dans_la_flash",
+     "le total d'une partition oublie les restes lisibles"),
+    (NVS, "    total.entrees_illisibles += page.entrees_illisibles;", "    (void)page;", T_SEC, "partition_de_trois_pages_comme_l_outil_la_produit",
+     "le total d'une partition oublie les entrées illisibles"),
+    (NVS, "    if (octets == nullptr || taille == 0 || taille % TAILLE_PAGE != 0) {", "    if (octets == nullptr || taille % TAILLE_PAGE != 0) {", T_SEC,
+     "taille_nulle_ou_incomplete_n_est_jamais_vide", "une partition de taille nulle est prise pour vide"),
+    (NVS, "    if (octets == nullptr || taille == 0 || taille % TAILLE_PAGE != 0) {", "    if (octets == nullptr || taille == 0) {", T_SEC,
+     "taille_nulle_ou_incomplete_n_est_jamais_vide", "une partition coupée en deux pages à moitié est prise pour vide"),
+    (NVS, "    if (b.pages_inconnues > 0) {\n        return Contenu::Inconnue;", "    if (false) {\n        return Contenu::Inconnue;", T_SEC,
+     "une_page_inconnue_l_emporte_sur_tout", "une page étrangère est ignorée dans le classement"),
+    (NVS, "    if (b.entrees_lisibles > 0 && b.entrees_illisibles > 0) {", "    if (false) {", T_SEC, "clair_et_chiffre_ensemble_sont_melanges",
+     "du clair et du chiffré mélangés sont pris pour du chiffré seul"),
+    (NVS, "    return b.pages_formatees > 0 ? Contenu::SansDonnee : Contenu::Vide;", "    return Contenu::Vide;", T_SEC, "page_formatee_sans_entree_est_sans_donnee",
+     "une partition formatée mais sans donnée est prise pour vierge"),
+    # --- table de décision ---
+    (NVS, "    if (s.contenu == Contenu::Melangee || s.contenu == Contenu::Inconnue) {", "    if (s.contenu == Contenu::Melangee) {", T_SEC,
+     "partition_melangee_ou_etrangere_est_toujours_refusee", "une partition étrangère est ouverte"),
+    (NVS, "        return s.contenu == Contenu::Illisible ? Decision::Refuser : Decision::Ouvrir;", "        return Decision::Ouvrir;", T_SEC,
+     "mode_clair_refuse_une_partition_chiffree", "une partition chiffrée est ouverte en clair (la NVS effacerait tout)"),
+    (NVS, "    if (!s.cle_existe) {\n        return Decision::AttendreCle;", "    if (false) {\n        return Decision::AttendreCle;", T_SEC,
+     "mode_chiffre_sans_cle_n_ouvre_jamais", "le mode chiffré s'ouvre sans clé (la NVS la créerait : eFuse brûlé)"),
+    (NVS, "    case Contenu::Vide:\n        return Decision::Ouvrir;", "    case Contenu::Vide:\n        return Decision::Migrer;", T_SEC,
+     "mode_chiffre_partition_vierge_s_ouvre", "une partition vierge est « migrée »"),
+    (NVS, "        return s.restes ? Decision::Purger : Decision::Ouvrir;", "        return Decision::Ouvrir;", T_SEC,
+     "mode_chiffre_sans_donnee_purge_les_restes_sans_ordre", "des restes de secrets lisibles ne sont pas purgés"),
+    (NVS, "        return s.restes ? Decision::Purger : Decision::Ouvrir;", "        return Decision::Purger;", T_SEC,
+     "mode_chiffre_sans_donnee_purge_les_restes_sans_ordre", "une partition propre est purgée pour rien"),
+    (NVS, "        return s.ordre ? Decision::Migrer : Decision::AttendreOrdre;", "        return Decision::Migrer;", T_SEC,
+     "mode_chiffre_du_clair_attend_l_ordre_puis_migre", "la migration part sans l'ordre d'Axel"),
+    (NVS, "        return s.ordre ? Decision::Migrer : Decision::AttendreOrdre;", "        return Decision::AttendreOrdre;", T_SEC,
+     "mode_chiffre_du_clair_attend_l_ordre_puis_migre", "l'ordre d'Axel ne déclenche jamais la migration"),
+    (NVS, "        if (!s.cle_essayee) {", "        if (false) {", T_SEC, "mode_chiffre_illisible_exige_une_cle_essayee",
+     "une clé jamais essayée ouvre une partition chiffrée (une mauvaise clé efface tout)"),
+    (NVS, "        return (s.restes && s.ordre) ? Decision::Migrer : Decision::Ouvrir;", "        return s.restes ? Decision::Migrer : Decision::Ouvrir;", T_SEC,
+     "mode_chiffre_illisible_exige_une_cle_essayee", "une recopie de la NVS chiffrée part sans l'ordre d'Axel"),
+    (NVS, "        return (s.restes && s.ordre) ? Decision::Migrer : Decision::Ouvrir;", "        return Decision::Ouvrir;", T_SEC,
+     "mode_chiffre_illisible_exige_une_cle_essayee", "les restes en clair d'une NVS chiffrée ne sont jamais purgés"),
+    # --- instantané (test de la migration) ---
+    (NVS, "            taille > OCTETS_MAX - utilises) {", "            taille >= OCTETS_MAX - utilises) {", T_MIG, "instantane_plein_refuse_la_valeur_suivante",
+     "une valeur qui tient exactement est refusée"),
+    # Retirer la limite (ou la laisser passer d'une valeur) écrit hors du tableau : sous AddressSanitizer le programme s'arrête
+    # avant d'afficher le nom du test, la mutation ne peut donc pas être attribuée à un test. On mute dans l'autre sens.
+    (NVS, "nombre >= ENTREES_MAX ||", "nombre + 1 >= ENTREES_MAX ||", T_MIG, "instantane_plein_refuse_la_valeur_suivante",
+     "la dernière place du tableau n'est jamais utilisée"),
+    (NVS, "        return i > 0;", "        return true;", T_MIG, "instantane_refuse_ce_qui_ne_tient_pas", "un nom vide est accepté"),
+    (NVS, "        e.debut = static_cast<std::uint16_t>(utilises);", "        e.debut = 0;", T_MIG, "instantane_garde_et_rend_les_valeurs",
+     "toutes les valeurs sont rangées au début de la mémoire (elles s'écrasent)"),
+    (NVS, "        utilises += taille;", "        (void)taille;", T_MIG, "instantane_garde_et_rend_les_valeurs", "la place utilisée n'augmente jamais"),
+    (NVS, "            o[i] = 0;", "            o[i] = o[i];", T_MIG, "instantane_efface_met_tout_a_zero", "l'effacement laisse les valeurs (les secrets) en mémoire"),
+    (NVS, "            n[i] = 0;", "            n[i] = n[i];", T_MIG, "instantane_efface_met_tout_a_zero", "l'effacement laisse les noms des clés en mémoire"),
+    (NVS, "        nombre = 0;\n        utilises = 0;\n    }", "        nombre = 0;\n    }", T_MIG, "instantane_efface_met_tout_a_zero",
+     "l'instantané effacé se croit encore plein"),
+    # --- migration ---
+    (NVS, "    if (!p.purger()) {\n        return Issue::EchecPurge;", "    if (false) {\n        return Issue::EchecPurge;", T_MIG, "migration_nominale_dans_l_ordre",
+     "la partition n'est jamais purgée physiquement"),
+    (NVS, "    if (!p.bilan_brut(vide) || classer(vide) != Contenu::Vide) {", "    if (!p.bilan_brut(vide)) {", T_MIG, "purge_non_prouvee_par_la_lecture_brute_est_un_echec",
+     "on écrit sur une partition dont on n'a pas vu qu'elle était vide"),
+    (NVS, "    if (!p.ouvrir(Mode::Chiffre)) {", "    if (false) {", T_MIG, "migration_nominale_dans_l_ordre", "la partition n'est jamais ouverte en chiffré"),
+    (NVS, "inst.valeur(inst.entrees[i]))) {\n            p.fermer();", "inst.valeur(inst.entrees[i]))) {\n            (void)0;", T_MIG,
+     "ecriture_qui_echoue_au_milieu_se_reprend_sans_doublon", "après un échec d'écriture la partition reste ouverte"),
+    (NVS, "    if (!p.valider()) {\n        p.fermer();", "    if (!p.valider()) {\n        (void)0;", T_MIG, "validation_qui_echoue_est_un_echec_d_ecriture",
+     "après un échec de validation la partition reste ouverte"),
+    (NVS, "    if (!p.valider()) {", "    if (false) {", T_MIG, "validation_qui_echoue_est_un_echec_d_ecriture", "l'échec de la validation est ignoré"),
+    (NVS, "        if (!p.relire(e, relu, sizeof(relu), taille) || taille != e.taille) {", "        if (!p.relire(e, relu, sizeof(relu), taille)) {", T_MIG,
+     "valeur_relue_plus_courte_est_detectee", "une valeur relue plus courte passe pour identique"),
+    (NVS, "            if (relu[k] != attendu[k]) {", "            if (relu[k] != attendu[k] && false) {", T_MIG, "valeur_relue_differente_est_detectee",
+     "une valeur relue différente passe pour identique"),
+    (NVS, "    for (std::size_t i = 0; i < inst.nombre && identique; ++i) {", "    for (std::size_t i = 0; i + 1 < inst.nombre && identique; ++i) {", T_MIG,
+     "valeur_relue_differente_est_detectee", "la dernière valeur n'est jamais relue"),
+    (NVS, "    if (!identique) {", "    if (!identique && false) {", T_MIG, "valeur_relue_differente_est_detectee", "le résultat de la comparaison est ignoré"),
+    (NVS, " || classer(apres) != Contenu::Illisible", "", T_MIG, "ecriture_en_clair_est_vue_par_la_lecture_brute",
+     "des valeurs « chiffrées » restées lisibles dans la flash passent pour chiffrées"),
+    (NVS, " || apres.restes_lisibles > 0", "", T_MIG, "un_reste_lisible_apres_l_ecriture_est_vu_par_la_lecture_brute",
+     "des secrets effacés mais lisibles restent dans la flash sans que personne le voie"),
+    (NVS, "    inst.effacer();\n    return Issue::Fait;", "    return Issue::Fait;", T_MIG, "migration_nominale_dans_l_ordre",
+     "après la réussite, les secrets restent dans la copie en mémoire vive"),
+    (NVS, "    inst.effacer();\n    const bool lu = p.lire_tout(depuis, inst);", "    const bool lu = p.lire_tout(depuis, inst);", T_MIG,
+     "l_instantane_d_avant_n_est_pas_repris", "une copie laissée par un essai précédent est mêlée à la nouvelle"),
+    (NVS, "    const bool lu = p.lire_tout(depuis, inst);\n    p.fermer();", "    const bool lu = p.lire_tout(depuis, inst);", T_MIG, "migration_nominale_dans_l_ordre",
+     "la NVS ouverte pour la lecture n'est pas refermée avant la purge"),
+    (NVS, "    if (!lu) {\n        inst.effacer();", "    if (!lu) {\n        (void)0;", T_MIG, "trop_de_valeurs_pour_l_instantane_ne_purge_pas",
+     "après une lecture ratée, les secrets déjà copiés restent en mémoire vive"),
+    (NVS, "    if (inst.nombre == 0) {\n        inst.effacer();\n        return Issue::InstantaneVide;", "    if (false) {\n        inst.effacer();\n        return Issue::InstantaneVide;",
+     T_MIG, "rien_lu_d_une_partition_claire_ne_purge_pas", "on purge une partition dont la lecture n'a rien rendu"),
+    (NVS, "    return i == Issue::EchecPurge || i == Issue::EchecOuverture", "    return i == Issue::EchecOuverture", T_MIG,
+     "a_reprendre_dit_vrai_seulement_quand_les_valeurs_ne_sont_qu_en_memoire", "un échec de purge n'est pas à reprendre : la copie serait perdue"),
+]
