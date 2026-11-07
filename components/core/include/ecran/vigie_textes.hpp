@@ -177,8 +177,10 @@ constexpr std::size_t libelle_derive(Phenomene phenomene, Niveau niveau_alerte, 
     return p.finir();
 }
 
-// « samedi 8 novembre · 05:59 » (sans l'année) dans la langue de l'écran, d'après l'heure locale déjà calculée. Rend 0 et un tampon vidé
-// si la date est invalide ou le tampon trop petit.
+// « 05:59 · samedi 8 novembre » (sans l'année) dans la langue de l'écran, d'après l'heure locale déjà calculée. L'heure vient EN
+// PREMIER : le moteur de texte de l'écran coupe une ligne après un « : », donc « samedi 8 novembre · 05:59 » pouvait finir sur « … · 05: »
+// puis « 59 » (vu sur le rendu PC) ; au début d'une ligne, l'heure ne peut pas être coupée. Rend 0 et un tampon vidé si la date est
+// invalide ou le tampon trop petit.
 constexpr std::size_t formater_instant(i18n::Langue langue, const heure::HeureLocale &h, char *sortie,
                                        std::size_t capacite) noexcept {
     if (sortie == nullptr || capacite == 0)
@@ -187,18 +189,19 @@ constexpr std::size_t formater_instant(i18n::Langue langue, const heure::HeureLo
         sortie[0] = '\0';
         return 0;
     }
-    const std::size_t n = visuel::formater_date(langue, h, sortie, capacite, false);
-    if (n == 0)
-        return 0;
     visuel::detail::Plume p{sortie, capacite};
-    p.n = n;
-    p.texte(" \xC2\xB7 ");
     p.car(static_cast<char>('0' + h.heure / 10));
     p.car(static_cast<char>('0' + h.heure % 10));
     p.car(':');
     p.car(static_cast<char>('0' + h.minute / 10));
     p.car(static_cast<char>('0' + h.minute % 10));
-    return p.finir();
+    p.texte(" \xC2\xB7 ");
+    const std::size_t n = visuel::formater_date(langue, h, sortie + p.n, capacite - p.n, false);
+    if (n == 0) {
+        sortie[0] = '\0';
+        return 0;
+    }
+    return p.n + n;
 }
 
 } // namespace ecran::vigie

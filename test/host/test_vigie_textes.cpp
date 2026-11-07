@@ -142,16 +142,15 @@ constexpr HeureLocale SAMEDI_DIX_HEURES = {2026, 11, 7, 10, 0, 0, 6, 3600, false
 constexpr int un_instant_s_ecrit_jour_mois_et_heure_dans_la_langue_de_l_ecran() {
     char t[64] = {};
     VERIFIER(formater_instant(Langue::Fr, SAMEDI_DIX_HEURES, t, sizeof t) > 0 &&
-             egal(t, "samedi 7 novembre \xC2\xB7 10:00"));
+             egal(t, "10:00 \xC2\xB7 samedi 7 novembre"));
     VERIFIER(formater_instant(Langue::En, SAMEDI_DIX_HEURES, t, sizeof t) > 0 &&
-             egal(t, "Saturday, 7 November \xC2\xB7 10:00"));
+             egal(t, "10:00 \xC2\xB7 Saturday, 7 November"));
     VERIFIER(formater_instant(Langue::De, SAMEDI_DIX_HEURES, t, sizeof t) > 0 &&
-             egal(t, "Samstag, 7. November \xC2\xB7 10:00"));
-    VERIFIER(formater_instant(Langue::Es, SAMEDI_DIX_HEURES, t, sizeof t) > 0 &&
-             egal(t, "s\xC3\xA1"
-                     "bado, 7 de noviembre \xC2\xB7 10:00"));
+             egal(t, "10:00 \xC2\xB7 Samstag, 7. November"));
+    VERIFIER(formater_instant(Langue::Es, SAMEDI_DIX_HEURES, t, sizeof t) > 0 && egal(t, "10:00 \xC2\xB7 s\xC3\xA1"
+                                                                                         "bado, 7 de noviembre"));
     VERIFIER(formater_instant(Langue::Tr, SAMEDI_DIX_HEURES, t, sizeof t) > 0 &&
-             egal(t, "7 Kas\xC4\xB1m Cumartesi \xC2\xB7 10:00"));
+             egal(t, "10:00 \xC2\xB7 7 Kas\xC4\xB1m Cumartesi"));
     return 0;
 }
 
@@ -160,13 +159,13 @@ constexpr int les_minutes_et_les_heures_ont_toujours_deux_chiffres() {
     HeureLocale h = SAMEDI_DIX_HEURES;
     h.heure = 0;
     h.minute = 7;
-    VERIFIER(formater_instant(Langue::Fr, h, t, sizeof t) > 0 && egal(t, "samedi 7 novembre \xC2\xB7 00:07"));
+    VERIFIER(formater_instant(Langue::Fr, h, t, sizeof t) > 0 && egal(t, "00:07 \xC2\xB7 samedi 7 novembre"));
     h.heure = 9;
     h.minute = 59;
-    VERIFIER(formater_instant(Langue::Fr, h, t, sizeof t) > 0 && egal(t, "samedi 7 novembre \xC2\xB7 09:59"));
+    VERIFIER(formater_instant(Langue::Fr, h, t, sizeof t) > 0 && egal(t, "09:59 \xC2\xB7 samedi 7 novembre"));
     h.heure = 23;
     h.minute = 0;
-    VERIFIER(formater_instant(Langue::Fr, h, t, sizeof t) > 0 && egal(t, "samedi 7 novembre \xC2\xB7 23:00"));
+    VERIFIER(formater_instant(Langue::Fr, h, t, sizeof t) > 0 && egal(t, "23:00 \xC2\xB7 samedi 7 novembre"));
     return 0;
 }
 
@@ -186,8 +185,8 @@ constexpr int une_date_invalide_ou_un_tampon_trop_petit_donne_un_texte_vide() {
     }
     h = SAMEDI_DIX_HEURES;
     t[0] = 'x';
-    // « samedi 7 novembre · 10:00 » : 17 + 4 (espace, « · » sur deux octets, espace) + 5 = 26 octets, 27 avec le zéro.
-    VERIFIER(formater_instant(Langue::Fr, h, t, 27) == 26 && egal(t, "samedi 7 novembre \xC2\xB7 10:00"));
+    // « 10:00 · samedi 7 novembre » : 5 + 4 (espace, « · » sur deux octets, espace) + 5 = 26 octets, 27 avec le zéro.
+    VERIFIER(formater_instant(Langue::Fr, h, t, 27) == 26 && egal(t, "10:00 \xC2\xB7 samedi 7 novembre"));
     t[0] = 'x';
     VERIFIER(formater_instant(Langue::Fr, h, t, 26) == 0 && t[0] == '\0');
     t[0] = 'x';
