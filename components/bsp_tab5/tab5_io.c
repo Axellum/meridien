@@ -57,22 +57,6 @@ esp_err_t tab5_expander_output(tab5_expander_t which, uint32_t pin_mask, int lev
     return err;
 }
 
-// Etat de la broche SANS changer sa direction (une sortie reste une sortie) : pour verifier ce qu'on a ecrit.
-esp_err_t tab5_expander_peek(tab5_expander_t which, uint32_t pin_mask, int *level) {
-    esp_io_expander_handle_t expander = expander_handle(which);
-    if (expander == NULL || s_expander_lock == NULL || level == NULL) {
-        return ESP_ERR_INVALID_STATE;
-    }
-    xSemaphoreTake(s_expander_lock, portMAX_DELAY);
-    uint32_t value = 0;
-    const esp_err_t err = esp_io_expander_get_level(expander, pin_mask, &value);
-    xSemaphoreGive(s_expander_lock);
-    if (err == ESP_OK) {
-        *level = (value & pin_mask) ? 1 : 0;
-    }
-    return err;
-}
-
 esp_err_t tab5_expander_input(tab5_expander_t which, uint32_t pin_mask, int *level) {
     esp_io_expander_handle_t expander = expander_handle(which);
     if (expander == NULL || s_expander_lock == NULL || level == NULL) {
@@ -88,6 +72,30 @@ esp_err_t tab5_expander_input(tab5_expander_t which, uint32_t pin_mask, int *lev
     if (err == ESP_OK) {
         *level = (value & pin_mask) ? 1 : 0;
     }
+    return err;
+}
+
+// Registres du PI4IOE5V6408 lus tels quels (diagnostic) : direction (0x03, 1 = sortie), niveau de sortie (0x05), sortie en haute
+// impedance (0x07, 1 = haute impedance, donc broche EN FAIT en entree), tirage actif (0x0B), tirage haut/bas (0x0D), etat des
+// broches (0x0F). Adresses : esp_io_expander_pi4ioe5v6408.c du pilote. Un second descripteur I2C sur la meme adresse, en lecture
+// seule : le pilote de l'expandeur garde le sien.
+esp_err_t tab5_expander_dump(tab5_expander_t which, uint8_t regs[6]) {
+    static i2c_master_dev_handle_t dev[2];
+    static const uint8_t addr[2] = {0x43, 0x44};
+    static const uint8_t reg_list[6] = {0x03, 0x05, 0x07, 0x0B, 0x0D, 0x0F};
+    if (s_expander_lock == NULL || s_bus == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    const int i = which == TAB5_EXPANDER_ALIM ? 1 : 0;
+    xSemaphoreTake(s_expander_lock, portMAX_DELAY);
+    esp_err_t err = ESP_OK;
+    if (dev[i] == NULL) {
+        err = tab5_i2c_attach(addr[i], &dev[i]);
+    }
+    for (int k = 0; k < 6 && err == ESP_OK; k++) {
+        err = tab5_i2c_read_u8(dev[i], reg_list[k], &regs[k]);
+    }
+    xSemaphoreGive(s_expander_lock);
     return err;
 }
 

@@ -325,8 +325,17 @@ void essai_alimentation() {
     resultat(v_min >= 0 && v_max <= 20000, "alim.plausible", "tension entre %d et %d mV (0 à 20 V)", (int)v_min,
              (int)v_max);
     resultat(!info.charger_enabled, "alim.chargeur_coupe", "ce micrologiciel n'allume jamais le chargeur");
-    resultat(info.battery == BOARD_BATTERY_NONE, "alim.sans_batterie",
-             "le Tab5 d'Axel n'a pas de batterie : état « %s »", nom_batterie(info.battery));
+    // Prémisse d'Axel : « pas de batterie ». Ce n'est pas un controle du code mais une comparaison avec ce que la carte mesure.
+    mesure("alim.premisse_sans_batterie", "état « %s » à %d mV chargeur coupé : %s", nom_batterie(info.battery),
+           (int)info.bus_mv,
+           info.battery == BOARD_BATTERY_NONE
+               ? "conforme à « pas de batterie »"
+               : "NE CORRESPOND PAS à « pas de batterie » (tension de batterie présente, chargeur coupé)");
+    uint8_t r[6] = {};
+    const esp_err_t e = tab5_expander_dump(TAB5_EXPANDER_ALIM, r);
+    mesure("alim.expandeur_0x44",
+           "%s : dir=0x%02X sortie=0x%02X haute-imp=0x%02X état=0x%02X (CHG_EN = bit 7, nCHG_QC_EN = bit 5)",
+           esp_err_to_name(e), r[0], r[1], r[2], r[5]);
 }
 
 // --- audio ------------------------------------------------------------------------------------------------------------------
@@ -377,7 +386,11 @@ void essai_audio() {
     resultat(e_bruit == ESP_OK, "audio.micro.bruit",
              "%s ; bruit de fond gauche %d / droite %d (dBFS×10), 1 kHz : %d / %d", esp_err_to_name(e_bruit),
              (int)g_rms, (int)d_rms, (int)g_ton, (int)d_ton);
-    const int32_t bruit_ton = g_ton > d_ton ? g_ton : d_ton;
+    // Plancher de comparaison : le bruit EFFICACE large bande du micro le plus bruyant (le niveau d'un seul bin de Goertzel sans son
+    // tombe sous le plancher de mesure et ne compare rien).
+    const int32_t bruit_ton = g_rms > d_rms ? g_rms : d_rms;
+    (void)g_ton;
+    (void)d_ton;
     resultat(g_rms > -1200 || d_rms > -1200, "audio.micro.vivant", "au moins un microphone n'est pas à zéro absolu");
 
     const int64_t t_bip = esp_timer_get_time();
@@ -408,17 +421,22 @@ void essai_audio() {
             e == ESP_OK && r.tx_overflows == 0 && r.rx_overflows == 0 && r.frames_read + 640 >= r.frames_written;
         mesure("audio.duplex",
                "ligne %s : %s, écrit %u / lu %u trames en %u ms, dépassements tx %u rx %u, bloc le plus lent %u ms, "
-               "SPEAKER_EN relu pendant le son : %d",
+               "expandeur 0x43 pendant le son : dir=0x%02X sortie=0x%02X haute-imp=0x%02X",
                l.nom, esp_err_to_name(e), (unsigned)r.frames_written, (unsigned)r.frames_read, (unsigned)r.elapsed_ms,
-               (unsigned)r.tx_overflows, (unsigned)r.rx_overflows, (unsigned)r.slowest_block_ms, r.speaker_en_pin);
+               (unsigned)r.tx_overflows, (unsigned)r.rx_overflows, (unsigned)r.slowest_block_ms, r.expander43_regs[0],
+               r.expander43_regs[1], r.expander43_regs[2]);
         mesure("audio.duplex.niveaux",
                "ligne %s : micro gauche rms %d ton %d, droit rms %d ton %d (dBFS×10) ; ton entendu = plancher %d %+d "
                "(dixièmes de dB)",
                l.nom, (int)r.left_rms_dbfs_x10, (int)r.left_tone_dbfs_x10, (int)r.right_rms_dbfs_x10,
                (int)r.right_tone_dbfs_x10, (int)bruit_ton, (int)gain);
         resultat(propre, "audio.duplex.flux", "ligne %s : lecture et enregistrement sans dépassement ni trou", l.nom);
-        resultat(r.speaker_en_pin == 1, "audio.ampli_allume", "ligne %s : SPEAKER_EN relu à %d pendant le son", l.nom,
-                 r.speaker_en_pin);
+        // SPEAKER_EN (bit 1 de l'expandeur 0x43) est piloté à 1 si : direction = sortie, niveau de sortie = 1, pas en haute impédance.
+        const uint8_t m = static_cast<uint8_t>(TAB5_EXPANDER_SPEAKER_EN);
+        const bool ampli_pilote =
+            r.expander43_ok && (r.expander43_regs[0] & m) && (r.expander43_regs[1] & m) && !(r.expander43_regs[2] & m);
+        resultat(ampli_pilote, "audio.ampli_allume", "ligne %s : SPEAKER_EN %s pendant le son (registres relus : %s)",
+                 l.nom, ampli_pilote ? "piloté à 1" : "NON piloté à 1", r.expander43_ok ? "oui" : "illisibles");
         if (propre && gain >= 120) {
             duplex_prouve =
                 true; // le bip a ete ENTENDU par les micros pendant que le flux d'entree tournait : la simultaneite marche
@@ -469,6 +487,14 @@ void tache(void *) {
     ESP_LOGI(TAG, "[AT-MAT] DEBUT essai du matériel, binaire du %s %s", __DATE__, __TIME__);
     const int niveau_origine = board_get_backlight_percent();
     memoire("au début");
+    for (int w = 0; w < 2; w++) {
+        uint8_t r[6] = {};
+        const esp_err_t e = tab5_expander_dump(w == 0 ? TAB5_EXPANDER_ECRAN : TAB5_EXPANDER_ALIM, r);
+        mesure("expandeur.registres",
+               "0x%02X (%s) : dir=0x%02X sortie=0x%02X haute-imp=0x%02X tirage-actif=0x%02X tirage-haut=0x%02X "
+               "état=0x%02X",
+               w == 0 ? 0x43 : 0x44, esp_err_to_name(e), r[0], r[1], r[2], r[3], r[4], r[5]);
+    }
 
     essai_luminosite();
     essai_veille();

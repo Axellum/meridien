@@ -452,8 +452,10 @@ esp_err_t tab5_audio_duplex_probe(const tab5_duplex_cfg_t *cfg, tab5_duplex_resu
         s_en_lecture = true;
         (void)appliquer_volume(false);
         (void)ampli(true);
-        result->speaker_en_pin = -1;
-        (void)tab5_expander_peek(TAB5_EXPANDER_ECRAN, TAB5_EXPANDER_SPEAKER_EN, &result->speaker_en_pin);
+        // Registres de l'expandeur relus pendant que l'amplificateur est allume : c'est la seule preuve fiable que SPEAKER_EN est
+        // pilote a 1. Le registre d'ETAT des broches (0x0F) ne reflete pas une broche pilotee en sortie (constate sur carte le
+        // 07/11/2026 : relu a 0 alors que le son etait audible et que sortie=1, haute impedance=0).
+        result->expander43_ok = tab5_expander_dump(TAB5_EXPANDER_ECRAN, result->expander43_regs) == ESP_OK;
         Flux flux;
         const int64_t debut = esp_timer_get_time();
         err = emettre_ton(cfg->tone_hz, cfg->tone_peak_dbfs_x10, trames, rx, flux);

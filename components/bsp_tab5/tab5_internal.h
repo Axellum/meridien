@@ -101,8 +101,9 @@ uint32_t tab5_backlight_get_duty(void); // relu dans le LEDC (pas une copie logi
 typedef enum { TAB5_EXPANDER_ECRAN = 0, TAB5_EXPANDER_ALIM = 1 } tab5_expander_t;
 esp_err_t tab5_expander_output(tab5_expander_t expander, uint32_t pin_mask, int level);
 esp_err_t tab5_expander_input(tab5_expander_t expander, uint32_t pin_mask, int *level);
-esp_err_t tab5_expander_peek(tab5_expander_t expander, uint32_t pin_mask,
-                             int *level);                                       // lecture sans changer la direction
+// Registres bruts, dans l'ordre : direction, niveau de sortie, haute impedance, tirage actif, tirage haut/bas, etat des broches.
+// Pour verifier une SORTIE, lire direction/sortie/haute impedance : le registre d'etat ne reflete pas une broche en sortie.
+esp_err_t tab5_expander_dump(tab5_expander_t expander, uint8_t regs[6]);
 esp_err_t tab5_expander_pull_down(tab5_expander_t expander, uint32_t pin_mask); // entree avec tirage vers le bas
 
 // tab5_i2c.c : petits peripheriques du bus commun, registres de 8 bits.
@@ -159,7 +160,8 @@ typedef struct {
     int32_t left_tone_dbfs_x10;
     int32_t right_rms_dbfs_x10;
     int32_t right_tone_dbfs_x10;
-    int speaker_en_pin; // niveau relu de SPEAKER_EN (expandeur 0x43, bit 1) PENDANT le son : 1 attendu, -1 illisible
+    uint8_t expander43_regs[6]; // registres de l'expandeur 0x43 relus PENDANT le son (voir tab5_expander_dump)
+    bool expander43_ok;         // false si la relecture a echoue (les registres ne valent alors rien)
 } tab5_duplex_result_t;
 esp_err_t tab5_audio_duplex_probe(const tab5_duplex_cfg_t *cfg, tab5_duplex_result_t *result);
 esp_err_t tab5_audio_set_line(tab5_dac_line_t line);
