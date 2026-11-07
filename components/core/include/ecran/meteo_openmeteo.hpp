@@ -30,6 +30,14 @@ namespace ecran::meteo {
 
 inline constexpr int JOURS_MAX = 7;
 inline constexpr int PROBA_INCONNUE = -1;
+// « La source ne donne pas cette valeur » : jamais 0, jamais une valeur inventée. Seuls les lecteurs de MET Norway et du NWS
+// (meteo_metno.hpp, meteo_nws.hpp) en produisent ; le lecteur d'Open-Meteo refuse une réponse où ces champs manquent, comme avant.
+//  - `INCONNU_DIX` : valeur en dixièmes (°C, km/h, hPa, mm, cm, indice UV), hors de toute plage vraisemblable ;
+//  - `INCONNU_ENTIER` : pourcentage, degré ou nombre d'heures (même valeur que `PROBA_INCONNUE`).
+// Le contrat de l'écran les traduit en NaN (flottants) et en -1 (entiers) : voir meteo_detail.hpp et main/meteo_etat.h. Ce sont
+// aussi, exactement, les valeurs « inconnu » de la vue de l'écran (visuel_vue.hpp : INCONNU_DIX = -32768, INCONNU = -1).
+inline constexpr std::int16_t INCONNU_DIX = INT16_MIN;
+inline constexpr std::int16_t INCONNU_ENTIER = -1;
 inline constexpr std::size_t FUSEAU_MAX = 48; // octets, zéro final compris (le plus long nom IANA fait 32)
 
 struct Jour {
@@ -119,7 +127,7 @@ constexpr Diagnostic echec(Erreur e, std::string_view champ) noexcept { return D
 
 // Cohérence d'un relevé : plages de chaque champ et liens entre champs. Sert après l'analyse JSON ET après la
 // lecture du cache binaire (un cache altéré mais de bonne somme de contrôle reste refusé s'il est invraisemblable).
-constexpr Diagnostic verifier_champs(const Releve &r) noexcept {
+constexpr Diagnostic verifier_champs(const Releve &r, bool inconnus = true) noexcept {
     const auto hors = [](std::int64_t v, std::int64_t bas, std::int64_t haut) { return v < bas || v > haut; };
     if (hors(r.recu_a_s, INSTANT_MIN, INSTANT_MAX))
         return echec(Erreur::HorsPlage, "recu_a_s");
@@ -142,21 +150,28 @@ constexpr Diagnostic verifier_champs(const Releve &r) noexcept {
     }
     if (!fin_vue)
         return echec(Erreur::HorsPlage, "timezone");
+    // Les champs « ou inconnu » (INCONNU_DIX, INCONNU_ENTIER) : voir plus haut ; la température et le code météo ne le sont jamais.
+    const auto hors_ou_inconnu_dix = [&](std::int64_t v, std::int64_t bas, std::int64_t haut) {
+        return !(inconnus && v == INCONNU_DIX) && hors(v, bas, haut);
+    };
+    const auto hors_ou_inconnu_entier = [&](std::int64_t v, std::int64_t bas, std::int64_t haut) {
+        return !(inconnus && v == INCONNU_ENTIER) && hors(v, bas, haut);
+    };
     if (hors(r.temperature_dixiemes, -900, 600))
         return echec(Erreur::HorsPlage, "current.temperature_2m");
-    if (hors(r.ressentie_dixiemes, -1200, 800))
+    if (hors_ou_inconnu_dix(r.ressentie_dixiemes, -1200, 800))
         return echec(Erreur::HorsPlage, "current.apparent_temperature");
     if (hors(r.code_wmo, 0, 99))
         return echec(Erreur::HorsPlage, "current.weather_code");
-    if (hors(r.vent_dixiemes_kmh, 0, 5000))
+    if (hors_ou_inconnu_dix(r.vent_dixiemes_kmh, 0, 5000))
         return echec(Erreur::HorsPlage, "current.wind_speed_10m");
-    if (hors(r.rafales_dixiemes_kmh, 0, 5000))
+    if (hors_ou_inconnu_dix(r.rafales_dixiemes_kmh, 0, 5000))
         return echec(Erreur::HorsPlage, "current.wind_gusts_10m");
-    if (hors(r.direction_vent_deg, 0, 360))
+    if (hors_ou_inconnu_entier(r.direction_vent_deg, 0, 360))
         return echec(Erreur::HorsPlage, "current.wind_direction_10m");
-    if (hors(r.pression_dixiemes_hpa, 8000, 11000))
+    if (hors_ou_inconnu_dix(r.pression_dixiemes_hpa, 8000, 11000))
         return echec(Erreur::HorsPlage, "current.pressure_msl");
-    if (hors(r.humidite_pct, 0, 100))
+    if (hors_ou_inconnu_entier(r.humidite_pct, 0, 100))
         return echec(Erreur::HorsPlage, "current.relative_humidity_2m");
     if (hors(r.proba_precip_pct, PROBA_INCONNUE, 100))
         return echec(Erreur::HorsPlage, "hourly.precipitation_probability");
@@ -180,9 +195,9 @@ constexpr Diagnostic verifier_champs(const Releve &r) noexcept {
             return echec(Erreur::HorsPlage, "daily.sunset");
         if (j.lever_s > j.coucher_s)
             return echec(Erreur::HorsPlage, "daily.sunset");
-        if (hors(j.uv_max_dixiemes, 0, 250))
+        if (hors_ou_inconnu_dix(j.uv_max_dixiemes, 0, 250))
             return echec(Erreur::HorsPlage, "daily.uv_index_max");
-        if (hors(j.proba_precip_max, 0, 100))
+        if (hors_ou_inconnu_entier(j.proba_precip_max, 0, 100))
             return echec(Erreur::HorsPlage, "daily.precipitation_probability_max");
         if (i > 0) { // un jour dure 23, 24 ou 25 heures (changement d'heure)
             const std::int64_t ecart = j.date_s - r.jours[i - 1].date_s;
@@ -416,11 +431,12 @@ constexpr Analyse analyser(std::string_view texte, std::int64_t recu_a_s) noexce
         a.diag = l.diag;
         return a;
     }
-    a.diag = detail::verifier_champs(r);
+    a.diag = detail::verifier_champs(r, false); // la réponse d'Open-Meteo ne contient jamais d'« inconnu »
     return a;
 }
 
-// Vérifie un relevé déjà construit (plages et cohérence). Même contrôle que celui de `analyser`.
+// Vérifie un relevé déjà construit (plages et cohérence). Même contrôle que celui de `analyser`, sauf que les valeurs « inconnu »
+// (INCONNU_DIX, INCONNU_ENTIER) y sont admises : le cache, MET Norway et le NWS en contiennent ; `analyser` (Open-Meteo) les refuse.
 constexpr Diagnostic verifier(const Releve &r) noexcept { return detail::verifier_champs(r); }
 
 // ---- fraîcheur -----------------------------------------------------------------------------------------------------

@@ -13,6 +13,8 @@
 //  - les indices (heure en cours, jour en cours, quart d'heure en cours) et la pluie des prochaines minutes sont recalculés pour
 //    `maintenant_s`, l'heure de l'appareil ; horloge non réglée (avant l'an 2000) : aucune plage de la réponse ne la contient, tous
 //    les indices valent -1 et la pluie proche n'est pas « connue » (aucun cas particulier : les fonctions du noyau le disent) ;
+//  - une valeur que la source ne donne pas (INCONNU_DIX, INCONNU_ENTIER : MET Norway, NWS) sort en NaN pour les flottants et en -1
+//    pour les entiers, jamais en 0 ; l'écran les cache déjà (main/vue_depuis_detail.h) ;
 //  - les `float` sont exacts au dixième : un dixième entier divisé par 10,0F est l'arrondi correct du nombre décimal (la division
 //    IEEE est correctement arrondie, comme le littéral 12,3F) ; seule exception, `ensoleillement_h`, à la MINUTE près (8,55 h) ;
 //  - `tendance_pression_3h_hpa` vient des pressions que l'appareil a lui-même mesurées (meteo_tendance.hpp) : NaN tant qu'il n'a
@@ -33,7 +35,10 @@ namespace ecran::meteo {
 
 namespace detail {
 
-constexpr float vers_float(int dixiemes) noexcept { return static_cast<float>(dixiemes) / 10.0F; }
+// Dixièmes -> flottant. `INCONNU_DIX` (la source ne donne pas la valeur : MET Norway, NWS) devient NaN, que l'écran sait cacher.
+constexpr float vers_float(int dixiemes) noexcept {
+    return dixiemes == INCONNU_DIX ? std::numeric_limits<float>::quiet_NaN() : static_cast<float>(dixiemes) / 10.0F;
+}
 
 // Texte terminé par un zéro dans un tableau du contrat. Un texte trop long serait coupé (zéro final garanti, jamais de
 // débordement) ; ça n'arrive pas : le test prouve que les 100 codes WMO donnent un libellé qui tient dans `libelle[40]`, et
@@ -51,7 +56,9 @@ constexpr int dixiemes_d_heure_depuis_secondes(std::int64_t secondes) noexcept {
 }
 // Minutes -> heures, SANS arrondi au dixième : le noyau garde l'ensoleillement à la minute (il est déjà arrondi à la minute,
 // l'arrondir encore au dixième d'heure fausserait de 0,1 h environ 4 jours sur 100). 513 min -> 8,55 h.
-constexpr float heures_depuis_minutes(int minutes) noexcept { return static_cast<float>(minutes) / 60.0F; }
+constexpr float heures_depuis_minutes(int minutes) noexcept {
+    return minutes == INCONNU_ENTIER ? std::numeric_limits<float>::quiet_NaN() : static_cast<float>(minutes) / 60.0F;
+}
 
 } // namespace detail
 
@@ -91,7 +98,10 @@ constexpr void remplir_detail(const Meteo &m, std::uint32_t version, std::int64_
     d.courant.nuages_pct = q.nuages_pct;
     d.courant.pression_hpa = detail::vers_float(r.pression_dixiemes_hpa);
     {
-        const Tendance t = tendance_3h(histo, r.instant_s, r.pression_dixiemes_hpa);
+        // Sans pression (NWS n'en donne pas), pas de tendance : jamais la différence avec une valeur « inconnue ».
+        const Tendance t = r.pression_dixiemes_hpa == INCONNU_DIX
+                               ? Tendance{}
+                               : tendance_3h(histo, r.instant_s, r.pression_dixiemes_hpa);
         d.courant.tendance_pression_3h_hpa =
             t.connue ? detail::vers_float(t.dixiemes_hpa) : std::numeric_limits<float>::quiet_NaN();
     }

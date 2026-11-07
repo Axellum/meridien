@@ -117,3 +117,42 @@ Utilisés par `test_gzip.cpp` (noyau `ecran/gzip.hpp`). Résultat consigné (07/
 mode « complet ») : 23 tests, 0 échec ; `--mutations` : 73 mutations, toutes détectées. **Limite** : ces tests prouvent l'enveloppe gzip
 (en-tête, pied, CRC32, décision sur `Content-Encoding`), **pas** la décompression, que fait `tinfl_decompress` de la ROM de l'ESP32-P4 et
 qui n'a jamais été exécutée (compilée seulement, aucune carte).
+
+## Réponses de MET Norway et du NWS (07/11/2026)
+
+Les vraies réponses des deux services **sans clé** que lit directement l'appareil (ADR-0014), captées le 07/11/2026 entre 13 h 56 et
+13 h 57 (heure de Paris, 12 h 56 à 12 h 57 UTC) par `test/host/capturer_fournisseurs_meteo.py`, avec les adresses et le `User-Agent` EXACTS
+du firmware (lus dans `meteo_requete_fournisseurs.hpp`, jamais recopiés) et les en-têtes de `main/http_commun.cpp` (`Accept` du service,
+`Accept-Encoding: gzip`). Les fichiers `.json` sont la réponse **décompressée, octet pour octet**.
+
+| Fichier | Contenu | Sur le fil → décompressé |
+|---|---|---|
+| `metno_<lieu>.json` | Locationforecast 2.0 « complete » : Oslo, Reykjavik, Helsinki, Tromsø, Longyearbyen (nuit polaire), Londres, Tokyo, Sydney | 4 549 à 7 515 → 60 818 à 90 783 octets |
+| `nws_<lieu>_points.json` | `/points/{lat},{lon}` : la maille (bureau, x, y) et le fuseau : New York, Miami, Seattle, Anchorage, Honolulu, San Juan | 1 006 à 1 014 → 3 913 à 3 937 octets |
+| `nws_<lieu>_grille.json` | `/gridpoints/{bureau}/{x},{y}` : les couches de prévision de la maille | 5 714 à 11 209 → 120 347 à 240 402 octets |
+| `nws_lyon_points.json` | `/points` pour Lyon, **hors couverture** : HTTP 404 `application/problem+json`, non compressé | 301 octets |
+| `*.inc` | les mêmes réponses en littéral brut C++ (copie octet par octet du `.json`, générée) | `test_meteo_metno.cpp`, `test_meteo_nws.cpp`, `test_requete_fournisseurs.cpp` |
+| `attendu_metno_<lieu>.inc`, `attendu_nws_<lieu>.inc` | ce que `analyser_metno()` et `analyser_nws()` doivent produire, une valeur entière par ligne, rang et nom en commentaire (généré) | les `*_identique_a_python` |
+| `lieux_metno.inc`, `lieux_nws.inc` | pour chaque capture : nom, instant de réception, position en e5, fuseau (et, pour le NWS, bureau et maille lus dans `/points`) (générés) | les `*_identique_a_python` et `test_requete_fournisseurs.cpp` |
+| `fournisseurs_capture.json` | pour chaque appel : adresse, statut HTTP, octets sur le fil et décompressés, `Expires`, `Last-Modified`, `Cache-Control`, `Date`, `Age`, instant de réception ; plus l'essai de requête conditionnelle (`If-Modified-Since` → 304 chez MET Norway) | `docs/mesures/fournisseurs-meteo.md` |
+| `soleil_metno_reference.json` | 79 réponses du produit « Sunrise 3.0 » de MET Norway (lever et coucher du soleil), captées le 07/11/2026 par `capturer_soleil_metno.py` pour 24 lieux et autant de jours choisis, des cercles polaires à l'équateur, changements d'heure compris | `attendu_soleil_metno.inc` (généré) |
+| `attendu_soleil.inc` | lever et coucher recalculés en Python par un AUTRE algorithme (« Almanac for Computers » de l'US Naval Observatory) | `test_soleil_calcule.cpp` |
+| `attendu_symboles_metno.inc` | les 41 symboles de la légende officielle de MET Norway, chacun avec ses variantes `_day`, `_night`, `_polartwilight`, et le code WMO attendu (règle écrite dans `lecture_fournisseurs.py`, d'après l'ADR-0014) | `les_41_symboles_officiels_et_leurs_variantes` |
+
+Les valeurs attendues sont calculées par `python test/host/controle_python_fournisseurs.py` : les réponses sont lues avec
+`json.loads(parse_float=Decimal)`, les instants et les jours locaux avec `datetime` et `zoneinfo` (la base de fuseaux de Python, pas celle de
+`fuseaux.hpp`), le soleil avec un autre algorithme que le noyau, **sans reprendre une ligne de C++ du noyau** ; les règles de lecture (quel champ
+devient quelle valeur, ce qui reste « inconnu ») sont écrites à partir de la documentation de chaque service. `--verifier` ne modifie rien et
+échoue si un `.inc` n'est pas à jour. Ne relancer les deux scripts de capture que pour renouveler les fixtures (ils appellent le réseau, une
+seconde entre deux appels, un seul appel par adresse) : les attendus sont alors à régénérer et les tests à relire (les horodatages changent).
+
+**Limites.** Huit lieux pour MET Norway, six pour le NWS : une seule mesure par lieu, un seul jour (07/11/2026, jours courts en
+hémisphère nord) ; ni Guam, ni les îles Vierges, ni les Mariannes du Nord (le NWS y répond, constaté en direct, mais sans fixture :
+l'appareil ne les propose pas encore), et les Samoa américaines n'ont pas de grille (`gridId` nul, refus propre). Des cartes réelles : aucune.
+Données MET Norway : CC BY 4.0 et NLOD 2.0 (https://api.met.no/license_data.html) ; données NWS : domaine public (https://www.weather.gov/).
+
+Résultat consigné (07/11/2026, PC d'Axel, clang++ 23.1.5 avec AddressSanitizer + UBSan, mode « complet (compilé + exécuté) », branche
+`claude/meteo-fournisseurs-e3cd8b`) : `test_meteo_metno.cpp` 32 tests, `test_meteo_nws.cpp` 45, `test_requete_fournisseurs.cpp` 11,
+`test_soleil_calcule.cpp` 12, 0 échec (exécution complète du dépôt : 51 fichiers, 1 009 tests, 0 échec) ; `python test/host/controle_python_fournisseurs.py
+--verifier` : « tout est à jour » (14 captures, 449 valeurs attendues chacune) ; `--mutations` : 19 (MET Norway) + 17 (NWS) + 8 (requêtes) + 8 (soleil)
+mutations, toutes détectées par le test visé. **Limites** : mesuré sur x86-64, pas sur le RISC-V de la carte ; aucune carte.

@@ -150,6 +150,7 @@ MUTATIONS = [
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
 from mutations_fournisseurs import MUTATIONS_FOURNISSEURS  # noqa: E402  (sources météo : table, liste par pays, lien avec le lecteur)
+from mutations_fournisseurs_natifs import MUTATIONS_FOURNISSEURS_NATIFS  # noqa: E402  (MET Norway et NWS : lecteurs, dates, rythme, requêtes, soleil)
 from mutations_geocodage import MUTATIONS_GEOCODAGE  # noqa: E402  (recherche de lieu : lecture, ville choisie, état)
 from mutations_gzip import MUTATIONS_GZIP  # noqa: E402  (enveloppe gzip des réponses HTTP : en-tête, pied, CRC32, Content-Encoding)
 from mutations_hote_appareil import MUTATIONS_HOTE_APPAREIL  # noqa: E402  (hôte de l'appareil et lieux de la recherche : voir ce fichier)
@@ -169,6 +170,7 @@ from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-ID
 MUTATIONS += MUTATIONS_METEO_HEURE
 MUTATIONS += MUTATIONS_METEO_APPAREIL
 MUTATIONS += MUTATIONS_FOURNISSEURS
+MUTATIONS += MUTATIONS_FOURNISSEURS_NATIFS
 MUTATIONS += MUTATIONS_METEO_RICHE
 MUTATIONS += MUTATIONS_METEO_DETAIL
 MUTATIONS += MUTATIONS_METEO_TENDANCE

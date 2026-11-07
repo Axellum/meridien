@@ -102,18 +102,33 @@ struct AnalyseRiche {
 namespace detail {
 
 constexpr bool dans(std::int64_t v, std::int64_t bas, std::int64_t haut) noexcept { return v >= bas && v <= haut; }
+// Dans la plage, ou « inconnu » (INCONNU_DIX et INCONNU_ENTIER, meteo_openmeteo.hpp) quand `inconnus` est vrai. Le lecteur
+// d'Open-Meteo passe `inconnus = false` : il ne produit jamais d'inconnu, donc un « -1 » ou un « -3276,8 » dans SA réponse est une
+// valeur fausse, refusée (HorsPlage) comme avant l'arrivée de MET Norway et du NWS. Le cache et les lecteurs de ces deux services
+// l'admettent (inconnus = vrai).
+struct Plages {
+    bool inconnus = true;
+    constexpr bool dix(std::int64_t v, std::int64_t bas, std::int64_t haut) const noexcept {
+        return (inconnus && v == INCONNU_DIX) || dans(v, bas, haut);
+    }
+    constexpr bool entier(std::int64_t v, std::int64_t bas, std::int64_t haut) const noexcept {
+        return (inconnus && v == INCONNU_ENTIER) || dans(v, bas, haut);
+    }
+};
 
 // ---- contrôle des compléments ----------------------------------------------------------------------------------------
 
-constexpr Diagnostic verifier_courant_riche(const Riche &r) noexcept {
-    if (!dans(r.precip_courante_dixiemes, 0, 1000))
+constexpr Diagnostic verifier_courant_riche(const Riche &r, bool inconnus = true) noexcept {
+    const Plages p{inconnus};
+    if (!p.dix(r.precip_courante_dixiemes, 0, 1000))
         return echec(Erreur::HorsPlage, "current.precipitation");
-    if (!dans(r.nuages_pct, 0, 100))
+    if (!p.entier(r.nuages_pct, 0, 100))
         return echec(Erreur::HorsPlage, "current.cloud_cover");
     return Diagnostic{};
 }
 
-constexpr Diagnostic verifier_heures_riche(const Riche &r) noexcept {
+constexpr Diagnostic verifier_heures_riche(const Riche &r, bool inconnus = true) noexcept {
+    const Plages p{inconnus};
     if (r.nb_heures > HEURES_MAX)
         return echec(Erreur::HorsPlage, "hourly");
     for (std::size_t i = 0; i < r.nb_heures; ++i) {
@@ -124,52 +139,54 @@ constexpr Diagnostic verifier_heures_riche(const Riche &r) noexcept {
             return echec(Erreur::TableauxIncoherents, "hourly.time");
         if (!dans(h.temperature_dixiemes, -900, 600))
             return echec(Erreur::HorsPlage, "hourly.temperature_2m");
-        if (!dans(h.ressentie_dixiemes, -1200, 800))
+        if (!p.dix(h.ressentie_dixiemes, -1200, 800))
             return echec(Erreur::HorsPlage, "hourly.apparent_temperature");
-        if (!dans(h.humidite_pct, 0, 100))
+        if (!p.entier(h.humidite_pct, 0, 100))
             return echec(Erreur::HorsPlage, "hourly.relative_humidity_2m");
         if (!dans(h.proba_pct, PROBA_INCONNUE, 100))
             return echec(Erreur::HorsPlage, "hourly.precipitation_probability");
-        if (!dans(h.precip_dixiemes_mm, 0, 2000))
+        if (!p.dix(h.precip_dixiemes_mm, 0, 2000))
             return echec(Erreur::HorsPlage, "hourly.precipitation");
         if (!dans(h.code_wmo, 0, 99))
             return echec(Erreur::HorsPlage, "hourly.weather_code");
-        if (!dans(h.nuages_pct, 0, 100))
+        if (!p.entier(h.nuages_pct, 0, 100))
             return echec(Erreur::HorsPlage, "hourly.cloud_cover");
-        if (!dans(h.vent_dixiemes_kmh, 0, 5000))
+        if (!p.dix(h.vent_dixiemes_kmh, 0, 5000))
             return echec(Erreur::HorsPlage, "hourly.wind_speed_10m");
-        if (!dans(h.rafales_dixiemes_kmh, 0, 5000))
+        if (!p.dix(h.rafales_dixiemes_kmh, 0, 5000))
             return echec(Erreur::HorsPlage, "hourly.wind_gusts_10m");
-        if (!dans(h.direction_deg, 0, 360))
+        if (!p.entier(h.direction_deg, 0, 360))
             return echec(Erreur::HorsPlage, "hourly.wind_direction_10m");
-        if (!dans(h.uv_dixiemes, 0, 250))
+        if (!p.dix(h.uv_dixiemes, 0, 250))
             return echec(Erreur::HorsPlage, "hourly.uv_index");
     }
     return Diagnostic{};
 }
 
-constexpr Diagnostic verifier_jours_riche(const Releve &base, const Riche &r) noexcept {
+constexpr Diagnostic verifier_jours_riche(const Releve &base, const Riche &r, bool inconnus = true) noexcept {
+    const Plages p{inconnus};
     if (r.nb_jours != 0 && r.nb_jours != base.nb_jours)
         return echec(Erreur::TableauxIncoherents, "daily");
     for (std::size_t i = 0; i < r.nb_jours; ++i) {
         const JourRiche &j = r.jours[i];
-        if (!dans(j.ressentie_min_dixiemes, -1200, 800) || !dans(j.ressentie_max_dixiemes, -1200, 800))
+        if (!p.dix(j.ressentie_min_dixiemes, -1200, 800) || !p.dix(j.ressentie_max_dixiemes, -1200, 800))
             return echec(Erreur::HorsPlage, "daily.apparent_temperature");
-        if (j.ressentie_min_dixiemes > j.ressentie_max_dixiemes)
+        if (j.ressentie_min_dixiemes != INCONNU_DIX && j.ressentie_max_dixiemes != INCONNU_DIX &&
+            j.ressentie_min_dixiemes > j.ressentie_max_dixiemes)
             return echec(Erreur::HorsPlage, "daily.apparent_temperature_min");
-        if (!dans(j.ensoleillement_min, 0, 1500))
+        if (!p.entier(j.ensoleillement_min, 0, 1500))
             return echec(Erreur::HorsPlage, "daily.sunshine_duration");
-        if (!dans(j.precip_dixiemes_mm, 0, 10000))
+        if (!p.dix(j.precip_dixiemes_mm, 0, 10000))
             return echec(Erreur::HorsPlage, "daily.precipitation_sum");
-        if (!dans(j.neige_dixiemes_cm, 0, 10000))
+        if (!p.dix(j.neige_dixiemes_cm, 0, 10000))
             return echec(Erreur::HorsPlage, "daily.snowfall_sum");
-        if (!dans(j.heures_precip, 0, 24))
+        if (!p.entier(j.heures_precip, 0, 24))
             return echec(Erreur::HorsPlage, "daily.precipitation_hours");
-        if (!dans(j.vent_max_dixiemes_kmh, 0, 5000))
+        if (!p.dix(j.vent_max_dixiemes_kmh, 0, 5000))
             return echec(Erreur::HorsPlage, "daily.wind_speed_10m_max");
-        if (!dans(j.rafales_max_dixiemes_kmh, 0, 5000))
+        if (!p.dix(j.rafales_max_dixiemes_kmh, 0, 5000))
             return echec(Erreur::HorsPlage, "daily.wind_gusts_10m_max");
-        if (!dans(j.direction_dominante_deg, 0, 360))
+        if (!p.entier(j.direction_dominante_deg, 0, 360))
             return echec(Erreur::HorsPlage, "daily.wind_direction_10m_dominant");
     }
     return Diagnostic{};
@@ -312,7 +329,7 @@ constexpr void lire_heures(const json::Valeur &racine, Riche &r, Diagnostic &dia
         diag = l.diag;
         return;
     }
-    diag = verifier_heures_riche(essai);
+    diag = verifier_heures_riche(essai, false); // Open-Meteo ne produit jamais d'inconnu
     if (diag.ok()) {
         r.nb_heures = essai.nb_heures;
         for (std::size_t i = 0; i < nb; ++i)
@@ -361,7 +378,7 @@ constexpr void lire_jours(const json::Valeur &racine, const Releve &base, Riche 
         diag = l.diag;
         return;
     }
-    diag = verifier_jours_riche(base, essai);
+    diag = verifier_jours_riche(base, essai, false); // idem
     if (diag.ok()) {
         r.nb_jours = essai.nb_jours;
         for (std::size_t i = 0; i < base.nb_jours; ++i)
@@ -452,7 +469,7 @@ constexpr AnalyseRiche analyser_riche(std::string_view texte, std::int64_t recu_
         a.diag = l.diag;
         return a;
     }
-    a.diag = detail::verifier_courant_riche(a.meteo.riche);
+    a.diag = detail::verifier_courant_riche(a.meteo.riche, false); // idem
     if (!a.diag.ok())
         return a;
 
@@ -640,6 +657,14 @@ struct LectureCacheMeteo {
     constexpr bool ok() const noexcept { return diag.ok(); }
 };
 
+namespace detail {
+// Un octet du cache pour une valeur de 0 à 100 (ou 0 à 24) : 255, que l'écriture produit pour INCONNU_ENTIER (-1) et qu'aucune
+// valeur vraisemblable n'atteint, redevient « inconnu ». Les caches écrits avant MET Norway et le NWS n'ont jamais d'octet à 255.
+constexpr std::int16_t entier_du_cache(std::uint32_t octet) noexcept {
+    return octet == 255U ? INCONNU_ENTIER : static_cast<std::int16_t>(octet);
+}
+} // namespace detail
+
 constexpr LectureCacheMeteo deserialiser_cache_meteo(const std::uint8_t *donnees, std::size_t taille) noexcept {
     constexpr std::size_t ENTETE = 3 + 4 + 4 + 2;
     LectureCacheMeteo out;
@@ -693,7 +718,7 @@ constexpr LectureCacheMeteo deserialiser_cache_meteo(const std::uint8_t *donnees
     }
     Riche &r = out.meteo.riche;
     r.precip_courante_dixiemes = rd.i16();
-    r.nuages_pct = static_cast<std::int16_t>(rd.u8());
+    r.nuages_pct = detail::entier_du_cache(rd.u8());
     const std::uint32_t nb_h = rd.u8();
     if (nb_h > static_cast<std::uint32_t>(HEURES_MAX)) {
         out.diag = detail::echec(Erreur::Corrompu, "cache.heures");
@@ -708,11 +733,11 @@ constexpr LectureCacheMeteo deserialiser_cache_meteo(const std::uint8_t *donnees
         h.debut_s = premiere + PAS_HEURE_S * static_cast<std::int64_t>(i);
         h.temperature_dixiemes = rd.i16();
         h.ressentie_dixiemes = rd.i16();
-        h.humidite_pct = static_cast<std::int16_t>(rd.u8());
+        h.humidite_pct = detail::entier_du_cache(rd.u8());
         h.proba_pct = static_cast<std::int16_t>(rd.i8());
         h.precip_dixiemes_mm = rd.i16();
         h.code_wmo = static_cast<std::int16_t>(rd.u8());
-        h.nuages_pct = static_cast<std::int16_t>(rd.u8());
+        h.nuages_pct = detail::entier_du_cache(rd.u8());
         h.vent_dixiemes_kmh = rd.i16();
         h.rafales_dixiemes_kmh = rd.i16();
         h.direction_deg = rd.i16();
@@ -732,7 +757,7 @@ constexpr LectureCacheMeteo deserialiser_cache_meteo(const std::uint8_t *donnees
         j.ensoleillement_min = rd.i16();
         j.precip_dixiemes_mm = rd.i16();
         j.neige_dixiemes_cm = rd.i16();
-        j.heures_precip = static_cast<std::int16_t>(rd.u8());
+        j.heures_precip = detail::entier_du_cache(rd.u8());
         j.vent_max_dixiemes_kmh = rd.i16();
         j.rafales_max_dixiemes_kmh = rd.i16();
         j.direction_dominante_deg = rd.i16();

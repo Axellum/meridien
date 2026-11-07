@@ -437,6 +437,32 @@ constexpr int une_couverture_nuageuse_de_101_pour_cent_est_refusee() {
     return 0;
 }
 
+// Open-Meteo ne produit jamais d'« inconnu » : un « -1 » (INCONNU_ENTIER) ou un « -3276,8 » (INCONNU_DIX) écrit dans SA réponse est
+// une valeur fausse, refusée comme avant l'arrivée de MET Norway et du NWS (eux en produisent, leurs lecteurs l'admettent).
+constexpr int une_valeur_inconnue_ecrite_dans_une_reponse_d_open_meteo_est_refusee() {
+    const Texte courant = remplacer(LYON, "\"cloud_cover\":48,", "\"cloud_cover\":-1,");
+    VERIFIER(courant.n != 0);
+    const AnalyseRiche a = analyser_riche(courant.vue(), RECU);
+    VERIFIER(!a.ok() && a.diag.erreur == Erreur::HorsPlage && a.diag.champ == "current.cloud_cover");
+    const Texte heures = remplacer(LYON, "\"relative_humidity_2m\":[98,", "\"relative_humidity_2m\":[-1,");
+    VERIFIER(heures.n != 0);
+    const AnalyseRiche b = analyser_riche(heures.vue(), RECU);
+    VERIFIER(b.ok() && b.diag_heures.erreur == Erreur::HorsPlage &&
+             b.diag_heures.champ == "hourly.relative_humidity_2m");
+    VERIFIER(b.meteo.riche.nb_heures == 0);
+    const Texte heures_par_jour = remplacer(LYON, "\"precipitation_hours\":[0.0,", "\"precipitation_hours\":[-1.0,");
+    VERIFIER(heures_par_jour.n != 0);
+    const AnalyseRiche c = analyser_riche(heures_par_jour.vue(), RECU);
+    VERIFIER(c.ok() && c.diag_jours.erreur == Erreur::HorsPlage && c.diag_jours.champ == "daily.precipitation_hours");
+    VERIFIER(c.meteo.riche.nb_jours == 0);
+    const Texte neige = remplacer(LYON, "\"snowfall_sum\":[0.00,", "\"snowfall_sum\":[-3276.80,");
+    VERIFIER(neige.n != 0);
+    const AnalyseRiche d = analyser_riche(neige.vue(), RECU);
+    VERIFIER(d.ok() && d.diag_jours.erreur == Erreur::HorsPlage && d.diag_jours.champ == "daily.snowfall_sum");
+    VERIFIER(d.meteo.riche.nb_jours == 0);
+    return 0;
+}
+
 constexpr int une_reponse_de_base_fausse_reste_refusee_sans_toucher_aux_ajouts() {
     const Texte t = remplacer(LYON, "\"temperature_2m\":7.4,", "\"temperature_2m\":99.4,");
     VERIFIER(t.n != 0);
@@ -964,6 +990,7 @@ constexpr int verifier_meteo_refuse_les_incoherences() {
     X(une_neige_negative_vide_les_jours_riches_sans_toucher_aux_jours_de_base)                                         \
     X(sans_precipitation_courante_toute_la_reponse_est_refusee)                                                        \
     X(une_couverture_nuageuse_de_101_pour_cent_est_refusee)                                                            \
+    X(une_valeur_inconnue_ecrite_dans_une_reponse_d_open_meteo_est_refusee)                                            \
     X(une_reponse_de_base_fausse_reste_refusee_sans_toucher_aux_ajouts)                                                \
     X(une_petite_reponse_donne_moins_d_heures_et_de_quarts)                                                            \
     X(une_seule_etiquette_horaire_ne_fait_pas_une_heure)                                                               \
