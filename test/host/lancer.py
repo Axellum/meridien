@@ -150,6 +150,7 @@ MUTATIONS = [
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
 from mutations_geocodage import MUTATIONS_GEOCODAGE  # noqa: E402  (recherche de lieu : lecture, ville choisie, état)
+from mutations_gzip import MUTATIONS_GZIP  # noqa: E402  (enveloppe gzip des réponses HTTP : en-tête, pied, CRC32, Content-Encoding)
 from mutations_hote_appareil import MUTATIONS_HOTE_APPAREIL  # noqa: E402  (hôte de l'appareil et lieux de la recherche : voir ce fichier)
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
 from mutations_materiel_tab5 import MUTATIONS_MATERIEL_TAB5  # noqa: E402  (matériel du Tab5 : luminosité, veille, RTC, volume…)
@@ -178,6 +179,7 @@ MUTATIONS += MUTATIONS_GEOCODAGE
 MUTATIONS += MUTATIONS_REGLAGES_ECRAN
 MUTATIONS += MUTATIONS_HOTE_APPAREIL
 MUTATIONS += MUTATIONS_MATERIEL_TAB5
+MUTATIONS += MUTATIONS_GZIP
 
 
 @functools.lru_cache(maxsize=None)

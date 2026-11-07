@@ -1,3 +1,5 @@
 # Les crochets git sont lus par sh de Git for Windows : fins de ligne LF obligatoires (autocrlf=true sinon les casse).
 .githooks/* text eol=lf
 *.sh text eol=lf
+# Captures gzip des tests (octets du fil) : jamais de conversion de fins de ligne, sinon gzip.decompress échoue.
+test/host/donnees/*.gz binary

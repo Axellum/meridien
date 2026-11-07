@@ -94,3 +94,26 @@ Résultat consigné (07/11/2026, PC d'Axel, clang++ 23.1.5 avec AddressSanitizer
 `--mutations` : 40 + 37 + 17 + 39 mutations, toutes détectées. **Limites** : sept villes, une seule avec de la pluie
 (la seule qui départage les deux conventions d'étiquetage des cumuls) ; fuseaux +5:30, +3:30 et +10:30, jour polaire non captés ;
 compilé pour x86-64, pas pour le RISC-V de la carte. Données Open-Meteo, CC BY 4.0 (https://open-meteo.com), usage non commercial.
+
+## Réponses gzip (07/11/2026)
+
+Deux vraies réponses d'Open-Meteo **telles qu'elles passent sur le fil** avec `Accept-Encoding: gzip`, captées le 07/11/2026 vers 09 h 48
+(heure de Paris) par `test/host/capturer_gzip_meteo.py` (même adresse que le firmware, lue dans `meteo_requete.hpp`) : HTTP 200,
+`Content-Encoding: gzip`, en-tête gzip `1f 8b 08 00 00 00 00 00 00 03` (aucun champ facultatif, MTIME 0, système 3).
+
+| Fichier | Lieu | Sur le fil | Décompressé |
+|---|---|---|---|
+| `openmeteo_gzip_lyon.gz` / `.inc` | 45,74906 N ; 4,84789 E | 1 498 octets | 4 443 octets |
+| `openmeteo_gzip_sydney.gz` / `.inc` | 33,86785 S ; 151,20732 E | 1 626 octets | 4 575 octets |
+
+`gzip_cas.inc` : douze fichiers gzip FABRIQUÉS par `test/host/controle_python_gzip.py` (flux DEFLATE brut de `zlib` + en-tête écrit à la main,
+chacun relu par `gzip.decompress`), un par particularité de la RFC 1952 : aucun champ, FTEXT, FNAME, FEXTRA (plein, vide, de 300 octets),
+FCOMMENT, FHCRC, les quatre ensemble, flux vide, 70 000 octets, deux membres collés. Pour chacun : le décalage du flux, le CRC32 et la taille
+du pied, calculés par `zlib.crc32` et `len()`, jamais par le noyau. Tous les `.inc` sont générés (`python test/host/controle_python_gzip.py`,
+`--verifier` ne modifie rien et échoue si l'un d'eux n'est pas à jour) ; ne relancer `capturer_gzip_meteo.py` que pour renouveler les
+captures (il appelle le réseau), puis régénérer les `.inc`. Données Open-Meteo, CC BY 4.0 (https://open-meteo.com), usage non commercial.
+
+Utilisés par `test_gzip.cpp` (noyau `ecran/gzip.hpp`). Résultat consigné (07/11/2026, PC d'Axel, clang++ 23.1.5 avec AddressSanitizer + UBSan,
+mode « complet ») : 23 tests, 0 échec ; `--mutations` : 73 mutations, toutes détectées. **Limite** : ces tests prouvent l'enveloppe gzip
+(en-tête, pied, CRC32, décision sur `Content-Encoding`), **pas** la décompression, que fait `tinfl_decompress` de la ROM de l'ESP32-P4 et
+qui n'a jamais été exécutée (compilée seulement, aucune carte).

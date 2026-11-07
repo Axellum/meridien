@@ -2,14 +2,11 @@
 
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 #include <ctime>
 #include <new>
 #include <string_view>
 
-#include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
-#include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -23,10 +20,10 @@
 #include "ecran/meteo_riche.hpp"
 #include "ecran/meteo_synthese.hpp"
 #include "horloge.h"
+#include "http_commun.h"
 #include "meteo_etat.h"
 #include "meteo_interne.h"
 #include "reseau.h"
-#include "verrou_tls.h"
 
 namespace ecran {
 
@@ -38,11 +35,10 @@ const char *TAG_RESULTAT = "METEO";
 
 constexpr const char *kEspaceNvs = "meteo";
 constexpr const char *kCleCache = "cache";
-// Tampon de réception : 16 Ko, en PSRAM, rendu après chaque essai. Pourquoi 16 Ko : la réponse riche (courant, 24 heures, 7 jours,
-// quarts d'heure) fait 4 427 à 4 575 octets sur les sept villes captées le 07/11/2026 (test/host/donnees/openmeteo_riche_*.json),
-// soit une marge de 3,5 ; une réponse plus grande est REFUSÉE (`Issue::TropGrand`), jamais lue à moitié. Pourquoi en PSRAM : un
-// tampon de plusieurs Ko en RAM interne mangerait le budget de la prise de contact TLS (voir jalon 1b).
-constexpr size_t kTailleTampon = 16 * 1024;
+// L'aller-retour HTTPS (tampons en PSRAM, gzip, verrou TLS, taille maximale d'une réponse) est dans main/http_commun.{h,cpp}.
+// User-Agent : un nom fixe, sans version ni identifiant (rien à formater sur la pile de 12 Ko, rien de variable envoyé) ; Open-Meteo
+// n'exige pas de contact dans le User-Agent (MET Norway l'exige : son appelant donnera le sien).
+constexpr const char *kAgentUtilisateur = "Meridien/ESP32-P4 (open-meteo-client)";
 constexpr uint32_t kAttenteVerrouTlsMs = 40000; // une recherche de ville tient le verrou 8 s au plus (geocodage.cpp)
 constexpr int kDelaiHttpMs = 15000;             // connexion, TLS et lecture : au-delà, l'essai est un échec
 constexpr uint32_t kPasAttenteMs = 2000;        // contrôle de l'IP et de l'heure avant le premier essai
@@ -58,23 +54,8 @@ TaskHandle_t g_tache = nullptr;
 
 // ---- mémoire -------------------------------------------------------------------------------------------------------
 
-struct Memoire {
-    size_t interne;      // octets libres en RAM interne
-    size_t interne_bloc; // plus grand bloc libre en RAM interne
-    size_t interne_min;  // minimum de RAM interne libre depuis le démarrage
-    size_t psram;        // octets libres en PSRAM
-    size_t psram_bloc;   // plus grand bloc libre en PSRAM
-};
-
-Memoire mesurer_memoire() {
-    Memoire m;
-    m.interne = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    m.interne_bloc = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-    m.interne_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
-    m.psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-    m.psram_bloc = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
-    return m;
-}
+using client_http::Memoire;
+using client_http::mesurer_memoire;
 
 void journaliser_memoire(const char *quand, const Memoire &m) {
     ESP_LOGI(TAG,
@@ -86,53 +67,8 @@ void journaliser_memoire(const char *quand, const Memoire &m) {
 
 // ---- une requête ---------------------------------------------------------------------------------------------------
 
-struct Reception {
-    uint8_t *donnees;
-    size_t capacite;
-    size_t n;
-    bool trop;
-    bool connecte;
-    Memoire
-        apres_connexion; // mesurée une fois la connexion TLS établie : c'est là que la RAM interne est la plus sollicitée
-};
-
-esp_err_t sur_evenement_http(esp_http_client_event_t *evt) {
-    auto *rec = static_cast<Reception *>(evt->user_data);
-    if (rec == nullptr) {
-        return ESP_OK;
-    }
-    switch (evt->event_id) {
-    case HTTP_EVENT_ON_CONNECTED:
-        rec->connecte = true;
-        rec->apres_connexion = mesurer_memoire();
-        break;
-    case HTTP_EVENT_ON_DATA:
-        if (evt->data_len > 0 && evt->data != nullptr) {
-            const size_t len = static_cast<size_t>(evt->data_len);
-            if (rec->n + len > rec->capacite) {
-                rec->trop = true; // réponse plus grande que prévu : on ne la lit pas à moitié
-            } else {
-                std::memcpy(rec->donnees + rec->n, evt->data, len);
-                rec->n += len;
-            }
-        }
-        break;
-    default:
-        break;
-    }
-    return ESP_OK;
-}
-
-enum class Issue : uint8_t {
-    Ok,
-    Memoire,        // pas de place en PSRAM pour le tampon
-    Requete,        // adresse non construite (position invraisemblable : ne devrait pas arriver)
-    Reseau,         // DNS, connexion, TLS ou délai dépassé
-    Http,           // le serveur a répondu autre chose que 200
-    TropDeRequetes, // HTTP 429
-    TropGrand,      // réponse au-delà du tampon
-    Illisible,      // 200, mais la réponse n'est pas celle qu'on attend
-};
+// Les issues d'un aller-retour sont celles du client commun (http_commun.h) ; `Requete` y est aussi « adresse non construite ».
+using Issue = client_http::Issue;
 
 struct Essai {
     Issue issue = Issue::Reseau;
@@ -190,8 +126,20 @@ __attribute__((noinline)) bool lire_reponse(std::string_view texte, int64_t main
     return true;
 }
 
-// Un aller-retour complet. Le tampon de réception est pris en PSRAM et rendu avant de sortir. La météo lue est écrite dans
-// `sortie` (seulement si l'issue est `Ok`).
+// Ce que `lire_corps` a besoin pour lire la réponse : où écrire la météo.
+struct Lecture {
+    meteo::Meteo *sortie;
+};
+
+// Appelée par le client commun avec le texte DÉCOMPRESSÉ de la réponse 200, une fois la connexion fermée (hors du verrou TLS).
+bool lire_corps(std::string_view corps, void *utilisateur) {
+    auto *lecture = static_cast<Lecture *>(utilisateur);
+    const int64_t maintenant = static_cast<int64_t>(std::time(nullptr));
+    return lire_reponse(corps, maintenant, *lecture->sortie);
+}
+
+// Un aller-retour complet. Les tampons sont pris en PSRAM par le client commun (http_commun.h) et rendus avant de sortir. La météo
+// lue est écrite dans `sortie` (seulement si l'issue est `Ok`).
 Essai interroger(const PositionE5 &position, meteo::Meteo &sortie) {
     Essai e;
     char url[meteo::TAILLE_REQUETE_MAX];
@@ -203,76 +151,22 @@ Essai interroger(const PositionE5 &position, meteo::Meteo &sortie) {
     const Memoire avant = mesurer_memoire();
     journaliser_memoire("avant la requête", avant);
 
-    auto *tampon = static_cast<uint8_t *>(heap_caps_malloc(kTailleTampon, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    if (tampon == nullptr) {
-        e.issue = Issue::Memoire;
-        return e;
-    }
-    Reception rec = {};
-    rec.donnees = tampon;
-    rec.capacite = kTailleTampon;
+    client_http::Requete requete;
+    requete.adresse = url;
+    requete.user_agent = kAgentUtilisateur;
+    requete.accept = "application/json";
+    requete.delai_ms = kDelaiHttpMs;
+    requete.attente_verrou_tls_ms = kAttenteVerrouTlsMs;
+    Lecture lecture = {&sortie};
+    const client_http::Reponse r = client_http::obtenir(requete, lire_corps, &lecture);
+    e.issue = r.issue;
+    e.statut_http = r.statut_http;
+    e.octets = r.octets; // le texte lu (décompressé) ; les octets du fil sont au journal du client commun
+    e.duree_ms = r.duree_ms;
 
-    esp_http_client_config_t config = {};
-    config.url = url;
-    config.method = HTTP_METHOD_GET;
-    config.timeout_ms = kDelaiHttpMs;
-    config.event_handler = sur_evenement_http;
-    config.user_data = &rec;
-    config.crt_bundle_attach =
-        esp_crt_bundle_attach; // certificats racine du paquet d'ESP-IDF (Mozilla) : le serveur est vérifié
-    config.buffer_size = 2048; // en-têtes de réponse
-    config.buffer_size_tx =
-        1024; // ligne de requête (851 octets au plus, test_meteo_appareil.cpp) : 512 par défaut ne suffit pas
-    config.keep_alive_enable = false;
-
-    // Un seul TLS à la fois dans tout le firmware (verrou_tls.h) : la poignée de main demande ≈ 65 Ko de RAM interne, et la carte
-    // n'en a pas assez pour deux (une recherche de ville et cette requête, par exemple). Le verrou couvre exactement
-    // esp_http_client_init -> esp_http_client_cleanup ; il n'est pas tenu pendant la lecture de la réponse.
-    if (!verrou_tls_prendre(kAttenteVerrouTlsMs)) {
-        ESP_LOGW(TAG, "verrou TLS occupé depuis plus de %u ms : essai reporté",
-                 static_cast<unsigned>(kAttenteVerrouTlsMs));
-        heap_caps_free(tampon);
-        e.issue = Issue::Reseau;
-        return e;
+    if (r.connecte) {
+        journaliser_memoire("une fois la connexion TLS établie", r.apres_connexion);
     }
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == nullptr) {
-        verrou_tls_rendre();
-        heap_caps_free(tampon);
-        e.issue = Issue::Reseau;
-        return e;
-    }
-    esp_http_client_set_header(client, "Accept", "application/json");
-
-    const int64_t debut_us = esp_timer_get_time();
-    const esp_err_t err = esp_http_client_perform(client);
-    e.duree_ms = static_cast<int>((esp_timer_get_time() - debut_us) / 1000);
-    e.statut_http = esp_http_client_get_status_code(client);
-    const int erreur_socket = esp_http_client_get_errno(client);
-    esp_http_client_cleanup(client);
-    verrou_tls_rendre();
-    e.octets = rec.n;
-
-    if (rec.connecte) {
-        journaliser_memoire("une fois la connexion TLS établie", rec.apres_connexion);
-    }
-
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "requête échouée : %s (errno %d) après %d ms", esp_err_to_name(err), erreur_socket, e.duree_ms);
-        e.issue = Issue::Reseau;
-    } else if (e.statut_http == 429) {
-        e.issue = Issue::TropDeRequetes;
-    } else if (e.statut_http != 200) {
-        e.issue = Issue::Http;
-    } else if (rec.trop) {
-        e.issue = Issue::TropGrand;
-    } else {
-        const int64_t maintenant = static_cast<int64_t>(std::time(nullptr));
-        e.issue = lire_reponse(std::string_view(reinterpret_cast<const char *>(tampon), rec.n), maintenant, sortie)
-                      ? Issue::Ok
-                      : Issue::Illisible;
-    }
-    heap_caps_free(tampon);
 
     const Memoire apres = mesurer_memoire();
     journaliser_memoire("après la requête", apres);
@@ -651,7 +545,7 @@ void meteo_client_demarrer() {
     // Les tailles réelles sur le RISC-V (le PC en annonce d'autres : alignement des entiers 64 bits).
     ESP_LOGI(TAG, "tailles : météo %u o, contrat v2 %u o, cache NVS au plus %u o, tampon de réception %u o (PSRAM)",
              static_cast<unsigned>(sizeof(meteo::Meteo)), static_cast<unsigned>(sizeof(MeteoDetail)),
-             static_cast<unsigned>(meteo::TAILLE_CACHE_RICHE_MAX), static_cast<unsigned>(kTailleTampon));
+             static_cast<unsigned>(meteo::TAILLE_CACHE_RICHE_MAX), static_cast<unsigned>(client_http::kTailleTampon));
     relire_cache();
     journaliser_contrat("au démarrage, depuis le cache");
     journaliser_detail("au démarrage, depuis le cache");
