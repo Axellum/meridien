@@ -4,7 +4,7 @@
 
 ---
 
-Native ESP-IDF + LVGL 9 firmware for the ESP32-P4: time and date, weather from an API, a voice assistant linked to an LLM of your choice, a settings page served by the device. No Home Assistant, no ESPHome. Developed on the M5Stack Tab5; compatibility with the Waveshare 7B is aimed at (no physical test yet: see [compatibility](compatibilite.md)).
+Native ESP-IDF + LVGL 9 firmware for the ESP32-P4: time and date, weather from an API, a voice assistant linked to an LLM of your choice, a settings page served by the device. No Home Assistant, no ESPHome. Developed on the M5Stack Tab5; the Waveshare 7B has a board layer, written and built but not tried on the board yet (see [the 7B board](carte-7b.md) and [compatibility](compatibilite.md)).
 
 This documentation is kept **at the same time as the code**: every result carries the board and the display revision it was observed on, and every incident is recorded with its cause and its solution. The plan, the cost, the milestone measurements, the research notes and the decisions (ADR) are working documents, written in French.
 
@@ -35,7 +35,7 @@ This documentation is kept **at the same time as the code**: every result carrie
 
 ---
 
-Firmware natif ESP-IDF + LVGL 9 pour ESP32-P4 : heure et date, météo par API, assistant vocal relié à un LLM au choix, page de réglages servie par l'appareil. Sans Home Assistant, sans ESPHome. Développé sur le M5Stack Tab5 ; compatibilité Waveshare 7B visée (aucun essai physique pour l'instant : voir la [compatibilité](compatibilite.md#version-française)).
+Firmware natif ESP-IDF + LVGL 9 pour ESP32-P4 : heure et date, météo par API, assistant vocal relié à un LLM au choix, page de réglages servie par l'appareil. Sans Home Assistant, sans ESPHome. Développé sur le M5Stack Tab5 ; la Waveshare 7B a une couche carte, écrite et compilée mais pas encore essayée sur la carte (voir [la carte 7B](carte-7b.md#version-française) et la [compatibilité](compatibilite.md#version-française)).
 
 Cette documentation est tenue **en même temps que le code** : chaque résultat porte la carte et la révision d'écran sur lesquelles il a été constaté, et chaque incident est consigné avec sa cause et sa solution. Le plan, le coût, les mesures de jalon, les notes de recherche et les décisions (ADR) sont des documents de travail, écrits en français.
 

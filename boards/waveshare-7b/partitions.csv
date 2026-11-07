@@ -1,0 +1,15 @@
+# Table de partitions de la Waveshare 7B (flash 32 Mo). Decisions : docs/carte-7b.md, section « Partitions ».
+#
+# Memes decalages que le Tab5 et que les firmware ESPHome pour otadata (0x9000), phy_init (0xb000) et l'application (0x10000), et
+# deux emplacements d'application de 4 Mo (OTA avec retour arriere, phase 3) ; notre NVS juste apres.
+#
+# Cette table ne declare RIEN au-dela de 0x880000 : le firmware ESPHome d'origine garde donc sa NVS (Wi-Fi, cle API, reglages)
+# ou qu'elle soit dans les 32 Mo, sans que ce firmware-ci la lise, l'ecrive ou la reformate. L'emplacement exact de la NVS
+# d'ESPHome sur cette carte n'est PAS verifie ici : il se lit dans la table de la sauvegarde de la flash
+# (_sauvegardes/waveshare_7b_avant_meridien_*/), et tools/essai_7b.py l'affiche avant d'ecrire quoi que ce soit.
+# Name,        Type, SubType, Offset,   Size,     Flags
+otadata,       data, ota,     0x9000,   0x2000,
+phy_init,      data, phy,     0xb000,   0x1000,
+ota_0,         app,  ota_0,   0x10000,  0x400000,
+ota_1,         app,  ota_1,   0x410000, 0x400000,
+nvs,           data, nvs,     0x810000, 0x70000,

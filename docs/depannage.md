@@ -147,6 +147,17 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 **Seen on** the build PC (Windows 11, ESP-IDF 5.5.5), branch `claude/reglages-appareil-b3aad6`, 06/11/2026; no board involved. **Evidence**: Python traceback in the build log; path length computed (260) and the same computation for the other worktrees; with the short cache the configuration, the download of the components (including `espressif/mdns` 1.13.1) and the build (exit code 0) went through. **Status**: worked around.
 
+
+#### Switching boards: stale settings, or the dependency lock rewritten
+
+**Symptom.** After changing `BOARD`, the build keeps the previous board's flash size, partition table or PSRAM mode; or a build of one board downloads the other board's drivers and rewrites `dependencies.lock`.
+
+**Cause.** The `sdkconfig.defaults*` files are only read for a **new** `sdkconfig` (see “A change in `sdkconfig.defaults*` has no effect”); and the component manager looks at every `components/bsp_*` folder and merges all their dependencies into one lock file.
+
+**Solution.** Delete `sdkconfig`, then run `set-target` again with `"-DBOARD=<board>"` ([commands](carte-7b.md#build)). The root CMake excludes the component of the board that is not selected (`EXCLUDE_COMPONENTS`, so the component manager does not see it) and each board other than the Tab5 has its own lock file (`boards/<board>/dependencies.lock`; the Tab5 keeps the one at the root).
+
+**Seen on** the PC, no board, commit `52f6372`, 07/11/2026. **Evidence**: the 7B configures and builds (1,837,760 bytes); the Tab5 builds too (commit `093ac94`, separate build directory) and the root `dependencies.lock` was not modified by it. **Status**: resolved (build side only).
+
 ---
 
 ### Chip, display and touch
@@ -216,11 +227,28 @@ Emitted by `esp_lvgl_port` at initialisation; no observed effect on the image (f
 
 #### Low bootloader margin and PSRAM test
 
-The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if options are added. Start-up takes about 2.9 s from the reset to the first image, of which ~0.95 s of PSRAM test (`CONFIG_SPIRAM_MEMTEST=y`) and 1 s of waiting for the expander: two possible gains, **to be measured before sacrificing anything**, one change at a time. **Seen on** Tab5 ST7121, 06/11/2026. **Status**: known, not addressed.
+The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if options are added. Start-up takes about 2.9 s from the reset to the first image, of which ~0.95 s of PSRAM test (`CONFIG_SPIRAM_MEMTEST=y`) and 1 s of waiting for the expander: two possible gains, **to be measured before sacrificing anything**, one change at a time. On the 7B build (commit `c48c418`, 07/11/2026, PC): bootloader 0x5d10 bytes, **0x2f0 bytes (3 %) free**, even tighter. **Seen on** Tab5 ST7121, 06/11/2026. **Status**: known, not addressed.
 
 #### Black screen after a software restart
 
 *Known elsewhere; here, only one software restart tried and it succeeded (no. 2 of 06/11/2026, `SW_SYS_RESET`, image came back, Tab5 ST7121), no series of 20.* On the ESPHome firmware, the display's reset pin goes through the PI4IOE5V6408 expander, which needs about a second to be reliable: reset too early = black screen. The native firmware takes over the 1 s wait before the reset (specific to the board: the 7B has none, its reset is a P4 pin). On the P4, `esp_restart()` only resets the cores: finish with `esp_rom_software_reset_system()`. To be verified at milestone 1b with 20 restarts.
+
+
+#### Waveshare 7B: the backlight never goes fully black
+
+*Known elsewhere (the author's ESPHome firmware on this board, 16–17/10/2026); the native fix is written and **not verified on the board**.* The backlight is analog (BL_CTRL → RC filter → AP3032): at 0 % the panel stays dimly lit, and the “display off” command (0x28) alone changed nothing visible. What worked under ESPHome: black veil, then 0x28, then “sleep in” 0x10, and the reverse on wake (0x11, 120 ms, 0x29). The board layer does the same in `board_set_backlight_percent(0)` (`ws7b_panel_plan()`, tested on the PC). **Seen on** Waveshare 7B under ESPHome, 17/10/2026 (the author's observation); native firmware: PC only, commit `52f6372`. **Status**: worked around under ESPHome; the native version is not tested on a board.
+
+#### Waveshare 7B: the C6 does not answer the version request
+
+*Known elsewhere (the author's measurements, 16–19/10/2026).* The factory ESP32-C6 firmware does not answer esp_hosted's “version” request, which can look like a link failure. The board layer does not ask (`WS7B_READ_C6_VERSION=0`) and never updates the C6 (decision of the author, 16/10/2026). **Seen on** Waveshare 7B under ESPHome. **Status**: worked around; not yet seen with this firmware.
+
+#### Waveshare 7B: the speaker saturates above 0 dB
+
+*Known elsewhere (the author's trial by ear, 17–18/10/2026, ESPHome).* ES8311 volume register 0x32: 0xBF = 0 dB (75 % of the register scale), above it the speaker saturates (+32 dB at 0xFF); below 40 % of the scale (0x66) “nothing is heard”. The layer caps at 0xBF and floors a non-zero volume at 0x66; the curve is tested on the PC. **Status**: worked around; not tested on a board.
+
+#### Waveshare 7B: touch reset wiring, two sources disagree
+
+**Symptom.** None seen yet. **Cause.** The schematic and the ESPHome firmware (`reset_pin: GPIO23`) put the GT911 reset on GPIO23; Waveshare's BSP declares it not connected / shared with the display reset. The layer pulses GPIO23 and gives the driver no reset pin. **Solution.** None applied. At the first trial, check in the log that the product ID “911” is read at 0x5D (or 0x14) after the pulse; if not, try without the pulse (display reset only). **Seen on** no board. **Status**: **open**, not verified.
 
 ---
 
@@ -249,6 +277,11 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 - A USB-C cable not fully pushed in leaves the tablet on **battery, without serial port** (Windows: `Present = False` for the MAC): no log, so no readable cause for what happens during that time.
 
 **Seen on** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Status**: worked around.
+
+
+#### Waveshare 7B: backing up the 32 MB flash
+
+*Known elsewhere (the author's backups of this board on 20/10/2026, esptool 5.3.1).* On the ESP32-P4 the stub `read-flash` fails at fixed sectors: read in 2 MB pieces (about 21 s each), split by 8 on failure, 4 KB sectors with `--no-stub` as a last resort, use `--before default-reset` after a dropped stub, and prove the copy with `verify-flash` (MD5 computed in the chip). The real flash is **32 MB** (the first plan assumed 16 MB). The otadata (0x9000 and 0xa000) must be decoded before choosing what to keep: sequence number, CRC `crc32_le(0xFFFFFFFF, seq)`, slot `(seq − 1) % 2`. `tools/essai_7b.py` does all of this; its decoder was checked against the real otadata of the backup of 20/10/2026 (sequences 5 and 4, both CRC valid, slot 0 chosen). The part of the script that talks to the board has **not been run**. **Status**: worked around; script written, board part not run.
 
 ---
 
@@ -603,6 +636,17 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 
 **Vu sur** le PC de compilation (Windows 11, ESP-IDF 5.5.5), branche `claude/reglages-appareil-b3aad6`, 06/11/2026 ; aucune carte en jeu. **Preuve** : trace Python dans le journal de compilation ; longueur du chemin calculée (260) et même calcul pour les autres worktrees ; avec le cache court, la configuration, le téléchargement des composants (dont `espressif/mdns` 1.13.1) et la compilation (code de sortie 0) sont passés. **Statut** : contourné.
 
+
+#### Changer de carte : réglages périmés, ou verrou de dépendances réécrit
+
+**Symptôme.** Après avoir changé `BOARD`, la compilation garde la taille de flash, la table de partitions ou le mode PSRAM de la carte précédente ; ou la compilation d'une carte télécharge les pilotes de l'autre et réécrit `dependencies.lock`.
+
+**Cause.** Les `sdkconfig.defaults*` ne sont lus que pour un `sdkconfig` **neuf** (voir « Une modification de `sdkconfig.defaults*` n'a aucun effet ») ; et le gestionnaire de composants regarde tous les dossiers `components/bsp_*` et fusionne leurs dépendances dans un seul fichier de verrou.
+
+**Solution.** Supprimer `sdkconfig`, puis relancer `set-target` avec `"-DBOARD=<carte>"` ([commandes](carte-7b.md#compiler)). Le CMake de la racine exclut le composant de la carte non choisie (`EXCLUDE_COMPONENTS`, donc le gestionnaire de composants ne le voit pas) et chaque carte autre que le Tab5 a son propre verrou (`boards/<carte>/dependencies.lock` ; le Tab5 garde celui de la racine).
+
+**Vu sur** le PC, aucune carte, commit `52f6372`, 07/11/2026. **Preuve** : la 7B se configure et se compile (1 837 760 octets) ; le Tab5 se compile aussi (commit `093ac94`, dossier de compilation à part) et le `dependencies.lock` de la racine n'a pas été modifié. **Statut** : résolu (côté compilation seulement).
+
 ---
 
 ### Puce, écran et tactile
@@ -672,11 +716,28 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 
 #### Marge faible du bootloader et test de la PSRAM
 
-Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement, à surveiller si on ajoute des options. Le démarrage prend environ 2,9 s de la remise à zéro à la première image, dont ~0,95 s de test de la PSRAM (`CONFIG_SPIRAM_MEMTEST=y`) et 1 s d'attente de l'expandeur : deux gains possibles, **à mesurer avant de sacrifier quoi que ce soit**, un changement à la fois. **Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : connu, pas traité.
+Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement, à surveiller si on ajoute des options. Le démarrage prend environ 2,9 s de la remise à zéro à la première image, dont ~0,95 s de test de la PSRAM (`CONFIG_SPIRAM_MEMTEST=y`) et 1 s d'attente de l'expandeur : deux gains possibles, **à mesurer avant de sacrifier quoi que ce soit**, un changement à la fois. Sur la compilation de la 7B (commit `c48c418`, 07/11/2026, PC) : bootloader de 0x5d10 octets, **0x2f0 octets (3 %) de marge**, encore plus serré. **Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : connu, pas traité.
 
 #### Écran noir après un redémarrage logiciel
 
 *Connu ailleurs ; ici, un seul redémarrage logiciel essayé et réussi (n° 2 du 06/11/2026, `SW_SYS_RESET`, image revenue, Tab5 ST7121), pas de série de 20.* Sur le firmware ESPHome, la broche de reset de l'écran passe par l'expandeur PI4IOE5V6408, qui a besoin d'environ une seconde pour être fiable : reset trop tôt = écran noir. Le firmware natif reprend l'attente de 1 s avant le reset (propre à la carte : la 7B n'en a pas, son reset est une broche du P4). Sur P4, `esp_restart()` ne remet à zéro que les cœurs : terminer par `esp_rom_software_reset_system()`. À vérifier au jalon 1b par 20 redémarrages.
+
+
+#### Waveshare 7B : le rétroéclairage ne devient jamais tout à fait noir
+
+*Connu ailleurs (le firmware ESPHome de l'auteur sur cette carte, 16–17/10/2026) ; le correctif natif est écrit et **non vérifié sur la carte**.* Le rétroéclairage est analogique (BL_CTRL → filtre RC → AP3032) : à 0 % la dalle reste faiblement éclairée, et la commande « display off » (0x28) seule ne changeait rien de visible. Ce qui a marché sous ESPHome : voile noir, puis 0x28, puis « sleep in » 0x10, et l'inverse au réveil (0x11, 120 ms, 0x29). La couche carte fait pareil dans `board_set_backlight_percent(0)` (`ws7b_panel_plan()`, testé sur le PC). **Vu sur** Waveshare 7B sous ESPHome, 17/10/2026 (observation de l'auteur) ; firmware natif : PC seulement, commit `52f6372`. **Statut** : contourné sous ESPHome ; la version native n'est pas testée sur carte.
+
+#### Waveshare 7B : le C6 ne répond pas à la requête de version
+
+*Connu ailleurs (mesures de l'auteur, 16–19/10/2026).* Le micrologiciel d'origine de l'ESP32-C6 ne répond pas à la requête « version » d'esp_hosted, ce qui peut ressembler à une panne du lien. La couche carte ne la pose pas (`WS7B_READ_C6_VERSION=0`) et ne met jamais le C6 à jour (décision de l'auteur, 16/10/2026). **Vu sur** Waveshare 7B sous ESPHome. **Statut** : contourné ; pas encore vu avec ce firmware.
+
+#### Waveshare 7B : le haut-parleur sature au-dessus de 0 dB
+
+*Connu ailleurs (essai de l'auteur à l'oreille, 17–18/10/2026, ESPHome).* Registre de volume 0x32 de l'ES8311 : 0xBF = 0 dB (75 % de l'échelle du registre), au-dessus le haut-parleur sature (+32 dB à 0xFF) ; sous 40 % de l'échelle (0x66) « on n'entend rien ». La couche plafonne à 0xBF et fixe le plancher d'un volume non nul à 0x66 ; la courbe est testée sur le PC. **Statut** : contourné ; non testé sur carte.
+
+#### Waveshare 7B : câblage du reset tactile, deux sources se contredisent
+
+**Symptôme.** Aucun vu pour l'instant. **Cause.** Le schéma et le firmware ESPHome (`reset_pin: GPIO23`) mettent le reset du GT911 sur GPIO23 ; le BSP de Waveshare le déclare non relié / partagé avec le reset de l'écran. La couche envoie l'impulsion sur GPIO23 et ne donne aucune broche de reset au pilote. **Solution.** Aucune appliquée. Au premier essai, vérifier au journal que l'identifiant produit « 911 » est lu en 0x5D (ou 0x14) après l'impulsion ; sinon essayer sans l'impulsion (reset de l'écran seul). **Vu sur** aucune carte. **Statut** : **ouvert**, non vérifié.
 
 ---
 
@@ -705,6 +766,11 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 - Un USB-C mal enfoncé laisse la tablette allumée **sur batterie, sans port série** (Windows : `Present = False` pour la MAC) : aucun journal, donc aucune cause lisible pour ce qui se passe pendant ce temps.
 
 **Vu sur** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Statut** : contourné.
+
+
+#### Waveshare 7B : sauvegarder la flash de 32 Mo
+
+*Connu ailleurs (les sauvegardes de l'auteur sur cette carte le 20/10/2026, esptool 5.3.1).* Sur l'ESP32-P4, `read-flash` avec le stub échoue à des secteurs fixes : lire par morceaux de 2 Mo (environ 21 s chacun), couper en 8 en cas d'échec, secteurs de 4 Ko en `--no-stub` en dernier recours, `--before default-reset` après un stub coupé, et prouver la copie par `verify-flash` (MD5 calculé dans la puce). La flash réelle fait **32 Mo** (le premier plan en supposait 16). L'otadata (0x9000 et 0xa000) se décode avant de choisir ce qu'on garde : numéro de séquence, CRC `crc32_le(0xFFFFFFFF, seq)`, emplacement `(seq − 1) % 2`. `tools/essai_7b.py` fait tout cela ; son décodeur a été confronté à l'otadata réelle de la sauvegarde du 20/10/2026 (séquences 5 et 4, CRC valides toutes les deux, emplacement 0 choisi). La partie du script qui parle à la carte **n'a pas été exécutée**. **Statut** : contourné ; script écrit, partie carte non exécutée.
 
 ---
 

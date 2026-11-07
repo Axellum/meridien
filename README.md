@@ -15,7 +15,7 @@ A personal project, shared in case it is useful to someone, built with the help 
 | | |
 |---|---|
 | Development board | M5Stack Tab5, **ST7121 display revision** (1280×720) |
-| Target compatibility | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600), physical tests now and then — **not tried yet** |
+| Target compatibility | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600), board layer written and built, **not tried on the board yet** ([details](docs/carte-7b.md)) |
 | Version 1 | time/date, weather (Open-Meteo), voice assistant (wake word → STT → LLM → TTS), settings page |
 | Version 2 | Google calendar (through a secret iCal address, see [ADR-0004](docs/decisions/0004-calendrier-par-adresse-ical-secrete.md)) |
 | Out of scope | home automation, Home Assistant, ESPHome |
@@ -103,7 +103,7 @@ Un projet personnel, partagé au cas où il servirait à quelqu'un, fait avec l'
 | | |
 |---|---|
 | Carte de développement | M5Stack Tab5, **révision d'écran ST7121** (1280×720) |
-| Compatibilité visée | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600), essais physiques de temps en temps — **pas encore essayée** |
+| Compatibilité visée | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600), couche carte écrite et compilée, **pas encore essayée sur la carte** ([détails](docs/carte-7b.md#version-française)) |
 | Version 1 | heure/date, météo (Open-Meteo), assistant vocal (mot d'activation → STT → LLM → TTS), page de réglages |
 | Version 2 | calendrier Google (par adresse iCal secrète, voir [ADR-0004](docs/decisions/0004-calendrier-par-adresse-ical-secrete.md)) |
 | Hors périmètre | domotique, Home Assistant, ESPHome |
