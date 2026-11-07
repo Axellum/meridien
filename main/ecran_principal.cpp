@@ -16,6 +16,7 @@
 #include "meteo_etat.h"
 #include "meteo_interne.h"
 #include "meteo_zone.h"
+#include "reglages.h"
 #include "reseau.h"
 #include "textes_principal.h"
 #include "ui_bonjour.h"
@@ -55,8 +56,24 @@ void vers_principal() {
     }
 }
 
+// Le réglage « thème » de la page de réglages (reglages.h) choisit l'habillage de l'écran principal : « auto » = ciel (suit l'heure
+// et le temps), « clair » = clair, « sombre » = tableau sombre. Le thème « horloge » (heure géante) n'a pas de valeur dans ce
+// réglage : il faudrait une quatrième valeur au registre des réglages (session reglages-ecran), donc il n'est pas atteignable.
+const visuel::ThemePrincipal &theme_du_reglage() {
+    switch (reglages_affichage().theme) {
+    case reglages::Theme::Clair:
+        return visuel::kThemeClair;
+    case reglages::Theme::Sombre:
+        return visuel::kThemeTableauSombre;
+    case reglages::Theme::Auto:
+        break;
+    }
+    return visuel::kThemeCiel;
+}
+
 // Appelé par LVGL (dans sa tâche, verrou pris) deux fois par seconde.
 void rafraichir(lv_timer_t *) {
+    ui_principal_changer_theme(theme_du_reglage()); // rien si le thème n'a pas changé depuis la page de réglages
     const EtatReseau etat = reseau_etat();
 
     EntreesPrincipal entrees = {};
@@ -117,7 +134,7 @@ void ecran_principal_creer(const BootInfo &boot) {
     g_ecran_principal = lv_obj_create(nullptr);
     const size_t libre_interne_avant = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     const RessourcesPrincipal ressources = {roboto_700_start, static_cast<size_t>(roboto_700_end - roboto_700_start)};
-    if (!ui_principal_creer(g_ecran_principal, ressources, carte->width, carte->height)) {
+    if (!ui_principal_creer(g_ecran_principal, ressources, carte->width, carte->height, theme_du_reglage())) {
         ESP_LOGE(TAG, "écran principal non créé (police TrueType) : l'écran de diagnostic reste affiché");
         lv_obj_delete(g_ecran_principal);
         g_ecran_principal = nullptr; // l'appui long de l'écran de diagnostic ne charge alors rien

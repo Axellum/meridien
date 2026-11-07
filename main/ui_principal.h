@@ -45,6 +45,13 @@ bool ui_principal_creer(lv_obj_t *ecran, const RessourcesPrincipal &ressources, 
 // Met à jour les textes et les dessins (sans redessiner ce qui n'a pas changé). À appeler dans la tâche LVGL, verrou pris.
 void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees);
 
+// Change de thème sur l'écran déjà construit (couleurs, fond), tout est redessiné au passage suivant. Les thèmes qui ont la même
+// composition (« ciel », « tableau sombre », « clair ») se remplacent à chaud ; passer de ou vers « horloge » demande une autre
+// taille de police et une autre disposition : rend faux sans rien changer, il faut alors reconstruire l'écran. Rend vrai si le
+// thème demandé est maintenant celui de l'écran. À appeler dans la tâche LVGL, verrou pris. Le thème doit vivre aussi longtemps
+// que l'écran (les thèmes de visuel_themes.hpp sont des constantes).
+bool ui_principal_changer_theme(const visuel::ThemePrincipal &theme);
+
 // Appui long (400 ms) sur l'écran : `rappel` est appelé dans la tâche LVGL. nullptr : rien. Sert à ouvrir l'écran de diagnostic.
 void ui_principal_sur_appui_long(void (*rappel)());
 

@@ -43,6 +43,34 @@ void afficher(const banc::Contexte &contexte, const ThemePrincipal &theme, const
     lv_screen_load(ecran_lvgl);
 }
 
+// Bascule à chaud (ui_principal_changer_theme) : l'écran est construit et rendu avec `depart`, puis passe à `arrivee`. Le PNG doit
+// être identique, pixel pour pixel, à celui de `arrivee` construit directement (tools/rendu/verifier_bascule.py le contrôle).
+void bascule(const banc::Contexte &contexte, const ThemePrincipal &depart, const ThemePrincipal &arrivee) {
+    lv_obj_t *ecran_lvgl = lv_obj_create(nullptr);
+    const ecran::RessourcesPrincipal ressources = {roboto_700_start,
+                                                   static_cast<std::size_t>(roboto_700_end - roboto_700_start)};
+    if (!ecran::ui_principal_creer(ecran_lvgl, ressources, contexte.largeur, contexte.hauteur, depart)) {
+        return;
+    }
+    const ecran::EntreesPrincipal e = entrees(contexte, 0, vue(SOLEIL, contexte.instant_utc_s));
+    ecran::ui_principal_mettre_a_jour(e);
+    lv_screen_load(ecran_lvgl);
+    lv_refr_now(contexte.affichage); // le premier état est vraiment dessiné avant la bascule
+    ecran::ui_principal_changer_theme(arrivee);
+    ecran::ui_principal_mettre_a_jour(e);
+}
+
+void bascule_ciel_clair(const banc::Contexte &c) { bascule(c, ecran::visuel::kThemeCiel, ecran::visuel::kThemeClair); }
+void bascule_clair_ciel(const banc::Contexte &c) { bascule(c, ecran::visuel::kThemeClair, ecran::visuel::kThemeCiel); }
+void bascule_ciel_tableau(const banc::Contexte &c) {
+    bascule(c, ecran::visuel::kThemeCiel, ecran::visuel::kThemeTableauSombre);
+}
+void bascule_tableau_ciel(const banc::Contexte &c) {
+    bascule(c, ecran::visuel::kThemeTableauSombre, ecran::visuel::kThemeCiel);
+}
+// Vers « horloge » la bascule est refusée (autre disposition) : l'écran doit rester celui du départ.
+void bascule_refusee(const banc::Contexte &c) { bascule(c, ecran::visuel::kThemeCiel, ecran::visuel::kThemeHorloge); }
+
 // Huit temps par thème : de quoi juger le même thème sur un ciel dégagé, de la pluie, de la neige, un orage, du brouillard, la
 // nuit, une canicule et les textes les plus longs (essayer avec -Langue de tr).
 #define VARIANTES(nom, theme)                                                                                          \
@@ -97,6 +125,11 @@ const Scene kScenes[] = {
     {"clair-nuit", "Clair : nuit froide", clair_nuit},
     {"clair-chaleur", "Clair : canicule", clair_chaleur},
     {"clair-pires", "Clair : textes les plus longs", clair_pires},
+    {"bascule-ciel-clair", "Bascule à chaud : ciel vers clair", bascule_ciel_clair},
+    {"bascule-clair-ciel", "Bascule à chaud : clair vers ciel", bascule_clair_ciel},
+    {"bascule-ciel-tableau", "Bascule à chaud : ciel vers tableau", bascule_ciel_tableau},
+    {"bascule-tableau-ciel", "Bascule à chaud : tableau vers ciel", bascule_tableau_ciel},
+    {"bascule-refusee", "Bascule refusée : ciel vers horloge (reste ciel)", bascule_refusee},
 };
 const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
 

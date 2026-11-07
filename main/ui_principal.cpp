@@ -25,7 +25,7 @@
 //   | horloge + date  |  maintenant        |  | horloge + date        |
 //   +-----------------+--------------------+  | maintenant            |
 //   | vent · pluie · humidité · pression · UV · soleil · lune           | grandeurs en grille
-//   | heures : icône, température, pluie, sur 12 colonnes               | heures
+//   | heures : icône, température, pluie, selon la largeur              | heures
 //   | semaine : 7 jours, barre min-max sur une échelle commune          | semaine en lignes
 //
 // Une zone n'est redessinée que si ses données ont changé (empreinte par zone) : l'horloge change à la minute, le reste à la
@@ -1203,6 +1203,11 @@ void appliquer_ciel() {
         lv_obj_set_style_bg_image_src(g.ecran, nullptr, 0);
         lv_obj_set_style_bg_color(g.ecran, dz::couleur(t.fond), 0);
         lv_obj_set_style_bg_grad_dir(g.ecran, LV_GRAD_DIR_NONE, 0);
+        if (g.ciel_image !=
+            nullptr) { // venu d'un thème à ciel : le style ne le référence plus, on rend ses 1,8 Mo de PSRAM
+            lv_draw_buf_destroy(g.ciel_image);
+            g.ciel_image = nullptr;
+        }
         return;
     }
     const Degrade d = ciel(moment_du_jour(), ambiance_du_moment());
@@ -1429,6 +1434,28 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     if (tout) {
         lv_obj_invalidate(g.ecran);
     }
+}
+
+bool ui_principal_changer_theme(const ThemePrincipal &theme) {
+    if (g.ecran == nullptr || g.theme == nullptr) {
+        return false;
+    }
+    if (&theme == g.theme) {
+        return true;
+    }
+    // L'horloge en vedette a sa propre police et sa propre disposition (créées à la construction) : pas de bascule à chaud.
+    if ((theme.disposition == Disposition::HORLOGE) != (g.theme->disposition == Disposition::HORLOGE)) {
+        return false;
+    }
+    g.theme = &theme;
+    lv_obj_set_style_border_color(g.anneau, dz::couleur(theme.accent), 0);
+    appliquer_ciel();
+    for (int z = 0; z < Z_NOMBRE; ++z) {
+        lv_obj_invalidate(g.zone[z]);
+    }
+    lv_obj_invalidate(g.bouton);
+    lv_obj_invalidate(g.ecran);
+    return true;
 }
 
 void ui_principal_sur_appui_long(void (*rappel)()) { g.appui_long = rappel; }
