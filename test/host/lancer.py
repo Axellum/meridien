@@ -144,6 +144,7 @@ from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assist
 from mutations_geocodage import MUTATIONS_GEOCODAGE  # noqa: E402  (recherche de lieu : lecture, ville choisie, état)
 from mutations_hote_appareil import MUTATIONS_HOTE_APPAREIL  # noqa: E402  (hôte de l'appareil et lieux de la recherche : voir ce fichier)
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
+from mutations_materiel_tab5 import MUTATIONS_MATERIEL_TAB5  # noqa: E402  (matériel du Tab5 : luminosité, veille, RTC, volume…)
 from mutations_meteo_appareil import MUTATIONS_METEO_APPAREIL  # noqa: E402  (météo sur l'appareil : requête, zone, cache)
 from mutations_meteo_detail import MUTATIONS_METEO_DETAIL  # noqa: E402  (météo riche -> contrat MeteoDetail)
 from mutations_meteo_heure import MUTATIONS_METEO_HEURE  # noqa: E402
@@ -168,6 +169,7 @@ MUTATIONS += MUTATIONS_VISUEL
 MUTATIONS += MUTATIONS_GEOCODAGE
 MUTATIONS += MUTATIONS_REGLAGES_ECRAN
 MUTATIONS += MUTATIONS_HOTE_APPAREIL
+MUTATIONS += MUTATIONS_MATERIEL_TAB5
 
 
 @functools.lru_cache(maxsize=None)
