@@ -25,13 +25,18 @@ constexpr sv PARIS =
 constexpr std::int64_t RECU = 1793966500; // 100 s après current.time de la réponse de Paris
 constexpr Releve PARIS_R = analyser(PARIS, RECU).releve;
 
+// Écrite À LA MAIN, volontairement : si la requête change par accident, ce test le voit. La requête riche (courant complet,
+// 24 heures, 7 jours, pluie par quarts d'heure) : voir meteo_requete.hpp pour la raison de chaque paramètre.
 constexpr sv URL_LYON =
     "https://api.open-meteo.com/v1/forecast?latitude=45.74906&longitude=4.84789"
-    "&current=temperature_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,"
-    "pressure_msl,relative_humidity_2m"
-    "&hourly=temperature_2m,weather_code,precipitation_probability,uv_index&forecast_hours=48"
-    "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_"
-    "max"
+    "&current=temperature_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m,"
+    "wind_direction_10m,wind_gusts_10m,pressure_msl,relative_humidity_2m"
+    "&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,"
+    "weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,is_day&forecast_hours=25"
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,"
+    "sunrise,sunset,sunshine_duration,uv_index_max,precipitation_sum,snowfall_sum,precipitation_hours,"
+    "precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant"
+    "&minutely_15=precipitation&forecast_minutely_15=9"
     "&forecast_days=7&timezone=auto&timeformat=unixtime";
 
 constexpr double NAN_ = std::numeric_limits<double>::quiet_NaN();
@@ -103,12 +108,17 @@ constexpr int requete_refuse_une_place_insuffisante_sans_deborder() {
 }
 
 constexpr int requete_et_ses_en_tetes_depassent_le_tampon_d_envoi_par_defaut() {
-    // esp_http_client écrit la ligne de requête (« GET … HTTP/1.1 ») et les en-têtes (Host, User-Agent…) dans un tampon d'envoi de
-    // 512 octets par défaut. L'adresse seule fait 479 octets au plus ; avec ~110 octets de ligne et d'en-têtes (estimation
-    // à contrôler sur la carte), 512 est dépassé : main/meteo_client.cpp demande buffer_size_tx = 1024.
-    VERIFIER(TAILLE_REQUETE_MAX == 479);
-    VERIFIER(TAILLE_REQUETE_MAX + 110 > 512);
-    VERIFIER(TAILLE_REQUETE_MAX + 300 <= 1024); // large marge sous 1024
+    // esp_http_client écrit la LIGNE de requête (« GET /chemin?… HTTP/1.1 ») d'un coup dans son tampon d'envoi, 512 octets par
+    // défaut, et échoue (« Out of buffer ») si elle n'y tient pas ; les en-têtes (Host, User-Agent…) partent ensuite par
+    // tranches de ce même tampon (esp_http_client.c d'ESP-IDF 5.5.5, esp_http_client_request_send). L'adresse seule fait 863 octets
+    // au plus, la première ligne 851 : 512 ne suffit pas, main/meteo_client.cpp demande buffer_size_tx = 1024.
+    constexpr std::size_t SCHEMA_ET_HOTE = sv("https://api.open-meteo.com").size();
+    constexpr std::size_t PREMIERE_LIGNE_MAX =
+        sv("GET ").size() + (TAILLE_REQUETE_MAX - 1 - SCHEMA_ET_HOTE) + sv(" HTTP/1.1\r\n").size();
+    VERIFIER(TAILLE_REQUETE_MAX == 863);
+    VERIFIER(PREMIERE_LIGNE_MAX == 851);
+    VERIFIER(PREMIERE_LIGNE_MAX > 512);         // le tampon par défaut ne suffit pas
+    VERIFIER(PREMIERE_LIGNE_MAX + 100 <= 1024); // marge d'au moins 100 octets sous 1024 (en-têtes inclus dans la marge)
     return 0;
 }
 

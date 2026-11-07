@@ -5,18 +5,20 @@
 
 #include <cstdint>
 
-#include "ecran/meteo_openmeteo.hpp"
+#include "ecran/meteo_riche.hpp"
 #include "meteo_zone.h"
 
 namespace ecran {
 
 // ---- état (meteo_etat.cpp), écrit par le client --------------------------------------------------------------------
 
-// Une réponse reçue, ou relue du cache : devient la météo courante et remet le compteur d'échecs à zéro.
-void meteo_etat_publier(const meteo::Releve &releve);
+// Une réponse reçue, ou relue du cache : devient la météo courante, remet le compteur d'échecs à zéro et change le numéro de
+// version (`MeteoDetail::version`). Rend faux, sans rien publier, si l'état n'a pas pu être alloué (ni PSRAM ni RAM interne).
+bool meteo_etat_publier(const meteo::Meteo &meteo);
 // Un essai raté de plus (réseau, HTTP, réponse illisible). Sans effet sur la météo déjà connue, qui reste lisible.
 void meteo_etat_compter_echec();
-// La zone a changé : la météo de l'ancien lieu ne s'affiche plus (`valide` repasse à faux) jusqu'à la prochaine réponse.
+// La zone a changé : la météo de l'ancien lieu ne s'affiche plus (`valide` repasse à faux, `meteo_detail_version()` à 0) jusqu'à
+// la prochaine réponse.
 void meteo_etat_oublier();
 // Nombre d'essais ratés de suite depuis la dernière réponse.
 int meteo_etat_echecs();

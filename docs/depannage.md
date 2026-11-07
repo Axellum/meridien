@@ -321,6 +321,26 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 **Solution.** That mutant is left out of `test/host/mutations_meteo_appareil.py` (the reason is written at the top of the file); the real code leaves the loop after 7 turns, and `planning_normal_et_reessais` covers 1 000 000 and `INT_MAX` failures. When writing a mutation, check that it does not remove the end of a loop. **Seen on** the author's PC, 06/11/2026, clang 23.1.5. **Evidence**: process CPU time, mutant no. 32 of the list. **Status**: worked around.
 
+#### Open-Meteo: the rain, probability and UV of an hour show up one hour (or one quarter of an hour) early
+
+**Symptom.** Reading `hourly.precipitation[i]` next to `hourly.temperature_2m[i]` draws the rain of the hour `i` with the value that belongs to the hour before it; the same for `precipitation_probability`, `uv_index` and for `minutely_15.precipitation` (a quarter of an hour).
+
+**Cause.** Open-Meteo labels a sum or an average by the END of its interval (“preceding hour”), unlike instantaneous values (temperature, wind, code), which are at the label. The data do not say it; the documentation does.
+
+**Solution.** The core shifts by one label (`heures[i]`: instantaneous values at label `i`, sums at label `i + 1`; the quarters start at the first label minus 900 s) and the request asks for 25 hourly labels and 9 quarter-hour labels to keep 24 complete hours. Tests compare the result with values computed independently by Python on seven real responses.
+
+**Seen on** the author's PC, real responses captured on 2026-11-07 at 00:12 (Paris time), branch `claude/meteo-appareil-f761d6`, no board. **Evidence**: Seattle (the only capture with rain): label +3,600 s = 1.0 mm = the four quarters labelled +900 to +3,600 s (0.3 + 0.3 + 0.2 + 0.2), the other convention would give 0.4; label +7,200 s = 0.2 mm = 0.1 + 0.0 + 0.1 + 0.0. **Status**: resolved in the core; not seen on a board.
+
+#### Open-Meteo: in a time zone that is not on the hour (Newfoundland, Nepal) the series do not start at the current hour
+
+**Symptom.** With `timezone=auto`, the hourly and quarter-hour series begin 45 minutes before `current.time` in Kathmandu (UTC+5:45) and 30 minutes after it in Newfoundland (UTC-3:30), but exactly at it in Lyon, Sydney or Singapore. A screen that looks for “the hour that contains now” finds nothing at the start in Newfoundland.
+
+**Cause.** The series start at the current instant rounded to the UTC hour, minus the remainder of `utc_offset_seconds` modulo 3,600 (sign of C): +20,700 s gives -2,700 s, -12,600 s gives +1,800 s. Measured on two captures; the same rule is expected for +5:30, +3:30, +10:30 (not captured).
+
+**Solution.** `heure_courante`, `quart_courant` and the “rain soon” block are recomputed against the device clock; when no hour contains it the index is -1 and `courant.proba_precip_pct` is `METEO_PROBA_INCONNUE`, never the probability of the neighbouring hour. The contract says so (`main/meteo_etat.h`) and tests cover both zones.
+
+**Seen on** the author's PC, captures of 2026-11-07 00:12 (Paris time), no board. **Evidence**: `hourly.time[0] - current.time` = -2,700 s (Kathmandu), +1,800 s (Newfoundland), 0 (Lyon, Sydney, Singapore). **Status**: resolved in the core; the screen must accept `heure_courante == -1`.
+
 ---
 
 ## Version Française
@@ -643,3 +663,23 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 **Cause.** La preuve par mutation compile les tests avec une modification du noyau. Un mutant qui retire la condition de sortie d'une boucle `constexpr` (ici `&& base < PERIODE_S` dans `delai_avant_essai_s`) fait évaluer la boucle à clang jusqu'à sa limite de 2 milliards de pas (`-fconstexpr-steps=2000000000`, réglée pour que les tests qui relisent une vraie réponse compilent) : 765 s de CPU mesurées avant d'arrêter le compilateur.
 
 **Solution.** Ce mutant est écarté de `test/host/mutations_meteo_appareil.py` (la raison est écrite en tête du fichier) ; le vrai code sort de la boucle après 7 tours, et `planning_normal_et_reessais` couvre 1 000 000 et `INT_MAX` échecs. En écrivant une mutation, vérifier qu'elle ne supprime pas la fin d'une boucle. **Vu sur** PC de l'auteur, 06/11/2026, clang 23.1.5. **Preuve** : temps CPU du processus, mutant n° 32 de la liste. **Statut** : contourné.
+
+#### Open-Meteo : la pluie, la probabilité et l'UV d'une heure arrivent une heure (ou un quart d'heure) trop tôt
+
+**Symptôme.** Lire `hourly.precipitation[i]` à côté de `hourly.temperature_2m[i]` dessine la pluie de l'heure `i` avec la valeur de l'heure d'avant ; pareil pour `precipitation_probability`, `uv_index` et pour `minutely_15.precipitation` (un quart d'heure).
+
+**Cause.** Open-Meteo étiquette un cumul ou une moyenne par la FIN de son intervalle (« l'heure qui précède »), contrairement aux valeurs instantanées (température, vent, code), qui sont à l'étiquette. Les données ne le disent pas ; la documentation, si.
+
+**Solution.** Le noyau décale d'une étiquette (`heures[i]` : instantanés à l'étiquette `i`, cumuls à l'étiquette `i + 1` ; les quarts d'heure commencent à la première étiquette moins 900 s) et la requête demande 25 étiquettes horaires et 9 en quarts d'heure pour garder 24 heures complètes. Les tests comparent le résultat à des valeurs calculées à part par Python sur sept réponses réelles.
+
+**Vu sur** PC de l'auteur, réponses réelles captées le 2026-11-07 à 00 h 12 (heure de Paris), branche `claude/meteo-appareil-f761d6`, aucune carte. **Preuve** : Seattle (la seule capture où il pleut) : étiquette +3 600 s = 1,0 mm = les quatre quarts étiquetés +900 à +3 600 s (0,3 + 0,3 + 0,2 + 0,2), l'autre convention donnerait 0,4 ; étiquette +7 200 s = 0,2 mm = 0,1 + 0,0 + 0,1 + 0,0. **Statut** : résolu dans le noyau ; non vu sur une carte.
+
+#### Open-Meteo : dans un fuseau qui n'est pas à l'heure ronde (Terre-Neuve, Népal) les séries ne commencent pas à l'heure courante
+
+**Symptôme.** Avec `timezone=auto`, les séries horaires et en quarts d'heure commencent 45 minutes avant `current.time` à Katmandou (UTC+5:45) et 30 minutes après à Terre-Neuve (UTC-3:30), mais exactement à `current.time` à Lyon, Sydney ou Singapour. Un écran qui cherche « l'heure qui contient maintenant » ne trouve rien au début à Terre-Neuve.
+
+**Cause.** Les séries commencent à l'instant courant arrondi à l'heure UTC, moins le reste de `utc_offset_seconds` modulo 3 600 (signe du C) : +20 700 s donne -2 700 s, -12 600 s donne +1 800 s. Mesuré sur deux captures ; la même règle est attendue pour +5:30, +3:30, +10:30 (non captés).
+
+**Solution.** `heure_courante`, `quart_courant` et le bloc « pluie proche » sont recalculés avec l'heure de l'appareil ; quand aucune heure ne la contient, l'indice vaut -1 et `courant.proba_precip_pct` vaut `METEO_PROBA_INCONNUE`, jamais la probabilité de l'heure voisine. Le contrat le dit (`main/meteo_etat.h`) et les tests couvrent les deux fuseaux.
+
+**Vu sur** PC de l'auteur, captures du 2026-11-07 00 h 12 (heure de Paris), aucune carte. **Preuve** : `hourly.time[0] - current.time` = -2 700 s (Katmandou), +1 800 s (Terre-Neuve), 0 (Lyon, Sydney, Singapour). **Statut** : résolu dans le noyau ; l'écran doit accepter `heure_courante == -1`.

@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <new>
 #include <string_view>
 
 #include "esp_crt_bundle.h"
@@ -19,6 +20,7 @@
 #include "ecran/meteo_cache.hpp"
 #include "ecran/meteo_planning.hpp"
 #include "ecran/meteo_requete.hpp"
+#include "ecran/meteo_riche.hpp"
 #include "ecran/meteo_synthese.hpp"
 #include "horloge.h"
 #include "meteo_etat.h"
@@ -35,8 +37,11 @@ const char *TAG_RESULTAT = "METEO";
 
 constexpr const char *kEspaceNvs = "meteo";
 constexpr const char *kCleCache = "cache";
-constexpr size_t kTailleTampon =
-    16 * 1024; // réponse mesurée : 2 826 à 2 960 octets ; tampon en PSRAM, libéré après chaque essai
+// Tampon de réception : 16 Ko, en PSRAM, rendu après chaque essai. Pourquoi 16 Ko : la réponse riche (courant, 24 heures, 7 jours,
+// quarts d'heure) fait 4 427 à 4 575 octets sur les sept villes captées le 07/11/2026 (test/host/donnees/openmeteo_riche_*.json),
+// soit une marge de 3,5 ; une réponse plus grande est REFUSÉE (`Issue::TropGrand`), jamais lue à moitié. Pourquoi en PSRAM : un
+// tampon de plusieurs Ko en RAM interne mangerait le budget de la prise de contact TLS (voir jalon 1b).
+constexpr size_t kTailleTampon = 16 * 1024;
 constexpr int kDelaiHttpMs = 15000;          // connexion, TLS et lecture : au-delà, l'essai est un échec
 constexpr uint32_t kPasAttenteMs = 2000;     // contrôle de l'IP et de l'heure avant le premier essai
 constexpr uint32_t kAntiRebondZoneMs = 1500; // plusieurs changements de zone d'affilée = une seule requête
@@ -132,11 +137,60 @@ struct Essai {
     int statut_http = 0;
     size_t octets = 0;
     int duree_ms = 0;
-    meteo::Releve releve{};
 };
 
-// Un aller-retour complet. Le tampon de réception est pris en PSRAM et rendu avant de sortir.
-Essai interroger(const PositionE5 &position) {
+// Zone de travail en PSRAM, allouée une fois : la météo lue (1 312 octets sur le PC) et la copie du contrat v2 (2 088 octets) qui sert au journal.
+// Hors de la pile (12 Ko, dont le pic est la prise de contact TLS) et hors de la RAM interne, qui est rare.
+struct Travail {
+    meteo::Meteo meteo;
+    MeteoDetail detail;
+};
+
+Travail *g_travail = nullptr;
+
+Travail *travail() {
+    if (g_travail == nullptr) {
+        void *place = heap_caps_calloc(1, sizeof(Travail), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (place == nullptr) {
+            ESP_LOGE(TAG, "pas de place en PSRAM pour la zone de travail (%u octets)",
+                     static_cast<unsigned>(sizeof(Travail)));
+            return nullptr;
+        }
+        g_travail = new (place) Travail();
+    }
+    return g_travail;
+}
+
+// Lit la réponse JSON dans `sortie`. Fonction à part et jamais « en ligne » : l'analyse (≈ 1,3 Ko de résultat) n'existe sur la pile
+// que le temps de la lecture, pas pendant la prise de contact TLS, qui est le pic de pile de la tâche.
+__attribute__((noinline)) bool lire_reponse(std::string_view texte, int64_t maintenant, meteo::Meteo &sortie) {
+    const meteo::AnalyseRiche a = meteo::analyser_riche(texte, maintenant);
+    if (!a.ok()) {
+        ESP_LOGW(
+            TAG, "réponse refusée : %.*s (champ %.*s)", static_cast<int>(meteo::message_court(a.diag.erreur).size()),
+            meteo::message_court(a.diag.erreur).data(), static_cast<int>(a.diag.champ.size()), a.diag.champ.data());
+        return false;
+    }
+    // Une section riche cassée est vidée (le reste reste utilisable) : on le dit au journal, avec le champ en cause.
+    const struct {
+        const char *nom;
+        const meteo::Diagnostic &diag;
+    } sections[] = {{"heures", a.diag_heures}, {"jours", a.diag_jours}, {"quarts d'heure", a.diag_quarts}};
+    for (const auto &s : sections) {
+        if (!s.diag.ok()) {
+            ESP_LOGW(TAG, "section « %s » de la réponse écartée : %.*s (champ %.*s)", s.nom,
+                     static_cast<int>(meteo::message_court(s.diag.erreur).size()),
+                     meteo::message_court(s.diag.erreur).data(), static_cast<int>(s.diag.champ.size()),
+                     s.diag.champ.data());
+        }
+    }
+    sortie = a.meteo;
+    return true;
+}
+
+// Un aller-retour complet. Le tampon de réception est pris en PSRAM et rendu avant de sortir. La météo lue est écrite dans
+// `sortie` (seulement si l'issue est `Ok`).
+Essai interroger(const PositionE5 &position, meteo::Meteo &sortie) {
     Essai e;
     char url[meteo::TAILLE_REQUETE_MAX];
     if (meteo::construire_requete(position.latitude_e5, position.longitude_e5, url, sizeof(url)) == 0) {
@@ -163,9 +217,10 @@ Essai interroger(const PositionE5 &position) {
     config.event_handler = sur_evenement_http;
     config.user_data = &rec;
     config.crt_bundle_attach =
-        esp_crt_bundle_attach;    // certificats racine du paquet d'ESP-IDF (Mozilla) : le serveur est vérifié
-    config.buffer_size = 2048;    // en-têtes de réponse
-    config.buffer_size_tx = 1024; // ligne de requête (479 octets) + en-têtes : 512 par défaut ne suffit pas
+        esp_crt_bundle_attach; // certificats racine du paquet d'ESP-IDF (Mozilla) : le serveur est vérifié
+    config.buffer_size = 2048; // en-têtes de réponse
+    config.buffer_size_tx =
+        1024; // ligne de requête (851 octets au plus, test_meteo_appareil.cpp) : 512 par défaut ne suffit pas
     config.keep_alive_enable = false;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -199,18 +254,9 @@ Essai interroger(const PositionE5 &position) {
         e.issue = Issue::TropGrand;
     } else {
         const int64_t maintenant = static_cast<int64_t>(std::time(nullptr));
-        const meteo::Analyse a =
-            meteo::analyser(std::string_view(reinterpret_cast<const char *>(tampon), rec.n), maintenant);
-        if (a.ok()) {
-            e.releve = a.releve;
-            e.issue = Issue::Ok;
-        } else {
-            ESP_LOGW(TAG, "réponse refusée : %.*s (champ %.*s)",
-                     static_cast<int>(meteo::message_court(a.diag.erreur).size()),
-                     meteo::message_court(a.diag.erreur).data(), static_cast<int>(a.diag.champ.size()),
-                     a.diag.champ.data());
-            e.issue = Issue::Illisible;
-        }
+        e.issue = lire_reponse(std::string_view(reinterpret_cast<const char *>(tampon), rec.n), maintenant, sortie)
+                      ? Issue::Ok
+                      : Issue::Illisible;
     }
     heap_caps_free(tampon);
 
@@ -224,11 +270,14 @@ Essai interroger(const PositionE5 &position) {
 
 // ---- cache NVS -----------------------------------------------------------------------------------------------------
 
-void enregistrer_cache(const meteo::Releve &releve, const PositionE5 &position) {
-    uint8_t brut[meteo::TAILLE_CACHE_ZONE_MAX];
-    const size_t n = meteo::serialiser_cache(releve, position.latitude_e5, position.longitude_e5, brut, sizeof(brut));
+// Le cache est VERSIONNÉ (format v2, ecran/meteo_riche.hpp) : un cache d'un autre format (le v1 écrit par les firmwares d'avant la
+// météo riche) est reconnu à sa version avant toute lecture, ignoré, et remplacé à la première réponse.
+void enregistrer_cache(const meteo::Meteo &meteo, const PositionE5 &position) {
+    uint8_t brut[meteo::TAILLE_CACHE_RICHE_MAX]; // ≈ 860 octets
+    const size_t n =
+        meteo::serialiser_cache_meteo(meteo, position.latitude_e5, position.longitude_e5, brut, sizeof(brut));
     if (n == 0) {
-        ESP_LOGE(TAG, "cache non écrit : relevé ou position refusés par le noyau");
+        ESP_LOGE(TAG, "cache non écrit : météo ou position refusées par le noyau");
         return;
     }
     nvs_handle_t h = 0;
@@ -247,7 +296,8 @@ void enregistrer_cache(const meteo::Releve &releve, const PositionE5 &position) 
     }
 }
 
-void relire_cache() {
+// Jamais « en ligne » : le résultat de la lecture (≈ 1,3 Ko) n'occupe la pile d'`app_main` que le temps de la relecture.
+__attribute__((noinline)) void relire_cache() {
     PositionE5 position = {};
     zone_lire_e5(nullptr, &position);
     nvs_handle_t h = 0;
@@ -256,7 +306,7 @@ void relire_cache() {
         ESP_LOGI(TAG, "pas de cache météo (NVS : %s)", esp_err_to_name(ouvert));
         return;
     }
-    uint8_t brut[meteo::TAILLE_CACHE_ZONE_MAX];
+    uint8_t brut[meteo::TAILLE_CACHE_RICHE_MAX];
     size_t taille = sizeof(brut);
     const esp_err_t err = nvs_get_blob(h, kCleCache, brut, &taille);
     nvs_close(h);
@@ -264,34 +314,51 @@ void relire_cache() {
         ESP_LOGI(TAG, "pas de cache météo enregistré");
         return;
     }
+    if (err == ESP_ERR_NVS_INVALID_LENGTH) {
+        // Plus grand que le plus grand cache v2 : ce n'est pas un cache que ce firmware sait lire.
+        ESP_LOGI(TAG, "cache météo d'un format inconnu (trop grand), ignoré ; il sera remplacé à la prochaine réponse");
+        return;
+    }
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "cache météo non lu : %s", esp_err_to_name(err));
         return;
     }
-    const meteo::LectureCache lu = meteo::deserialiser_cache(brut, taille);
+    const meteo::LectureCacheMeteo lu = meteo::deserialiser_cache_meteo(brut, taille);
     if (!lu.ok()) {
-        ESP_LOGW(TAG, "cache météo refusé : %.*s (%.*s) ; il sera remplacé à la prochaine réponse",
-                 static_cast<int>(meteo::message_court(lu.diag.erreur).size()),
-                 meteo::message_court(lu.diag.erreur).data(), static_cast<int>(lu.diag.champ.size()),
-                 lu.diag.champ.data());
+        if (lu.diag.erreur == meteo::Erreur::VersionInconnue) {
+            ESP_LOGI(TAG, "cache météo d'un ancien format, ignoré ; il sera remplacé à la prochaine réponse");
+        } else {
+            ESP_LOGW(TAG, "cache météo refusé : %.*s (%.*s) ; il sera remplacé à la prochaine réponse",
+                     static_cast<int>(meteo::message_court(lu.diag.erreur).size()),
+                     meteo::message_court(lu.diag.erreur).data(), static_cast<int>(lu.diag.champ.size()),
+                     lu.diag.champ.data());
+        }
         return;
     }
     if (!(PositionE5{lu.latitude_e5, lu.longitude_e5} == position)) {
         ESP_LOGI(TAG, "cache météo d'un autre lieu que la zone actuelle : ignoré");
         return;
     }
-    meteo_etat_publier(lu.releve);
+    if (!meteo_etat_publier(lu.meteo)) {
+        ESP_LOGE(TAG, "cache relu mais non publié : pas de place pour l'état de la météo");
+        return;
+    }
+    const meteo::Releve &r = lu.meteo.releve;
     char t[12];
-    meteo::ecrire_dixiemes(lu.releve.temperature_dixiemes, t, sizeof(t));
-    const std::string_view libelle = meteo::decrire(lu.releve.code_wmo, lu.releve.jour).libelle;
-    ESP_LOGI(TAG, "cache relu : %s °C, %.*s, reçu à l'instant UNIX %lld (fraîcheur : voir la ligne contrat suivante)",
-             t, static_cast<int>(libelle.size()), libelle.data(), static_cast<long long>(lu.releve.recu_a_s));
+    meteo::ecrire_dixiemes(r.temperature_dixiemes, t, sizeof(t));
+    const std::string_view libelle = meteo::decrire(r.code_wmo, r.jour).libelle;
+    ESP_LOGI(TAG,
+             "cache relu : %s °C, %.*s, reçu à l'instant UNIX %lld ; %u heures, %u jours, %u quarts d'heure (fraîcheur "
+             ": voir "
+             "la ligne contrat suivante)",
+             t, static_cast<int>(libelle.size()), libelle.data(), static_cast<long long>(r.recu_a_s),
+             static_cast<unsigned>(lu.meteo.riche.nb_heures), static_cast<unsigned>(lu.meteo.riche.nb_jours),
+             static_cast<unsigned>(lu.meteo.riche.nb_quarts));
 }
 
 // ---- journal du résultat -------------------------------------------------------------------------------------------
 
-void journaliser_releve(const ZoneMeteo &zone, const Essai &e) {
-    const meteo::Releve &r = e.releve;
+void journaliser_releve(const ZoneMeteo &zone, const meteo::Releve &r, const Essai &e) {
     const int64_t maintenant = r.recu_a_s;
     const meteo::Synthese s = meteo::synthetiser(r, maintenant, 0);
     char temp[12], ress[12], mini[12], maxi[12], vent[12], pression[12];
@@ -340,6 +407,109 @@ void journaliser_contrat(const char *quand) {
              "jour=%d libellé=« %s »",
              quand, e.valide ? 1 : 0, e.perime ? 1 : 0, static_cast<long long>(e.maj_epoch_s), temp, mini, maxi,
              e.minmax_connus ? "du jour" : "prévision du jour absente", e.code_wmo, e.jour ? 1 : 0, e.libelle);
+}
+
+// Un nombre du contrat (exact au dixième) en texte « -0,5 » : pas de printf("%f") dans les journaux.
+void dixiemes_de(float valeur, char *sortie, size_t n) {
+    meteo::ecrire_dixiemes(static_cast<int32_t>(std::lroundf(valeur * 10.0F)), sortie, n);
+}
+
+// Relit la météo détaillée PAR LE CONTRAT v2 (meteo_detail_lire), exactement comme le fera l'écran « très visuel », et la met au
+// journal : c'est la preuve sur la carte que ce que l'écran recevra (courant, heures, jours, pluie proche) est la réponse réelle.
+void journaliser_detail(const char *quand) {
+    Travail *t = travail();
+    if (t == nullptr) {
+        return;
+    }
+    const MeteoDetail &d = t->detail;
+    if (!meteo_detail_lire(&t->detail)) {
+        ESP_LOGI(TAG_RESULTAT,
+                 "contrat v2 (%s) : meteo_detail_lire -> valide=0 (aucune météo connue pour la zone actuelle)", quand);
+        return;
+    }
+    ESP_LOGI(TAG_RESULTAT,
+             "contrat v2 (%s) : meteo_detail_lire -> valide=1 perime=%d version=%u fuseau=%s décalage=%d s ; %d heures "
+             "(en cours : %d), %d jours (en cours : %d), %d quarts d'heure (en cours : %d)",
+             quand, d.perime ? 1 : 0, static_cast<unsigned>(d.version), d.fuseau, static_cast<int>(d.decalage_utc_s),
+             d.nb_heures, d.heure_courante, d.nb_jours, d.jour_courant, d.nb_quarts, d.quart_courant);
+
+    char t_c[12], res[12], vent[12], raf[12], pluie_mm[12];
+    dixiemes_de(d.courant.temperature_c, t_c, sizeof(t_c));
+    dixiemes_de(d.courant.ressentie_c, res, sizeof(res));
+    dixiemes_de(d.courant.vent_kmh, vent, sizeof(vent));
+    dixiemes_de(d.courant.rafales_kmh, raf, sizeof(raf));
+    dixiemes_de(d.courant.precipitation_mm, pluie_mm, sizeof(pluie_mm));
+    char proba[8];
+    if (d.courant.proba_precip_pct == METEO_PROBA_INCONNUE) {
+        std::snprintf(proba, sizeof(proba), "?");
+    } else {
+        std::snprintf(proba, sizeof(proba), "%d", static_cast<int>(d.courant.proba_precip_pct));
+    }
+    char tendance[12];
+    if (std::isnan(d.courant.tendance_pression_3h_hpa)) {
+        std::snprintf(tendance, sizeof(tendance),
+                      "?"); // moins de 3 h de relevés depuis le démarrage ou le changement de zone
+    } else {
+        dixiemes_de(d.courant.tendance_pression_3h_hpa, tendance, sizeof(tendance));
+    }
+    ESP_LOGI(TAG_RESULTAT,
+             "  courant : %s °C (ressentie %s), « %s », humidité %d %%, nuages %d %%, pluie %s mm, probabilité %s %%, "
+             "vent %s "
+             "km/h (rafales %s) direction %d°, pression %d hPa (tendance sur 3 h : %s hPa)",
+             t_c, res, d.courant.libelle, static_cast<int>(d.courant.humidite_pct),
+             static_cast<int>(d.courant.nuages_pct), pluie_mm, proba, vent, raf,
+             static_cast<int>(d.courant.direction_vent_deg), static_cast<int>(std::lroundf(d.courant.pression_hpa)),
+             tendance);
+
+    if (d.heure_courante >= 0) {
+        const MeteoHeure &h = d.heures[d.heure_courante];
+        char ht[12], hp[12], uv[12];
+        dixiemes_de(h.temperature_c, ht, sizeof(ht));
+        dixiemes_de(h.precipitation_mm, hp, sizeof(hp));
+        dixiemes_de(h.uv, uv, sizeof(uv));
+        ESP_LOGI(TAG_RESULTAT,
+                 "  heure en cours (début UNIX %lld) : %s °C, pluie %s mm, probabilité %d %%, UV %s, code %d",
+                 static_cast<long long>(h.debut_epoch_s), ht, hp, static_cast<int>(h.proba_precip_pct), uv,
+                 static_cast<int>(h.code_wmo));
+    }
+    if (d.jour_courant >= 0) {
+        const MeteoJour &j = d.jours[d.jour_courant];
+        char mn[12], mx[12], duree[12], soleil[12], cumul[12];
+        dixiemes_de(j.min_c, mn, sizeof(mn));
+        dixiemes_de(j.max_c, mx, sizeof(mx));
+        dixiemes_de(j.duree_jour_h, duree, sizeof(duree));
+        dixiemes_de(j.ensoleillement_h, soleil, sizeof(soleil));
+        dixiemes_de(j.precipitation_mm, cumul, sizeof(cumul));
+        ESP_LOGI(
+            TAG_RESULTAT,
+            "  jour en cours : min %s / max %s °C, jour de %s h%s, ensoleillement %s h, pluie %s mm sur %d h, code %d",
+            mn, mx, duree, j.sans_soleil ? " (nuit polaire)" : "", soleil, cumul,
+            static_cast<int>(j.heures_precipitation), static_cast<int>(j.code_wmo));
+    }
+    const MeteoPluieProche &p = d.pluie;
+    char cumul[12], fort[12];
+    dixiemes_de(p.cumul_mm, cumul, sizeof(cumul));
+    dixiemes_de(p.max_quart_mm, fort, sizeof(fort));
+    if (!p.connue) {
+        ESP_LOGI(TAG_RESULTAT, "  pluie proche : inconnue (aucun quart d'heure ne couvre l'heure actuelle)");
+    } else if (p.en_cours) {
+        if (p.fin_dans_min >= 0) {
+            ESP_LOGI(TAG_RESULTAT,
+                     "  pluie proche : il pleut, jusqu'à dans %d min ; %s mm sur %d min (plus fort quart : %s mm)%s",
+                     p.fin_dans_min, cumul, p.fenetre_min, fort, p.perimee ? " [périmée]" : "");
+        } else {
+            ESP_LOGI(TAG_RESULTAT,
+                     "  pluie proche : il pleut, sur toute la fenêtre de %d min ; %s mm (plus fort quart : %s mm)%s",
+                     p.fenetre_min, cumul, fort, p.perimee ? " [périmée]" : "");
+        }
+    } else if (p.dans_min >= 0) {
+        ESP_LOGI(TAG_RESULTAT,
+                 "  pluie proche : de la pluie dans %d min ; %s mm sur %d min (plus fort quart : %s mm)%s", p.dans_min,
+                 cumul, p.fenetre_min, fort, p.perimee ? " [périmée]" : "");
+    } else {
+        ESP_LOGI(TAG_RESULTAT, "  pluie proche : pas de pluie dans les %d min qui viennent%s", p.fenetre_min,
+                 p.perimee ? " [périmée]" : "");
+    }
 }
 
 const char *nom_issue(Issue i) {
@@ -404,11 +574,16 @@ void tache_meteo(void *) {
         }
 
         journaliser_contrat("réseau et heure prêts, avant la requête");
+        journaliser_detail("réseau et heure prêts, avant la requête");
         ZoneMeteo zone = {};
         PositionE5 position = {};
         zone_lire_e5(&zone, &position);
         ESP_LOGI(TAG, "requête Open-Meteo pour « %s » (%d échec(s) de suite jusqu'ici)", zone.nom, meteo_etat_echecs());
-        const Essai e = interroger(position);
+        Travail *tr = travail();
+        const Essai e = tr != nullptr ? interroger(position, tr->meteo) : Essai{Issue::Memoire};
+        // Pile : marge restante la plus basse depuis le début de la tâche (le pic est la prise de contact TLS, juste faite).
+        ESP_LOGI(TAG, "pile de la tâche : %u octets jamais utilisés sur %u",
+                 static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)), static_cast<unsigned>(kPileOctets));
 
         bool immediat = false;
         if (e.issue == Issue::Ok) {
@@ -417,11 +592,14 @@ void tache_meteo(void *) {
             if (!(maintenant == position)) {
                 ESP_LOGI(TAG, "la zone a changé pendant la requête : réponse écartée, nouvelle requête");
                 immediat = true;
+            } else if (!meteo_etat_publier(tr->meteo)) {
+                ESP_LOGE(TAG, "réponse lue mais non publiée : pas de place pour l'état de la météo");
+                meteo_etat_compter_echec();
             } else {
-                meteo_etat_publier(e.releve);
-                enregistrer_cache(e.releve, position);
-                journaliser_releve(zone, e);
+                enregistrer_cache(tr->meteo, position);
+                journaliser_releve(zone, tr->meteo.releve, e);
                 journaliser_contrat("après la réponse");
+                journaliser_detail("après la réponse");
                 trop_de_requetes = false;
             }
         } else {
@@ -456,8 +634,13 @@ void meteo_client_zone_changee() {
 }
 
 void meteo_client_demarrer() {
+    // Les tailles réelles sur le RISC-V (le PC en annonce d'autres : alignement des entiers 64 bits).
+    ESP_LOGI(TAG, "tailles : météo %u o, contrat v2 %u o, cache NVS au plus %u o, tampon de réception %u o (PSRAM)",
+             static_cast<unsigned>(sizeof(meteo::Meteo)), static_cast<unsigned>(sizeof(MeteoDetail)),
+             static_cast<unsigned>(meteo::TAILLE_CACHE_RICHE_MAX), static_cast<unsigned>(kTailleTampon));
     relire_cache();
     journaliser_contrat("au démarrage, depuis le cache");
+    journaliser_detail("au démarrage, depuis le cache");
     if (xTaskCreate(tache_meteo, "meteo", kPileOctets, nullptr, kPrioriteMeteo, &g_tache) != pdPASS) {
         ESP_LOGE(TAG, "tâche météo non créée");
     }
