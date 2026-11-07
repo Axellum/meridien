@@ -1,12 +1,16 @@
-// Noyau pur : lever et coucher du soleil d'un lieu et d'un jour, par le calcul (ADR-0012). Sert au ciel de l'écran principal quand
-// la météo n'est pas là (premier démarrage sans réseau, cache absent) : à la place d'un « jour de 8 h à 18 h » écrit en dur, faux
-// partout et toute l'année.
+// Noyau pur : lever et coucher du soleil d'un lieu et d'un jour, par le calcul (ADR-0012). C'est LE calcul du soleil de l'appareil,
+// le seul : il sert au ciel de l'écran principal quand la météo n'est pas là (premier démarrage sans réseau, cache absent : à la
+// place d'un « jour de 8 h à 18 h » écrit en dur, faux partout et toute l'année), et aux lecteurs de MET Norway et du NWS, dont les
+// réponses ne donnent ni lever ni coucher (ADR-0014, meteo_natif_commun.hpp : `lever_coucher_e5`, `est_leve_e5`).
 //
 // Méthode : l'algorithme de la NOAA (Global Monitoring Laboratory, « Solar Calculation Details » : équation du temps, déclinaison,
 // angle horaire à 90,833° du zénith = rayon du soleil + réfraction), calculé deux fois (une première estimation à midi solaire, puis
 // à l'instant estimé du lever ou du coucher), comme la feuille de calcul de la NOAA. Précision attendue : de l'ordre de la minute
-// sous 60° de latitude, quelques minutes près des cercles polaires ; ce n'est pas une éphéméride (voir test_soleil.cpp : comparé à
-// une implémentation indépendante en Python, et aux levers et couchers réels d'Open-Meteo de six lieux).
+// sous 60° de latitude, quelques minutes près des cercles polaires ; ce n'est pas une éphéméride. Preuves, toutes dans
+// test_soleil.cpp : une réécriture indépendante en Python du même algorithme (120 jours), les levers et couchers RÉELS d'Open-Meteo
+// (63 jours + 49 jours de sept lieux), ceux du produit « Sunrise 3.0 » de MET Norway (79 jours de 24 lieux) et un second calcul
+// écrit en Python avec un AUTRE algorithme (« Almanac for Computers » de l'US Naval Observatory, 79 jours). Chiffres :
+// docs/mesures/fuseaux.md et docs/mesures/fournisseurs-meteo.md.
 // Cas polaires : jour polaire (le soleil ne se couche pas) et nuit polaire (il ne se lève pas) sont rendus tels quels, sans heure.
 //
 // C++17 standard, aucun include ESP-IDF, évaluable à la compilation. Pas de <cmath> (ses fonctions ne sont pas constexpr) : sinus,
@@ -181,6 +185,44 @@ constexpr std::int64_t arrondi_s(double minutes) noexcept {
     return static_cast<std::int64_t>(plancher(minutes * 60.0 + 0.5));
 }
 
+// Degrés d'une coordonnée en e5 (degrés × 100 000, entier : la forme où les lecteurs de météo gardent la position).
+constexpr double degres_depuis_e5(std::int32_t e5) noexcept { return static_cast<double>(e5) / 100000.0; }
+
+// Lever et coucher du jour solaire dont le midi est le plus proche de `midi_local_s` (le midi du jour local, instant UNIX).
+constexpr LeverCoucher lever_coucher_autour_de(double latitude_deg, double longitude_deg,
+                                               std::int64_t midi_local_s) noexcept {
+    LeverCoucher r;
+    if (!(latitude_deg >= -90.0 && latitude_deg <= 90.0) || !(longitude_deg >= -180.0 && longitude_deg <= 180.0)) {
+        r.situation = Situation::NuitPolaire; // lieu invraisemblable : aucune heure, l'appelant retombe sur son repli
+        return r;
+    }
+    const double midi_moyen_min = 720.0 - 4.0 * longitude_deg;
+    // Jour UTC de base : celui dont le midi solaire moyen tombe le plus près du midi local.
+    const double n_reel = (static_cast<double>(midi_local_s) - midi_moyen_min * 60.0) / 86400.0 + 0.5;
+    const std::int64_t n = static_cast<std::int64_t>(plancher(n_reel));
+    const double jd_minuit = static_cast<double>(n) + 2440587.5; // le 1970-01-01 00:00 UTC est le jour julien 2440587,5
+
+    const Evenement lever1 = evenement(latitude_deg, longitude_deg, jd_minuit + midi_moyen_min / 1440.0, true);
+    const Evenement coucher1 = evenement(latitude_deg, longitude_deg, jd_minuit + midi_moyen_min / 1440.0, false);
+    if (lever1.situation != Situation::Normal || coucher1.situation != Situation::Normal) {
+        r.situation = lever1.situation != Situation::Normal ? lever1.situation : coucher1.situation;
+        return r;
+    }
+    // Seconde passe, à l'instant estimé : la déclinaison et l'équation du temps ont bougé depuis midi.
+    const Evenement lever2 = evenement(latitude_deg, longitude_deg, jd_minuit + lever1.minutes_utc / 1440.0, true);
+    const Evenement coucher2 = evenement(latitude_deg, longitude_deg, jd_minuit + coucher1.minutes_utc / 1440.0, false);
+    const double lever_min = lever2.situation == Situation::Normal ? lever2.minutes_utc : lever1.minutes_utc;
+    const double coucher_min = coucher2.situation == Situation::Normal ? coucher2.minutes_utc : coucher1.minutes_utc;
+    r.lever_s = n * 86400 + arrondi_s(lever_min);
+    r.coucher_s = n * 86400 + arrondi_s(coucher_min);
+    if (r.coucher_s <= r.lever_s) { // incohérent (cas limites près des pôles) : mieux vaut aucune heure qu'une fausse
+        r.situation = Situation::NuitPolaire;
+        r.lever_s = 0;
+        r.coucher_s = 0;
+    }
+    return r;
+}
+
 } // namespace detail
 
 // Lever et coucher du soleil du jour civil (an, mois, jour) d'un lieu. `latitude_deg` : nord positif ; `longitude_deg` : est positif.
@@ -189,42 +231,41 @@ constexpr std::int64_t arrondi_s(double minutes) noexcept {
 // instants UNIX (UTC), que l'appelant convertit en heure locale avec le fuseau.
 constexpr LeverCoucher lever_coucher(double latitude_deg, double longitude_deg, int an, int mois, int jour,
                                      std::int32_t decalage_s) noexcept {
-    LeverCoucher r;
-    if (!(latitude_deg >= -90.0 && latitude_deg <= 90.0) || !(longitude_deg >= -180.0 && longitude_deg <= 180.0)) {
-        r.situation = Situation::NuitPolaire; // lieu invraisemblable : aucune heure, l'appelant retombe sur son repli
-        return r;
-    }
     const std::int64_t midi_local_s =
         ecran::heure::detail::jours_depuis_epoch(an, mois, jour) * 86400 + 43200 - decalage_s;
-    const double midi_moyen_min = 720.0 - 4.0 * longitude_deg;
-    // Jour UTC de base : celui dont le midi solaire moyen tombe le plus près du midi local.
-    const double n_reel = (static_cast<double>(midi_local_s) - midi_moyen_min * 60.0) / 86400.0 + 0.5;
-    const std::int64_t n = static_cast<std::int64_t>(detail::plancher(n_reel));
-    const double jd_minuit = static_cast<double>(n) + 2440587.5; // le 1970-01-01 00:00 UTC est le jour julien 2440587,5
+    return detail::lever_coucher_autour_de(latitude_deg, longitude_deg, midi_local_s);
+}
 
-    detail::Evenement lever1 =
-        detail::evenement(latitude_deg, longitude_deg, jd_minuit + midi_moyen_min / 1440.0, true);
-    detail::Evenement coucher1 =
-        detail::evenement(latitude_deg, longitude_deg, jd_minuit + midi_moyen_min / 1440.0, false);
-    if (lever1.situation != Situation::Normal || coucher1.situation != Situation::Normal) {
-        r.situation = lever1.situation != Situation::Normal ? lever1.situation : coucher1.situation;
-        return r;
-    }
-    // Seconde passe, à l'instant estimé : la déclinaison et l'équation du temps ont bougé depuis midi.
-    const detail::Evenement lever2 =
-        detail::evenement(latitude_deg, longitude_deg, jd_minuit + lever1.minutes_utc / 1440.0, true);
-    const detail::Evenement coucher2 =
-        detail::evenement(latitude_deg, longitude_deg, jd_minuit + coucher1.minutes_utc / 1440.0, false);
-    const double lever_min = lever2.situation == Situation::Normal ? lever2.minutes_utc : lever1.minutes_utc;
-    const double coucher_min = coucher2.situation == Situation::Normal ? coucher2.minutes_utc : coucher1.minutes_utc;
-    r.lever_s = n * 86400 + detail::arrondi_s(lever_min);
-    r.coucher_s = n * 86400 + detail::arrondi_s(coucher_min);
-    if (r.coucher_s <= r.lever_s) { // incohérent (cas limites près des pôles) : mieux vaut aucune heure qu'une fausse
-        r.situation = Situation::NuitPolaire;
-        r.lever_s = 0;
-        r.coucher_s = 0;
-    }
-    return r;
+// Le même calcul pour une position en e5 (degrés × 100 000) et le jour LOCAL qui commence à `debut_jour_s` (son minuit local, instant
+// UNIX) : la forme des lecteurs de MET Norway et du NWS (meteo_natif_commun.hpp), qui découpent eux-mêmes les jours locaux avec le
+// fuseau. Un jour dure 23, 24 ou 25 heures (changement d'heure) : le jour solaire est celui dont le midi est le plus proche du
+// milieu du jour local (début + 12 h), comme `lever_coucher` avec le midi local.
+constexpr LeverCoucher lever_coucher_e5(std::int64_t debut_jour_s, std::int32_t latitude_e5,
+                                        std::int32_t longitude_e5) noexcept {
+    return detail::lever_coucher_autour_de(detail::degres_depuis_e5(latitude_e5),
+                                           detail::degres_depuis_e5(longitude_e5), debut_jour_s + 43200);
+}
+
+// Hauteur du centre du soleil au-dessus de l'horizon (degrés, sans réfraction) à l'instant UNIX `instant_s`, pour une position en
+// degrés. Même équation du temps et même déclinaison que le lever et le coucher.
+constexpr double hauteur_deg(std::int64_t instant_s, double latitude_deg, double longitude_deg) noexcept {
+    const detail::Astre a = detail::position_du_soleil(static_cast<double>(instant_s) / 86400.0 + 2440587.5);
+    // L'angle horaire est périodique (24 h = 360°) : le reste de la division par un jour suffit, même négatif avant 1970.
+    const double minutes_utc = static_cast<double>(instant_s % 86400) / 60.0;
+    const double temps_solaire_vrai_min = minutes_utc + a.equation_min + 4.0 * longitude_deg;
+    const double angle_horaire = (temps_solaire_vrai_min / 4.0 - 180.0) * detail::RAD;
+    const double lat = latitude_deg * detail::RAD;
+    const double s = detail::sinus(lat) * detail::sinus(a.declinaison) +
+                     detail::cosinus(lat) * detail::cosinus(a.declinaison) * detail::cosinus(angle_horaire);
+    return detail::arc_sinus(s) / detail::RAD;
+}
+
+// Le soleil est-il levé à `instant_s` (son centre plus haut que -0,833°, comme pour le lever et le coucher) ? Position en e5.
+// Les lecteurs de MET Norway et du NWS en font l'indicateur « jour » du moment et de chaque heure.
+constexpr bool est_leve_e5(std::int64_t instant_s, std::int32_t latitude_e5, std::int32_t longitude_e5) noexcept {
+    const double lat = detail::degres_depuis_e5(latitude_e5);
+    const double lon = detail::degres_depuis_e5(longitude_e5);
+    return hauteur_deg(instant_s, lat, lon) > 90.0 - detail::ZENITH_LEVER_DEG;
 }
 
 } // namespace ecran::soleil

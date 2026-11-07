@@ -4,7 +4,7 @@
 //     nombre, ou hors de l'entier 16 bits = réponse refusée (le champ est nommé dans le diagnostic) ;
 //   - les jours LOCAUX : minuit local de chacun des sept jours, changements d'heure compris (les deux services donnent leurs
 //     instants en UTC, sans fuseau : c'est l'appareil qui découpe les jours) ;
-//   - le lever et le coucher du soleil (soleil_calcule.hpp), que ni l'un ni l'autre ne donne ;
+//   - le lever et le coucher du soleil (soleil.hpp, le calcul de l'appareil, ADR-0012), que ni l'un ni l'autre ne donne ;
 //   - de quoi garder le plus petit et le plus grand d'une série sans jamais compter une valeur inconnue.
 #pragma once
 
@@ -15,7 +15,7 @@
 #include "ecran/heure_fr.hpp"
 #include "ecran/json_mini.hpp"
 #include "ecran/meteo_riche.hpp"
-#include "ecran/soleil_calcule.hpp"
+#include "ecran/soleil.hpp"
 
 namespace ecran::meteo::natif {
 
@@ -153,17 +153,17 @@ constexpr Jours jours_locaux(const heure::Fuseau &f, std::int64_t recu_a_s) noex
 // comme Open-Meteo (`Jour::sans_soleil()`). Jour polaire : lever au minuit, coucher à la fin du jour.
 constexpr void remplir_soleil(Jour &j, std::int64_t fin_s, std::int32_t latitude_e5,
                               std::int32_t longitude_e5) noexcept {
-    const astro::EvenementsSoleil e = astro::evenements_du_jour(j.date_s, latitude_e5, longitude_e5);
+    const soleil::LeverCoucher e = soleil::lever_coucher_e5(j.date_s, latitude_e5, longitude_e5);
     switch (e.situation) {
-    case astro::Situation::Normal:
+    case soleil::Situation::Normal:
         j.lever_s = e.lever_s;
         j.coucher_s = e.coucher_s > e.lever_s ? e.coucher_s : e.lever_s;
         return;
-    case astro::Situation::NuitPolaire:
+    case soleil::Situation::NuitPolaire:
         j.lever_s = j.date_s;
         j.coucher_s = j.date_s;
         return;
-    case astro::Situation::JourPolaire:
+    case soleil::Situation::JourPolaire:
         j.lever_s = j.date_s;
         j.coucher_s = fin_s;
         return;

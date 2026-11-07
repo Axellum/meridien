@@ -5,10 +5,13 @@ fichier de test qui doit échouer, nom de la fonction de test qui doit être cit
 ce que la mutation simule). Une mutation « non détectée » ou « détectée par autre chose » fait échouer le lanceur.
 
 Fichiers couverts : iso8601.hpp (dates, durées, dates HTTP), parcours_json.hpp, meteo_rythme_natif.hpp,
-meteo_requete_fournisseurs.hpp, soleil_calcule.hpp, meteo_natif_commun.hpp, meteo_metno.hpp, meteo_nws.hpp, plus quatre
+meteo_requete_fournisseurs.hpp, meteo_natif_commun.hpp, meteo_metno.hpp, meteo_nws.hpp, plus quatre
 mutations de meteo_openmeteo.hpp et meteo_riche.hpp (le lecteur d'Open-Meteo refuse un « inconnu » écrit dans sa réponse). Les huit « identique à
 Python » de chaque lecteur voient n'importe quelle valeur copiée au mauvais endroit : les mutations de champs sont attendues d'eux
 sans nommer lequel (None) ; les autres visent un test précis.
+
+Le calcul du soleil lui-même (soleil.hpp, ADR-0012) n'est plus ici : les lecteurs l'appellent, ses mutations sont dans
+mutations_fuseaux.py ; ici, le BRANCHEMENT (quel jour, quelle position, quel sens du « jour »).
 
 Écartées volontairement (mutations équivalentes : aucun comportement observable ne change) : le `std::max` du coucher du soleil
 (`e.coucher_s > e.lever_s ? … : …`, le calcul ne donne jamais un coucher avant le lever hors des pôles), la remise de `p_` à la fin
@@ -19,7 +22,6 @@ ISO = "test_iso8601.cpp"
 PARCOURS = "test_parcours_json.cpp"
 RYTHME = "test_rythme_natif.cpp"
 REQUETE = "test_requete_fournisseurs.cpp"
-SOLEIL = "test_soleil_calcule.cpp"
 METNO = "test_meteo_metno.cpp"
 NWS = "test_meteo_nws.cpp"
 OPENMETEO = "test_meteo_openmeteo.cpp"
@@ -29,7 +31,6 @@ C_ISO = "iso8601.hpp"
 P = "parcours_json.hpp"
 R = "meteo_rythme_natif.hpp"
 Q = "meteo_requete_fournisseurs.hpp"
-S = "soleil_calcule.hpp"
 C = "meteo_natif_commun.hpp"
 M = "meteo_metno.hpp"
 N = "meteo_nws.hpp"
@@ -109,25 +110,6 @@ MUTATIONS_FOURNISSEURS_NATIFS = [
      REQUETE, "l_identification_est_celle_de_l_application", "l'identification n'a plus de contact : MET Norway répond 403"),
     (Q, "inline constexpr std::size_t TAILLE_REPONSE_NWS_GRILLE_MAX = 384 * 1024;", "inline constexpr std::size_t TAILLE_REPONSE_NWS_GRILLE_MAX = 200 * 1024;",
      REQUETE, "les_bornes_de_reponse_ont_de_la_marge_sur_les_reponses_reelles", "la borne de la grille du NWS est plus petite que la réponse de San Juan"),
-    # ====================================================================== soleil_calcule.hpp
-    (S, "inline constexpr double HAUTEUR_LEVER_DEG = -0.833;", "inline constexpr double HAUTEUR_LEVER_DEG = -0.5;",
-     SOLEIL, "contre_open_meteo_lyon", "la réfraction et le demi-disque du soleil sont oubliés"),
-    (S, "const double temps_solaire_vrai_min = minutes_utc + p.equation_du_temps_min + 4.0 * lon;",
-     "const double temps_solaire_vrai_min = minutes_utc + p.equation_du_temps_min - 4.0 * lon;",
-     SOLEIL, "hauteur_du_soleil", "la longitude est comptée dans le mauvais sens"),
-    (S, "const double demi_jour_s = detail::vers_deg(detail::arc_cosinus(ratio)) * 240.0;", "const double demi_jour_s = detail::vers_deg(detail::arc_cosinus(ratio)) * 120.0;",
-     SOLEIL, "contre_open_meteo_lyon", "une minute par demi-degré au lieu de quatre par degré"),
-    (S, "p.equation_du_temps_min = 4.0 * vers_deg(eq);", "p.equation_du_temps_min = 3.0 * vers_deg(eq);",
-     SOLEIL, "contre_open_meteo_lyon", "l'équation du temps est fausse d'un quart"),
-    (S, "        r.situation = Situation::NuitPolaire;", "        r.situation = Situation::JourPolaire;",
-     SOLEIL, "contre_open_meteo_longyearbyen_nuit_polaire", "la nuit polaire est prise pour un jour polaire"),
-    (S, "const double lever = midi - demi_jour_s;", "const double lever = midi + demi_jour_s;",
-     SOLEIL, "contre_open_meteo_lyon", "le lever est après le midi solaire"),
-    (S, "const long long k = static_cast<long long>(n >= 0.0 ? n + 0.5 : n - 0.5);", "const long long k = static_cast<long long>(n + 0.5);",
-     SOLEIL, "fonctions_trigonometriques", "la réduction d'un angle négatif arrondit du mauvais côté"),
-    (S, "for (int n = 1; n <= 12; ++n) {\n        terme *= -x * x / (static_cast<double>(2 * n) * static_cast<double>(2 * n + 1));",
-     "for (int n = 1; n <= 3; ++n) {\n        terme *= -x * x / (static_cast<double>(2 * n) * static_cast<double>(2 * n + 1));",
-     SOLEIL, "fonctions_trigonometriques", "le sinus n'a que trois termes"),
     # ====================================================================== meteo_natif_commun.hpp
     (C, "if (n > 100) {", "if (n > 1000) {",
      METNO, "une_humidite_au_dela_de_100_est_refusee", "un pourcentage de 306 est rangé dans un octet : il deviendrait 50"),
@@ -140,6 +122,12 @@ MUTATIONS_FOURNISSEURS_NATIFS = [
      METNO, "les_extremes_d_un_jour_gardent_un_zero_et_ignorent_l_inconnu", "un zéro est ignoré et l'inconnu est compté dans le plus petit et le plus grand"),
     (C, "j.coucher_s = j.date_s;", "j.coucher_s = fin_s;",
      METNO, "la_nuit_polaire_de_longyearbyen_a_lever_et_coucher_a_minuit", "la nuit polaire a son coucher à la fin du jour"),
+    (C, "soleil::lever_coucher_e5(j.date_s, latitude_e5, longitude_e5);", "soleil::lever_coucher_e5(fin_s, latitude_e5, longitude_e5);",
+     METNO, None, "le lever et le coucher d'un jour sont ceux du lendemain"),
+    (C, "soleil::lever_coucher_e5(j.date_s, latitude_e5, longitude_e5);", "soleil::lever_coucher_e5(j.date_s, longitude_e5, latitude_e5);",
+     METNO, None, "la latitude et la longitude sont échangées pour le lever du soleil"),
+    (C, "j.lever_s = e.lever_s;", "j.lever_s = e.coucher_s;",
+     METNO, None, "le lever d'un jour prend l'heure du coucher"),
     (C, "if (iana.empty() || iana.size() >= FUSEAU_MAX)", "if (iana.empty() || iana.size() > FUSEAU_MAX)",
      METNO, "un_nom_de_fuseau_qui_ne_tient_pas_dans_le_releve_est_refuse", "un nom de fuseau déborde du relevé d'un caractère"),
     # ====================================================================== meteo_metno.hpp
@@ -151,8 +139,10 @@ MUTATIONS_FOURNISSEURS_NATIFS = [
      METNO, "un_vent_negatif_ou_enorme_est_refuse", "un vent négatif est accepté"),
     (M, "if (s.n > 0 && e.t <= s.e[s.n - 1].t) {", "if (s.n > 0 && e.t < s.e[s.n - 1].t) {",
      METNO, "des_instants_qui_ne_croissent_pas_sont_refuses", "deux éléments au même instant sont acceptés"),
-    (M, "r.jour = astro::soleil_leve(c.t, latitude_e5, longitude_e5);", "r.jour = !astro::soleil_leve(c.t, latitude_e5, longitude_e5);",
+    (M, "r.jour = soleil::est_leve_e5(c.t, latitude_e5, longitude_e5);", "r.jour = !soleil::est_leve_e5(c.t, latitude_e5, longitude_e5);",
      METNO, None, "le jour et la nuit sont inversés pour le moment"),
+    (M, "h.jour = soleil::est_leve_e5(e.t, latitude_e5, longitude_e5);", "h.jour = !soleil::est_leve_e5(e.t, latitude_e5, longitude_e5);",
+     METNO, None, "le jour et la nuit sont inversés pour chaque heure"),
     (M, "j.uv_max_dixiemes = INCONNU_DIX;", "j.uv_max_dixiemes = 0;",
      METNO, "ce_que_la_source_ne_donne_pas_reste_inconnu", "l'indice UV du jour vaut zéro au lieu d'être inconnu"),
     (M, "q.precip_courante_dixiemes = INCONNU_DIX; // « le dernier quart d'heure écoulé »", "q.precip_courante_dixiemes = 0; // « le dernier quart d'heure écoulé »",
@@ -170,6 +160,10 @@ MUTATIONS_FOURNISSEURS_NATIFS = [
     (M, "e.h1.presente && e.h1.code >= 0;", "e.h1.presente;",
      METNO, "vingt_quatre_heures_de_suite_avec_chacune_un_symbole_connu", "une heure sans symbole connu entre dans les 24 heures"),
     # ====================================================================== meteo_nws.hpp
+    (N, "r.jour = soleil::est_leve_e5(recu_a_s, latitude_e5, longitude_e5);", "r.jour = !soleil::est_leve_e5(recu_a_s, latitude_e5, longitude_e5);",
+     NWS, None, "le jour et la nuit sont inversés pour le moment (NWS)"),
+    (N, "h.jour = soleil::est_leve_e5(t, latitude_e5, longitude_e5);", "h.jour = !soleil::est_leve_e5(t, latitude_e5, longitude_e5);",
+     NWS, None, "le jour et la nuit sont inversés pour chaque heure (NWS)"),
     (N, "return force == Force::Legere ? 56 : 57;", "return force == Force::Legere ? 57 : 56;",
      NWS, "chaque_phenomene_donne_son_code", "la bruine verglaçante légère et forte sont échangées"),
     (N, "return 77; // « ice pellets »", "return 71; // « ice pellets »",

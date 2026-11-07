@@ -1,6 +1,6 @@
 // Noyau pur : la réponse de MET Norway « Locationforecast 2.0 / complete » -> la météo du noyau (`AnalyseRiche`, comme le lecteur
 // d'Open-Meteo). C++17 standard, aucun include ESP-IDF, aucun flottant dans la lecture des données (entiers en dixièmes) ; seul
-// le calcul du soleil (soleil_calcule.hpp) emploie des `double`. Décision et mesures : ADR-0014, docs/mesures/fournisseurs-meteo.md.
+// le calcul du soleil (soleil.hpp) emploie des `double`. Décision et mesures : ADR-0014, docs/mesures/fournisseurs-meteo.md.
 //
 // Requête : meteo_requete_fournisseurs.hpp (https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=…&lon=…, quatre
 // décimales, User-Agent qui identifie l'application). Réponse : GeoJSON, `properties.timeseries[]`, un élément par instant UTC
@@ -16,7 +16,7 @@
 //     l'autre à Reykjavik, Londres, Tokyo, Sydney. Absentes : inconnues.
 //   - indice UV : MET Norway ne donne que l'UV « ciel dégagé » (`ultraviolet_index_clear_sky`), pas l'UV prévu avec les nuages.
 //     Le montrer sous le nom « UV » serait faux : l'UV est INCONNU (décision d'Axel à confirmer, ADR-0014).
-//   - lever et coucher du soleil : non fournis, calculés ici (soleil_calcule.hpp).
+//   - lever et coucher du soleil : non fournis, calculés ici (soleil.hpp).
 //   - pluie par quarts d'heure, neige (cm), durée d'ensoleillement, direction dominante du vent d'un jour : non fournis.
 //   - cumul de pluie d'un jour et nombre d'heures de pluie : seulement pour un jour dont chaque heure (ou bloc de six heures
 //     tombant exactement dans le jour) est connue ; sinon inconnus. Le premier jour n'est jamais complet : la réponse commence à
@@ -42,7 +42,7 @@
 #include "ecran/meteo_natif_commun.hpp"
 #include "ecran/meteo_riche.hpp"
 #include "ecran/parcours_json.hpp"
-#include "ecran/soleil_calcule.hpp"
+#include "ecran/soleil.hpp"
 
 namespace ecran::meteo::metno {
 
@@ -305,7 +305,7 @@ constexpr AnalyseRiche analyser_metno(std::string_view texte, std::int64_t recu_
     r.temperature_dixiemes = c.instant.temperature;
     r.ressentie_dixiemes = c.instant.ressentie;
     r.code_wmo = code_courant;
-    r.jour = astro::soleil_leve(c.t, latitude_e5, longitude_e5);
+    r.jour = soleil::est_leve_e5(c.t, latitude_e5, longitude_e5);
     r.vent_dixiemes_kmh = c.instant.vent;
     r.rafales_dixiemes_kmh = c.instant.rafales;
     r.direction_vent_deg = c.instant.direction;
@@ -348,7 +348,7 @@ constexpr AnalyseRiche analyser_metno(std::string_view texte, std::int64_t recu_
                 h.rafales_dixiemes_kmh = e.instant.rafales;
                 h.direction_deg = e.instant.direction;
                 h.uv_dixiemes = INCONNU_DIX; // MET Norway ne donne que l'UV par ciel dégagé
-                h.jour = astro::soleil_leve(e.t, latitude_e5, longitude_e5);
+                h.jour = soleil::est_leve_e5(e.t, latitude_e5, longitude_e5);
             }
             q.nb_heures = static_cast<std::uint8_t>(HEURES_MAX);
             a.diag_heures = ecran::meteo::detail::verifier_heures_riche(q);
