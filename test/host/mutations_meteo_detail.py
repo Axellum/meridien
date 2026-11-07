@@ -1,0 +1,97 @@
+"""Mutations de la conversion `Meteo` -> `MeteoDetail` (meteo_detail.hpp), lues par lancer.py --mutations.
+
+Même format que MUTATIONS_METEO_RICHE : (fichier du noyau, texte exact à remplacer — il doit apparaître UNE fois —,
+remplacement, test qui doit échouer, nom de la fonction de test qui doit être citée (None : n'importe laquelle), ce que la
+mutation simule). Une mutation « non détectée » ou « détectée par autre chose » fait échouer le lanceur.
+
+Les 7 tests « identique à Python » voient n'importe quelle valeur copiée au mauvais endroit (un champ pour un autre) : les
+mutations de champs sont donc attendues d'eux, sans nommer lequel (None) ; les autres mutations visent un test précis.
+"""
+
+DETAIL = "test_meteo_detail.cpp"
+H = "meteo_detail.hpp"
+
+MUTATIONS_METEO_DETAIL = [
+    # --- champs copiés au mauvais endroit (vus par les valeurs de Python sur de vraies réponses) ---
+    (H, "d.courant.temperature_c = detail::vers_float(r.temperature_dixiemes);",
+     "d.courant.temperature_c = detail::vers_float(r.ressentie_dixiemes);",
+     DETAIL, None, "la température du moment est la ressentie"),
+    (H, "d.courant.precipitation_mm = detail::vers_float(q.precip_courante_dixiemes);",
+     "d.courant.precipitation_mm = detail::vers_float(q.nuages_pct);",
+     DETAIL, None, "la pluie du moment est la couverture nuageuse"),
+    (H, "d.courant.jour = r.jour;", "d.courant.jour = !r.jour;",
+     DETAIL, None, "le jour et la nuit sont inversés pour le moment"),
+    (H, "s.precipitation_mm = detail::vers_float(h.precip_dixiemes_mm);",
+     "s.precipitation_mm = detail::vers_float(h.uv_dixiemes);",
+     DETAIL, None, "la pluie de l'heure est l'UV"),
+    (H, "s.rafales_max_kmh = detail::vers_float(c.rafales_max_dixiemes_kmh);",
+     "s.rafales_max_kmh = detail::vers_float(c.vent_max_dixiemes_kmh);",
+     DETAIL, None, "les rafales du jour sont le vent du jour"),
+    (H, "d.quarts_precipitation_mm[i] = detail::vers_float(q.quarts_dixiemes[i]);",
+     "d.quarts_precipitation_mm[i] = detail::vers_float(q.quarts_dixiemes[q.nb_quarts - 1 - i]);",
+     DETAIL, None, "les quarts d'heure sont à l'envers"),
+    (H, "d.courant.proba_precip_pct = static_cast<decltype(d.courant.proba_precip_pct)>(proba_courante(q, maintenant_s));",
+     "d.courant.proba_precip_pct = static_cast<decltype(d.courant.proba_precip_pct)>(r.proba_precip_pct);",
+     DETAIL, "seattle_le_libelle_est_en_francais", "la probabilité du moment est celle du relevé de base (une heure d'écart)"),
+    (H, "d.maj_epoch_s = r.recu_a_s;", "d.maj_epoch_s = r.instant_s;",
+     DETAIL, None, "la date de mise à jour est celle de la mesure (jusqu'à 15 min d'écart)"),
+    # --- unités ---
+    (H, "return static_cast<float>(dixiemes) / 10.0F;", "return static_cast<float>(dixiemes) / 100.0F;",
+     DETAIL, None, "un dixième vaut un centième"),
+    (H, "return static_cast<float>(minutes) / 60.0F;", "return static_cast<float>(minutes) / 6.0F;",
+     DETAIL, "les_durees_du_jour_et_de_soleil", "l'ensoleillement est mal converti des minutes aux heures"),
+    (H, "return secondes <= 0 ? 0 : static_cast<int>((secondes * 10 + 1800) / 3600);",
+     "return secondes <= 0 ? 0 : static_cast<int>((secondes * 10) / 3600);",
+     DETAIL, "la_duree_du_jour_est_arrondie_au_dixieme_d_heure", "la durée du jour est tronquée au lieu d'être arrondie"),
+    (H, "return secondes <= 0 ? 0 : static_cast<int>((secondes * 10 + 1800) / 3600);",
+     "return static_cast<int>((secondes * 10 + 1800) / 3600);",
+     DETAIL, "la_duree_du_jour_est_arrondie_au_dixieme_d_heure", "une durée négative donne une durée de jour négative"),
+    # --- indices recalculés pour l'heure de l'appareil ---
+    (H, "d.jour_courant = index_du_jour(r, maintenant_s);", "d.jour_courant = index_du_jour(r, r.instant_s);",
+     DETAIL, "les_indices_suivent_l_heure_de_l_appareil", "le jour en cours est celui de la mesure, pas celui de l'appareil"),
+    (H, "d.heure_courante = heure_courante(q, maintenant_s);", "d.heure_courante = heure_courante(q, r.recu_a_s);",
+     DETAIL, "les_indices_suivent_l_heure_de_l_appareil", "l'heure en cours est celle de la réception, pas celle de l'appareil"),
+    (H, "d.quart_courant = quart_courant(q, maintenant_s);", "d.quart_courant = heure_courante(q, maintenant_s);",
+     DETAIL, None, "le quart d'heure en cours est cherché dans les heures"),
+    (H, "const PluieProche p = pluie_proche(q, r.recu_a_s, maintenant_s);",
+     "const PluieProche p = pluie_proche(q, maintenant_s, maintenant_s);",
+     DETAIL, "la_pluie_proche_est_recalculee_a_chaque_lecture", "la pluie proche n'est jamais périmée (âge toujours nul)"),
+    (H, "d.pluie.fin_dans_min = p.fin_dans_min;", "d.pluie.fin_dans_min = p.dans_min;",
+     DETAIL, "seattle_la_pluie_proche_pendant_la_pluie", "la fin de la pluie est son début"),
+    (H, "d.pluie.cumul_mm = detail::vers_float(p.cumul_dixiemes);", "d.pluie.cumul_mm = detail::vers_float(p.max_quart_dixiemes);",
+     DETAIL, "seattle_la_pluie_proche_pendant_la_pluie", "le cumul de la pluie est son quart le plus fort"),
+    (H, "d.pluie.perimee = p.perimee;", "d.pluie.perimee = false;",
+     DETAIL, "la_pluie_proche_est_recalculee_a_chaque_lecture", "la pluie proche n'est jamais marquée périmée"),
+    (H, "d.quarts_debut_epoch_s = q.nb_quarts > 0 ? q.quarts_debut_s : 0;", "d.quarts_debut_epoch_s = q.quarts_debut_s;",
+     DETAIL, "sans_quarts_pas_de_pluie_proche", "un début de quarts d'heure est publié alors qu'il n'y a pas de quart"),
+    # --- périmé, version, remise à zéro ---
+    (H, "d.perime = est_perime(r, maintenant_s, echecs);", "d.perime = est_perime(r, maintenant_s, 0);",
+     DETAIL, "perime_suit_la_regle_de_l_appareil", "les essais ratés ne comptent pas pour « périmé »"),
+    (H, "d.perime = est_perime(r, maintenant_s, echecs);", "d.perime = false;",
+     DETAIL, None, "la météo n'est jamais périmée"),
+    (H, "    d.version = version;\n", "    d.version = 0;\n",
+     DETAIL, "la_version_publiee_est_celle_qu_on_donne", "la conversion efface le numéro de publication"),
+    (H, "    d = D{};\n", "",
+     DETAIL, "une_nouvelle_conversion_ne_garde_rien_de_l_ancienne", "la structure n'est pas remise à zéro avant la conversion"),
+    (H, "    d.valide = true;\n", "    d.valide = false;\n",
+     DETAIL, None, "la météo détaillée n'est jamais valide"),
+    # --- jours : publiés seulement si tous ont leurs compléments ---
+    (H, "if (q.nb_jours == r.nb_jours) {", "if (q.nb_jours <= r.nb_jours) {",
+     DETAIL, "jours_publies_seulement_si_tous_ont_leurs_complements", "des jours sans compléments sont publiés (vent, ensoleillement à zéro)"),
+    (H, "s.sans_soleil = j.sans_soleil();", "s.sans_soleil = false;",
+     DETAIL, "la_nuit_polaire_n_a_ni_duree_de_jour_ni_soleil", "la nuit polaire n'est pas signalée"),
+    (H, "s.duree_jour_h = detail::vers_float(detail::dixiemes_d_heure_depuis_secondes(j.coucher_s - j.lever_s));",
+     "s.duree_jour_h = detail::vers_float(detail::dixiemes_d_heure_depuis_secondes(j.coucher_s));",
+     DETAIL, None, "la durée du jour est calculée depuis l'instant du coucher"),
+    # --- texte ---
+    (H, "const std::size_t n = source.size() < N - 1 ? source.size() : N - 1;",
+     "const std::size_t n = source.size() < N ? source.size() : N;",
+     DETAIL, "copier_texte_coupe_et_termine_toujours_par_zero", "un texte trop long déborde du tableau (plus de place pour le zéro final)"),
+    (H, "    dest[n] = '\\0';\n", "    if (n == 0)\n        dest[n] = '\\0';\n",
+     DETAIL, "copier_texte_coupe_et_termine_toujours_par_zero", "le texte copié n'est pas terminé par un zéro"),
+    (H, "detail::copier_texte(decrire(r.code_wmo, r.jour).libelle, d.courant.libelle);",
+     "detail::copier_texte(decrire(r.code_wmo + 1, r.jour).libelle, d.courant.libelle);",
+     DETAIL, "seattle_le_libelle_est_en_francais", "le libellé est celui du code suivant"),
+    (H, "while (n < FUSEAU_MAX && r.fuseau[n] != '\\0')", "while (n < 40 && r.fuseau[n] != '\\0')",
+     DETAIL, "le_nom_du_fuseau_le_plus_long_tient", "le nom du fuseau est coupé à 40 caractères"),
+]
