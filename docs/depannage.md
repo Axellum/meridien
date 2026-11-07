@@ -19,6 +19,8 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 - [Tools and build](#tools-and-build)
 - [Chip, display and touch](#chip-display-and-touch)
 - [Flash, serial port and backup](#flash-serial-port-and-backup)
+- [Memory and watchdog](#memory-and-watchdog)
+- [Wi-Fi](#wi-fi)
 - [Settings page and core](#settings-page-and-core)
 
 ---
@@ -241,6 +243,54 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 ---
 
+### Memory and watchdog
+
+#### The weather request fails: `esp-aes: Failed to allocate memory…` or `PK verify failed with error 0x4290`
+
+**Symptom.** `esp-aes: Failed to allocate memory for the array of DMA descriptors` (or `… for start alignment buffer`) about 80 ms after an HTTPS request starts, or, on later attempts, `esp-x509-crt-bundle: PK verify failed with error 0x4290` after 14 s, then `esp-tls: Failed to open new connection`. The weather stays “unavailable”; free internal RAM is below 20 kB (700 B at the lowest).
+
+**Cause.** The ESP32-P4 has about 455 kB of internal heap. By default (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384`) every `malloc()` up to 16 kB is served from it first, and mbedTLS takes its buffers from it too (16 kB in, 4 kB out, certificates). With the display buffers (216 kB), about 106 kB of task stacks and the objects of the screens, 111.6 kB were left before the first request and 74 kB once the web server was up. A handshake needs about 51 kB, and the hardware AES always needs a DMA-capable *internal* block for its descriptor array (`esp_aes_dma_core.c:458`). When one allocation fails the handshake aborts (0x4290 is the RSA public operation failing on an allocation).
+
+**Solution.** In `boards/tab5/sdkconfig.defaults.board`: `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256` (objects of 256 B and more go to PSRAM: +65.9 kB free before the first request) and `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y` (TLS buffers in PSRAM: about 29 kB less internal RAM during a handshake; the handshake lasts 2.8 s instead of 1.5 s). Task stacks cannot go to PSRAM here: `spi_flash/cache_utils.c:127` asserts that a task writing the flash (the NVS) has its stack in internal RAM.
+
+**Seen on** Tab5 ST7121, integrated build `4e7d8af`, fix `4f6bd0a`, 06–07/11/2026. **Evidence**: per-stage log lines and the serial commands `memoire`, `blocs` and `piles`; before, 3 failed requests out of 3; after, 29 of 30 boots observed to the end with a successful request (27 in a row), 0 watchdog, 0 allocation failure; details in [mesures/memoire-interne.md](mesures/memoire-interne.md). **Status**: resolved on the Tab5 ST7121; other boards not tried.
+
+#### The task watchdog fires: `IDLE0 (CPU 0)` … `CPU 0: meteo`
+
+**Symptom.** `task_wdt: Task watchdog got triggered … IDLE0 (CPU 0) … CPU 0: meteo`, every 5 s while a TLS handshake runs.
+
+**Cause.** A handshake computes for seconds without ever sleeping. The weather task was at priority 3, above the idle task (0): on the core it runs on, the idle task never gets the CPU and stops feeding the watchdog (`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`, timeout 5 s).
+
+**Solution.** The weather task runs at `tskIDLE_PRIORITY` (0) and shares the core with the idle task slice by slice (1 ms). The watchdog stays enabled and unchanged: do not disable it or lengthen it to hide this symptom.
+
+**Seen on** Tab5 ST7121, `2a05811`, 07/11/2026. **Evidence**: the temporary serial commands `tourner3` and `tourner0` (a task pinned to core 0 computes for 8 s): the watchdog fires 5.0 s after the start at priority 3 and does not fire at priority 0. **Status**: resolved.
+
+---
+
+### Wi-Fi
+
+#### A wrong Wi-Fi password is almost never recognised as such: the radio says 2 and 205
+
+**Symptom.** Trying a new network with a wrong password: the disconnect events carry reason **2** (`AUTH_EXPIRE`, “authentication expired”) and **205** (`CONNECTION_FAIL`, “connection failed”), each repeated, and the reason **202** (`AUTH_FAIL`, the one that means “password refused”) came in **1 trial out of 9** (28.9 s after the start); the 8 other times nothing but 2 and 205 until the 30 s limit. A rule “the same sure cause twice” never fires, and the result given to the screen is “other”.
+
+**Cause.** `reseau.cpp` retries the connection 2 s after every disconnect (`kDelaiReessaiWifiUs`) and each attempt ends with a reason code chosen by the radio; on this access point the authentication failure only comes after several attempts. Which codes appear for which fault depends on the access point: **not verified on another one**.
+
+**Solution.** `essai_wifi.hpp`: only *sure* causes (14, 15, 202, 204 = password refused; 201, 210, 211, 212 = network not found) count; two of the same one end the trial early; any other reason, including our own disconnect (8), is neither proof nor denial; at the 30 s limit, the last sure cause seen is the one reported. Consequence for the screen: an answer found only at the 30 s limit reaches it about **36 s** after the request (30 s trial + about 6 s for the old network to come back), later than its own 30 s counter (`DELAI_CONNEXION_MS`), which has by then shown its own “no answer” failure and ignores a late result (`sur_resultat`, `changement_wifi.hpp`). So with this access point the screen shows its generic “no answer” message for a wrong password; to be decided on the screen's side (a “going back to the old network” state that waits for the answer, or a trial limit shorter than the screen's). Classing repeated 2 and 205 as “password refused” is one line in `resultat_pour_raison`, **not done**: measured on one access point only, and the documentation of ESP-IDF 5.5.5 does not tie these two codes to the password.
+
+**Seen on** Tab5 ST7121, commit `fe54f8d`, 07/11/2026 (first series on `5f17506`). **Evidence**: log of 9 trials with a wrong password on the author's own network (7 with an old network: every time the old network back with its IP address 6.0 to 6.15 s after the decision; 2 without); the two sequences are replayed as tests (`serie_relevee_sur_la_carte_mot_de_passe_faux`, `…_sans_202_dit_autre`); details in [mesures/wifi-retour-arriere.md](mesures/wifi-retour-arriere.md). **Status**: worked around (roll-back reliable; specific cause unavailable on this access point).
+
+#### With no known network, the Wi-Fi keeps retrying a connection every 2 s after a scan
+
+**Symptom.** New device (nothing in the NVS, nothing compiled in): after the first network scan the log shows `Wi-Fi coupé (raison 201 …) ; nouvelle tentative dans 2 s` forever (11 times in 45 s), the radio is busy, and the next scan can fail.
+
+**Cause.** `terminer_recherche()` restarted the connection retries whenever the Wi-Fi was not connected, with no network in service to find again (empty configuration → “no access point found”, reason 201).
+
+**Solution.** `reconnexion_utile()` in `main/reseau.cpp`: retry only if there is a network in service or a trial in progress (`06b7afe`). The trial's own retries are unchanged.
+
+**Seen on** Tab5 ST7121, local binary that ignores the compiled network (not committed), 07/11/2026. **Evidence**: before, 11 disconnects in 45 s after the scan; after, none between the scan and the next trial, a failed trial reported at +30.01 s with no retry afterwards, a good network adopted in 6.1 s. The normal path (with a known network) was replayed on the final binary `a244af0`. **Status**: resolved.
+
+---
+
 ### Settings page and core
 
 #### No host compiler on the PC: the core tests do not run
@@ -292,6 +342,8 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 - [Outils et compilation](#outils-et-compilation)
 - [Puce, écran et tactile](#puce-écran-et-tactile)
 - [Flash, port série et sauvegarde](#flash-port-série-et-sauvegarde)
+- [Mémoire et chien de garde](#mémoire-et-chien-de-garde)
+- [Wi-Fi](#wi-fi)
 - [Page de réglages et noyau](#page-de-réglages-et-noyau)
 
 ---
@@ -511,6 +563,54 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 - Un USB-C mal enfoncé laisse la tablette allumée **sur batterie, sans port série** (Windows : `Present = False` pour la MAC) : aucun journal, donc aucune cause lisible pour ce qui se passe pendant ce temps.
 
 **Vu sur** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Statut** : contourné.
+
+---
+
+### Mémoire et chien de garde
+
+#### La requête météo échoue : `esp-aes: Failed to allocate memory…` ou `PK verify failed with error 0x4290`
+
+**Symptôme.** `esp-aes: Failed to allocate memory for the array of DMA descriptors` (ou `… for start alignment buffer`) environ 80 ms après le début d'une requête HTTPS, ou, aux essais suivants, `esp-x509-crt-bundle: PK verify failed with error 0x4290` après 14 s, puis `esp-tls: Failed to open new connection`. La météo reste « indisponible » ; la RAM interne libre passe sous 20 Ko (700 o au plus bas).
+
+**Cause.** L'ESP32-P4 a environ 455 Ko de tas interne. Par défaut (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384`) tout `malloc()` jusqu'à 16 Ko y est servi en premier, et mbedTLS y prend ses tampons (16 Ko en entrée, 4 Ko en sortie, certificats). Avec les tampons d'écran (216 Ko), environ 106 Ko de piles de tâches et les objets des écrans, il restait 111,6 Ko avant la première requête et 74 Ko une fois le serveur web lancé. Une prise de contact en demande environ 51 Ko, et l'AES matériel exige toujours un bloc *interne* compatible DMA pour son tableau de descripteurs (`esp_aes_dma_core.c:458`). Quand une allocation échoue, la prise de contact s'interrompt (0x4290 est l'opération publique RSA qui échoue sur une allocation).
+
+**Solution.** Dans `boards/tab5/sdkconfig.defaults.board` : `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256` (les objets de 256 o et plus vont en PSRAM : +65,9 Ko libres avant la première requête) et `CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y` (tampons TLS en PSRAM : environ 29 Ko de moins en interne pendant une prise de contact ; elle dure 2,8 s au lieu de 1,5 s). Les piles de tâches ne peuvent pas aller en PSRAM ici : `spi_flash/cache_utils.c:127` vérifie qu'une tâche qui écrit en flash (la NVS) a sa pile en RAM interne.
+
+**Vu sur** Tab5 ST7121, build intégré `4e7d8af`, correctif `4f6bd0a`, 06–07/11/2026. **Preuve** : lignes de journal par étape et commandes série `memoire`, `blocs` et `piles` ; avant, 3 requêtes sur 3 ratées ; après, 29 démarrages sur 30 suivis jusqu'au bout avec une requête réussie (27 de suite), 0 chien de garde, 0 échec d'allocation ; détail dans [mesures/memoire-interne.md](mesures/memoire-interne.md). **Statut** : résolu sur le Tab5 ST7121 ; autres cartes non essayées.
+
+#### Le chien de garde des tâches se déclenche : `IDLE0 (CPU 0)` … `CPU 0: meteo`
+
+**Symptôme.** `task_wdt: Task watchdog got triggered … IDLE0 (CPU 0) … CPU 0: meteo`, toutes les 5 s pendant une prise de contact TLS.
+
+**Cause.** Une prise de contact calcule des secondes sans jamais s'endormir. La tâche météo était à la priorité 3, au-dessus de la tâche d'inactivité (0) : sur le cœur qu'elle occupe, la tâche d'inactivité n'obtient plus le processeur et cesse de nourrir le chien de garde (`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`, délai de 5 s).
+
+**Solution.** La tâche météo tourne à `tskIDLE_PRIORITY` (0) et partage le cœur avec la tâche d'inactivité tranche par tranche (1 ms). Le chien de garde reste actif et inchangé : ne pas le désactiver ni l'allonger pour masquer ce symptôme.
+
+**Vu sur** Tab5 ST7121, `2a05811`, 07/11/2026. **Preuve** : les commandes série provisoires `tourner3` et `tourner0` (une tâche épinglée sur le cœur 0 calcule 8 s) : le chien de garde se déclenche 5,0 s après le début à la priorité 3 et ne se déclenche pas à la priorité 0. **Statut** : résolu.
+
+---
+
+### Wi-Fi
+
+#### Un mauvais mot de passe Wi-Fi n'est presque jamais reconnu comme tel : la radio dit 2 et 205
+
+**Symptôme.** Essai d'un nouveau réseau avec un mot de passe faux : les événements de déconnexion portent la raison **2** (`AUTH_EXPIRE`, « authentification expirée ») et **205** (`CONNECTION_FAIL`, « connexion échouée »), chacune répétée, et la raison **202** (`AUTH_FAIL`, celle qui veut dire « mot de passe refusé ») n'est venue que dans **1 essai sur 9** (à 28,9 s du début) ; les 8 autres fois, rien d'autre que 2 et 205 jusqu'au délai de 30 s. Une règle « la même cause sûre deux fois » ne se déclenche jamais, et le résultat rendu à l'écran est « autre ».
+
+**Cause.** `reseau.cpp` réessaie la connexion 2 s après chaque coupure (`kDelaiReessaiWifiUs`) et chaque tentative se termine par un code de raison choisi par la radio ; sur ce point d'accès l'échec d'authentification n'arrive qu'après plusieurs tentatives. Quels codes apparaissent pour quelle faute dépend du point d'accès : **non vérifié sur un autre**.
+
+**Solution.** `essai_wifi.hpp` : seules les causes *sûres* (14, 15, 202, 204 = mot de passe refusé ; 201, 210, 211, 212 = réseau introuvable) comptent ; deux fois la même arrête l'essai plus tôt ; toute autre raison, y compris notre propre déconnexion (8), n'est ni preuve ni démenti ; au délai de 30 s, c'est la dernière cause sûre vue qui est dite. Conséquence pour l'écran : une réponse trouvée seulement au délai de 30 s lui parvient environ **36 s** après la demande (30 s d'essai + environ 6 s pour que l'ancien réseau revienne), après son propre compte à rebours de 30 s (`DELAI_CONNEXION_MS`), qui a alors déjà affiché son échec « sans réponse » et ignore un résultat tardif (`sur_resultat`, `changement_wifi.hpp`). Avec ce point d'accès l'écran affiche donc son message générique « sans réponse » pour un mot de passe faux ; à trancher côté écran (un état « retour à l'ancien réseau » qui attend la réponse, ou un délai d'essai plus court que le sien). Classer 2 et 205 répétés comme « mot de passe refusé » tient en une ligne dans `resultat_pour_raison`, **non fait** : mesuré sur un seul point d'accès, et la documentation d'ESP-IDF 5.5.5 ne lie pas ces deux codes au mot de passe.
+
+**Vu sur** Tab5 ST7121, commit `fe54f8d`, 07/11/2026 (première série sur `5f17506`). **Preuve** : journal de 9 essais avec un mot de passe faux sur le propre réseau d'Axel (7 avec un ancien réseau : à chaque fois l'ancien réseau revenu avec son adresse IP 6,0 à 6,15 s après la décision ; 2 sans) ; les deux suites sont rejouées en tests (`serie_relevee_sur_la_carte_mot_de_passe_faux`, `…_sans_202_dit_autre`) ; détail dans [mesures/wifi-retour-arriere.md](mesures/wifi-retour-arriere.md). **Statut** : contourné (retour arrière fiable ; cause précise indisponible sur ce point d'accès).
+
+#### Sans réseau connu, le Wi-Fi réessaie une connexion toutes les 2 s après une recherche
+
+**Symptôme.** Appareil neuf (rien en NVS, rien de compilé) : après la première recherche de réseaux, le journal montre sans fin `Wi-Fi coupé (raison 201 …) ; nouvelle tentative dans 2 s` (11 fois en 45 s), la radio est occupée et la recherche suivante peut échouer.
+
+**Cause.** `terminer_recherche()` relançait les tentatives de connexion dès que le Wi-Fi n'était pas connecté, alors qu'aucun réseau en service n'était à retrouver (configuration vide → « aucun point d'accès », raison 201).
+
+**Solution.** `reconnexion_utile()` dans `main/reseau.cpp` : réessayer seulement s'il y a un réseau en service ou un essai en cours (`06b7afe`). Les tentatives de l'essai lui-même ne changent pas.
+
+**Vu sur** Tab5 ST7121, binaire local qui ignore le réseau de la compilation (non commité), 07/11/2026. **Preuve** : avant, 11 coupures en 45 s après la recherche ; après, aucune entre la recherche et l'essai suivant, un essai raté signalé à +30,01 s sans réessai ensuite, un bon réseau adopté en 6,1 s. Le chemin normal (avec un réseau connu) a été rejoué sur le binaire final `a244af0`. **Statut** : résolu.
 
 ---
 

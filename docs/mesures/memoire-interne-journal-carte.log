@@ -1,0 +1,986 @@
+# Journal série du Tab5 ST7121 : budget de la mémoire interne, 06-07/11/2026 (extrait des lignes utiles, sans adresse réseau ni identifiant de carte).
+# Binaires : essais a, b1, e1, e2 = commit 86e9805 avec variantes (voir memoire-interne.md §5) ; final = 7EFD993F5DC555EB542FDEF1F02ABC51298E38D975B160EEF05F8059242419FC (commit 2a05811).
+# (nombre) = millisecondes depuis le démarrage de la carte ; les lignes commençant par « # » sont des notes du banc. L'heure du PC n'est pas reproduite.
+# Les lignes de deux cœurs s'entrelacent parfois : les lignes illisibles ont été écartées.
+
+===== a : avant le correctif (86e9805), 1 capture (trace FreeRTOS, outils de mesure) =====
+# port ouvert : COM11
+I (3118) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1066, détection 1226, dalle 1639, LVGL 1657
+I (3119) jalon_mem: JALON_MEM t_ms=1680 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=260571 delta=-233032 plus_gros_bloc=131072 dma_bloc=131072 interne_min=156836
+I (3120) jalon_mem: JALON_CLASSES t_ms=1682 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=337816 libre=260520 c0=194/4532 c1=58/5516 c2=26/11608 c3=7/12096 c4=9/55296 c5=1/32768 c6=3/216000
+I (3233) jalon_mem: JALON_MEM t_ms=1795 etape="après l'écran principal (objets, police, première image)" interne_libre=180871 delta=-79700 plus_gros_bloc=55296 dma_bloc=55296 interne_min=144132
+I (3340) ecran: rétroéclairage allumé à 75 % à 1901 ms ; première image affichée
+I (3341) jalon_mem: JALON_MEM t_ms=1903 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=168247 delta=-12624 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136200
+# >>> redemarrer
+I (3347) jalon_mem: JALON_CLASSES t_ms=1909 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=423372 libre=16I (3349) meteo: cache relu : 9,2 °C, Brouillard, reçu à l'instant UNIX 1794000171 (fraîcheur : voir la ligne contrat suivante)
+I (3350) jalon_mem: JALON_MEM t_ms=1912 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=155599 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=123552
+I (3356) jalon_mem: JALON_CLASSES t_ms=1918 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=436012 libre=155540 c0=1644/35156 c1=267/21600 c2=53/27000 c3=12/20928 c4=12/82560 c5=1/32768 c6=3/216000
+I (3362) jalon_mem: JALON_CLASSES t_ms=1924 etape="après le lancement de la tâche du serveur web" utilise=448652 libre=142892 c0=1644/35156 c1=267/21600 c2=54/27352 c3=12/20928 c4=13/94848 c5=1/32768 c6=3/216000
+I (3368) jalon_mem: JALON_CLASSES t_ms=1930 etape="fin de app_main (commande série lancée)" utilise=452076 libre=139460 c0=1644/35156 c1=267/21600 c2=55/27704 c3=13/24000 c4=13/94848 c5=1/32768 c6=3/216000
+I (1445) jalon_mem: JALON_MEM t_ms=6 etape="début de app_main" interne_libre=504759 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=472712
+I (1446) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94524 libre=504508 c0=56/924 c1=30/3040 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1456) jalon_mem: JALON_MEM t_ms=18 etape="après la NVS et les réglages" interne_libre=493603 delta=-11156 plus_gros_bloc=352256 dma_bloc=352256 interne_min=461484
+I (1457) jalon_mem: JALON_CLASSES t_ms=18 etape="après la NVS et les réglages" utilise=105412 libre=493540 c0=68/1448 c1=36/3676 c2=22/9152 c3=6/10240 c4=8/48128 c5=1/32768 c6=0/0
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3076) jalon_mem: JALON_MEM t_ms=1637 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=260571 delta=-233032 plus_gros_bloc=131072 dma_bloc=131072 interne_min=156836
+I (3077) jalon_mem: JALON_CLASSES t_ms=1639 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=337816 libre=260520 c0=194/4532 c1=58/5516 c2=26/11608 c3=7/12096 c4=9/55296 c5=1/32768 c6=3/216000
+I (3190) jalon_mem: JALON_MEM t_ms=1751 etape="après l'écran principal (objets, police, première image)" interne_libre=181547 delta=-79024 plus_gros_bloc=55296 dma_bloc=55296 interne_min=144808
+I (3196) jalon_mem: JALON_CLASSES t_ms=1757 etape="après l'écran principal (objets, police, première image)" utilise=410220 lI (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (3298) jalon_mem: JALON_MEM t_ms=1860 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=168923 delta=-12624 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136876
+I (3304) jalon_mem: JALON_CLASSES t_ms=1865 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=422792 libre=168864 c0=1622/34704 c1=265/21472 c2=52/26648 c3=12/20928 c4=11/70272 c5=1/32768 c6=3/216000
+I (3307) jalon_mem: JALON_MEM t_ms=1868 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=156275 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=124228
+I (3313) jalon_mem: JALON_CLASSES t_ms=1874 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=435432 libre=156216 c0=1622/34704 c1=265/21472 c2=53/27000 c3=12/20928 c4=12/82560 c5=1/32768 c6=3/216000
+I (3324) jalon_mem: JALON_CLASSES t_ms=1885 etape="fin de app_main (commande série lancée)" utilise=451496 libre=140136 c0=162I (4819) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[20000 KHz]
+I (5447) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=125403 delta=-14792 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95636
+I (5454) jalon_mem: JALON_CLASSES t_ms=4015 etape="après le lien avec le C6 (esp_hosted, SDIO)" utilise=465448 libre=125324 c0=1804/38604 c1=281/22692 c2=65/32280 c3=14/25184 c4=14/97920 c5=1/32768 c6=3/216000
+I (5700) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=119343 delta=-6060 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12826) jalon_mem: JALON_MEM t_ms=11387 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=111879 delta=-7464 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12832) jalon_mem: JALON_CLASSES t_ms=11393 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" utiliI (12837) BOOT: BOOT 124 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3616 wifi_ms=8283 ip_ms=11351 ntp_ms=11387 coupures=0 echecs_transport=0 rssi=-48 utc=1794004900 local="vendredi 6 novembre 2026, 23 h 41"
+I (13130) principal: affichage : « 23:41 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794004901
+I (13307) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13308) meteo: mémoire libre avant la requête : interne 111587 o (plus grand bloc 55296 o, minimum depuis le démarrage 95480 o), PSRAM 31516968 o (plus grand bloc 31457280 o)
+I (13318) jalon_mem: JALON_MEM t_ms=11879 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=74279 delta=-37600 plus_gros_bloc=31744 dma_bloc=30720 interne_min=74272
+E (13389) esp-aes: Failed to allocate memory for the array of DMA descriptors
+E (13389) esp-aes: Generating output DMA descriptors failed
+E (13390) esp-tls: Failed to open new connection
+E (13393) HTTP_CLIENT: Connection failed, sock < 0
+W (13394) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 84 ms
+I (13395) meteo: mémoire libre après la requête : interne 48643 o (plus grand bloc 31744 o, minimum depuis le démarrage 17896 o), PSRAM 31492244 o (plus grand bloc 31457280 o)
+I (13395) meteo: écart de mémoire libre sur la requête : interne -62944 o, PSRAM -24724 o
+W (13395) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 1 échec(s) de suite
+I (28396) meteo: requête Open-Meteo pour « Lyon » (1 échec(s) de suite jusqu'ici)
+I (28397) meteo: mémoire libre avant la requête : interne 48915 o (plus grand bloc 31744 o, minimum depuis le démarrage 17896 o), PSRAM 31492244 o (plus grand bloc 31457280 o)
+# >>> piles
+I (29820) commande_serie: PILE nom=meteo base=0x4ff95fc8 libre_min=7960 priorite=3
+I (29821) commande_serie: PILE nom=commande_serie base=0x4ff9c214 libre_min=2572 priorite=2
+I (29821) commande_serie: PILE nom=mdns base=0x4ff32558 libre_min=2352 priorite=1
+I (29821) commande_serie: PILE nom=IDLE1 base=0x4ff2c3e8 libre_min=1240 priorite=0
+I (29821) commande_serie: PILE nom=IDLE0 base=0x4ff2bc80 libre_min=1200 priorite=0
+I (29822) commande_serie: PILE nom=tiT base=0x4ff420cc libre_min=2436 priorite=18
+I (29822) commande_serie: PILE nom=serveur_web base=0x4ff990ac libre_min=9732 priorite=3
+I (29822) commande_serie: PILE nom=taskLVGL base=0x4ff48788 libre_min=2360 priorite=4
+I (29822) commande_serie: PILE nom=ipc0 base=0x4ff1e9d4 libre_min=620 priorite=1
+I (29823) commande_serie: PILE nom=ipc1 base=0x4ff1ef3c libre_min=724 priorite=24
+I (29823) commande_serie: PILE nom=rpc_tx base=0x4ff271a0 libre_min=4364 priorite=23
+I (29823) commande_serie: PILE nom=rpc_rx base=0x4ff25c28 libre_min=2232 priorite=23
+I (29823) commande_serie: PILE nom=httpd base=0x4ff2d554 libre_min=19772 priorite=3
+I (29823) commande_serie: PILE nom=sys_evt base=0x4ff95440 libre_min=848 priorite=20
+I (29824) commande_serie: PILE nom=sdio_write base=0x4ff24338 libre_min=4376 priorite=23
+I (29824) commande_serie: PILE nom=sdio_rx_buf base=0x4ff20ad0 libre_min=1200 priorite=23
+I (29824) commande_serie: PILE nom=sdio_read base=0x4ff21848 libre_min=3320 priorite=23
+I (29824) commande_serie: PILE nom=sdio_process_rx base=0x4ff22dc0 libre_min=3168 priorite=23
+I (29825) commande_serie: PILE nom=esp_timer base=0x4ff28708 libre_min=3736 priorite=22
+I (29825) commande_serie: PILE nom=Tmr Svc base=0x4ff2cb50 libre_min=1712 priorite=1
+I (29825) commande_serie: PILES : 20 tâches
+E (33487) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+E (38487) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+E (42502) esp-x509-crt-bundle: PK verify failed with error 0x4290
+E (42503) esp-x509-crt-bundle: Certificate matched but signature verification failed
+E (42503) esp-x509-crt-bundle: Failed to verify certificate
+E (42505) esp-tls: Failed to open new connection
+E (42509) HTTP_CLIENT: Connection failed, sock < 0
+W (42509) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 14110 ms
+I (42510) meteo: mémoire libre après la requête : interne 44215 o (plus grand bloc 21504 o, minimum depuis le démarrage 980 o), PSRAM 31491220 o (plus grand bloc 31457280 o)
+I (42511) meteo: écart de mémoire libre sur la requête : interne -4700 o, PSRAM -1024 o
+W (42511) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 2 échec(s) de suite
+# >>> memoire
+I (59825) commande_serie: MEMOIRE t_s=58 interne_libre=48555 plus_gros_bloc=24576 interne_min=980 psram_libre=31491220 dma_bloc=3840
+I (63144) principal: affichage : « 23:42 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794004951
+I (72512) meteo: requête Open-Meteo pour « Lyon » (2 échec(s) de suite jusqu'ici)
+I (72513) meteo: mémoire libre avant la requête : interne 48555 o (plus grand bloc 24576 o, minimum depuis le démarrage 980 o), PSRAM 31491220 o (plus grand bloc 31457280 o)
+E (77602) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+E (82602) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+E (86587) esp-x509-crt-bundle: PK verify failed with error 0x4290
+E (86588) esp-x509-crt-bundle: Certificate matched but signature verification failed
+E (86588) esp-x509-crt-bundle: Failed to verify certificate
+E (86590) esp-tls: Failed to open new connection
+E (86593) HTTP_CLIENT: Connection failed, sock < 0
+W (86594) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 14079 ms
+I (86595) meteo: mémoire libre après la requête : interne 44967 o (plus grand bloc 17408 o, minimum depuis le démarrage 716 o), PSRAM 31491220 o (plus grand bloc 31457280 o)
+I (86595) meteo: écart de mémoire libre sur la requête : interne -3588 o, PSRAM +0 o
+W (86595) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 3 échec(s) de suite
+# port ouvert : COM11
+# >>> redemarrer
+I (123144) principal: affichage : « 23:43 » / « vendredi 6 noW (161676) commande_serie: redémarrage logiciel demandé sur la console (esp_rom_software_reset_system)
+I (1447) jalon_mem: JALON_MEM t_ms=6 etape="début de app_main" interne_libre=504759 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=472712
+I (1448) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94524 libre=504508 c0=56/924 c1=30/3040 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1458) jalon_mem: JALON_MEM t_ms=18 etape="après la NVS et les réglages" interne_libre=493603 delta=-11156 plus_gros_bloc=352256 dma_bloc=352256 interne_min=461484
+I (1459) jalon_mem: JALON_CLASSES t_ms=19 etape="après la NVS et les réglages" utilise=105412 libre=493540 c0=68/1448 c1=36/3676 c2=22/9152 c3=6/10240 c4=8/48128 c5=1/32768 c6=0/0
+I (3077) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3078) jalon_mem: JALON_MEM t_ms=1637 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=260571 delta=-233032 plus_gros_bloc=131072 dma_bloc=131072 interne_min=156836
+I (3080) jalon_mem: JALON_CLASSES t_ms=1639 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=337816 libre=260520 c0=194/4532 c1=58/5516 c2=26/11608 c3=7/12096 c4=9/55296 c5=1/32768 c6=3/216000
+I (3192) jalon_mem: JALON_MEM t_ms=1751 etape="après l'écran principal (objets, police, première image)" interne_libre=181547 delta=-79024 plus_gros_bloc=55296 dma_bloc=55296 interne_min=144808
+I (3198) jalon_mem: JALON_CLASSES t_ms=1757 etape="après l'écran principal (objets, police, première image)" utilise=410220 libre=181484 c0=1615/34544 c1=264/21380 c2=49/25336 c3=11/18112 c4=10/62080 c5=1/32768 c6=3/216000
+I (3299) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (3300) jalon_mem: JALON_MEM t_ms=1860 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=168923 delta=-12624 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136876
+I (3306) jalon_mem: JALON_CLASSES t_ms=1865 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=422792 libre=168864 c0=1622/34704 c1=265/21472 c2=52/26648 c3=12/20928 c4=11/70272 c5=1/32768 c6=3/216000
+I (3309) jalon_mem: JALON_MEM t_ms=1868 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=156275 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=124228
+I (3315) jalon_mem: JALON_CLASSES t_ms=1874 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=435432 libre=156216 c0=1622/34704 c1=265/21472 c2=53/27000 c3=12/20928 c4=12/82560 c5=1/32768 c6=3/216000
+I (3321) jalon_mem: JALON_CLASSES t_ms=1880 etape="après le lancement de la tâche du serveur web" utilise=448072 libre=143568 c0=1622/34704 c1=265/21472 c2=54/27352 c3=12/20928 c4=13/94848 c5=1/32768 c6=3/216000
+I (5449) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=125403 delta=-14696 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95636
+I (5456) jalon_mem: JALON_CLASSES t_ms=4015 etape="après le lien avec le C6 (esp_hosted, SDIO)" utilise=465448 libre=125324 c0=1804/38604 c1=281/22692 c2=65/32280 c3=14/25184 c4=14/97920 c5=1/32768 c6=3/216000
+I (5702) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=119343 delta=-6060 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12864) jalon_mem: JALON_MEM t_ms=11423 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=111879 delta=-7464 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12871) jalon_mem: JALON_CLASSES t_ms=11430 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" utilise=471964 libre=118464 c0=1880/39920 c1=290/23684 c2=67/32904 c3=15/28768 c4=14/97920 c5=1/32768 c6=3/216000
+I (12876) BOOT: BOOT 125 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8312 ip_ms=11387 ntp_ms=11423 coupures=0 echecs_transport=0 rssi=-51 utc=1794005062 local="vendredi 6 novembre 2026, 23 h 44"
+I (13132) principal: affichage : « 23:44 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005063
+I (13309) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13310) meteo: mémoire libre avant la requête : interne 111895 o (plus grand bloc 55296 o, minimum depuis le démarrage 95480 o), PSRAM 31533868 o (plus grand bloc 31457280 o)
+I (13321) jalon_mem: JALON_MEM t_ms=11880 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=74587 delta=-37292 plus_gros_bloc=34816 dma_bloc=34816 interne_min=74580
+E (13393) esp-aes: Failed to allocate memory for start alignment buffer
+E (13393) esp-aes: Generating output DMA descriptors failed
+E (13393) esp-tls: Failed to open new connection
+E (13397) HTTP_CLIENT: Connection failed, sock < 0
+W (13398) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 86 ms
+I (13399) meteo: mémoire libre après la requête : interne 48843 o (plus grand bloc 31744 o, minimum depuis le démarrage 18120 o), PSRAM 31509148 o (plus grand bloc 31457280 o)
+I (13399) meteo: écart de mémoire libre sur la requête : interne -63052 o, PSRAM -24720 o
+W (13399) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 1 échec(s) de suite
+# >>> redemarrer
+I (1446) jalon_mem: JALON_MEM t_ms=7 etape="début de app_main" interne_libre=504759 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=472712
+I (1446) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94524 libre=504508 c0=56/924 c1=30/3040 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1457) jalon_mem: JALON_MEM t_ms=19 etape="après la NVS et les réglages" interne_libre=493603 delta=-11156 plus_gros_bloc=352256 dma_bloc=352256 interne_min=461484
+I (1458) jalon_mem: JALON_CLASSES t_ms=19 etape="après la NVS et les réglages" utilise=105412 libre=493540 c0=68/1448 c1=36/3676 c2=22/9152 c3=6/10240 c4=8/48128 c5=1/32768 c6=0/0
+I (3077) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3077) jalon_mem: JALON_MEM t_ms=1638 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=260571 delta=-233032 plus_gros_bloc=131072 dma_bloc=131072 interne_min=156836
+I (3079) jalon_mem: JALON_CLASSES t_ms=1641 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=337816 libre=260520 c0=194/4532 c1=58/5516 c2=26/11608 c3=7/12096 c4=9/55296 c5=1/32768 c6=3/216000
+I (3191) jalon_mem: JALON_MEM t_ms=1752 etape="après l'écran principal (objets, police, première image)" interne_libre=181655 delta=-78916 plus_gros_bloc=55296 dma_bloc=55296 interne_min=144916
+I (3197) jalon_mem: JALON_CLASSES t_ms=1759 etape="après l'écran principal (objets, police, première image)" utilise=410124 lI (3298) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (3299) jalon_mem: JALON_MEM t_ms=1860 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=169031 delta=-12624 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136984
+I (3305) jalon_mem: JALON_CLASSES t_ms=1866 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=422696 libre=168972 c0=1620/34672 c1=264/21408 c2=52/26648 c3=12/20928 c4=11/70272 c5=1/32768 c6=3/216000
+I (3308) jalon_mem: JALON_MEM t_ms=1869 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=156383 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=124336
+I (3319) jalon_mem: JALON_CLASSES t_ms=1880 etape="après le lancement de la tâche du serveur web" utilise=447976 libre=143676 c0=1620/34672 c1=264/21408 c2=54/27352 c3=12/20928 c4=13/94848 c5=1/32768 c6=3/216000
+I (3320) jalon_mem: JALON_MEM t_ms=1881 etape="fin de app_main (commande série lancée)" interne_libre=140207 delta=-3528 plus_gros_bloc=55296 dma_bloc=55296 interne_min=108160
+I (5447) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=125507 delta=-14700 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95576
+I (5454) jalon_mem: JALON_CLASSES t_ms=4015 etape="après le lien avec le C6 (esp_hosted, SDIO)" utilise=465356 libre=125428 c0=1802/38576 c1=280/22628 c2=65/32280 c3=14/25184 c4=14/97920 c5=1/32768 c6=3/216000
+I (5700) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=119419 delta=-6088 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12872) jalon_mem: JALON_MEM t_ms=11433 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=112007 delta=-7412 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12884) BOOT: BOOT 126 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8311 ip_ms=11398 ntp_ms=11433 coupures=0 echecs_transport=0 rssi=-50 utc=1794005082 local="vendredi 6 novembre 2026, 23 h 44"
+I (13131) principal: affichage : « 23:44 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005083
+I (13308) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13309) meteo: mémoire libre avant la requête : interne 112011 o (plus grand bloc 55296 o, minimum depuis le démarrage 95480 o), PSRAM 31534380 o (plus grand bloc 31457280 o)
+I (13319) jalon_mem: JALON_MEM t_ms=11880 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=74727 delta=-37280 plus_gros_bloc=34816 dma_bloc=34816 interne_min=74720
+# >>> redemarrer
+I (1445) jalon_mem: JALON_MEM t_ms=6 etape="début de app_main" interne_libre=504759 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=472712
+I (1446) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94524 libre=504508 c0=56/924 c1=30/3040 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1457) jalon_mem: JALON_MEM t_ms=18 etape="après la NVS et les réglages" interne_libre=493603 delta=-11156 plus_gros_bloc=352256 dma_bloc=352256 interne_min=461484
+I (1458) jalon_mem: JALON_CLASSES t_ms=19 etape="après la NVS et les réglages" utilise=105412 libre=493540 c0=68/1448 c1=36/3676 c2=22/9152 c3=6/10240 c4=8/48128 c5=1/32768 c6=0/0
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3076) jalon_mem: JALON_MEM t_ms=1637 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=260571 delta=-233032 plus_gros_bloc=131072 dma_bloc=131072 interne_min=156836
+I (3078) jalon_mem: JALON_CLASSES t_ms=1639 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=337816 libre=260520 c0=194/4532 c1=58/5516 c2=26/11608 c3=7/12096 c4=9/55296 c5=1/32768 c6=3/216000
+I (3190) jalon_mem: JALON_MEM t_ms=1751 etape="après l'écran principal (objets, police, première image)" interne_libre=181655 delta=-78916 plus_gros_bloc=55296 dma_bloc=55296 interne_min=144916
+I (3196) jalon_mem: JALON_CLASSES t_ms=1757 etape="après l'écran principal (objets, police, première image)" utilise=410124 lI (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (3298) jalon_mem: JALON_MEM t_ms=1859 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=169031 delta=-12624 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136984
+I (3304) jalon_mem: JALON_CLASSES t_ms=1865 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=422696 libre=168972 c0=1620/34672 c1=264/21408 c2=52/26648 c3=12/20928 c4=11/70272 c5=1/32768 c6=3/216000
+I (3307) jalon_mem: JALON_MEM t_ms=1868 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=156383 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=124336
+I (3318) jalon_mem: JALON_CLASSES t_ms=1879 etape="après le lancement de la tâche du serveur web" utilise=447976 libre=143676 I (3324) jalon_mem: JALON_CLASSES t_ms=1885 etape="fin de app_main (commande série lancée)" utilise=451400 libre=140244 c0=1620/34672 c1=264/21408 c2=55/27704 c3=13/24000 c4=13/94848 c5=1/32768 c6=3/216000
+I (5447) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=125507 delta=-14796 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95576
+I (5453) jalon_mem: JALON_CLASSES t_ms=4015 etape="après le lien avec le C6 (esp_hosted, SDIO)" utilise=465356 libre=125428 c0=1802/38576 c1=280/22628 c2=65/32280 c3=14/25184 c4=14/97920 c5=1/32768 c6=3/216000
+I (5700) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=119455 delta=-6052 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12886) jalon_mem: JALON_MEM t_ms=11447 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=112007 delta=-7448 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12898) BOOT: BOOT 127 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3616 wifi_ms=8304 ip_ms=11409 ntp_ms=11447 coupures=0 echecs_transport=0 rssi=-50 utc=1794005102 local="vendredi 6 novembre 2026, 23 h 45"
+I (13130) principal: affichage : « 23:45 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005103
+I (13307) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13308) meteo: mémoire libre avant la requête : interne 111699 o (plus grand bloc 55296 o, minimum depuis le démarrage 95480 o), PSRAM 31508264 o (plus grand bloc 31457280 o)
+I (13318) jalon_mem: JALON_MEM t_ms=11879 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=74383 delta=-37624 plus_gros_bloc=31744 dma_bloc=30720 interne_min=74376
+E (13392) esp-aes: Failed to allocate memory for the array of DMA descriptors
+E (13393) esp-aes: Generating output DMA descriptors failed
+E (13393) esp-tls: Failed to open new connection
+E (13397) HTTP_CLIENT: Connection failed, sock < 0
+W (13397) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 87 ms
+I (13398) meteo: mémoire libre après la requête : interne 48711 o (plus grand bloc 31744 o, minimum depuis le démarrage 17836 o), PSRAM 31483540 o (plus grand bloc 31457280 o)
+I (13399) meteo: écart de mémoire libre sur la requête : interne -62988 o, PSRAM -24724 o
+W (13399) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 1 échec(s) de suite
+===== b1 : seuil malloc 256 o, appel a l'execution =====
+# port ouvert : COM11
+# >>> redemarrer
+I (1446) jalon_mem: JALON_MEM t_ms=6 etape="début de app_main" interne_libre=504759 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=472712
+I (1447) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94524 libre=504508 c0=56/924 c1=30/3040 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1458) jalon_mem: JALON_MEM t_ms=18 etape="après la NVS et les réglages" interne_libre=493603 delta=-11156 plus_gros_bloc=352256 dma_bloc=352256 interne_min=461484
+I (1459) jalon_mem: JALON_CLASSES t_ms=19 etape="après la NVS et les réglages" utilise=105412 libre=493540 c0=68/1448 c1=36/3676 c2=22/9152 c3=6/10240 c4=8/48128 c5=1/32768 c6=0/0
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3078) jalon_mem: JALON_MEM t_ms=1638 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=260571 delta=-233032 plus_gros_bloc=131072 dma_bloc=131072 interne_min=156836
+I (3080) jalon_mem: JALON_CLASSES t_ms=1640 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=337816 libre=260520 c0=194/4532 c1=58/5516 c2=26/11608 c3=7/12096 c4=9/55296 c5=1/32768 c6=3/216000
+I (3192) jalon_mem: JALON_MEM t_ms=1752 etape="après l'écran principal (objets, police, première image)" interne_libre=181655 delta=-78916 plus_gros_bloc=55296 dma_bloc=55296 interne_min=144916
+I (3299) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (3300) jalon_mem: JALON_MEM t_ms=1860 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=169031 delta=-12624 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136984
+I (3309) jalon_mem: JALON_MEM t_ms=1869 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=156383 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=124336
+I (3314) jalon_mem: JALON_CLASSES t_ms=1874 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=435I (3320) jalon_mem: JALON_CLASSES t_ms=1880 etape="après le lancement de la tâche du serveur web" utilise=447976 libre=143676 c0=1620/34672 c1=264/21408 c2=54/27352 c3=12/20928 c4=13/94848 c5=1/32768 c6=3/216000
+I (3321) jalon_mem: JALON_MEM t_ms=1881 etape="fin de app_main (commande série lancée)" interne_libre=140207 delta=-3528 plus_gros_bloc=55296 dma_bloc=55296 interne_min=108160
+I (5448) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=125507 delta=-14700 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95576
+I (5454) jalon_mem: JALON_CLASSES t_ms=4015 etape="après le lien avec le C6 (esp_hosted, SDIO)" utilise=465356 libre=125428 c0=1802/38576 c1=280/22628 c2=65/32280 c3=14/25184 c4=14/97920 c5=1/32768 c6=3/216000
+I (5701) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=119419 delta=-6088 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12840) jalon_mem: JALON_MEM t_ms=11400 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=112007 delta=-7412 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12852) BOOT: BOOT 128 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3616 wifi_ms=8287 ip_ms=11364 ntp_ms=11400 coupures=0 echecs_transport=0 rssi=-49 utc=1794005231 local="vendredi 6 novembre 2026, 23 h 47"
+I (13130) principal: affichage : « 23:47 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005232
+I (13309) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13310) meteo: mémoire libre avant la requête : interne 111699 o (plus grand bloc 55296 o, minimum depuis le démarrage 95480 o), PSRAM 31507240 o (plus grand bloc 31457280 o)
+I (13320) jalon_mem: JALON_MEM t_ms=11880 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=74387 delta=-37620 plus_gros_bloc=31744 dma_bloc=30720 interne_min=74380
+I (13334) commande_serie: BLOCS_CLASSE >=64Ko : 3 blocs, 216000 octets
+E (18318) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+E (23318) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+E (28197) esp-x509-crt-bundle: PK verify failed with error 0x4290
+E (28198) esp-x509-crt-bundle: Certificate matched but signature verification failed
+E (28198) esp-x509-crt-bundle: Failed to verify certificate
+E (28202) esp-tls: Failed to open new connection
+E (28203) HTTP_CLIENT: Connection failed, sock < 0
+W (28203) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 14891 ms
+I (28204) meteo: mémoire libre après la requête : interne 47575 o (plus grand bloc 18432 o, minimum depuis le démarrage 2188 o), PSRAM 31480980 o (plus grand bloc 31457280 o)
+I (28205) meteo: écart de mémoire libre sur la requête : interne -64124 o, PSRAM -26260 o
+W (28205) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 1 échec(s) de suite
+# >>> piles
+I (39823) commande_serie: PILE nom=commande_serie base=0x4ff9c1a8 libre_min=2568 priorite=2
+I (39823) commande_serie: PILE nom=IDLE1 base=0x4ff2c3e8 libre_min=1240 priorite=0
+I (39823) commande_serie: PILE nom=IDLE0 base=0x4ff2bc80 libre_min=1200 priorite=0
+I (39823) commande_serie: PILE nom=tiT base=0x4ff420cc libre_min=2436 priorite=18
+I (39824) commande_serie: PILE nom=serveur_web base=0x4ff99040 libre_min=9792 priorite=3
+I (39824) commande_serie: PILE nom=meteo base=0x4ff95f5c libre_min=7812 priorite=3
+I (39824) commande_serie: PILE nom=taskLVGL base=0x4ff48788 libre_min=2296 priorite=4
+I (39824) commande_serie: PILE nom=ipc0 base=0x4ff1e9d4 libre_min=620 priorite=1
+I (39824) commande_serie: PILE nom=ipc1 base=0x4ff1ef3c libre_min=740 priorite=24
+I (39825) commande_serie: PILE nom=rpc_tx base=0x4ff271a0 libre_min=4364 priorite=23
+I (39825) commande_serie: PILE nom=rpc_rx base=0x4ff25c28 libre_min=2232 priorite=23
+I (39825) commande_serie: PILE nom=httpd base=0x4ff2d554 libre_min=19804 priorite=3
+I (39825) commande_serie: PILE nom=sys_evt base=0x4ff953d4 libre_min=860 priorite=20
+I (39826) commande_serie: PILE nom=sdio_write base=0x4ff24338 libre_min=4376 priorite=23
+I (39826) commande_serie: PILE nom=mdns base=0x4ff32558 libre_min=2352 priorite=1
+I (39826) commande_serie: PILE nom=sdio_rx_buf base=0x4ff20ad0 libre_min=1200 priorite=23
+I (39826) commande_serie: PILE nom=sdio_process_rx base=0x4ff22dc0 libre_min=3168 priorite=23
+I (39827) commande_serie: PILE nom=sdio_read base=0x4ff21848 libre_min=3320 priorite=23
+I (39827) commande_serie: PILE nom=esp_timer base=0x4ff28708 libre_min=3704 priorite=22
+I (39827) commande_serie: PILE nom=Tmr Svc base=0x4ff2cb50 libre_min=1712 priorite=1
+I (39827) commande_serie: PILES : 20 tâches
+I (43206) meteo: requête Open-Meteo pour « Lyon » (1 échec(s) de suite jusqu'ici)
+I (43207) meteo: mémoire libre avant la requête : interne 49907 o (plus grand bloc 18432 o, minimum depuis le démarrage 2188 o), PSRAM 31480980 o (plus grand bloc 31457280 o)
+E (43245) esp-tls: Failed to open new connection
+E (43245) HTTP_CLIENT: Connection failed, sock < 0
+W (43246) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 37 ms
+I (43247) meteo: mémoire libre après la requête : interne 49555 o (plus grand bloc 18432 o, minimum depuis le démarrage 2188 o), PSRAM 31480980 o (plus grand bloc 31457280 o)
+I (43247) meteo: écart de mémoire libre sur la requête : interne -352 o, PSRAM +0 o
+W (43247) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 2 échec(s) de suite
+I (63131) principal: affichage : « 23:48 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005282
+I (74248) meteo: requête Open-Meteo pour « Lyon » (2 échec(s) de suite jusqu'ici)
+I (74249) meteo: mémoire libre avant la requête : interne 49187 o (plus grand bloc 18432 o, minimum depuis le démarrage 2188 o), PSRAM 31454352 o (plus grand bloc 30932992 o)
+E (74286) esp-tls: Failed to open new connection
+E (74287) HTTP_CLIENT: Connection failed, sock < 0
+W (74287) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 36 ms
+I (74288) meteo: mémoire libre après la requête : interne 48847 o (plus grand bloc 18432 o, minimum depuis le démarrage 2188 o), PSRAM 31454352 o (plus grand bloc 30932992 o)
+I (74289) meteo: écart de mémoire libre sur la requête : interne -340 o, PSRAM +0 o
+W (74289) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 3 échec(s) de suite
+# >>> memoire
+I (79877) commande_serie: MEMOIRE t_s=78 interne_libre=46999 plus_gros_bloc=18432 interne_min=2188 psram_libre=31454352 dma_bloc=18432
+# port ouvert : COM11
+I (3120) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1066, détection 1226, dalle 1639, LVGL 1657
+I (3121) jalon_mem: JALON_MEM t_ms=1680 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=274323 delta=-229012 plus_gros_bloc=139264 dma_bloc=139264 interne_min=170588
+I (3122) jalon_mem: JALON_CLASSES t_ms=1682 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=324084 libre=274252 c0=194/4488 c1=58/5516 c2=23/9504 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+I (3235) jalon_mem: JALON_MEM t_ms=1795 etape="après l'écran principal (objets, police, première image)" interne_libre=221259 delta=-53064 plus_gros_bloc=92160 dma_bloc=92160 interne_min=166448
+I (3242) jalon_mem: JALON_CLASSES t_ms=1802 etape="après l'écran principal (objets, police, première image)" utilise=370544 libre=221192 c0=1637/34956 c1=266/21508 c2=23/9504 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+# >>> redemarrer
+I (3342) ecran: rétroéclairage allumé à 75 % à 1901 ms ; première image affichée
+I (3343) jalon_mem: JALON_MEM t_ms=1903 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=208631 delta=-12628 plus_gros_bloc=79872 dma_bloc=79872 interne_min=166448
+I (3352) jalon_mem: JALON_MEM t_ms=1912 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=195983 delta=-12648 plus_gros_bloc=67584 dma_bloc=67584 interne_min=163936
+I (3358) jalon_mem: JALON_CLASSES t_ms=1917 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=395760 libre=195924 c0=1644/35120 c1=267/21600 c2=27/11168 c3=7/13056 c4=10/66048 c5=1/32768 c6=3/216000
+I (3358) jalon_mem: JALON_MEM t_ms=1918 etape="après le lancement de la tâche du serveur web" interne_libre=183335 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=151288
+I (3364) jalon_mem: JALON_MEM t_ms=1924 etape="fin de app_main (commande série lancée)" interne_libre=179903 delta=-3432 plus_gros_bloc=55296 dma_bloc=55296 interne_min=147856
+I (3370) jalon_mem: JALON_CLASSES t_ms=1930 etape="fin de app_main (commande série lancée)" utilise=411824 libre=179844 c0=1644/35120 c1=267/21600 c2=29/11872 c3=8/16128 c4=11/78336 c5=1/32768 c6=3/216000
+W (1446) ecran: ESSAI : malloc() reste en interne jusqu'à 256 octets seulement
+I (1446) jalon_mem: JALON_MEM t_ms=7 etape="début de app_main" interne_libre=504759 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=472712
+I (1447) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94524 libre=504508 c0=56/924 c1=30/3040 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1458) jalon_mem: JALON_MEM t_ms=19 etape="après la NVS et les réglages" interne_libre=503335 delta=-1424 plus_gros_bloc=352256 dma_bloc=352256 interne_min=471216
+I (1459) jalon_mem: JALON_CLASSES t_ms=19 etape="après la NVS et les réglages" utilise=95684 libre=503272 c0=68/1448 c1=36/3676 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (3077) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3078) jalon_mem: JALON_MEM t_ms=1638 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=274323 delta=-229012 plus_gros_bloc=139264 dma_bloc=139264 interne_min=170588
+I (3079) jalon_mem: JALON_CLASSES t_ms=1639 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=324084 libre=274252 c0=194/4488 c1=58/5516 c2=23/9504 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+I (3193) jalon_mem: JALON_MEM t_ms=1753 etape="après l'écran principal (objets, police, première image)" interne_libre=221859 delta=-52464 plus_gros_bloc=92160 dma_bloc=92160 interne_min=166448
+I (3199) jalon_mem: JALON_CLASSES t_ms=1759 etape="après l'écran principal (objets, police, première image)" utilise=370028 libre=221792 c0=1618/34568 c1=264/21380 c2=23/9504 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+I (3300) ecran: rétroéclairage allumé à 75 % à 1860 ms ; première image affichée
+I (3302) jalon_mem: JALON_MEM t_ms=1862 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=209231 delta=-12628 plus_gros_bloc=79872 dma_bloc=79872 interne_min=166448
+I (3307) jalon_mem: JALON_CLASSES t_ms=1867 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=382604 libre=209172 c0=1625/34732 c1=265/21472 c2=26/10816 c3=7/13056 c4=9/53760 c5=1/32768 c6=3/216000
+I (3310) jalon_mem: JALON_MEM t_ms=1870 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=196583 delta=-12648 plus_gros_bloc=67584 dma_bloc=67584 interne_min=164536
+I (3316) jalon_mem: JALON_CLASSES t_ms=1876 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=395244 libre=196524 c0=1625/34732 c1=265/21472 c2=27/11168 c3=7/13056 c4=10/66048 c5=1/32768 c6=3/216000
+I (3322) jalon_mem: JALON_CLASSES t_ms=1882 etape="après le lancement de la tâche du serveur web" utilise=407884 libre=183876 c0=1625/34732 c1=265/21472 c2=28/11520 c3=7/13056 c4=11/78336 c5=1/32768 c6=3/216000
+I (3328) jalon_mem: JALON_CLASSES t_ms=1888 etape="fin de app_main (commande série lancée)" utilise=411308 libre=180444 c0=1625/34732 c1=265/21472 c2=29/11872 c3=8/16128 c4=11/78336 c5=1/32768 c6=3/216000
+I (5448) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=183123 delta=2620 plus_gros_bloc=55296 dma_bloc=55296 interne_min=141744
+I (5701) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=177379 delta=-5744 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136048
+I (12835) jalon_mem: JALON_MEM t_ms=11395 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=169931 delta=-7448 plus_gros_bloc=55296 dma_bloc=55296 interne_min=127940
+I (12841) jalon_mem: JALON_CLASSES t_ms=11401 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" utilise=414088 libre=176520 c0=1883/39908 c1=290/23684 c2=30/12384 c3=9/19712 c4=10/69632 c5=1/32768 c6=3/216000
+I (12846) BOOT: BOOT 130 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3610 wifi_ms=8287 ip_ms=11341 ntp_ms=11395 coupures=0 echecs_transport=0 rssi=-49 utc=1794005410 local="vendredi 6 novembre 2026, 23 h 50"
+I (13118) principal: affichage : « 23:50 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005410
+I (13310) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 177575 o (plus grand bloc 55296 o, minimum depuis le démarrage 127940 o), PSRAM 31443720 o (plus grand bloc 30932992 o)
+I (13320) jalon_mem: JALON_MEM t_ms=11880 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=148407 delta=-21524 plus_gros_bloc=55296 dma_bloc=55296 interne_min=107296
+I (14495) esp-x509-crt-bundle: Certificate validated
+I (14804) meteo: mémoire libre une fois la connexion TLS établie : interne 97147 o (plus grand bloc 55296 o, minimum depuis le démarrage 88852 o), PSRAM 31381576 o (plus grand bloc 30932992 o)
+I (14807) meteo: mémoire libre après la requête : interne 128679 o (plus grand bloc 55296 o, minimum depuis le démarrage 88852 o), PSRAM 31403284 o (plus grand bloc 30932992 o)
+I (14808) meteo: écart de mémoire libre sur la requête : interne -48896 o, PSRAM -40436 o
+I (14812) meteo: cache écrit en NVS (204 octets)
+I (14812) METEO: METEO Lyon : 7,6 °C (ressentie 6,6), Brouillard, nuit ; min 7,4 / max 13,0 du jour ; vent 1,4 km/h, direction 360° ; pression 1024,8 hPa ; humidité 98 % ; pluie 0 % ; mesure UNIX 1794005100, reçue UNIX 1794005412 (vendredi 6 novembre 2026, 23 h 50) ; 7 jours ; 2838 octets en 1490 ms
+# >>> piles
+I (39779) commande_serie: PILE nom=commande_serie base=0x4ff924f4 libre_min=2572 priorite=2
+I (39779) commande_serie: PILE nom=IDLE1 base=0x4ff2c3e8 libre_min=1240 priorite=0
+I (39780) commande_serie: PILE nom=IDLE0 base=0x4ff2bc80 libre_min=1200 priorite=0
+I (39780) commande_serie: PILE nom=tiT base=0x4ff94d24 libre_min=2444 priorite=18
+I (39780) commande_serie: PILE nom=serveur_web base=0x4ff8f38c libre_min=9796 priorite=3
+I (39780) commande_serie: PILE nom=meteo base=0x4ff8c2a8 libre_min=7832 priorite=3
+I (39780) commande_serie: PILE nom=taskLVGL base=0x4ff3c288 libre_min=2344 priorite=4
+I (39781) commande_serie: PILE nom=ipc0 base=0x4ff1e9d4 libre_min=620 priorite=1
+I (39781) commande_serie: PILE nom=rpc_tx base=0x4ff271a0 libre_min=4364 priorite=23
+I (39781) commande_serie: PILE nom=rpc_rx base=0x4ff25c28 libre_min=2232 priorite=23
+I (39781) commande_serie: PILE nom=httpd base=0x4ff97eac libre_min=19796 priorite=3
+I (39782) commande_serie: PILE nom=sys_evt base=0x4ff8b5bc libre_min=852 priorite=20
+I (39782) commande_serie: PILE nom=ipc1 base=0x4ff1ef3c libre_min=740 priorite=24
+I (39782) commande_serie: PILE nom=sdio_write base=0x4ff24338 libre_min=4376 priorite=23
+I (39782) commande_serie: PILE nom=mdns base=0x4ff9ceb0 libre_min=2344 priorite=1
+I (39783) commande_serie: PILE nom=sdio_rx_buf base=0x4ff20ad0 libre_min=1200 priorite=23
+I (39783) commande_serie: PILE nom=sdio_process_rx base=0x4ff22dc0 libre_min=3168 priorite=23
+I (39783) commande_serie: PILE nom=sdio_read base=0x4ff21848 libre_min=3320 priorite=23
+I (39783) commande_serie: PILE nom=esp_timer base=0x4ff28708 libre_min=3720 priorite=22
+I (39783) commande_serie: PILE nom=Tmr Svc base=0x4ff2cb50 libre_min=1712 priorite=1
+I (39784) commande_serie: PILES : 20 tâches
+I (63127) principal: affichage : « 23:51 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005461
+# >>> memoire
+I (79834) commande_serie: MEMOIRE t_s=78 interne_libre=127919 plus_gros_bloc=55296 interne_min=88852 psram_libre=31380408 dma_bloc=55296
+===== e1 : meteo a la priorite 0, memoire inchangee =====
+# port ouvert : COM11
+I (3119) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1066, détection 1226, dalle 1639, LVGL 1657
+I (3120) jalon_mem: JALON_MEM t_ms=1680 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=260571 delta=-233032 plus_gros_bloc=131072 dma_bloc=131072 interne_min=156836
+I (3122) jalon_mem: JALON_CLASSES t_ms=1683 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=337816 libre=260520 c0=194/4532 c1=58/5516 c2=26/11608 c3=7/12096 c4=9/55296 c5=1/32768 c6=3/216000
+I (3234) jalon_mem: JALON_MEM t_ms=1795 etape="après l'écran principal (objets, police, première image)" interne_libre=180795 delta=-79776 plus_gros_bloc=55296 dma_bloc=55296 interne_min=144056
+# >>> redemarrer
+I (3341) ecran: rétroéclairage allumé à 75 % à 1901 ms ; première image affichée
+I (3342) jalon_mem: JALON_MEM t_ms=1903 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=168171 delta=-12624 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136124
+I (3348) jalon_mem: JALON_CLASSES t_ms=1909 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=423436 libre=168112 c0=1647/35220 c1=267/21600 c2=52/26648 c3=12/20928 c4=11/70272 c5=1/32768 c6=3/216000
+I (3351) jalon_mem: JALON_MEM t_ms=1912 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=155523 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=123476
+I (3357) jalon_mem: JALON_MEM t_ms=1918 etape="après le lancement de la tâche du serveur web" interne_libre=142875 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=110828
+I (3363) jalon_mem: JALON_MEM t_ms=1924 etape="fin de app_main (commande série lancée)" interne_libre=139443 delta=-3432 plus_gros_bloc=55296 dma_bloc=55296 interne_min=107396
+I (1445) jalon_mem: JALON_MEM t_ms=6 etape="début de app_main" interne_libre=504759 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=472712
+I (1446) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94524 libre=504508 c0=56/924 c1=30/3040 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1457) jalon_mem: JALON_MEM t_ms=18 etape="après la NVS et les réglages" interne_libre=493603 delta=-11156 plus_gros_bloc=352256 dma_bloc=352256 interne_min=461484
+I (1458) jalon_mem: JALON_CLASSES t_ms=19 etape="après la NVS et les réglages" utilise=105412 libre=493540 c0=68/1448 c1=36/3676 c2=22/9152 c3=6/10240 c4=8/48128 c5=1/32768 c6=0/0
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3077) jalon_mem: JALON_MEM t_ms=1638 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=260571 delta=-233032 plus_gros_bloc=131072 dma_bloc=131072 interne_min=156836
+I (3079) jalon_mem: JALON_CLASSES t_ms=1640 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=337816 libre=260520 c0=194/4532 c1=58/5516 c2=26/11608 c3=7/12096 c4=9/55296 c5=1/32768 c6=3/216000
+I (3191) jalon_mem: JALON_MEM t_ms=1752 etape="après l'écran principal (objets, police, première image)" interne_libre=181579 delta=-78992 plus_gros_bloc=55296 dma_bloc=55296 interne_min=144840
+I (3298) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (3299) jalon_mem: JALON_MEM t_ms=1860 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=168955 delta=-12624 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136908
+I (3305) jalon_mem: JALON_CLASSES t_ms=1866 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=422760 libre=168896 c0=1623/34736 c1=264/21408 c2=52/26648 c3=12/20928 c4=11/70272 c5=1/32768 c6=3/216000
+I (3308) jalon_mem: JALON_MEM t_ms=1869 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=156307 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=124260
+I (3319) jalon_mem: JALON_CLASSES t_ms=1880 etape="après le lancement de la tâche du serveur web" utilise=448040 libre=143600 c0=1623/34736 c1=264/21408 c2=54/27352 c3=12/20928 c4=13/94848 c5=1/32768 c6=3/216000
+I (3320) jalon_mem: JALON_MEM t_ms=1881 etape="fin de app_main (commande série lancée)" interne_libre=140131 delta=-3528 plus_gros_bloc=55296 dma_bloc=55296 interne_min=108084
+I (5447) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=125159 delta=-14972 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (5700) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=119103 delta=-6056 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12835) jalon_mem: JALON_MEM t_ms=11396 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=111655 delta=-7448 plus_gros_bloc=55296 dma_bloc=55296 interne_min=95480
+I (12842) jalon_mem: JALON_CLASSES t_ms=11403 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" utilise=472196 libre=118232 c0=1881/39956 c1=289/23608 c2=67/32920 c3=15/28768 c4=14/98176 c5=1/32768 c6=3/216000
+I (12846) BOOT: BOOT 132 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3617 wifi_ms=8290 ip_ms=11363 ntp_ms=11396 coupures=0 echecs_transport=0 rssi=-49 utc=1794005668 local="vendredi 6 novembre 2026, 23 h 54"
+I (13131) principal: affichage : « 23:54 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005668
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13312) meteo: mémoire libre avant la requête : interne 111347 o (plus grand bloc 55296 o, minimum depuis le démarrage 95480 o), PSRAM 31508264 o (plus grand bloc 31457280 o)
+I (13319) jalon_mem: JALON_MEM t_ms=11880 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=77235 delta=-34420 plus_gros_bloc=34816 dma_bloc=34816 interne_min=76896
+E (13437) esp-aes: Failed to allocate memory for start alignment buffer
+E (13439) esp-aes: Generating input DMA descriptors failed
+E (13439) esp-tls: Failed to open new connection
+E (13445) HTTP_CLIENT: Connection failed, sock < 0
+W (13446) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 83 ms
+I (13448) meteo: mémoire libre après la requête : interne 48415 o (plus grand bloc 31744 o, minimum depuis le démarrage 17688 o), PSRAM 31483540 o (plus grand bloc 31457280 o)
+I (13448) meteo: écart de mémoire libre sur la requête : interne -62932 o, PSRAM -24724 o
+W (13448) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 1 échec(s) de suite
+I (28452) meteo: requête Open-Meteo pour « Lyon » (1 échec(s) de suite jusqu'ici)
+I (28454) meteo: mémoire libre avant la requête : interne 48663 o (plus grand bloc 31744 o, minimum depuis le démarrage 17688 o), PSRAM 31483540 o (plus grand bloc 31457280 o)
+E (28502) esp-aes: Failed to allocate memory for the array of DMA descriptors
+E (28504) esp-aes: Generating input DMA descriptors failed
+E (28504) esp-tls: Failed to open new connection
+E (28512) HTTP_CLIENT: Connection failed, sock < 0
+W (28513) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 57 ms
+I (28513) meteo: mémoire libre après la requête : interne 48331 o (plus grand bloc 31744 o, minimum depuis le démarrage 17460 o), PSRAM 31483540 o (plus grand bloc 31457280 o)
+I (28516) meteo: écart de mémoire libre sur la requête : interne -332 o, PSRAM +0 o
+W (28516) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 2 échec(s) de suite
+# >>> memoire
+I (49870) commande_serie: MEMOIRE t_s=48 interne_libre=48287 plus_gros_bloc=31744 interne_min=17460 psram_libre=31483540 dma_bloc=3072
+I (58517) meteo: requête Open-Meteo pour « Lyon » (2 échec(s) de suite jusqu'ici)
+I (58518) meteo: mémoire libre avant la requête : interne 48287 o (plus grand bloc 31744 o, minimum depuis le démarrage 17460 o), PSRAM 31483540 o (plus grand bloc 31457280 o)
+E (58571) esp-aes: Failed to allocate memory for start alignment buffer
+E (58571) esp-aes: Generating input DMA descriptors failed
+E (58573) esp-tls: Failed to open new connection
+E (58580) HTTP_CLIENT: Connection failed, sock < 0
+W (58580) meteo: requête échouée : ESP_ERR_HTTP_CONNECT (errno 0) après 58 ms
+I (58582) meteo: mémoire libre après la requête : interne 47959 o (plus grand bloc 31744 o, minimum depuis le démarrage 17044 o), PSRAM 31483540 o (plus grand bloc 31457280 o)
+I (58584) meteo: écart de mémoire libre sur la requête : interne -328 o, PSRAM +0 o
+W (58584) meteo: essai raté : réseau (DNS, connexion, TLS ou délai) (HTTP 0) ; 3 échec(s) de suite
+I (63139) principal: affichage : « 23:55 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005718
+===== e2 : mbedTLS en PSRAM + tourner3/tourner0 =====
+# port ouvert : COM11
+I (3118) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1066, détection 1226, dalle 1639, LVGL 1657
+I (3119) jalon_mem: JALON_MEM t_ms=1680 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=274323 delta=-229012 plus_gros_bloc=139264 dma_bloc=139264 interne_min=170588
+I (3120) jalon_mem: JALON_CLASSES t_ms=1682 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=324084 libre=274252 c0=194/4488 c1=58/5516 c2=23/9504 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+I (3233) jalon_mem: JALON_MEM t_ms=1794 etape="après l'écran principal (objets, police, première image)" interne_libre=221183 delta=-53140 plus_gros_bloc=92160 dma_bloc=92160 interne_min=166448
+I (3239) jalon_mem: JALON_CLASSES t_ms=1801 etape="après l'écran principal (objets, police, première image)" utilise=370608 libre=221116 c0=1640/35020 c1=266/21508 c2=23/9504 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+# >>> redemarrer
+I (3340) ecran: rétroéclairage allumé à 75 % à 1901 ms ; première image affichée
+I (3341) jalon_mem: JALON_MEM t_ms=1903 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=208555 delta=-12628 plus_gros_bloc=79872 dma_bloc=79872 interne_min=166448
+I (3347) jalon_mem: JALON_CLASSES t_ms=1909 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=383184 libre=208496 c0=1647/35184 c1=267/21600 c2=26/10816 c3=7/13056 c4=9/53760 c5=1/32768 c6=3/216000
+I (3350) jalon_mem: JALON_MEM t_ms=1912 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=195907 delta=-12648 plus_gros_bloc=67584 dma_bloc=67584 interne_min=163860
+I (3356) jalon_mem: JALON_CLASSES t_ms=1918 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=395824 libre=195848 c0=1647/35184 c1=267/21600 c2=27/11168 c3=7/13056 c4=10/66048 c5=1/32768 c6=3/216000
+I (3362) jalon_mem: JALON_CLASSES t_ms=1924 etape="après le lancement de la tâche du serveur web" utilise=408464 libre=183200 c0=1647/35184 c1=267/21600 c2=28/11520 c3=7/13056 c4=11/78336 c5=1/32768 c6=3/216000
+I (3368) jalon_mem: JALON_CLASSES t_ms=1930 etape="fin de app_main (commande série lancée)" utilise=411888 libre=179768 c0=1647/35184 c1=267/21600 c2=29/11872 c3=8/16128 c4=11/78336 c5=1/32768 c6=3/216000
+W (1445) ecran: ESSAI : malloc() reste en interne jusqu'à 256 octets seulement
+I (1445) jalon_mem: JALON_MEM t_ms=7 etape="début de app_main" interne_libre=504759 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=472712
+I (1446) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94524 libre=504508 c0=56/924 c1=30/3040 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1457) jalon_mem: JALON_MEM t_ms=19 etape="après la NVS et les réglages" interne_libre=503335 delta=-1424 plus_gros_bloc=352256 dma_bloc=352256 interne_min=471216
+I (1458) jalon_mem: JALON_CLASSES t_ms=19 etape="après la NVS et les réglages" utilise=95684 libre=503272 c0=68/1448 c1=36/3676 c2=22/9152 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3077) jalon_mem: JALON_MEM t_ms=1638 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=274323 delta=-229012 plus_gros_bloc=139264 dma_bloc=139264 interne_min=170588
+I (3078) jalon_mem: JALON_CLASSES t_ms=1640 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=324084 libre=274252 c0=194/4488 c1=58/5516 c2=23/9504 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+I (3190) jalon_mem: JALON_MEM t_ms=1751 etape="après l'écran principal (objets, police, première image)" interne_libre=221859 delta=-52464 plus_gros_bloc=92160 dma_bloc=92160 interne_min=166448
+I (3197) jalon_mem: JALON_CLASSES t_ms=1758 etape="après l'écran principal (objets, police, première image)" utilise=370028 libre=221792 c0=1618/34568 c1=264/21380 c2=23/9504 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (3299) jalon_mem: JALON_MEM t_ms=1860 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=209231 delta=-12628 plus_gros_bloc=79872 dma_bloc=79872 interne_min=166448
+I (3304) jalon_mem: JALON_CLASSES t_ms=1866 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=382604 libre=20I (3306) meteo: cache relu : 7,6 °C, Brouillard, reçu à l'instant UNIX 1794005412 (fraîcheur : voir la ligne contrat suivante)
+I (3307) jalon_mem: JALON_MEM t_ms=1868 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=196583 delta=-12648 plus_gros_bloc=67584 dma_bloc=67584 interne_min=164536
+I (3313) jalon_mem: JALON_CLASSES t_ms=1874 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=395244 libre=196524 c0=1625/34732 c1=265/21472 c2=27/11168 c3=7/13056 c4=10/66048 c5=1/32768 c6=3/216000
+I (3319) jalon_mem: JALON_CLASSES t_ms=1880 etape="après le lancement de la tâche du serveur web" utilise=407884 libre=183876 c0=1625/34732 c1=265/21472 c2=28/11520 c3=7/13056 c4=11/78336 c5=1/32768 c6=3/216000
+I (3325) jalon_mem: JALON_CLASSES t_ms=1886 etape="fin de app_main (commande série lancée)" utilise=411412 libre=180340 c0=1625/34732 c1=266/21576 c2=29/11872 c3=8/16128 c4=11/78336 c5=1/32768 c6=3/216000
+I (5447) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=183123 delta=2728 plus_gros_bloc=55296 dma_bloc=55296 interne_min=141744
+I (5700) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=177379 delta=-5744 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136048
+I (5707) jalon_mem: JALON_CLASSES t_ms=4268 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" utilise=413392 libre=177316 c0=1862/39484 c1=287/23412 c2=30/12384 c3=9/19712 c4=10/69632 c5=1/32768 c6=3/216000
+I (12810) jalon_mem: JALON_MEM t_ms=11371 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=169931 delta=-7448 plus_gros_bloc=55296 dma_bloc=55296 interne_min=127940
+I (12822) BOOT: BOOT 134 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8297 ip_ms=11338 ntp_ms=11371 coupures=0 echecs_transport=0 rssi=-51 utc=1794005897 local="vendredi 6 novembre 2026, 23 h 58"
+I (13129) principal: affichage : « 23:58 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005897
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13312) meteo: mémoire libre avant la requête : interne 177575 o (plus grand bloc 55296 o, minimum depuis le démarrage 127940 o), PSRAM 31443568 o (plus grand bloc 30932992 o)
+I (13318) jalon_mem: JALON_MEM t_ms=11879 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=149963 delta=-19968 plus_gros_bloc=55296 dma_bloc=55296 interne_min=108852
+I (15592) esp-x509-crt-bundle: Certificate validated
+I (16074) meteo: mémoire libre une fois la connexion TLS établie : interne 127459 o (plus grand bloc 55296 o, minimum depuis le démarrage 95480 o), PSRAM 31352660 o (plus grand bloc 30932992 o)
+I (16081) meteo: mémoire libre après la requête : interne 128879 o (plus grand bloc 55296 o, minimum depuis le démarrage 95480 o), PSRAM 31403812 o (plus grand bloc 30932992 o)
+I (16081) meteo: écart de mémoire libre sur la requête : interne -48696 o, PSRAM -39756 o
+I (16088) meteo: cache écrit en NVS (204 octets)
+I (16091) METEO: METEO Lyon : 7,6 °C (ressentie 6,6), Brouillard, nuit ; min 7,4 / max 13,0 du jour ; vent 1,4 km/h, direction 360° ; pression 1024,8 hPa ; humidité 98 % ; pluie 0 % ; mesure UNIX 1794005100, reçue UNIX 1794005900 (vendredi 6 novembre 2026, 23 h 58) ; 7 jours ; 2838 octets en 2699 ms
+# >>> tourner3
+I (24870) commande_serie: TOURNER priorité 3 : début
+E (29870) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+I (32870) commande_serie: TOURNER fini : 8 s de calcul sans pause, sur le cœur 0
+# >>> tourner0
+I (50070) commande_serie: TOURNER priorité 0 : début
+I (58070) commande_serie: TOURNER fini : 8 s de calcul sans pause, sur le cœur 0
+I (63138) principal: affichage : « 23:59 » / « vendredi 6 novembre 2026 » ; météo à jour ; utc=1794005947
+# >>> memoire
+I (75220) commande_serie: MEMOIRE t_s=73 interne_libre=128799 plus_gros_bloc=55296 interne_min=95480 psram_libre=31377184 dma_bloc=55296
+===== final : 7EFD993F..19FC (2a05811), premier demarrage =====
+# port ouvert : COM11
+I (3119) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1066, détection 1226, dalle 1639, LVGL 1657
+I (3120) jalon_mem: JALON_MEM t_ms=1680 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=274759 delta=-229012 plus_gros_bloc=139264 dma_bloc=139264 interne_min=171024
+I (3122) jalon_mem: JALON_CLASSES t_ms=1683 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=323652 libre=274688 c0=194/4488 c1=58/5516 c2=22/9072 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+I (3234) jalon_mem: JALON_MEM t_ms=1794 etape="après l'écran principal (objets, police, première image)" interne_libre=221511 delta=-53248 plus_gros_bloc=92160 dma_bloc=92160 interne_min=166884
+# >>> redemarrer
+I (3341) ecran: rétroéclairage allumé à 75 % à 1901 ms ; première image affichée
+I (3342) jalon_mem: JALON_MEM t_ms=1903 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=208883 delta=-12628 plus_gros_bloc=79872 dma_bloc=79872 interne_min=166884
+I (3348) jalon_mem: JALON_CLASSES t_ms=1909 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=382848 libre=20I (3350) meteo: cache relu : 7,6 °C, Brouillard, reçu à l'instant UNIX 1794005900 (fraîcheur : voir la ligne contrat suivante)
+I (3351) jalon_mem: JALON_MEM t_ms=1912 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=196235 delta=-12648 plus_gros_bloc=67584 dma_bloc=67584 interne_min=164188
+I (3357) jalon_mem: JALON_CLASSES t_ms=1918 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" utilise=395488 libre=196176 c0=1649/35216 c1=268/21664 c2=26/10736 c3=7/13056 c4=10/66048 c5=1/32768 c6=3/216000
+I (3358) jalon_mem: JALON_MEM t_ms=1918 etape="après le lancement de la tâche du serveur web" interne_libre=183587 delta=-12648 plus_gros_bloc=55296 dma_bloc=55296 interne_min=151540
+I (3369) jalon_mem: JALON_CLASSES t_ms=1930 etape="fin de app_main (commande série lancée)" utilise=411552 libre=180096 c0=1649/35216 c1=268/21664 c2=28/11440 c3=8/16128 c4=11/78336 c5=1/32768 c6=3/216000
+I (1445) jalon_mem: JALON_MEM t_ms=6 etape="début de app_main" interne_libre=505195 delta=0 plus_gros_bloc=352256 dma_bloc=352256 interne_min=473148
+I (1446) jalon_mem: JALON_CLASSES t_ms=7 etape="début de app_main" utilise=94092 libre=504944 c0=56/924 c1=30/3040 c2=21/8720 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (1457) jalon_mem: JALON_MEM t_ms=19 etape="après la NVS et les réglages" interne_libre=503771 delta=-1424 plus_gros_bloc=352256 dma_bloc=352256 interne_min=471652
+I (1458) jalon_mem: JALON_CLASSES t_ms=19 etape="après la NVS et les réglages" utilise=95252 libre=503708 c0=68/1448 c1=36/3676 c2=21/8720 c3=6/10240 c4=7/38400 c5=1/32768 c6=0/0
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3077) jalon_mem: JALON_MEM t_ms=1638 etape="après board_init (écran, tactile, LVGL, tampons)" interne_libre=274759 delta=-229012 plus_gros_bloc=139264 dma_bloc=139264 interne_min=171024
+I (3078) jalon_mem: JALON_CLASSES t_ms=1639 etape="après board_init (écran, tactile, LVGL, tampons)" utilise=323652 libre=274688 c0=194/4488 c1=58/5516 c2=22/9072 c3=6/10240 c4=8/45568 c5=1/32768 c6=3/216000
+I (3191) jalon_mem: JALON_MEM t_ms=1752 etape="après l'écran principal (objets, police, première image)" interne_libre=222295 delta=-52464 plus_gros_bloc=92160 dma_bloc=92160 interne_min=166884
+I (3298) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (3299) jalon_mem: JALON_MEM t_ms=1861 etape="après le lancement de la tâche réseau (pile 8 Ko)" interne_libre=209667 delta=-12628 plus_gros_bloc=79872 dma_bloc=79872 interne_min=166884
+I (3305) jalon_mem: JALON_CLASSES t_ms=1866 etape="après le lancement de la tâche réseau (pile 8 Ko)" utilise=382172 libre=209608 c0=1625/34732 c1=265/21472 c2=25/10384 c3=7/13056 c4=9/53760 c5=1/32768 c6=3/216000
+I (3308) jalon_mem: JALON_MEM t_ms=1869 etape="après le lancement de la tâche météo (pile 12 Ko, cache NVS)" interne_libre=197019 delta=-12648 plus_gros_bloc=67584 dma_bloc=67584 interne_min=164972
+I (3319) jalon_mem: JALON_CLASSES t_ms=1881 etape="après le lancement de la tâche du serveur web" utilise=407452 libre=184312 I (3325) jalon_mem: JALON_CLASSES t_ms=1886 etape="fin de app_main (commande série lancée)" utilise=410876 libre=180880 c0=1625/34732 c1=265/21472 c2=28/11440 c3=8/16128 c4=11/78336 c5=1/32768 c6=3/216000
+I (5447) jalon_mem: JALON_MEM t_ms=4008 etape="après le lien avec le C6 (esp_hosted, SDIO)" interne_libre=183775 delta=2836 plus_gros_bloc=55296 dma_bloc=55296 interne_min=142320
+I (5700) jalon_mem: JALON_MEM t_ms=4261 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" interne_libre=178011 delta=-5764 plus_gros_bloc=55296 dma_bloc=55296 interne_min=136680
+I (5707) jalon_mem: JALON_CLASSES t_ms=4268 etape="après le démarrage du Wi-Fi (esp_wifi, lwIP, netif)" utilise=412792 libre=177948 c0=1856/39380 c1=286/23348 c2=29/11952 c3=9/19712 c4=10/69632 c5=1/32768 c6=3/216000
+I (12890) jalon_mem: JALON_MEM t_ms=11451 etape="heure reçue (ou délai écoulé) : IP, SNTP et serveur web en route" interne_libre=170579 delta=-7432 plus_gros_bloc=55296 dma_bloc=55296 interne_min=128588
+I (12902) BOOT: BOOT 136 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3617 wifi_ms=8339 ip_ms=11392 ntp_ms=11451 coupures=0 echecs_transport=0 rssi=-50 utc=1794006297 local="samedi 7 novembre 2026, 0 h 04"
+I (13117) principal: affichage : « 00:04 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006297
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13315) meteo: mémoire libre avant la requête : interne 178455 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31495256 o (plus grand bloc 31457280 o)
+I (13319) jalon_mem: JALON_MEM t_ms=11880 etape="après httpd_start et mDNS (piles 20 Ko et 4 Ko)" interne_libre=149751 delta=-20828 plus_gros_bloc=55296 dma_bloc=55296 interne_min=108640
+I (15587) esp-x509-crt-bundle: Certificate validated
+I (16097) meteo: mémoire libre une fois la connexion TLS établie : interne 127991 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31378272 o (plus grand bloc 30932992 o)
+I (16102) meteo: mémoire libre après la requête : interne 129367 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31429396 o (plus grand bloc 30932992 o)
+I (16104) meteo: écart de mémoire libre sur la requête : interne -49088 o, PSRAM -65860 o
+I (16110) meteo: cache écrit en NVS (204 octets)
+I (16112) METEO: METEO Lyon : 7,4 °C (ressentie 6,4), Brouillard, nuit ; min 4,4 / max 10,8 du jour ; vent 1,5 km/h, direction 346° ; pression 1024,9 hPa ; humidité 98 % ; pluie 0 % ; mesure UNIX 1794006000, reçue UNIX 1794006300 (samedi 7 novembre 2026, 0 h 05) ; 7 jours ; 2838 octets en 2734 ms
+# >>> piles
+I (34971) commande_serie: PILE nom=commande_serie base=0x4ff924f4 libre_min=2572 priorite=2
+I (34971) commande_serie: PILE nom=IDLE1 base=0x4ff2c234 libre_min=1212 priorite=0
+I (34972) commande_serie: PILE nom=IDLE0 base=0x4ff2bacc libre_min=1220 priorite=0
+I (34972) commande_serie: PILE nom=tiT base=0x4ff94c24 libre_min=2444 priorite=18
+I (34972) commande_serie: PILE nom=serveur_web base=0x4ff8f410 libre_min=9664 priorite=3
+I (34972) commande_serie: PILE nom=meteo base=0x4ff8c2a8 libre_min=7832 priorite=0
+I (34972) commande_serie: PILE nom=taskLVGL base=0x4ff3c288 libre_min=2296 priorite=4
+I (34973) commande_serie: PILE nom=ipc0 base=0x4ff1e820 libre_min=608 priorite=1
+I (34973) commande_serie: PILE nom=rpc_tx base=0x4ff26fec libre_min=4368 priorite=23
+I (34973) commande_serie: PILE nom=rpc_rx base=0x4ff25a74 libre_min=2188 priorite=23
+I (34973) commande_serie: PILE nom=httpd base=0x4ff97dd8 libre_min=19800 priorite=3
+I (34973) commande_serie: PILE nom=sys_evt base=0x4ff8b5bc libre_min=852 priorite=20
+I (34974) commande_serie: PILE nom=ipc1 base=0x4ff1ed88 libre_min=760 priorite=24
+I (34974) commande_serie: PILE nom=sdio_write base=0x4ff24184 libre_min=4380 priorite=23
+I (34974) commande_serie: PILE nom=mdns base=0x4ff8a1e8 libre_min=2352 priorite=1
+I (34974) commande_serie: PILE nom=sdio_rx_buf base=0x4ff2091c libre_min=1204 priorite=23
+I (34975) commande_serie: PILE nom=sdio_process_rx base=0x4ff22c0c libre_min=3172 priorite=23
+I (34975) commande_serie: PILE nom=sdio_read base=0x4ff21694 libre_min=3324 priorite=23
+I (34975) commande_serie: PILE nom=esp_timer base=0x4ff28554 libre_min=3740 priorite=22
+I (34975) commande_serie: PILE nom=Tmr Svc base=0x4ff2c99c libre_min=1716 priorite=1
+I (34976) commande_serie: PILES : 20 tâches
+I (63123) principal: affichage : « 00:05 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006347
+# >>> blocs
+# >>> memoire
+I (105193) commande_serie: MEMOIRE t_s=103 interne_libre=128983 plus_gros_bloc=55296 interne_min=95916 psram_libre=31397260 dma_bloc=55296
+I (123130) principal: affichage : « 00:06 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006407
+===== final : pente sur 30 min (relevé chaque minute) =====
+I (147394) commande_serie: MEMOIRE t_s=145 interne_libre=128755 plus_gros_bloc=55296 interne_min=95916 psram_libre=31370120 dma_bloc=55296
+I (183140) principal: affichage : « 00:07 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006467
+I (207495) commande_serie: MEMOIRE t_s=206 interne_libre=128251 plus_gros_bloc=55296 interne_min=95916 psram_libre=31343492 dma_bloc=55296
+I (243138) principal: affichage : « 00:08 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006527
+I (267446) commande_serie: MEMOIRE t_s=266 interne_libre=127747 plus_gros_bloc=55296 interne_min=95916 psram_libre=31316864 dma_bloc=55296
+I (303137) principal: affichage : « 00:09 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006587
+I (327447) commande_serie: MEMOIRE t_s=326 interne_libre=127123 plus_gros_bloc=55296 interne_min=95916 psram_libre=31299964 dma_bloc=55296
+I (363140) principal: affichage : « 00:10 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006647
+I (387548) commande_serie: MEMOIRE t_s=386 interne_libre=126959 plus_gros_bloc=55296 interne_min=95916 psram_libre=31299964 dma_bloc=55296
+I (423138) principal: affichage : « 00:11 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006707
+I (447449) commande_serie: MEMOIRE t_s=446 interne_libre=126483 plus_gros_bloc=55296 interne_min=95916 psram_libre=31272824 dma_bloc=55296
+I (483138) principal: affichage : « 00:12 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006767
+I (507450) commande_serie: MEMOIRE t_s=506 interne_libre=125999 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (543138) principal: affichage : « 00:13 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006827
+I (567501) commande_serie: MEMOIRE t_s=566 interne_libre=125835 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (603138) principal: affichage : « 00:14 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006887
+I (627452) commande_serie: MEMOIRE t_s=626 interne_libre=125683 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (663139) principal: affichage : « 00:15 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794006947
+I (687403) commande_serie: MEMOIRE t_s=685 interne_libre=125531 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (723139) principal: affichage : « 00:16 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007007
+I (747454) commande_serie: MEMOIRE t_s=746 interne_libre=125379 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (783139) principal: affichage : « 00:17 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007067
+I (807405) commande_serie: MEMOIRE t_s=805 interne_libre=125227 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (843139) principal: affichage : « 00:18 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007127
+I (867456) commande_serie: MEMOIRE t_s=866 interne_libre=125075 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (903139) principal: affichage : « 00:19 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007187
+I (927457) commande_serie: MEMOIRE t_s=926 interne_libre=124771 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (930120) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (930122) meteo: mémoire libre avant la requête : interne 124771 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31245684 o (plus grand bloc 30932992 o)
+I (932368) esp-x509-crt-bundle: Certificate validated
+I (933095) meteo: mémoire libre une fois la connexion TLS établie : interne 123023 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31194572 o (plus grand bloc 30932992 o)
+I (933103) meteo: mémoire libre après la requête : interne 124403 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31245684 o (plus grand bloc 30932992 o)
+I (933103) meteo: écart de mémoire libre sur la requête : interne -368 o, PSRAM +0 o
+I (933111) meteo: cache écrit en NVS (204 octets)
+I (963138) principal: affichage : « 00:20 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007247
+I (987458) commande_serie: MEMOIRE t_s=986 interne_libre=124367 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1023139) principal: affichage : « 00:21 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007307
+I (1047509) commande_serie: MEMOIRE t_s=1046 interne_libre=124215 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1083138) principal: affichage : « 00:22 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007367
+I (1107510) commande_serie: MEMOIRE t_s=1106 interne_libre=124295 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1143138) principal: affichage : « 00:23 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007427
+I (1167511) commande_serie: MEMOIRE t_s=1166 interne_libre=124143 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1203139) principal: affichage : « 00:24 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007487
+I (1227412) commande_serie: MEMOIRE t_s=1225 interne_libre=123991 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1263139) principal: affichage : « 00:25 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007547
+I (1287463) commande_serie: MEMOIRE t_s=1286 interne_libre=123839 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1323139) principal: affichage : « 00:26 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007607
+I (1347364) commande_serie: MEMOIRE t_s=1345 interne_libre=123687 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1383138) principal: affichage : « 00:27 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007667
+I (1407565) commande_serie: MEMOIRE t_s=1406 interne_libre=123535 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1443138) principal: affichage : « 00:28 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007727
+I (1467566) commande_serie: MEMOIRE t_s=1466 interne_libre=123383 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1503138) principal: affichage : « 00:29 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007787
+I (1527517) commande_serie: MEMOIRE t_s=1526 interne_libre=123079 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1563139) principal: affichage : « 00:30 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007847
+I (1587418) commande_serie: MEMOIRE t_s=1585 interne_libre=122943 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1623139) principal: affichage : « 00:31 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007907
+I (1647419) commande_serie: MEMOIRE t_s=1645 interne_libre=122791 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1683139) principal: affichage : « 00:32 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794007967
+I (1707520) commande_serie: MEMOIRE t_s=1706 interne_libre=122639 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1743139) principal: affichage : « 00:33 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008027
+I (1767471) commande_serie: MEMOIRE t_s=1766 interne_libre=122487 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1803139) principal: affichage : « 00:34 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008087
+I (1827472) commande_serie: MEMOIRE t_s=1826 interne_libre=122335 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1863138) principal: affichage : « 00:35 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008147
+I (1867118) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (1867121) meteo: mémoire libre avant la requête : interne 122335 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31245684 o (plus grand bloc 30932992 o)
+I (1869310) esp-x509-crt-bundle: Certificate validated
+I (1869799) meteo: mémoire libre une fois la connexion TLS établie : interne 120583 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31194572 o (plus grand bloc 30932992 o)
+I (1869805) meteo: mémoire libre après la requête : interne 121951 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31245684 o (plus grand bloc 30932992 o)
+I (1869805) meteo: écart de mémoire libre sur la requête : interne -384 o, PSRAM +0 o
+I (1869814) meteo: cache écrit en NVS (204 octets)
+I (1887523) commande_serie: MEMOIRE t_s=1886 interne_libre=121931 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (1923137) principal: affichage : « 00:36 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008207
+# bilan mémoire : {"mesures": 30, "pente_interne_libre_octets_par_min": -202.5563970052354, "pente_apres_5_min": -172.44675694379373, "premiere": {"t_pc_s": 0.2, "t_carte_s": 145, "interne_libre": 128755, "plus_gros_bloc": 55296, "interne_min": 95916, "psram_libre": 31370120}, "derniere": {"t_pc_s": 1740.4, "t_carte_s": 1886, "interne_libre": 121931, "plus_gros_bloc": 55296, "interne_min": 95916, 
+===== final : relevés espacés de 5 min, sans autre commande =====
+I (2020543) commande_serie: MEMOIRE t_s=2019 interne_libre=121875 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (2043138) principal: affichage : « 00:38 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008327
+I (2103145) principal: affichage : « 00:39 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008387
+I (2163143) principal: affichage : « 00:40 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008447
+I (2223143) principal: affichage : « 00:41 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008507
+I (2283143) principal: affichage : « 00:42 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008567
+I (2320744) commande_serie: MEMOIRE t_s=2319 interne_libre=120963 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (2343143) principal: affichage : « 00:43 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008627
+I (2403143) principal: affichage : « 00:44 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008687
+I (2463143) principal: affichage : « 00:45 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008747
+I (2523143) principal: affichage : « 00:46 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008807
+I (2583143) principal: affichage : « 00:47 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008867
+I (2620595) commande_serie: MEMOIRE t_s=2619 interne_libre=120203 plus_gros_bloc=55296 interne_min=95916 psram_libre=31245684 dma_bloc=55296
+I (2643143) principal: affichage : « 00:48 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794008927
+# bilan mémoire : {"mesures": 3, "pente_interne_libre_octets_par_min": -167.2, "pente_apres_5_min": -152.0, "premiere": {"t_pc_s": 0.2, "t_carte_s": 2019, "interne_libre": 121875, "plus_gros_bloc": 55296, "interne_min": 95916, "psram_libre": 31245684}, "derniere": {"t_pc_s": 600.3, "t_carte_s": 2619, "interne_libre": 120203, "plus_gros_bloc": 55296, "interne_min": 95916, "psram_libre": 31245684}, 
+===== final : serie 1, 20 redémarrages (attente 15 s) =====
+I (3077) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3299) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12916) BOOT: BOOT 137 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3610 wifi_ms=8320 ip_ms=11381 ntp_ms=11464 coupures=0 echecs_transport=0 rssi=-51 utc=1794009032 local="samedi 7 novembre 2026, 0 h 50"
+# cycle 1 : BOOT 137 propre (ntp_ms=11464, 13.2 s depuis la commande)
+I (13132) principal: affichage : « 00:50 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009033
+I (13313) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13318) meteo: mémoire libre avant la requête : interne 178579 o (plus grand bloc 55296 o, minimum depuis le démarrage 128700 o), PSRAM 31496268 o (plus grand bloc 31457280 o)
+I (15605) esp-x509-crt-bundle: Certificate validated
+I (16092) meteo: mémoire libre une fois la connexion TLS établie : interne 128627 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31405880 o (plus grand bloc 30932992 o)
+I (16099) meteo: mémoire libre après la requête : interne 130003 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31457036 o (plus grand bloc 30932992 o)
+I (16099) meteo: écart de mémoire libre sur la requête : interne -48576 o, PSRAM -39232 o
+I (16107) meteo: cache écrit en NVS (204 octets)
+I (3077) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3299) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12847) BOOT: BOOT 138 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8286 ip_ms=11361 ntp_ms=11396 coupures=0 echecs_transport=0 rssi=-51 utc=1794009061 local="samedi 7 novembre 2026, 0 h 51"
+# cycle 2 : BOOT 138 propre (ntp_ms=11396, 13.2 s depuis la commande)
+I (13129) principal: affichage : « 00:51 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009061
+I (13313) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13313) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31479388 o (plus grand bloc 30932992 o)
+I (15581) esp-x509-crt-bundle: Certificate validated
+I (16074) meteo: mémoire libre une fois la connexion TLS établie : interne 128407 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31389704 o (plus grand bloc 30932992 o)
+I (16081) meteo: mémoire libre après la requête : interne 129759 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31440832 o (plus grand bloc 30932992 o)
+I (16081) meteo: écart de mémoire libre sur la requête : interne -48372 o, PSRAM -38556 o
+I (16088) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3196) jalon_mem: JALON_CLASSES t_ms=1757 etape="après l'écran principal (objets, police, première image)" utilise=369692 lI (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12962) BOOT: BOOT 139 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3608 wifi_ms=8343 ip_ms=11422 ntp_ms=11510 coupures=0 echecs_transport=0 rssi=-51 utc=1794009089 local="samedi 7 novembre 2026, 0 h 51"
+# cycle 3 : BOOT 139 propre (ntp_ms=11510, 13.2 s depuis la commande)
+I (13133) principal: affichage : « 00:51 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009089
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178019 o (plus grand bloc 55296 o, minimum depuis le démarrage 128472 o), PSRAM 31479388 o (plus grand bloc 30932992 o)
+I (15603) esp-x509-crt-bundle: Certificate validated
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3196) jalon_mem: JALON_CLASSES t_ms=1758 etape="après l'écran principal (objets, police, première image)" utilise=369692 lI (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (13133) BOOT: BOOT 140 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3608 wifi_ms=8320 ip_ms=11403 ntp_ms=11682 coupures=0 echecs_transport=0 rssi=-51 utc=1794009117 local="samedi 7 novembre 2026, 0 h 51"
+I (13134) principal: affichage : « 00:51 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009117
+# cycle 4 : BOOT 140 propre (ntp_ms=11682, 13.4 s depuis la commande)
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 181335 o (plus grand bloc 55296 o, minimum depuis le démarrage 128472 o), PSRAM 31479388 o (plus grand bloc 30932992 o)
+I (15584) esp-x509-crt-bundle: Certificate validated
+I (16094) meteo: mémoire libre une fois la connexion TLS établie : interne 127547 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31361892 o (plus grand bloc 30932992 o)
+I (16101) meteo: mémoire libre après la requête : interne 128927 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31413016 o (plus grand bloc 30932992 o)
+I (16101) meteo: écart de mémoire libre sur la requête : interne -52408 o, PSRAM -66372 o
+I (16109) meteo: cache écrit en NVS (204 octets)
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3298) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12816) BOOT: BOOT 141 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8287 ip_ms=11333 ntp_ms=11366 coupures=0 echecs_transport=0 rssi=-51 utc=1794009146 local="samedi 7 novembre 2026, 0 h 52"
+# cycle 5 : BOOT 141 propre (ntp_ms=11366, 13.2 s depuis la commande)
+I (13128) principal: affichage : « 00:52 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009146
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13312) meteo: mémoire libre avant la requête : interne 178247 o (plus grand bloc 55296 o, minimum depuis le démarrage 128700 o), PSRAM 31469148 o (plus grand bloc 30932992 o)
+I (15583) esp-x509-crt-bundle: Certificate validated
+I (16066) meteo: mémoire libre une fois la connexion TLS établie : interne 127963 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31378104 o (plus grand bloc 30932992 o)
+I (16073) meteo: mémoire libre après la requête : interne 129339 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31429224 o (plus grand bloc 30932992 o)
+I (16073) meteo: écart de mémoire libre sur la requête : interne -48908 o, PSRAM -39924 o
+I (16081) meteo: cache écrit en NVS (204 octets)
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3298) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12815) BOOT: BOOT 142 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8281 ip_ms=11332 ntp_ms=11364 coupures=0 echecs_transport=0 rssi=-51 utc=1794009174 local="samedi 7 novembre 2026, 0 h 52"
+# cycle 6 : BOOT 142 propre (ntp_ms=11364, 13.2 s depuis la commande)
+I (13131) principal: affichage : « 00:52 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009174
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13312) meteo: mémoire libre avant la requête : interne 178247 o (plus grand bloc 55296 o, minimum depuis le démarrage 128700 o), PSRAM 31469660 o (plus grand bloc 30932992 o)
+I (15594) esp-x509-crt-bundle: Certificate validated
+I (16590) meteo: mémoire libre une fois la connexion TLS établie : interne 128487 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31379456 o (plus grand bloc 30932992 o)
+I (16599) meteo: mémoire libre après la requête : interne 129867 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31430580 o (plus grand bloc 30932992 o)
+I (16599) meteo: écart de mémoire libre sur la requête : interne -48380 o, PSRAM -39080 o
+I (16626) meteo: cache écrit en NVS (204 octets)
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3197) jalon_mem: JALON_CLASSES t_ms=1759 etape="après l'écran principal (objets, police, première image)" utilise=369596 lI (3298) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12834) BOOT: BOOT 143 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8298 ip_ms=11352 ntp_ms=11383 coupures=0 echecs_transport=0 rssi=-51 utc=1794009202 local="samedi 7 novembre 2026, 0 h 53"
+# cycle 7 : BOOT 143 propre (ntp_ms=11383, 13.3 s depuis la commande)
+I (13131) principal: affichage : « 00:53 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009202
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13315) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31469148 o (plus grand bloc 30932992 o)
+I (15594) esp-x509-crt-bundle: Certificate validated
+I (16075) meteo: mémoire libre une fois la connexion TLS établie : interne 127863 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31378096 o (plus grand bloc 30932992 o)
+I (16082) meteo: mémoire libre après la requête : interne 129243 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31429224 o (plus grand bloc 30932992 o)
+I (16082) meteo: écart de mémoire libre sur la requête : interne -48888 o, PSRAM -39924 o
+I (16090) meteo: cache écrit en NVS (204 octets)
+I (3077) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3299) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12823) BOOT: BOOT 144 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8284 ip_ms=11342 ntp_ms=11372 coupures=0 echecs_transport=0 rssi=-51 utc=1794009230 local="samedi 7 novembre 2026, 0 h 53"
+# cycle 8 : BOOT 144 propre (ntp_ms=11372, 13.2 s depuis la commande)
+I (13133) principal: affichage : « 00:53 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009231
+I (13313) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13313) meteo: mémoire libre avant la requête : interne 178247 o (plus grand bloc 55296 o, minimum depuis le démarrage 128700 o), PSRAM 31469148 o (plus grand bloc 30932992 o)
+I (15586) esp-x509-crt-bundle: Certificate validated
+I (16146) meteo: mémoire libre une fois la connexion TLS établie : interne 127739 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31377396 o (plus grand bloc 30932992 o)
+I (16153) meteo: mémoire libre après la requête : interne 129119 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31428548 o (plus grand bloc 30932992 o)
+I (16155) meteo: écart de mémoire libre sur la requête : interne -49128 o, PSRAM -40600 o
+I (16161) meteo: cache écrit en NVS (204 octets)
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3300) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12816) BOOT: BOOT 145 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8290 ip_ms=11330 ntp_ms=11363 coupures=0 echecs_transport=0 rssi=-51 utc=1794009259 local="samedi 7 novembre 2026, 0 h 54"
+# cycle 9 : BOOT 145 propre (ntp_ms=11363, 13.2 s depuis la commande)
+I (13130) principal: affichage : « 00:54 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009259
+I (13314) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13319) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31442284 o (plus grand bloc 30932992 o)
+I (15594) esp-x509-crt-bundle: Certificate validated
+I (16081) meteo: mémoire libre une fois la connexion TLS établie : interne 128223 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31378268 o (plus grand bloc 30932992 o)
+I (16089) meteo: mémoire libre après la requête : interne 129607 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31429388 o (plus grand bloc 30932992 o)
+I (16089) meteo: écart de mémoire libre sur la requête : interne -48524 o, PSRAM -12896 o
+I (16097) meteo: cache écrit en NVS (204 octets)
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3300) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12812) BOOT: BOOT 146 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8269 ip_ms=11329 ntp_ms=11359 coupures=0 echecs_transport=0 rssi=-51 utc=1794009287 local="samedi 7 novembre 2026, 0 h 54"
+# cycle 10 : BOOT 146 propre (ntp_ms=11359, 13.2 s depuis la commande)
+I (13131) principal: affichage : « 00:54 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009287
+I (13314) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13314) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31469148 o (plus grand bloc 30932992 o)
+I (15595) esp-x509-crt-bundle: Certificate validated
+I (16072) meteo: mémoire libre une fois la connexion TLS établie : interne 127863 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31377572 o (plus grand bloc 30932992 o)
+I (16081) meteo: mémoire libre après la requête : interne 129235 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31428712 o (plus grand bloc 30932992 o)
+I (16081) meteo: écart de mémoire libre sur la requête : interne -48896 o, PSRAM -40436 o
+I (16087) meteo: cache écrit en NVS (204 octets)
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1614
+I (3300) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12863) BOOT: BOOT 147 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8320 ip_ms=11378 ntp_ms=11410 coupures=0 echecs_transport=0 rssi=-51 utc=1794009315 local="samedi 7 novembre 2026, 0 h 55"
+# cycle 11 : BOOT 147 propre (ntp_ms=11410, 13.2 s depuis la commande)
+I (13130) principal: affichage : « 00:55 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009315
+I (13314) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13317) meteo: mémoire libre avant la requête : interne 178455 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31496800 o (plus grand bloc 31457280 o)
+I (15596) esp-x509-crt-bundle: Certificate validated
+I (16067) meteo: mémoire libre une fois la connexion TLS établie : interne 128471 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31405920 o (plus grand bloc 30932992 o)
+I (16074) meteo: mémoire libre après la requête : interne 129847 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31457056 o (plus grand bloc 30932992 o)
+I (16076) meteo: écart de mémoire libre sur la requête : interne -48608 o, PSRAM -39744 o
+I (16084) meteo: cache écrit en NVS (204 octets)
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3298) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12874) BOOT: BOOT 148 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8331 ip_ms=11394 ntp_ms=11423 coupures=0 echecs_transport=0 rssi=-51 utc=1794009343 local="samedi 7 novembre 2026, 0 h 55"
+# cycle 12 : BOOT 148 propre (ntp_ms=11423, 13.2 s depuis la commande)
+I (13128) principal: affichage : « 00:55 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009344
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13312) meteo: mémoire libre avant la requête : interne 178335 o (plus grand bloc 55296 o, minimum depuis le démarrage 128464 o), PSRAM 31496288 o (plus grand bloc 31457280 o)
+I (15599) esp-x509-crt-bundle: Certificate validated
+I (16071) meteo: mémoire libre une fois la connexion TLS établie : interne 128039 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31405248 o (plus grand bloc 30932992 o)
+I (16078) meteo: mémoire libre après la requête : interne 129423 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31456380 o (plus grand bloc 30932992 o)
+I (16080) meteo: écart de mémoire libre sur la requête : interne -48912 o, PSRAM -39908 o
+I (16086) meteo: cache écrit en NVS (204 octets)
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3300) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12857) BOOT: BOOT 149 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8282 ip_ms=11372 ntp_ms=11404 coupures=0 echecs_transport=0 rssi=-51 utc=1794009372 local="samedi 7 novembre 2026, 0 h 56"
+# cycle 13 : BOOT 149 propre (ntp_ms=11404, 13.2 s depuis la commande)
+I (13131) principal: affichage : « 00:56 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009372
+I (13314) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13314) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31470172 o (plus grand bloc 30932992 o)
+I (15582) esp-x509-crt-bundle: Certificate validated
+I (16053) meteo: mémoire libre une fois la connexion TLS établie : interne 128179 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31379288 o (plus grand bloc 30932992 o)
+I (16060) meteo: mémoire libre après la requête : interne 129547 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31430428 o (plus grand bloc 30932992 o)
+I (16060) meteo: écart de mémoire libre sur la requête : interne -48584 o, PSRAM -39744 o
+I (16068) meteo: cache écrit en NVS (204 octets)
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3300) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12875) BOOT: BOOT 150 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3619 wifi_ms=8327 ip_ms=11391 ntp_ms=11422 coupures=0 echecs_transport=0 rssi=-51 utc=1794009400 local="samedi 7 novembre 2026, 0 h 56"
+# cycle 14 : BOOT 150 propre (ntp_ms=11422, 13.3 s depuis la commande)
+I (13130) principal: affichage : « 00:56 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009400
+I (13314) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13314) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31470172 o (plus grand bloc 30932992 o)
+I (15595) esp-x509-crt-bundle: Certificate validated
+I (16070) meteo: mémoire libre une fois la connexion TLS établie : interne 128127 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31379240 o (plus grand bloc 30932992 o)
+I (16078) meteo: mémoire libre après la requête : interne 129503 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31430412 o (plus grand bloc 30932992 o)
+I (16078) meteo: écart de mémoire libre sur la requête : interne -48628 o, PSRAM -39760 o
+I (16088) meteo: cache écrit en NVS (204 octets)
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3300) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12813) BOOT: BOOT 151 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8266 ip_ms=11329 ntp_ms=11360 coupures=0 echecs_transport=0 rssi=-51 utc=1794009428 local="samedi 7 novembre 2026, 0 h 57"
+# cycle 15 : BOOT 151 propre (ntp_ms=11360, 13.2 s depuis la commande)
+I (13130) principal: affichage : « 00:57 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009429
+I (13314) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13317) meteo: mémoire libre avant la requête : interne 178247 o (plus grand bloc 55296 o, minimum depuis le démarrage 128700 o), PSRAM 31442284 o (plus grand bloc 30932992 o)
+I (15607) esp-x509-crt-bundle: Certificate validated
+I (16093) meteo: mémoire libre une fois la connexion TLS établie : interne 127967 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31378100 o (plus grand bloc 30932992 o)
+I (16100) meteo: mémoire libre après la requête : interne 129343 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31429224 o (plus grand bloc 30932992 o)
+I (16100) meteo: écart de mémoire libre sur la requête : interne -48904 o, PSRAM -13060 o
+I (16109) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12863) BOOT: BOOT 152 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8284 ip_ms=11379 ntp_ms=11412 coupures=0 echecs_transport=0 rssi=-51 utc=1794009457 local="samedi 7 novembre 2026, 0 h 57"
+# cycle 16 : BOOT 152 propre (ntp_ms=11412, 13.2 s depuis la commande)
+I (13128) principal: affichage : « 00:57 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009457
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31469660 o (plus grand bloc 30932992 o)
+I (15604) esp-x509-crt-bundle: Certificate validated
+I (16104) meteo: mémoire libre une fois la connexion TLS établie : interne 128047 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31378752 o (plus grand bloc 30932992 o)
+I (16110) meteo: mémoire libre après la requête : interne 129443 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31429916 o (plus grand bloc 30932992 o)
+I (16112) meteo: écart de mémoire libre sur la requête : interne -48688 o, PSRAM -39744 o
+I (16119) meteo: cache écrit en NVS (204 octets)
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3300) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12845) BOOT: BOOT 153 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3608 wifi_ms=8282 ip_ms=11359 ntp_ms=11392 coupures=0 echecs_transport=0 rssi=-51 utc=1794009485 local="samedi 7 novembre 2026, 0 h 58"
+# cycle 17 : BOOT 153 propre (ntp_ms=11392, 13.2 s depuis la commande)
+I (13130) principal: affichage : « 00:58 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009485
+I (13314) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13314) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31470172 o (plus grand bloc 30932992 o)
+I (15612) esp-x509-crt-bundle: Certificate validated
+I (16087) meteo: mémoire libre une fois la connexion TLS établie : interne 128087 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31379276 o (plus grand bloc 30932992 o)
+I (16095) meteo: mémoire libre après la requête : interne 129475 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31430416 o (plus grand bloc 30932992 o)
+I (16095) meteo: écart de mémoire libre sur la requête : interne -48656 o, PSRAM -39756 o
+I (16103) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12855) BOOT: BOOT 154 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8307 ip_ms=11373 ntp_ms=11404 coupures=0 echecs_transport=0 rssi=-51 utc=1794009513 local="samedi 7 novembre 2026, 0 h 58"
+# cycle 18 : BOOT 154 propre (ntp_ms=11404, 13.2 s depuis la commande)
+I (13128) principal: affichage : « 00:58 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009513
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178019 o (plus grand bloc 55296 o, minimum depuis le démarrage 128472 o), PSRAM 31469660 o (plus grand bloc 30932992 o)
+I (15592) esp-x509-crt-bundle: Certificate validated
+I (16079) meteo: mémoire libre une fois la connexion TLS établie : interne 127747 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31378620 o (plus grand bloc 30932992 o)
+I (16086) meteo: mémoire libre après la requête : interne 129127 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31429752 o (plus grand bloc 30932992 o)
+I (16088) meteo: écart de mémoire libre sur la requête : interne -48892 o, PSRAM -39908 o
+I (16112) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12870) BOOT: BOOT 155 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3616 wifi_ms=8321 ip_ms=11383 ntp_ms=11419 coupures=0 echecs_transport=0 rssi=-51 utc=1794009541 local="samedi 7 novembre 2026, 0 h 59"
+# cycle 19 : BOOT 155 propre (ntp_ms=11419, 13.2 s depuis la commande)
+I (13127) principal: affichage : « 00:59 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009542
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31469660 o (plus grand bloc 30932992 o)
+I (15581) esp-x509-crt-bundle: Certificate validated
+I (16739) meteo: mémoire libre une fois la connexion TLS établie : interne 127855 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31378588 o (plus grand bloc 30932992 o)
+I (16746) meteo: mémoire libre après la requête : interne 129499 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31429736 o (plus grand bloc 30932992 o)
+I (16746) meteo: écart de mémoire libre sur la requête : interne -48632 o, PSRAM -39924 o
+I (16754) meteo: cache écrit en NVS (204 octets)
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3197) jalon_mem: JALON_CLASSES t_ms=1758 etape="après l'écran principal (objets, police, première image)" utilise=369596 lI (3298) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12844) BOOT: BOOT 156 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3619 wifi_ms=8299 ip_ms=11364 ntp_ms=11394 coupures=0 echecs_transport=0 rssi=-51 utc=1794009570 local="samedi 7 novembre 2026, 0 h 59"
+# cycle 20 : BOOT 156 propre (ntp_ms=11394, 13.2 s depuis la commande)
+I (13131) principal: affichage : « 00:59 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009570
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13312) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31469660 o (plus grand bloc 30932992 o)
+I (15575) esp-x509-crt-bundle: Certificate validated
+I (16058) meteo: mémoire libre une fois la connexion TLS établie : interne 128327 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31379976 o (plus grand bloc 30932992 o)
+I (16066) meteo: mémoire libre après la requête : interne 129687 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31431104 o (plus grand bloc 30932992 o)
+I (16066) meteo: écart de mémoire libre sur la requête : interne -48444 o, PSRAM -38556 o
+I (16073) meteo: cache écrit en NVS (204 octets)
+# bilan : 20/20 démarrages propres
+===== final : serie 2, 10 redémarrages (attente 35 s) =====
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (13778) BOOT: BOOT 157 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3617 wifi_ms=8334 ip_ms=12295 ntp_ms=12328 coupures=0 echecs_transport=0 rssi=-51 utc=1794009640 local="samedi 7 novembre 2026, 1 h 00"
+# cycle 1 : BOOT 157 propre (ntp_ms=12328, 14.0 s depuis la commande)
+I (14136) principal: affichage : « 01:00 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009641
+I (15312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (15314) meteo: mémoire libre avant la requête : interne 130851 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31466620 o (plus grand bloc 31457280 o)
+I (17544) esp-x509-crt-bundle: Certificate validated
+I (18020) meteo: mémoire libre une fois la connexion TLS établie : interne 128587 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31414456 o (plus grand bloc 30932992 o)
+I (18028) meteo: mémoire libre après la requête : interne 129987 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31465596 o (plus grand bloc 30932992 o)
+I (18028) meteo: écart de mémoire libre sur la requête : interne -864 o, PSRAM -1024 o
+I (18036) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12852) BOOT: BOOT 158 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3617 wifi_ms=8293 ip_ms=11362 ntp_ms=11400 coupures=0 echecs_transport=0 rssi=-51 utc=1794009688 local="samedi 7 novembre 2026, 1 h 01"
+# cycle 2 : BOOT 158 propre (ntp_ms=11400, 13.2 s depuis la commande)
+I (13130) principal: affichage : « 01:01 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009689
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178423 o (plus grand bloc 55296 o, minimum depuis le démarrage 128472 o), PSRAM 31506016 o (plus grand bloc 31457280 o)
+I (15579) esp-x509-crt-bundle: Certificate validated
+I (16058) meteo: mémoire libre une fois la connexion TLS établie : interne 128243 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31414444 o (plus grand bloc 30932992 o)
+I (16064) meteo: mémoire libre après la requête : interne 129611 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31465596 o (plus grand bloc 30932992 o)
+I (16064) meteo: écart de mémoire libre sur la requête : interne -48812 o, PSRAM -40420 o
+I (16073) meteo: cache écrit en NVS (204 octets)
+I (3077) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1184, dalle 1597, LVGL 1615
+I (3299) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12880) BOOT: BOOT 159 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8288 ip_ms=11382 ntp_ms=11428 coupures=0 echecs_transport=0 rssi=-51 utc=1794009737 local="samedi 7 novembre 2026, 1 h 02"
+# cycle 3 : BOOT 159 propre (ntp_ms=11428, 13.2 s depuis la commande)
+I (13129) principal: affichage : « 01:02 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009737
+I (13313) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13313) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31478876 o (plus grand bloc 30932992 o)
+I (15571) esp-x509-crt-bundle: Certificate validated
+I (16057) meteo: mémoire libre une fois la connexion TLS établie : interne 128107 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31387952 o (plus grand bloc 30932992 o)
+I (16064) meteo: mémoire libre après la requête : interne 129475 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31439116 o (plus grand bloc 30932992 o)
+I (16064) meteo: écart de mémoire libre sur la requête : interne -48656 o, PSRAM -39760 o
+I (16072) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12869) BOOT: BOOT 160 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3617 wifi_ms=8339 ip_ms=11379 ntp_ms=11418 coupures=0 echecs_transport=0 rssi=-51 utc=1794009785 local="samedi 7 novembre 2026, 1 h 03"
+# cycle 4 : BOOT 160 propre (ntp_ms=11418, 13.2 s depuis la commande)
+I (13127) principal: affichage : « 01:03 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009785
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178019 o (plus grand bloc 55296 o, minimum depuis le démarrage 128472 o), PSRAM 31478364 o (plus grand bloc 30932992 o)
+I (15580) esp-x509-crt-bundle: Certificate validated
+I (26209) meteo: mémoire libre une fois la connexion TLS établie : interne 127931 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31388012 o (plus grand bloc 30932992 o)
+I (26216) meteo: mémoire libre après la requête : interne 129595 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31439132 o (plus grand bloc 30932992 o)
+I (26217) meteo: écart de mémoire libre sur la requête : interne -48424 o, PSRAM -39232 o
+I (26227) meteo: cache écrit en NVS (204 octets)
+I (3078) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1614
+I (3199) jalon_mem: JALON_CLASSES t_ms=1758 etape="après l'écran principal (objets, police, première image)" utilise=369596 lI (3300) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12873) BOOT: BOOT 161 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3619 wifi_ms=8331 ip_ms=11380 ntp_ms=11420 coupures=0 echecs_transport=0 rssi=-51 utc=1794009834 local="samedi 7 novembre 2026, 1 h 03"
+# cycle 5 : BOOT 161 propre (ntp_ms=11420, 13.2 s depuis la commande)
+I (13134) principal: affichage : « 01:03 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009834
+I (13314) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13314) meteo: mémoire libre avant la requête : interne 178123 o (plus grand bloc 55296 o, minimum depuis le démarrage 128592 o), PSRAM 31478364 o (plus grand bloc 30932992 o)
+I (15605) esp-x509-crt-bundle: Certificate validated
+I (16085) meteo: mémoire libre une fois la connexion TLS établie : interne 127827 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31387336 o (plus grand bloc 30932992 o)
+I (16092) meteo: mémoire libre après la requête : interne 129223 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31438456 o (plus grand bloc 30932992 o)
+I (16093) meteo: écart de mémoire libre sur la requête : interne -48900 o, PSRAM -39908 o
+I (16100) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3196) jalon_mem: JALON_CLASSES t_ms=1757 etape="après l'écran principal (objets, police, première image)" utilise=369596 lI (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12912) BOOT: BOOT 162 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3617 wifi_ms=8328 ip_ms=11423 ntp_ms=11461 coupures=0 echecs_transport=0 rssi=-51 utc=1794009882 local="samedi 7 novembre 2026, 1 h 04"
+# cycle 6 : BOOT 162 propre (ntp_ms=11461, 13.2 s depuis la commande)
+I (13130) principal: affichage : « 01:04 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009882
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178131 o (plus grand bloc 55296 o, minimum depuis le démarrage 128588 o), PSRAM 31478364 o (plus grand bloc 30932992 o)
+I (15593) esp-x509-crt-bundle: Certificate validated
+I (16080) meteo: mémoire libre une fois la connexion TLS établie : interne 127899 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31386800 o (plus grand bloc 30932992 o)
+I (16087) meteo: mémoire libre après la requête : interne 129271 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31437916 o (plus grand bloc 30932992 o)
+I (16087) meteo: écart de mémoire libre sur la requête : interne -48860 o, PSRAM -40448 o
+I (16095) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12850) BOOT: BOOT 163 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8312 ip_ms=11362 ntp_ms=11399 coupures=0 echecs_transport=0 rssi=-51 utc=1794009930 local="samedi 7 novembre 2026, 1 h 05"
+# cycle 7 : BOOT 163 propre (ntp_ms=11399, 13.2 s depuis la commande)
+I (13128) principal: affichage : « 01:05 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009931
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178019 o (plus grand bloc 55296 o, minimum depuis le démarrage 128472 o), PSRAM 31479388 o (plus grand bloc 30932992 o)
+I (15584) esp-x509-crt-bundle: Certificate validated
+I (16067) meteo: mémoire libre une fois la connexion TLS établie : interne 128043 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31389000 o (plus grand bloc 30932992 o)
+I (16075) meteo: mémoire libre après la requête : interne 129423 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31440140 o (plus grand bloc 30932992 o)
+I (16075) meteo: écart de mémoire libre sur la requête : interne -48596 o, PSRAM -39248 o
+I (16082) meteo: cache écrit en NVS (204 octets)
+I (3075) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3297) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12849) BOOT: BOOT 164 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3618 wifi_ms=8290 ip_ms=11354 ntp_ms=11398 coupures=0 echecs_transport=0 rssi=-51 utc=1794009979 local="samedi 7 novembre 2026, 1 h 06"
+# cycle 8 : BOOT 164 propre (ntp_ms=11398, 13.2 s depuis la commande)
+I (13127) principal: affichage : « 01:06 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794009979
+I (13311) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13311) meteo: mémoire libre avant la requête : interne 178019 o (plus grand bloc 55296 o, minimum depuis le démarrage 128472 o), PSRAM 31479388 o (plus grand bloc 30932992 o)
+I (15594) esp-x509-crt-bundle: Certificate validated
+I (16070) meteo: mémoire libre une fois la connexion TLS établie : interne 127739 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31387796 o (plus grand bloc 30932992 o)
+I (16076) meteo: mémoire libre après la requête : interne 129119 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31438952 o (plus grand bloc 30932992 o)
+I (16078) meteo: écart de mémoire libre sur la requête : interne -48900 o, PSRAM -40436 o
+I (16084) meteo: cache écrit en NVS (204 octets)
+I (3076) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1022, détection 1183, dalle 1596, LVGL 1614
+I (3197) jalon_mem: JALON_CLASSES t_ms=1757 etape="après l'écran principal (objets, police, première image)" utilise=369692 lI (3298) ecran: rétroéclairage allumé à 75 % à 1858 ms ; première image affichée
+I (12875) BOOT: BOOT 165 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3617 wifi_ms=8332 ip_ms=11387 ntp_ms=11424 coupures=0 echecs_transport=0 rssi=-51 utc=1794010027 local="samedi 7 novembre 2026, 1 h 07"
+# cycle 9 : BOOT 165 propre (ntp_ms=11424, 13.2 s depuis la commande)
+I (13131) principal: affichage : « 01:07 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794010027
+I (13312) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13312) meteo: mémoire libre avant la requête : interne 178019 o (plus grand bloc 55296 o, minimum depuis le démarrage 128472 o), PSRAM 31478364 o (plus grand bloc 30932992 o)
+I (15550) esp-x509-crt-bundle: Certificate validated
+I (16024) meteo: mémoire libre une fois la connexion TLS établie : interne 127751 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31387316 o (plus grand bloc 30932992 o)
+I (16030) meteo: mémoire libre après la requête : interne 129127 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31438456 o (plus grand bloc 30932992 o)
+I (16030) meteo: écart de mémoire libre sur la requête : interne -48892 o, PSRAM -39908 o
+I (16037) meteo: cache écrit en NVS (204 octets)
+I (3077) tab5: Carte prête : M5Stack Tab5, écran ST7121, interface 1280x720 (dalle 720x1280 tournée de 90°), jalons ms : attente expandeur 1023, détection 1184, dalle 1597, LVGL 1615
+I (3299) ecran: rétroéclairage allumé à 75 % à 1859 ms ; première image affichée
+I (12892) BOOT: BOOT 166 cause=3 rom=0x03 lien=1 essais=1 c6=1.4.1 hote=2.12.12 lien_ms=3609 wifi_ms=8335 ip_ms=11400 ntp_ms=11441 coupures=0 echecs_transport=0 rssi=-51 utc=1794010075 local="samedi 7 novembre 2026, 1 h 07"
+# cycle 10 : BOOT 166 propre (ntp_ms=11441, 13.2 s depuis la commande)
+I (13133) principal: affichage : « 01:07 » / « samedi 7 novembre 2026 » ; météo à jour ; utc=1794010076
+I (13313) meteo: requête Open-Meteo pour « Lyon » (0 échec(s) de suite jusqu'ici)
+I (13316) meteo: mémoire libre avant la requête : interne 178247 o (plus grand bloc 55296 o, minimum depuis le démarrage 128700 o), PSRAM 31478364 o (plus grand bloc 30932992 o)
+I (15581) esp-x509-crt-bundle: Certificate validated
+I (16065) meteo: mémoire libre une fois la connexion TLS établie : interne 128271 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31387984 o (plus grand bloc 30932992 o)
+I (16071) meteo: mémoire libre après la requête : interne 129655 o (plus grand bloc 55296 o, minimum depuis le démarrage 95916 o), PSRAM 31439132 o (plus grand bloc 30932992 o)
+I (16071) meteo: écart de mémoire libre sur la requête : interne -48592 o, PSRAM -39232 o
+I (16098) meteo: cache écrit en NVS (204 octets)
+# bilan : 10/10 démarrages propres

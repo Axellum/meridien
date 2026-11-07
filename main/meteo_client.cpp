@@ -42,6 +42,10 @@ constexpr uint32_t kPasAttenteMs = 2000;     // contrôle de l'IP et de l'heure 
 constexpr uint32_t kAntiRebondZoneMs = 1500; // plusieurs changements de zone d'affilée = une seule requête
 constexpr int64_t kInstantMin = 946684800;   // 1er janvier 2000 : en dessous, l'horloge n'est pas réglée
 constexpr uint32_t kPileOctets = 12288;      // la prise de contact TLS demande plusieurs Ko de pile
+// Priorité d'ARRIÈRE-PLAN : la prise de contact TLS calcule plusieurs secondes sans jamais s'endormir. À une priorité au-dessus de
+// celle de la tâche d'inactivité (0), la tâche IDLE du cœur qui l'exécute ne tourne plus et le chien de garde des tâches (5 s) se
+// déclenche. À la priorité 0 elle partage le cœur avec IDLE tranche par tranche (1 ms) : IDLE nourrit le chien de garde.
+constexpr UBaseType_t kPrioriteMeteo = tskIDLE_PRIORITY;
 
 TaskHandle_t g_tache = nullptr;
 
@@ -454,7 +458,7 @@ void meteo_client_zone_changee() {
 void meteo_client_demarrer() {
     relire_cache();
     journaliser_contrat("au démarrage, depuis le cache");
-    if (xTaskCreate(tache_meteo, "meteo", kPileOctets, nullptr, 3, &g_tache) != pdPASS) {
+    if (xTaskCreate(tache_meteo, "meteo", kPileOctets, nullptr, kPrioriteMeteo, &g_tache) != pdPASS) {
         ESP_LOGE(TAG, "tâche météo non créée");
     }
 }

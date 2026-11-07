@@ -35,6 +35,7 @@
 #include "mdns.h"
 
 #include "appairage.h"
+#include "commande_serie.h"
 #include "ecran/api_reglages.hpp"
 #include "ecran/http_requete.hpp"
 #include "meteo_etat.h"
@@ -508,6 +509,8 @@ void tache_serveur(void *) {
         return;
     }
     const bool mdns = demarrer_mdns();
+    memoire_jalon("après httpd_start et mDNS (piles 20 Ko et 4 Ko)");
+    memoire_blocs(); // photo du tas juste avant la première requête TLS de la météo
 
     char ip[16] = {};
     std::memcpy(ip, reseau_etat().ip, sizeof(ip));

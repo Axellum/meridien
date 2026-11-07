@@ -1,6 +1,8 @@
 // Réseau de l'application : lien avec le coprocesseur Wi-Fi (couche carte), connexion au point d'accès, heure par SNTP.
-// Phase 1b. Les identifiants Wi-Fi sont ceux de la compilation (identifiants_wifi.h, hors git) ; la saisie par l'utilisateur
-// et la NVS viennent avec la page de réglages (phase 3). Rien d'ici n'écrit l'SSID ni le mot de passe, ni à l'écran ni au journal.
+// Le réseau de départ est celui que l'hôte des réglages a retenu en mémoire permanente (NVS, espace « wifi »), sinon celui de la
+// compilation (identifiants_wifi.h, hors git). Changer de réseau depuis l'écran (recherche, essai avec retour arrière sous 30 s,
+// SSID courant) : voir reseau_wifi.h. Le mot de passe n'est écrit ni à l'écran, ni au journal, ni dans une réponse ; l'SSID
+// n'est jamais au journal et n'est montré à l'écran que par reseau_ssid_courant() (ADR-0007).
 #pragma once
 
 #include <cstdint>
@@ -10,7 +12,7 @@
 namespace ecran {
 
 struct EtatReseau {
-    bool identifiants_presents; // un SSID a été compilé dans le firmware (sa valeur n'est jamais exposée)
+    bool identifiants_presents; // un réseau est connu (mémoire permanente ou compilation), jamais exposé
     bool coprocesseur_pret;     // lien P4 <-> ESP32-C6 établi
     bool coprocesseur_echec;    // lien impossible après les essais de la couche carte
     bool wifi_connecte;         // associé au point d'accès

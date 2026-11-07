@@ -18,6 +18,11 @@ CONFIG_LV_USE_CLIB_STRING=y
 CONFIG_LV_USE_TINY_TTF=y
 CONFIG_LV_TINY_TTF_FILE_SUPPORT=n
 
+# Boucle d'evenements du systeme (tache sys_evt, pile par defaut 2304 octets) : elle execute les gestionnaires Wi-Fi/IP de
+# main/reseau.cpp, dont l'essai d'un nouveau reseau avec retour arriere (esp_wifi_set_config / disconnect / scan par RPC vers le
+# C6, structures de ~130 octets sur la pile). Valeur de depart ; la marge mesuree est dans docs/mesures/wifi-retour-arriere.md.
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
+
 # Heure reseau (jalon 1b) : deux serveurs SNTP (celui par defaut d'IDF n'en prend qu'un).
 CONFIG_LWIP_SNTP_MAX_SERVERS=2
 
@@ -26,3 +31,7 @@ CONFIG_LWIP_SNTP_MAX_SERVERS=2
 # atteindre ~1 Ko une fois les accents encodes.
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
 CONFIG_HTTPD_MAX_URI_LEN=1024
+
+# Outil de mesure PROVISOIRE (commande serie " piles ", jalon 1b) : liste des taches avec la base et la marge de leur pile.
+# A retirer avec la commande avant la phase 2.
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
