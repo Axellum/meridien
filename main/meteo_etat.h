@@ -79,7 +79,7 @@ struct MeteoCourant {
 // Une heure de prévision = l'intervalle [debut_epoch_s, debut_epoch_s + 3600) ; les heures se suivent de 3600 s.
 // Ce qui est « instantané » (température, ressentie, humidité, vent, rafales, direction, nuages, code, jour) est la valeur AU
 // DÉBUT de l'heure. Ce qui est un cumul ou une moyenne (précipitations, probabilité, UV) porte sur l'heure ENTIÈRE : Open-Meteo
-// donne ces trois-là pour « l'heure qui précède » son étiquette (documenté ; recoupé le 06/11/2026 sur l'API, voir
+// donne ces trois-là pour « l'heure qui précède » son étiquette (documenté ; recoupé le 07/11/2026 sur une vraie réponse, voir
 // docs/mesures/meteo.md), le noyau les décale donc d'une étiquette pour que `heures[i]` soit cohérente. L'interface n'a pas à
 // s'en soucier : elle dessine `heures[i]` sous l'heure `debut_epoch_s`.
 struct MeteoHeure {
@@ -110,7 +110,7 @@ struct MeteoJour {
     int64_t coucher_epoch_s;      // coucher du soleil, UTC
     bool sans_soleil;             // lever == coucher : nuit polaire (jour polaire : comportement non vérifié)
     float duree_jour_h;           // durée entre lever et coucher, en heures (un chiffre après la virgule)
-    float ensoleillement_h;       // durée d'ensoleillement prévue, en heures
+    float ensoleillement_h;       // ensoleillement prévu, en heures, à la minute près (8,55 = 8 h 33)
     float uv_max;                 // indice UV maximal du jour
     int16_t proba_precip_pct;     // probabilité maximale de précipitations du jour, ou METEO_PROBA_INCONNUE
     float precipitation_mm;       // cumul du jour (pluie, averses, neige fondue)
@@ -155,7 +155,7 @@ struct MeteoDetail {
 
     // Pluie par quart d'heure : quarts_precipitation_mm[i] = précipitations de l'intervalle
     // [quarts_debut_epoch_s + 900 * i, quarts_debut_epoch_s + 900 * (i + 1)). Le premier est en général le quart écoulé (Open-Meteo
-    // donne le cumul du quart d'heure qui PRÉCÈDE l'étiquette : recoupé sur l'API le 06/11/2026, voir docs/mesures/meteo.md).
+    // donne le cumul du quart d'heure qui PRÉCÈDE l'étiquette : recoupé le 07/11/2026 sur une vraie réponse, voir docs/mesures/meteo.md).
     int nb_quarts;     // 0..METEO_QUARTS_MAX
     int quart_courant; // indice du quart d'heure qui contient l'heure de l'appareil ; -1 si aucun
     int64_t quarts_debut_epoch_s;
@@ -163,11 +163,22 @@ struct MeteoDetail {
     MeteoPluieProche pluie;
 };
 
-// Copie atomique de la météo détaillée (environ 2 Ko : la mettre en statique ou en PSRAM, pas sur une petite pile). Rend `valide`
-// (faux tant qu'aucune météo n'est connue ; `*sortie` est alors remise à zéro, `heure_courante` et `jour_courant` valent -1).
-// `sortie` nul : rend faux sans rien écrire. Sûre depuis n'importe quelle tâche.
+// Copie atomique de la météo détaillée (environ 2 Ko : 2 080 octets sur le PC ; la mettre en statique ou en PSRAM, pas sur une petite pile). Rend `valide`
+// (faux tant qu'aucune météo n'est connue ; `*sortie` est alors remise à zéro, `heure_courante`, `jour_courant` et `quart_courant`
+// valent -1). `sortie` nul : rend faux sans rien écrire. Sûre depuis n'importe quelle tâche (jamais depuis une interruption : elle
+// prend un verrou, pour quelques dizaines de microsecondes).
+//
+// Rien n'est inventé. Une section que la réponse d'Open-Meteo n'a pas donnée ou qui était invraisemblable est VIDE (`nb_heures`,
+// `nb_jours` ou `nb_quarts` à 0) et son indice vaut -1 ; en particulier `jours` n'est publié que si les sept jours ont tous leurs
+// compléments (ensoleillement, vent, pluie), sinon `nb_jours` vaut 0. L'indice `heure_courante` vaut aussi -1 quand la liste ne
+// couvre pas l'heure de l'appareil : c'est ce qu'on a mesuré à Terre-Neuve (UTC-3:30), où la série d'Open-Meteo commence après
+// l'heure courante ; `courant.proba_precip_pct` vaut alors METEO_PROBA_INCONNUE plutôt que la probabilité de l'heure voisine.
+// (Au Népal, UTC+5:45, la série commence avant : l'heure en cours est trouvée.) Les indices et la pluie proche sont recalculés
+// à chaque lecture avec l'heure de l'appareil ; horloge non réglée : tous les indices valent -1 et `perime` est vrai.
 bool meteo_detail_lire(MeteoDetail *sortie);
 
-// Numéro de la dernière météo détaillée publiée (le même que `MeteoDetail::version`), sans copier la structure. 0 tant qu'aucune
-// météo n'est connue. Permet à l'interface de ne lire et ne redessiner que quand la météo a changé.
+// Numéro de la dernière météo détaillée publiée (le même que `MeteoDetail::version`), sans copier la structure ni prendre de
+// verrou. 0 tant qu'aucune météo n'est connue, et de nouveau 0 quand la zone change (la météo de l'ancien lieu est oubliée) : un
+// changement de numéro, y compris vers 0, veut dire « relire ». Une nouvelle réponse prend toujours un numéro encore jamais
+// utilisé. Permet à l'interface de ne lire et ne redessiner que quand la météo a changé.
 uint32_t meteo_detail_version();
