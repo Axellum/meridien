@@ -50,7 +50,8 @@ bool board_display_lock(uint32_t timeout_ms) { return lvgl_port_lock(timeout_ms)
 
 void board_display_unlock(void) { lvgl_port_unlock(); }
 
-esp_err_t board_set_backlight_percent(int percent) { return tab5_backlight_set_percent(percent); }
+// board_set_backlight_percent(), la veille, la RTC, l'audio et l'alimentation : tab5_ecran.cpp, tab5_rtc.cpp, tab5_audio.cpp,
+// tab5_alim.cpp (leur logique pure est dans components/core).
 
 static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_handle_t io, esp_lcd_touch_handle_t touch) {
     const lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
@@ -108,6 +109,14 @@ esp_err_t board_init(void) {
     vTaskDelay(pdMS_TO_TICKS(EXPANDER_SETTLE_MS));
     ESP_RETURN_ON_ERROR(tab5_io_init(), TAG, "E/S");
     s_timeline.expander_ready_ms = now_ms();
+    // Horloge materielle (reprend l'heure du systeme si elle n'en a pas) et alimentation (chargeur a l'arret) : une erreur est
+    // journalisee mais n'empeche jamais l'ecran de demarrer.
+    if (tab5_rtc_init() != ESP_OK) {
+        ESP_LOGW(TAG, "horloge matérielle indisponible");
+    }
+    if (tab5_alim_init() != ESP_OK) {
+        ESP_LOGW(TAG, "moniteur d'alimentation indisponible");
+    }
 
     // 2. Tactile hors reset, puis reset de la dalle, puis detection du controleur : AVANT de toucher au DSI.
     ESP_RETURN_ON_ERROR(tab5_touch_enable(), TAG, "activation du tactile");
@@ -147,6 +156,11 @@ esp_err_t board_init(void) {
     ESP_RETURN_ON_ERROR(lvgl_attach(panel, io, touch), TAG, "LVGL");
     s_timeline.lvgl_ready_ms = now_ms();
     tab5_orientation_bench(); // mesure unique (hors jalons du demarrage), voir tab5_orientation.c
+    // Luminosite percue et veille : le minuteur et le voile de la veille vivent dans LVGL, verrou pris.
+    lvgl_port_lock(0);
+    const esp_err_t ecran_err = tab5_ecran_init(s_display);
+    lvgl_port_unlock();
+    ESP_RETURN_ON_ERROR(ecran_err, TAG, "luminosité et veille");
 
     ESP_LOGI(
         TAG,
@@ -155,5 +169,6 @@ esp_err_t board_init(void) {
         s_info.board_name, s_info.display_controller, (int)s_info.width, (int)s_info.height, (int)s_info.panel_width,
         (int)s_info.panel_height, (int)s_info.rotation_degrees, (int)s_timeline.expander_ready_ms,
         (int)s_timeline.controller_detected_ms, (int)s_timeline.panel_ready_ms, (int)s_timeline.lvgl_ready_ms);
+    tab5_autotest_materiel_start(); // ne fait rien sans l'option TAB5_AUTOTEST_MATERIEL
     return ESP_OK;
 }

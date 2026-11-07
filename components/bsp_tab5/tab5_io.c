@@ -8,6 +8,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 #include "tab5_internal.h"
@@ -17,13 +18,93 @@ static const char *TAG = "tab5_io";
 #define BACKLIGHT_LEDC_MODE LEDC_LOW_SPEED_MODE
 #define BACKLIGHT_LEDC_TIMER LEDC_TIMER_0
 #define BACKLIGHT_LEDC_CHANNEL LEDC_CHANNEL_1
-#define BACKLIGHT_LEDC_BITS LEDC_TIMER_10_BIT
+#define BACKLIGHT_LEDC_BITS TAB5_BACKLIGHT_BITS // 10 : LEDC_TIMER_10_BIT, voir tab5_internal.h
 // 1 kHz comme le firmware ESPHome en service (ledc, tab5-hardware.yaml) ; le BSP d'Espressif prend 5 kHz.
 #define BACKLIGHT_LEDC_HZ 1000
 
 static i2c_master_bus_handle_t s_bus;
-static esp_io_expander_handle_t s_expander;       // 0x43 : resets de l'ecran et du tactile
-static esp_io_expander_handle_t s_expander_power; // 0x44 : alimentation du coprocesseur Wi-Fi (bit 0 seulement)
+static esp_io_expander_handle_t
+    s_expander; // 0x43 : resets de l'ecran et du tactile, ampli du haut-parleur, prise casque
+static esp_io_expander_handle_t s_expander_power; // 0x44 : coprocesseur Wi-Fi (bit 0), chargeur (bits 5 a 7)
+
+// Verrou commun a toutes les ecritures et lectures des deux expandeurs depuis les taches de fonctionnement (Wi-Fi, audio,
+// alimentation) : le pilote de l'expandeur lit, modifie puis ecrit ses registres sans protection. Statique : pas de tas.
+static StaticSemaphore_t s_expander_lock_storage;
+static SemaphoreHandle_t s_expander_lock;
+
+static esp_io_expander_handle_t expander_handle(tab5_expander_t which) {
+    return which == TAB5_EXPANDER_ALIM ? s_expander_power : s_expander;
+}
+
+esp_err_t tab5_expander_output(tab5_expander_t which, uint32_t pin_mask, int level) {
+    esp_io_expander_handle_t expander = expander_handle(which);
+    if (expander == NULL || s_expander_lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    xSemaphoreTake(s_expander_lock, portMAX_DELAY);
+    // Direction D'ABORD : le pilote refuse d'ecrire le niveau d'une broche en entree (« can't set level in input mode », constate
+    // sur carte le 07/11/2026). Consequence : a la PREMIERE sortie d'une broche, elle prend un instant le niveau du registre de
+    // sortie de la puce (0 apres la remise a zero) avant le niveau voulu : sans importance pour SPEAKER_EN et CHG_EN (0 = arret),
+    // et tab5_alim.cpp ne pilote pas nCHG_QC_EN quand elle est deja a l'arret.
+    esp_err_t err = esp_io_expander_set_dir(expander, pin_mask, IO_EXPANDER_OUTPUT);
+    if (err == ESP_OK) {
+        err = esp_io_expander_set_level(expander, pin_mask, level ? 1 : 0);
+    }
+    if (err == ESP_OK) {
+        err = esp_io_expander_set_output_mode(expander, pin_mask, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL);
+    }
+    xSemaphoreGive(s_expander_lock);
+    return err;
+}
+
+// Etat de la broche SANS changer sa direction (une sortie reste une sortie) : pour verifier ce qu'on a ecrit.
+esp_err_t tab5_expander_peek(tab5_expander_t which, uint32_t pin_mask, int *level) {
+    esp_io_expander_handle_t expander = expander_handle(which);
+    if (expander == NULL || s_expander_lock == NULL || level == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    xSemaphoreTake(s_expander_lock, portMAX_DELAY);
+    uint32_t value = 0;
+    const esp_err_t err = esp_io_expander_get_level(expander, pin_mask, &value);
+    xSemaphoreGive(s_expander_lock);
+    if (err == ESP_OK) {
+        *level = (value & pin_mask) ? 1 : 0;
+    }
+    return err;
+}
+
+esp_err_t tab5_expander_input(tab5_expander_t which, uint32_t pin_mask, int *level) {
+    esp_io_expander_handle_t expander = expander_handle(which);
+    if (expander == NULL || s_expander_lock == NULL || level == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    xSemaphoreTake(s_expander_lock, portMAX_DELAY);
+    esp_err_t err = esp_io_expander_set_dir(expander, pin_mask, IO_EXPANDER_INPUT);
+    uint32_t value = 0;
+    if (err == ESP_OK) {
+        err = esp_io_expander_get_level(expander, pin_mask, &value);
+    }
+    xSemaphoreGive(s_expander_lock);
+    if (err == ESP_OK) {
+        *level = (value & pin_mask) ? 1 : 0;
+    }
+    return err;
+}
+
+// Tirage vers le bas d'une entree (CHG_STAT, comme le firmware ESPHome : `mode: INPUT_PULLDOWN`).
+esp_err_t tab5_expander_pull_down(tab5_expander_t which, uint32_t pin_mask) {
+    esp_io_expander_handle_t expander = expander_handle(which);
+    if (expander == NULL || s_expander_lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    xSemaphoreTake(s_expander_lock, portMAX_DELAY);
+    esp_err_t err = esp_io_expander_set_dir(expander, pin_mask, IO_EXPANDER_INPUT);
+    if (err == ESP_OK) {
+        err = esp_io_expander_set_pullupdown(expander, pin_mask, IO_EXPANDER_PULL_DOWN);
+    }
+    xSemaphoreGive(s_expander_lock);
+    return err;
+}
 
 i2c_master_bus_handle_t tab5_i2c_bus(void) { return s_bus; }
 
@@ -48,18 +129,18 @@ static esp_err_t backlight_init(void) {
     return ledc_channel_config(&channel);
 }
 
-esp_err_t tab5_backlight_set_percent(int percent) {
-    if (percent < 0) {
-        percent = 0;
-    }
-    if (percent > 100) {
-        percent = 100;
-    }
+// Registre brut du PWM. La courbe de luminosite percue (niveau 0..100 -> registre) est dans tab5_ecran.cpp (noyau pur
+// ecran::luminosite, teste sur le PC) : ici on ne fait qu'ecrire et relire le materiel.
+esp_err_t tab5_backlight_set_duty(uint32_t duty) {
     const uint32_t max_duty = (1U << BACKLIGHT_LEDC_BITS) - 1U;
-    ESP_RETURN_ON_ERROR(ledc_set_duty(BACKLIGHT_LEDC_MODE, BACKLIGHT_LEDC_CHANNEL, max_duty * (uint32_t)percent / 100U),
-                        TAG, "duty");
+    if (duty > max_duty) {
+        duty = max_duty;
+    }
+    ESP_RETURN_ON_ERROR(ledc_set_duty(BACKLIGHT_LEDC_MODE, BACKLIGHT_LEDC_CHANNEL, duty), TAG, "duty");
     return ledc_update_duty(BACKLIGHT_LEDC_MODE, BACKLIGHT_LEDC_CHANNEL);
 }
+
+uint32_t tab5_backlight_get_duty(void) { return ledc_get_duty(BACKLIGHT_LEDC_MODE, BACKLIGHT_LEDC_CHANNEL); }
 
 // --- Reprise sur un expandeur qui ne repond pas au demarrage -----------------------------------------------------------------
 // Constate le 06/11/2026 (Tab5 ST7121, demarrage n° 65, binaire c1fa7f6) : « pi4ioe5v6408: reset(252): Chip reset failed » puis
@@ -145,6 +226,7 @@ esp_err_t tab5_io_init(void) {
         .flags.enable_internal_pullup = true,
     };
     ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_cfg, &s_bus), TAG, "bus I2C");
+    s_expander_lock = xSemaphoreCreateMutexStatic(&s_expander_lock_storage);
 
     // Attention : creer le pilote de l'expandeur le REMET A ZERO (registre 0x01, puis tous les registres par defaut :
     // sorties a bas, haute impedance). Au demarrage c'est l'etat voulu ; ce n'est pas un appel a refaire en marche.
@@ -179,11 +261,20 @@ esp_err_t tab5_wifi_power_set(bool on) {
     if (expander == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(expander, TAB5_EXPANDER_POWER_WIFI_EN, IO_EXPANDER_OUTPUT), TAG,
-                        "dir 0x44");
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_level(expander, TAB5_EXPANDER_POWER_WIFI_EN, on ? 1 : 0), TAG,
-                        "niveau 0x44");
-    return esp_io_expander_set_output_mode(expander, TAB5_EXPANDER_POWER_WIFI_EN, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL);
+    // Meme verrou que tab5_expander_output() : le chargeur (bits 5 a 7 du meme expandeur) est pilote depuis une autre tache.
+    // Avant que le verrou existe (creation de l'expandeur dans tab5_io_init), personne d'autre n'ecrit.
+    const bool locked = s_expander_lock != NULL && xSemaphoreTake(s_expander_lock, portMAX_DELAY) == pdTRUE;
+    esp_err_t err = esp_io_expander_set_dir(expander, TAB5_EXPANDER_POWER_WIFI_EN, IO_EXPANDER_OUTPUT);
+    if (err == ESP_OK) {
+        err = esp_io_expander_set_level(expander, TAB5_EXPANDER_POWER_WIFI_EN, on ? 1 : 0);
+    }
+    if (err == ESP_OK) {
+        err = esp_io_expander_set_output_mode(expander, TAB5_EXPANDER_POWER_WIFI_EN, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL);
+    }
+    if (locked) {
+        xSemaphoreGive(s_expander_lock);
+    }
+    return err;
 }
 
 // Reset de la dalle. La ligne LCD_RST est tenue a bas en push-pull, puis rendue en ENTREE a pull-up (drain ouvert) pour la

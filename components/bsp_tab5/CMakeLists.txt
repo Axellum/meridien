@@ -2,9 +2,12 @@
 # (aucun composant ne la "requiert" : le code applicatif ne connait que board_api).
 idf_component_register(
     SRCS "tab5_board.c" "tab5_io.c" "tab5_detect.c" "tab5_display.c" "tab5_touch.c" "tab5_wifi.c" "tab5_orientation.c"
+         "tab5_i2c.c" "tab5_ecran.cpp" "tab5_rtc.cpp" "tab5_i2s.c" "tab5_codec.c" "tab5_audio.cpp" "tab5_alim.cpp"
+         "tab5_autotest.cpp"
     PRIV_INCLUDE_DIRS "."
     REQUIRES board_api
-    PRIV_REQUIRES esp_driver_gpio esp_driver_i2c esp_driver_ledc esp_driver_ppa esp_event esp_hw_support esp_lcd esp_timer freertos
+    PRIV_REQUIRES core esp_driver_gpio esp_driver_i2c esp_driver_i2s esp_driver_ledc esp_driver_ppa esp_event esp_hw_support esp_lcd
+                  esp_timer freertos heap
                   espressif__esp_hosted
                   espressif__esp_io_expander espressif__esp_io_expander_pi4ioe5v6408
                   espressif__esp_lcd_st7121 espressif__esp_lcd_touch espressif__esp_lcd_touch_st7123
@@ -22,4 +25,12 @@ endif()
 # revenir au binaire normal avec "-DTAB5_AUTOTEST_EXPANDEUR=0" (le cache de CMake garde la valeur).
 if(TAB5_AUTOTEST_EXPANDEUR)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE TAB5_AUTOTEST_EXPANDEUR=${TAB5_AUTOTEST_EXPANDEUR})
+endif()
+
+# Binaire d'ESSAI du materiel (tab5_autotest.cpp) : luminosite, veille, horloge, audio (haut-parleur, microphones, lecture et
+# enregistrement simultanes), alimentation, sans toucher a l'ecran. Rend le materiel dans l'etat ou il l'a trouve (sauf le temps
+# ecoule). Usage : .\tools\idf.ps1 "-DTAB5_AUTOTEST_MATERIEL=1" build ; revenir au binaire normal avec "-DTAB5_AUTOTEST_MATERIEL=0"
+# (le cache de CMake garde la valeur).
+if(TAB5_AUTOTEST_MATERIEL)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE TAB5_AUTOTEST_MATERIEL=1)
 endif()
