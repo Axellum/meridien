@@ -62,7 +62,9 @@ MUTATIONS_HOTE_APPAREIL = [
     # --- recherche de lieu ---
     (HPP_HOTE, "if (v.erreur != reglages::ErreurRecherche::Aucune) {", "if (false) {", HOTE,
      "saisie_trop_courte_ou_illisible_ne_telecharge_rien", "une saisie de deux lettres part sur Internet"),
-    (HPP_HOTE, "p_.zone_enregistrer(lieux_[rang].zone);", "p_.zone_enregistrer(lieux_[0].zone);", HOTE,
+    # Le texte visé est « lieux_[rang].zone » seul (une occurrence) : l'appel qui l'entoure est coupé sur deux lignes par
+    # clang-format, et un texte sur une ligne devenait « inapplicable » dès qu'on reformatait (campagne du 07/11/2026).
+    (HPP_HOTE, "lieux_[rang].zone", "lieux_[0].zone", HOTE,
      "recherche_de_lieu_du_depart_au_choix", "le lieu touché n'est pas celui qui est enregistré"),
     (HPP_HOTE, "if (rang < nb_lieux_) {", "if (rang <= nb_lieux_) {", HOTE, "choisir_un_rang_qui_n_existe_pas_ne_change_rien",
      "un rang hors de la liste enregistre un lieu vide"),
