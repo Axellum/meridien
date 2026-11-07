@@ -6,6 +6,7 @@
 #include <cstring>
 #include <unistd.h>
 
+#include "banc_wifi.h"
 #include "board.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -228,6 +229,9 @@ void traiter(const char *ligne) {
         ESP_LOGW(TAG, "redémarrage logiciel demandé sur la console (esp_rom_software_reset_system)");
         vTaskDelay(pdMS_TO_TICKS(200)); // laisser partir le journal sur l'USB
         board_restart();
+    }
+    if (banc_wifi_lancer(ligne)) { // « wifi_scan », « wifi_faux »… (banc provisoire de l'interface Wi-Fi)
+        return;
     }
     ESP_LOGI(TAG, "commande inconnue ignorée");
 }

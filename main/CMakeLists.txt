@@ -33,6 +33,8 @@ idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp
 # Ecran principal (session ecran-principal). Ajoute par target_sources() apres l'enregistrement, et non dans la liste SRCS
 # ci-dessus, pour ne pas toucher a la ligne que les autres sessions (meteo, reglages) modifient aussi : un merge sans conflit.
 target_sources(${COMPONENT_LIB} PRIVATE "ecran_principal.cpp" "ui_principal.cpp")
+# Banc d'essai PROVISOIRE de l'interface Wi-Fi (commandes serie "wifi_scan", "wifi_faux"...), a retirer avant la phase 2.
+target_sources(${COMPONENT_LIB} PRIVATE "banc_wifi.cpp")
 # Contrat n 1 (main/meteo_etat.h), propriete de la session meteo-appareil. Tant que ce fichier n'existe pas, un BOUCHON
 # (main/bouchons/, valeurs d'exemple marquees "Exemple" a l'ecran) permet de compiler. Des que le vrai fichier est la, le
 # bouchon n'est plus ni compile ni dans le chemin d'inclusion : le dossier main/bouchons/ est alors a supprimer.
