@@ -115,9 +115,14 @@ void effacer(void *debut, std::size_t octets) {
     }
 }
 
+// Sous g_verrou. Réessayer la connexion n'a de sens que s'il y a un réseau à retrouver (celui en service) ou un essai en cours (le
+// nouveau). Sans réseau connu (appareil neuf), la radio reste immobile : une tentative sans identifiants échouerait sans fin
+// (mesuré : raison 201 toutes les 2 s après une recherche).
+bool reconnexion_utile() { return g_reconnexion && (g_actuels.present || g_occupe); }
+
 bool reconnexion_permise() {
     portENTER_CRITICAL(&g_verrou);
-    const bool ok = g_reconnexion && !g_scan_en_cours;
+    const bool ok = reconnexion_utile() && !g_scan_en_cours;
     portEXIT_CRITICAL(&g_verrou);
     return ok;
 }
@@ -293,7 +298,7 @@ void demarrer_essai() {
 void terminer_recherche() {
     portENTER_CRITICAL(&g_verrou);
     g_scan_en_cours = false;
-    const bool reessayer = g_reconnexion;
+    const bool reessayer = reconnexion_utile();
     portEXIT_CRITICAL(&g_verrou);
     esp_timer_stop(g_minuteur_scan);
     if (reessayer && !reseau_etat().wifi_connecte) {
