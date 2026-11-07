@@ -90,3 +90,22 @@ Avant : prendre le verrou de la 7B et celui du port (script de verrous propre au
 **Ce que ça change pour la suite.** La sauvegarde « complète » du plan n'existe pas pour cette carte par ce port : la preuve est le MD5 de la puce contre un fichier de référence **gardé** (`~/.tab5/elf/<version>/firmware.ota.bin`). Pour un autre firmware en service, il faut son fichier avant de commencer. La prise « USB TO UART » (pont série, **non essayée ici**) lirait peut-être tout ; à essayer si une copie complète devient nécessaire.
 
 **Non vérifié** : l'image sur la dalle (personne n'a regardé), le tactile réel, le rétroéclairage, la dalle noire à 0 %, la tonalité et le microphone, un démarrage après coupure de courant, la longue durée, la cause de l'erreur `mac type is incorrect`, le sens de l'image avec le montage à l'envers de l'exemplaire (rotation compilée 0 : à confirmer à l'œil).
+
+## 7. Deuxième essai physique : le firmware intégré (07/11/2026, soir)
+
+**Vu sur** : la même 7B (MAC non écrite ici), firmware `3fca1cc` (fusion de six branches, dont les fuseaux horaires, les alertes, MET Norway et le NWS ; 2 933 392 octets d'application, Wi-Fi compilé : ce binaire ne sort pas du PC), flashé le 07/11/2026 à 19 h 24 par `tools/essai_7b.py`, **à la demande de l'auteur**. Journal série par l'USB natif, une seule ouverture du port (ouvrir le port remet la puce à zéro).
+
+| Mesure | Valeur | Preuve |
+| --- | --- | --- |
+| Écriture | écrite à partir de 0x10000, « Hash of data verified », puis `verify-flash` : amorce, table de partitions et application **identiques** à la puce | journal du flash |
+| Démarrage | « Carte prête : Waveshare 7B, écran EK79007, interface 1024x600 » ; rétroéclairage à 75 % et première image à 542 ms | journal |
+| Image | **regardée par l'auteur : « il s'affiche bien »**. Couleurs, sens (montage à l'envers de l'exemplaire) et scintillement : rien de relevé | l'auteur, de vive voix |
+| Wi-Fi et heure | lien C6 à 2 222 ms, association à 7 294 ms (canal 1), adresse IP à 10 347 ms, horloge réglée +54 ms après le lancement de SNTP, signal −30 dBm, 0 coupure | journal |
+| Météo | une requête HTTPS au démarrage (source « auto ») : HTTP 200, 1 498 octets sur le fil (gzip), cache écrit en NVS (816 octets), 6 120 octets de pile jamais utilisés sur 12 288, prochaine requête dans 911 s ; fuseau « Europe/Paris », heure locale 19 h 24 | journal |
+| Alertes | tâche lancée (période de 15 min, niveau minimal jaune, instance publique) ; premier essai prévu 102 s plus tard : **hors des 13 s de journal** | journal |
+| Page de réglages | servie par la carte (10 fichiers, 36 540 octets en gzip, nom mDNS `ecran.local`) ; `GET /api/status` lu depuis un PC : version `…g3fca1`, mais nom de carte « M5Stack Tab5 » **faux** sur la 7B (corrigé ensuite dans le commit « fix(web): /api/status donne le vrai nom de la carte », **pas reflashé**) | journal, requête depuis le PC |
+| Lignes d'erreur restantes | les deux du premier essai : `swap_xy is not supported by this panel` et `0 mac type is incorrect (not found)` (cause non cherchée) | journal |
+
+**Après l'essai** : la 7B garde Meridien (décision de l'auteur) ; la restauration d'ESPHome n'a pas été refaite.
+
+**Non vérifié** : le tactile au doigt, le rétroéclairage à 0 / 50 / 100 %, le son et le microphone, une vraie alerte et sa pastille, le changement de fuseau depuis l'écran ou la page, la page ouverte dans un navigateur ou sur un téléphone, le sens de l'image avec le montage à l'envers, un démarrage après coupure de courant, la longue durée, et le correctif du nom de carte (il demande un nouveau flash).
