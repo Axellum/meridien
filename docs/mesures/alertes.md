@@ -80,6 +80,17 @@ Constaté sur les réponses réelles : des avertissements qui se suivent à la s
 | Seconde lecture indépendante | les `.inc` attendus sont à jour | `python test/host/controle_python_vigie.py --verifier` |
 | Police | les 790 caractères de la table du noyau sont tous dans `roboto_700.ttf` | `controle_python_vigie.py` |
 
+### Compilation (constatée, rien n'est flashé)
+
+**Vu sur** : PC d'Axel, ESP-IDF 5.5.5 (installation d'ESPHome, non modifiée), `CMAKE_BUILD_PARALLEL_LEVEL=4`, commit `4081efb`, 07/11/2026 12:25–12:27, verrou `build` tenu puis rendu. Aucune carte.
+
+| Carte | Fichier | Octets | SHA-256 | Avertissements |
+| --- | --- | ---: | --- | ---: |
+| Tab5 (`tab5`) | `build/meridien.bin` | 2 885 536 | `624210351B878636FBA8450CCDD07DBFC7CDAA9D2FA296229CB7B1B9D376EA39` | 0 |
+| Waveshare 7B | `build/7b/meridien.bin` | 2 866 224 | `AD46ECC2D631D76C629F0EC74EE05C191B8C9BB660F64B429071985F4DC64F26` | 0 |
+
+Copies, avec les `.elf` (pour décoder un plantage), dans le dossier de notes partagé `alertes-vigie-binaires\`. L'emplacement d'application des deux cartes fait 4 Mo : le Tab5 en prend ≈ 69 % (≈ 31 % libres). Par rapport à `main` au commit `9c89ad5` (Tab5 2 834 336 octets, 7B 2 814 896 octets, d'après la note de passation de l'étape 1, non remesurés ici), le firmware des alertes pèse ≈ **51 Ko de plus** sur chaque carte (+1,8 %). Cette compilation prouve que le code compile et se lie ; elle ne prouve **rien** sur le comportement : la 7B n'a été que compilée (aucun essai physique), et le Tab5 n'a pas été flashé non plus.
+
 **Ce que les rendus PC ont fait corriger.** La fin d'une alerte (« dimanche 8 novembre · 00:59 ») passait à la ligne après les deux-points (« 00: » puis « 59 ») parce que le moteur de texte de l'écran traite « : » comme une espace ; l'heure passe donc en premier (« 00:59 · dimanche 8 novembre »), voir [depannage.md](../depannage.md). Les rendus ne sont **pas** une photo de la carte : couleurs, lisibilité à 2 m et appui sont à juger sur la dalle (section 5).
 
 ## 5. À faire sur la carte (non vérifié)
