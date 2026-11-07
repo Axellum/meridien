@@ -368,9 +368,9 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 **Cause.** The end of an alert is exclusive and issuers do not agree on the last second.
 
-**Solution.** None yet: the core test `test_vigie_alertes.cpp` (instant 1794085199) pins the behaviour. A hysteresis (keeping the pill 2 s) would hide the gap but also keep an alert 2 s after its end; to decide with the owner if the case shows up.
+**Solution.** An end written at `hh:59:59` now counts as the last second of the alert (`fin_exclue_s` in `vigie_vue.hpp`, 07/11/2026); any other end stays exclusive. The core tests pin both (`test_vigie_alertes.cpp`: instant 1794085199 of the La Palma answer, and a dedicated test around `hh:59:59`, `hh:00:00` and `hh:39:59`). A hysteresis (keeping the pill 2 s) was not chosen: it would keep every alert 2 s after its end. Limit: an issuer writing `hh:59:59` as an exclusive end would keep its alert one second too long (not seen).
 
-**Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Status**: known, not fixed, never seen on a board.
+**Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Status**: fixed in the core (PC tests only), never seen on a board, before or after.
 
 #### An issuer text disappears from the screen
 
@@ -981,9 +981,9 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 **Cause.** La fin d'une alerte est exclue et les émetteurs ne s'accordent pas sur la dernière seconde.
 
-**Solution.** Aucune pour l'instant : le test du noyau `test_vigie_alertes.cpp` (instant 1794085199) fige le comportement. Une hystérésis (garder la pastille 2 s) cacherait le trou mais garderait aussi une alerte 2 s après sa fin ; à décider avec Axel si le cas se présente.
+**Solution.** Une fin écrite à `hh:59:59` compte désormais comme la dernière seconde de l'alerte (`fin_exclue_s` dans `vigie_vue.hpp`, 07/11/2026) ; toute autre fin reste exclue. Les tests du noyau figent les deux (`test_vigie_alertes.cpp` : instant 1794085199 de la réponse de La Palma, et un test dédié autour de `hh:59:59`, `hh:00:00` et `hh:39:59`). Une hystérésis (garder la pastille 2 s) n'a pas été choisie : elle garderait toute alerte 2 s après sa fin. Limite : un émetteur qui écrirait `hh:59:59` comme fin exclue garderait son alerte une seconde de trop (non vu).
 
-**Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Statut** : connu, non corrigé, jamais vu sur une carte.
+**Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Statut** : corrigé dans le noyau (tests sur le PC seulement), jamais vu sur une carte, ni avant ni après.
 
 #### Un texte d'émetteur disparaît de l'écran
 

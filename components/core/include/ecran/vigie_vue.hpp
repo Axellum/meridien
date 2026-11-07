@@ -6,8 +6,9 @@
 //   - elle n'est pas annulée (`Etat::Annule`) et son niveau n'est pas « vert » ;
 //   - son début est passé : `debut` (onset), à défaut `effectif` ; un début inconnu compte comme « déjà commencée » (l'émetteur la
 //     publie dans son flux) ; une alerte qui commence DANS LE FUTUR n'est pas montrée (l'écran ne parle que de ce qui est là) ;
-//   - sa fin n'est pas passée : `fin` (ends), à défaut `expire` (expires) ; une fin inconnue la laisse en vigueur, tant que la
-//     réponse reste fraîche (condition du premier point : une alerte sans fin ne reste jamais plus de 6 h sans nouvelle de Vigie).
+//   - sa fin n'est pas passée : `fin` (ends), à défaut `expire` (expires), la fin étant EXCLUE sauf à « hh:59:59 » (voir
+//     `fin_exclue_s`) ; une fin inconnue la laisse en vigueur, tant que la réponse reste fraîche (condition du premier point : une
+//     alerte sans fin ne reste jamais plus de 6 h sans nouvelle de Vigie).
 // Le niveau doit atteindre le niveau minimal du réglage ; un niveau INCONNU (absent ou hors de la table de Vigie) n'est montré que
 // pour le réglage « Jaune » (le plus bas), en couleur neutre : on ne le classe pas à la place de l'émetteur.
 //
@@ -46,6 +47,12 @@ constexpr bool niveau_suffisant(Niveau n, NiveauMin minimum) noexcept {
     return false;
 }
 
+// L'instant (secondes UTC) à partir duquel une alerte de fin `fin` n'est plus en vigueur : la fin elle-même, sauf quand l'émetteur
+// l'écrit à « hh:59:59 », la dernière seconde d'une heure pleine (l'AEMET), alors que le suivant commence à « hh:00:00 » (le DWD) :
+// cette seconde-là est encore dans l'alerte. Sans cela deux avertissements qui se suivent ainsi laissent l'écran muet UNE seconde (la
+// pastille disparaît puis revient). Toute autre fin reste exclue : on ne prolonge pas une alerte au-delà de ce que l'émetteur a écrit.
+constexpr std::int64_t fin_exclue_s(std::int64_t fin) noexcept { return (fin + 1) % 3600 == 0 ? fin + 1 : fin; }
+
 // L'alerte est-elle en vigueur à `maintenant_s` (secondes UTC), la réponse qui la porte ayant `age_s` secondes ?
 constexpr bool en_vigueur(const Alerte &a, std::int64_t maintenant_s, std::int64_t age_s) noexcept {
     if (age_s < 0 || age_s > AGE_MAX_S)
@@ -56,7 +63,7 @@ constexpr bool en_vigueur(const Alerte &a, std::int64_t maintenant_s, std::int64
     if (debut && maintenant_s < *debut)
         return false;
     const std::optional<std::int64_t> fin = a.fin ? a.fin : a.expire;
-    if (fin && maintenant_s >= *fin)
+    if (fin && maintenant_s >= fin_exclue_s(*fin))
         return false;
     return true;
 }
