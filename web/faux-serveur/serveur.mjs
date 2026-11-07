@@ -65,6 +65,7 @@ const T = (fr, vars) => {
 const etat = {
   nom: 'ecran-1a2b', version: '0.1.0', precedente: '0.0.9', demarre: Date.now(),
   zone: null, display: { langue_ecran: 'fr', langue_assistant: 'fr', theme: 'auto', luminosite: 80 },
+  alertes: { actives: true, adresse: '', periode_min: 15, niveau_min: 'yellow' },
   services: { stt: null, llm: null, tts: null },
   wifi: { etat: 'connecte', ssid: 'Maison', niveau: 3, force: -61, ip: '192.168.1.52' }, // adresse d'exemple, pas celle d'un vrai réseau
   maj: { dernier: null }, redemarreJusqua: 0, meteo: null, scanFin: 0,
@@ -164,6 +165,33 @@ function validerAffichage(a) {
   }
   return r;
 }
+/* Alertes officielles (docs/api-reglages.md §14) : mêmes règles que le noyau de l'appareil, en plus simple. */
+const ADRESSE_VIGIE_PUBLIQUE = 'https://vigie.auxfilsdesidees.fr';
+const NIVEAUX_ALERTE = ['yellow', 'orange', 'red'];
+function validerAlertes(a) {
+  const r = {};
+  if (a.actives !== undefined) {
+    if (typeof a.actives !== 'boolean') throw new Refus(422, 'actives_invalide', T('Les alertes doivent être activées ou désactivées.'), 'actives');
+    r.actives = a.actives;
+  }
+  if (a.adresse !== undefined) {
+    const refus = () => new Refus(422, 'adresse_invalide', T('L’adresse de Vigie doit commencer par https://.'), 'adresse');
+    if (typeof a.adresse !== 'string') throw refus();
+    const s = a.adresse.trim().replace(/\/+$/, '');
+    if (s !== '' && !(s.length <= 80 && /^https:\/\/[a-z0-9][\x21-\x7e]*$/i.test(s) && !/[?#@\\]/.test(s))) throw refus();
+    r.adresse = s === '' ? '' : 'https://' + s.slice(8);
+  }
+  if (a.periode_min !== undefined) {
+    if (!Number.isInteger(a.periode_min) || a.periode_min < 10 || a.periode_min > 180) throw new Refus(422, 'periode_invalide', T('La période doit être un nombre entier de minutes, de 10 à 180.'), 'periode_min');
+    r.periode_min = a.periode_min;
+  }
+  if (a.niveau_min !== undefined) {
+    if (!NIVEAUX_ALERTE.includes(a.niveau_min)) throw new Refus(422, 'niveau_inconnu', T('Ce niveau d’alerte n’existe pas.'), 'niveau_min');
+    r.niveau_min = a.niveau_min;
+  }
+  return r;
+}
+const alertesVue = () => ({ ...etat.alertes, adresse_publique: ADRESSE_VIGIE_PUBLIQUE, niveaux: NIVEAUX_ALERTE });
 function validerUrl(u) {
   let url;
   try { url = new URL(String(u)); } catch (e) { throw new Refus(422, 'url_invalide', T('Cette adresse n’est pas valide.'), 'url'); }
@@ -389,6 +417,12 @@ async function api(req, res, url) {
   if (m === 'PUT' && p === '/api/display') {
     Object.assign(etat.display, validerAffichage(await lireJson(req)));
     return json(res, 200, affichage());
+  }
+  /* alertes officielles */
+  if (m === 'GET' && p === '/api/alerts') return json(res, 200, alertesVue());
+  if (m === 'PUT' && p === '/api/alerts') {
+    Object.assign(etat.alertes, validerAlertes(await lireJson(req)));
+    return json(res, 200, alertesVue());
   }
   /* services */
   if (m === 'GET' && p === '/api/presets') return json(res, 200, presets());

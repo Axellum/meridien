@@ -9,8 +9,8 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 const $ = (s, r = document) => r.querySelector(s);
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const NOMS = { stt: ['svc.stt', 'mic'], llm: ['svc.llm', 'chat'], tts: ['svc.tts', 'speaker'] };
-const SECTIONS = ['ville', 'assistant', 'ecran', 'wifi', 'appareil'];
-const S = { statut: null, systeme: null, zone: null, meteo: null, display: null, services: null, presets: null, wifi: null, maj: null, tests: {} };
+const SECTIONS = ['ville', 'alertes', 'assistant', 'ecran', 'wifi', 'appareil'];
+const S = { statut: null, systeme: null, zone: null, meteo: null, display: null, alertes: null, services: null, presets: null, wifi: null, maj: null, tests: {} };
 let jeton = '';
 try { jeton = sessionStorage.getItem('jeton') || ''; } catch (e) { /* stockage refusé : la page redemandera le code */ }
 
@@ -172,11 +172,11 @@ async function demarrer(ancre) {
   if (st.langue && st.langue !== CAT.code) await appliquerLangue(st.langue);
   if (st.appairage !== 'ok') { oublier(); montrerAppairage(); return; }
   S.statut = st;
-  const [sys, zone, disp, svc, pre, wifi, maj] = await Promise.allSettled(
-    ['/api/system', '/api/location', '/api/display', '/api/services', '/api/presets', '/api/wifi', '/api/update'].map((c) => api('GET', c)));
+  const [sys, zone, disp, svc, pre, wifi, maj, alr] = await Promise.allSettled(
+    ['/api/system', '/api/location', '/api/display', '/api/services', '/api/presets', '/api/wifi', '/api/update', '/api/alerts'].map((c) => api('GET', c)));
   if (!jeton) return; /* une réponse 401 a déjà ramené à l'appairage */
   const val = (r) => (r.status === 'fulfilled' ? r.value : null);
-  Object.assign(S, { systeme: val(sys), zone: val(zone), display: val(disp), services: val(svc), presets: val(pre), wifi: val(wifi), maj: val(maj) });
+  Object.assign(S, { systeme: val(sys), zone: val(zone), display: val(disp), alertes: val(alr), services: val(svc), presets: val(pre), wifi: val(wifi), maj: val(maj) });
   S.meteo = null;
   construirePage();
   if (ancre && document.getElementById(ancre)) document.getElementById(ancre).scrollIntoView();
@@ -189,7 +189,7 @@ function construirePage() {
   $('#racine').replaceChildren(h('div', { class: 'page' },
     h('header', { class: 'haut' }, h('div', { class: 'top' }, h('span', { class: 'logo' }, ico('tablet')),
       h('div', {}, h('b', { text: t('app.titre') }), h('small', { id: 'sous-titre' }))), nav),
-    h('main', {}, carteVille(), carteAssistant(), carteEcran(), carteWifi(), carteAppareil())));
+    h('main', {}, carteVille(), carteAlertes(), carteAssistant(), carteEcran(), carteWifi(), carteAppareil())));
   majSousTitre();
   const liens = [...nav.querySelectorAll('a')];
   const actif = (id) => liens.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === '#' + id)));
@@ -435,6 +435,56 @@ function blocService(id) {
     entete.lastChild.replaceWith(ico(oui ? 'chevd' : 'chev'));
   };
   return { entete, detail, ouvrir, estOuvert: () => !detail.hidden };
+}
+
+/* ---------- alertes officielles (Vigie) ---------- */
+const minutes = (v) => { try { return new Intl.NumberFormat(CAT.code, { style: 'unit', unit: 'minute', unitDisplay: 'short' }).format(v); } catch (e) { return v + ' min'; } };
+const NIVEAUX_ALERTE = { yellow: () => t('alertes.jaune'), orange: () => t('alertes.orange'), red: () => t('alertes.rouge') };
+function carteAlertes() {
+  const a = S.alertes;
+  if (!a) return carte('alertes', 'bell', t('alertes.titre'), retour('err', t('erreur.interne')));
+  const enregistrer = async (champ) => {
+    try { S.alertes = await api('PUT', '/api/alerts', champ); toast(t('toast.enregistre')); } catch (e) { toast(msg(e), true); remplacer('alertes', carteAlertes()); }
+  };
+  /* Un groupe de boutons (oui / non, jaune / orange / rouge) : le choix part tout de suite, comme le thème de l'écran. */
+  const groupe = (id, libelle, aide, options, courant, champ) => {
+    const boutons = options.map(([valeur, texte]) => {
+      const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(valeur === courant), text: texte });
+      b.addEventListener('click', () => { boutons.forEach((x) => x.setAttribute('aria-checked', String(x === b))); enregistrer({ [champ]: valeur }); });
+      return b;
+    });
+    return h('div', { class: 'f' }, h('span', { class: 'lab', id: id + '-l', text: libelle }),
+      h('div', { class: 'seg', role: 'radiogroup', 'aria-labelledby': id + '-l', 'aria-describedby': id + '-a' }, boutons),
+      h('p', { class: 'aide', id: id + '-a', text: aide }));
+  };
+  const niveaux = (a.niveaux || Object.keys(NIVEAUX_ALERTE)).filter((n) => n in NIVEAUX_ALERTE);
+  const valeur = h('span', { class: 'valeur', text: minutes(a.periode_min) });
+  const periode = h('input', { id: 'alertes-periode', type: 'range', min: '10', max: '180', step: '1', value: String(a.periode_min), 'aria-valuetext': minutes(a.periode_min), 'aria-describedby': 'alertes-periode-aide' });
+  periode.addEventListener('input', () => { valeur.textContent = minutes(periode.value); periode.setAttribute('aria-valuetext', minutes(periode.value)); });
+  periode.addEventListener('change', () => enregistrer({ periode_min: Number(periode.value) }));
+  /* L'adresse est contrôlée par l'appareil (https:// obligatoire) : sa phrase d'erreur s'affiche sous le champ, et la valeur
+     enregistrée (normalisée) remplace celle qui a été tapée. Vide = le service public, dont l'adresse sert d'exemple grisé. */
+  const adresse = h('input', { id: 'alertes-adresse', type: 'text', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', maxlength: '80', placeholder: a.adresse_publique, value: a.adresse, 'aria-describedby': 'alertes-adresse-aide' });
+  const retoursAdresse = h('div', { 'aria-live': 'polite' });
+  adresse.addEventListener('change', async () => {
+    adresse.removeAttribute('aria-invalid');
+    retoursAdresse.replaceChildren();
+    try {
+      S.alertes = await api('PUT', '/api/alerts', { adresse: adresse.value });
+      adresse.value = S.alertes.adresse;
+      toast(t('toast.enregistre'));
+    } catch (e) {
+      adresse.setAttribute('aria-invalid', 'true');
+      retoursAdresse.replaceChildren(retour('err', msg(e)));
+    }
+  });
+  return carte('alertes', 'bell', t('alertes.titre'),
+    groupe('alertes-actives', t('alertes.actives'), t('alertes.actives_aide'), [[true, t('alertes.oui')], [false, t('alertes.non')]], a.actives, 'actives'),
+    groupe('alertes-niveau', t('alertes.niveau'), t('alertes.niveau_aide'), niveaux.map((n) => [n, NIVEAUX_ALERTE[n]()]), a.niveau_min, 'niveau_min'),
+    h('div', { class: 'f' }, h('label', { class: 'lab', for: 'alertes-periode' }, t('alertes.periode'), valeur), periode,
+      h('p', { class: 'aide', id: 'alertes-periode-aide', text: t('alertes.periode_aide') })),
+    h('div', { class: 'f' }, h('label', { class: 'lab', for: 'alertes-adresse', text: t('alertes.adresse') }), h('div', { class: 'champ' }, adresse),
+      h('p', { class: 'aide', id: 'alertes-adresse-aide', text: t('alertes.adresse_aide') }), retoursAdresse));
 }
 
 /* ---------- écran ---------- */
