@@ -43,6 +43,7 @@ CACHE = RACINE / ".cache" / "rendu"
 SORTIE_DEFAUT = RACINE / "docs" / "captures" / "ecran"
 LLVM_MINGW = Path(r"H:\AuxFilsDesIdees\_outils\llvm-mingw\bin")
 POLICE = RACINE / "main" / "assets" / "roboto_700.ttf"
+ICONES = RACINE / "main" / "assets" / "icones_meteo.bin"
 FICHIERS_COMMUNS = ["tools/rendu/banc.cpp"]
 
 # Les sept langues de l'écran (ADR-0006) : code -> nom dans sa langue, dans l'ordre des indices du noyau pur.
@@ -324,6 +325,8 @@ def construire_scenes(scenes: list, lvgl: Path, archive: Path, jobs: int) -> dic
 
     # La police est dans le firmware par EMBED_FILES (symboles _binary_roboto_700_ttf_start/end) : même fichier, mêmes
     # symboles, par un .s qui l'inclut.
+    # Le binaire des icônes météo (main/assets/icones_meteo.bin, EMBED_FILES aussi) est posé de la même façon, dans le même .o :
+    # sans lui, les scènes qui lient main/ui_meteo_icones.cpp n'ont pas de pixels à dessiner.
     police_s = dossier / "police.s"
     police_s.write_text(
         '    .section .rdata,"dr"\n'
@@ -331,7 +334,12 @@ def construire_scenes(scenes: list, lvgl: Path, archive: Path, jobs: int) -> dic
         "    .global _binary_roboto_700_ttf_end\n"
         "_binary_roboto_700_ttf_start:\n"
         f'    .incbin "{POLICE.as_posix()}"\n'
-        "_binary_roboto_700_ttf_end:\n",
+        "_binary_roboto_700_ttf_end:\n"
+        "    .global _binary_icones_meteo_bin_start\n"
+        "    .global _binary_icones_meteo_bin_end\n"
+        "_binary_icones_meteo_bin_start:\n"
+        f'    .incbin "{ICONES.as_posix()}"\n'
+        "_binary_icones_meteo_bin_end:\n",
         encoding="utf-8",
     )
     police_o = dossier / "police.o"

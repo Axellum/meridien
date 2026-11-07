@@ -2,6 +2,7 @@
 // Rendu LVGL logiciel sur le PC : ce n'est pas la dalle (docs/outils.md, « Ce que le rendu ne couvre pas »).
 #include "banc.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -199,12 +200,26 @@ int main(int argc, char **argv) {
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(g_affichage, sur_flush);
 
+    // BANC_CHRONO=1 : temps de construction de l'écran et du premier rendu complet, sur le PC (durées relatives entre écrans ou
+    // entre versions du dessin ; elles ne disent rien de la vitesse de la carte, voir docs/outils.md).
+    const bool chrono = std::getenv("BANC_CHRONO") != nullptr;
+    using horloge_pc = std::chrono::steady_clock;
     const banc::Contexte contexte = {g_largeur, g_hauteur, g_instant, g_affichage, langue};
+    const auto t0 = horloge_pc::now();
     scene->construire(contexte);
+    const auto t1 = horloge_pc::now();
 
     for (int pas = 0; pas < kNombrePas; ++pas) {
         g_ms += kPasMs;
         lv_timer_handler();
+        if (chrono && pas == 0) {
+            const auto t2 = horloge_pc::now();
+            const auto us = [](horloge_pc::time_point a, horloge_pc::time_point b) {
+                return static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(b - a).count());
+            };
+            std::fprintf(stderr, "chrono PC : construction %lld us, premier rendu complet %lld us\n", us(t0, t1),
+                         us(t1, t2));
+        }
     }
     if (!ecrire_ppm(sortie)) {
         std::fprintf(stderr, "banc : écriture impossible : %s\n", sortie);
