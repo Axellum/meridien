@@ -19,6 +19,7 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 - [Tools and build](#tools-and-build)
 - [Chip, display and touch](#chip-display-and-touch)
 - [Flash, serial port and backup](#flash-serial-port-and-backup)
+- [Audio, expanders and power](#audio-expanders-and-power)
 - [Settings page and core](#settings-page-and-core)
 
 ---
@@ -40,6 +41,13 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 #### Return to ESPHome never tried
 
 The restore recipe (three writes: start of the flash, application, NVS) is in the `LISEZMOI.md` file of the author's local backup, which is outside this repository. It has **never been played**: as long as it has not been, the return is “not verified”. **Status**: open.
+
+#### The battery connector reads 8.2 V although the unit “has no battery”
+
+**Symptom.** On 07/11/2026 the INA226 reads **8206 mV and +2 mA** at the battery connector, with the charger forced off, stable over the whole bench. The notes inherited from the ESPHome firmware say “the author's unit has no battery” (1.83–1.94 V charger off).
+**Cause.** **Not found.** Compatible with a two-cell lithium pack nearly full and idle (a battery connected since), not with an empty connector. Nothing in the software can tell the two apart.
+**Next step.** Look at the back of the unit (physical check). The firmware never switches the charger on, so nothing is charged by it in the meantime; the application must not infer a battery state from the reading.
+**Seen on** Tab5 ST7121, commit `5f797e3`, 07/11/2026 (see [mesures/tab5-materiel.md](mesures/tab5-materiel.md)). **Evidence**: log lines `tab5_alim: INA226 tel que trouvé … (8206 mV)` at every start and `alim.lecture` of the bench. **Status**: open.
 
 ---
 
@@ -241,6 +249,31 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 ---
 
+### Audio, expanders and power
+
+#### Reading the microphones alone on the I2S port times out
+
+**Symptom.** With only the receive channel of the shared I2S port enabled, every read ended on `ESP_ERR_TIMEOUT` (first bench pass of 07/11/2026): no microphone level, no recording.
+**Cause.** **Not elucidated.** The same port read fine as soon as the transmit channel was also enabled. Hypothesis, **not verified**: the port's shared clocks do not run for a receive-only channel in this configuration.
+**Solution.** `tab5_i2s_enable()` enables the transmit channel whenever the receive one is enabled; it then sends silence (the DAC is muted, the amplifier off). No audible effect. Do not “simplify” this away without re-running the bench.
+**Seen on** Tab5 ST7121, 07/11/2026; fix in `993500f`. **Evidence**: bench lines `audio.micro.bruit` and `audio.enregistrement` OK at `5f797e3`. **Status**: worked around (cause open).
+
+#### Expander: “can't set level in input mode”
+
+**Symptom.** Driving `CHG_EN` or `nCHG_QC_EN` (expander 0x44) failed with `can't set level in input mode` after the pin had been read.
+**Cause.** After a reset every PI4IOE5V6408 pin is an input, and reading a pin as input leaves its cached direction on “input”; the `esp_io_expander` driver then refuses to set a level.
+**Solution.** In this order: direction (output), level, push-pull mode (`tab5_expander_output()`). The pin takes the output register's value (0 after a reset) for an instant: harmless for `SPEAKER_EN` and `CHG_EN`; `nCHG_QC_EN` is not driven when it is already high.
+**Seen on** Tab5 ST7121, 07/11/2026; fix in `993500f`. **Evidence**: driver message in the first bench pass, then `tab5_alim` lines without error at every start. **Status**: resolved.
+
+#### A pin driven as an output reads 0 in the expander's state register
+
+**Symptom.** `SPEAKER_EN` read back as 0 while the speaker was playing (bench check `audio.ampli_allume` failed three times, once per DAC line, in the passes before `5f797e3`).
+**Cause.** The state register (0x0F) does not show a pin driven as an output (seen on the board; **not verified on the chip's datasheet**). The registers told the truth: during the tone expander 0x43 read direction 0x6F, output 0x22, high impedance 0xDD, so bit 1 is an output, high, not in high impedance.
+**Solution.** To check an output, read direction (0x03), output (0x05) and high impedance (0x07) (`tab5_expander_dump()`); the bench check does so since `5f797e3`.
+**Seen on** Tab5 ST7121, 07/11/2026. **Evidence**: register dump during the tone, 3 lines, and the check passing 3 out of 3 at `5f797e3`. **Status**: resolved (the check was wrong, not the board).
+
+---
+
 ### Settings page and core
 
 #### No host compiler on the PC: the core tests do not run
@@ -292,6 +325,7 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 - [Outils et compilation](#outils-et-compilation)
 - [Puce, écran et tactile](#puce-écran-et-tactile)
 - [Flash, port série et sauvegarde](#flash-port-série-et-sauvegarde)
+- [Audio, expandeurs et alimentation](#audio-expandeurs-et-alimentation)
 - [Page de réglages et noyau](#page-de-réglages-et-noyau)
 
 ---
@@ -313,6 +347,13 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 #### Retour à ESPHome jamais essayé
 
 La recette de remise en état (trois écritures : début de flash, application, NVS) est dans le `LISEZMOI.md` de la sauvegarde locale de l'auteur, hors de ce dépôt. Elle n'a **jamais été jouée** : tant qu'elle ne l'est pas, le retour est « non vérifié ». **Statut** : ouvert.
+
+#### Le connecteur de batterie lit 8,2 V alors que l'exemplaire « n'a pas de batterie »
+
+**Symptôme.** Le 07/11/2026 l'INA226 lit **8206 mV et +2 mA** au connecteur de batterie, chargeur forcé à l'arrêt, de façon stable pendant tout le banc. Les notes héritées du firmware ESPHome disent « l'exemplaire d'Axel n'a pas de batterie » (1,83 à 1,94 V chargeur coupé).
+**Cause.** **Non trouvée.** Compatible avec un bloc lithium à deux éléments presque plein au repos (une batterie branchée depuis), pas avec un connecteur vide. Rien dans le logiciel ne permet de trancher.
+**Suite.** Regarder le dos de l'appareil (contrôle physique). Le firmware n'allume jamais le chargeur : rien n'est donc chargé par lui d'ici là ; l'application ne doit pas déduire un état de batterie de cette lecture.
+**Vu sur** Tab5 ST7121, commit `5f797e3`, 07/11/2026 (voir [mesures/tab5-materiel.md](mesures/tab5-materiel.md)). **Preuve** : lignes de journal `tab5_alim: INA226 tel que trouvé … (8206 mV)` à chaque démarrage et `alim.lecture` du banc. **Statut** : ouvert.
 
 ---
 
@@ -511,6 +552,31 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 - Un USB-C mal enfoncé laisse la tablette allumée **sur batterie, sans port série** (Windows : `Present = False` pour la MAC) : aucun journal, donc aucune cause lisible pour ce qui se passe pendant ce temps.
 
 **Vu sur** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Statut** : contourné.
+
+---
+
+### Audio, expandeurs et alimentation
+
+#### La lecture des microphones seuls sur le port I2S expire
+
+**Symptôme.** Avec seulement le canal de réception du port I2S partagé activé, chaque lecture finissait en `ESP_ERR_TIMEOUT` (premier passage du banc, 07/11/2026) : ni niveau de microphone, ni enregistrement.
+**Cause.** **Non élucidée.** Le même port lisait correctement dès que le canal d'émission était aussi activé. Hypothèse, **non vérifiée** : les horloges partagées du port ne tournent pas pour un canal de réception seul dans cette configuration.
+**Solution.** `tab5_i2s_enable()` active le canal d'émission dès que celui de réception l'est ; il envoie alors du silence (le DAC est en sourdine, l'amplificateur éteint). Aucun effet audible. Ne pas « simplifier » cela sans rejouer le banc.
+**Vu sur** Tab5 ST7121, 07/11/2026 ; correctif dans `993500f`. **Preuve** : lignes `audio.micro.bruit` et `audio.enregistrement` du banc, OK à `5f797e3`. **Statut** : contourné (cause ouverte).
+
+#### Expandeur : « can't set level in input mode »
+
+**Symptôme.** Piloter `CHG_EN` ou `nCHG_QC_EN` (expandeur 0x44) échouait avec `can't set level in input mode` après que la broche avait été lue.
+**Cause.** Après une remise à zéro toutes les broches du PI4IOE5V6408 sont des entrées, et lire une broche en entrée laisse sa direction mémorisée sur « entrée » ; le pilote `esp_io_expander` refuse alors d'écrire un niveau.
+**Solution.** Dans cet ordre : direction (sortie), niveau, mode push-pull (`tab5_expander_output()`). La broche prend un instant la valeur du registre de sortie (0 après une remise à zéro) : sans effet pour `SPEAKER_EN` et `CHG_EN` ; `nCHG_QC_EN` n'est pas piloté quand elle est déjà haute.
+**Vu sur** Tab5 ST7121, 07/11/2026 ; correctif dans `993500f`. **Preuve** : message du pilote au premier passage du banc, puis lignes `tab5_alim` sans erreur à chaque démarrage. **Statut** : résolu.
+
+#### Une broche pilotée en sortie se lit à 0 dans le registre d'état de l'expandeur
+
+**Symptôme.** `SPEAKER_EN` était relu à 0 alors que le haut-parleur jouait (le contrôle `audio.ampli_allume` du banc échouait trois fois, une par ligne du DAC, aux passages précédant `5f797e3`).
+**Cause.** Le registre d'état (0x0F) ne montre pas une broche pilotée en sortie (vu sur la carte ; **non vérifié sur la fiche de la puce**). Les registres disaient vrai : pendant le son, l'expandeur 0x43 lisait direction 0x6F, sortie 0x22, haute impédance 0xDD, donc le bit 1 est en sortie, haut, hors haute impédance.
+**Solution.** Pour vérifier une sortie, lire direction (0x03), sortie (0x05) et haute impédance (0x07) (`tab5_expander_dump()`) ; le contrôle du banc le fait depuis `5f797e3`.
+**Vu sur** Tab5 ST7121, 07/11/2026. **Preuve** : relevé des registres pendant le son, 3 lignes, et le contrôle qui passe 3 fois sur 3 à `5f797e3`. **Statut** : résolu (le contrôle était faux, pas la carte).
 
 ---
 
