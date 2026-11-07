@@ -285,6 +285,22 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 **Seen on** PC rendering bench (software LVGL 9.5.0, `tools/rendre.ps1`), branch `claude/reglages-ecran-aea4e2`, 06/11/2026. **Evidence**: scripted journeys `zones-tactiles-reglages`, `zones-tactiles-installation` and `curseur-au-doigt` (`tools/rendu/scenes/scene_parcours.cpp`; the last one uses a pointer input device and `lv_indev_search_obj`, so the touch goes through LVGL's own search) in 7 languages × 3 sizes; four of five deliberately introduced faults are detected (the fifth, a button forced back to 56 px, is neutralised by `min_height`). **Status**: resolved on the PC for buttons, slider and scroll indicator; the keyboard keys are an open decision; not seen on a board (real finger, physical size of the target: not verified).
 
+#### On-board test: the virtual finger lands on the wrong object
+
+**Symptom.** In the first two runs of the settings test on the board, a tap on the centre of "Affichage" opened the "Appareil" page, "Retour" did nothing, and the aimed button received no press, no release and no click (counts 0, 0, 0), although `lv_indev_search_obj()` found that button at that very point.
+
+**Cause.** `lv_indev.c:743` calls `lv_display_rotate_point()` on every point a pointer reads, because touch drivers give **raw** panel coordinates (`components/bsp_tab5/tab5_touch.c` says so). The test's virtual pointer gave logical coordinates, so the point was rotated twice: (639, 424) became (855, 639), inside the "Appareil" row; (86, 43) became (1236, 86), on nothing. A `grep rotation` on `lv_indev.c` finds nothing: the function is called `rotate_point`.
+
+**Solution.** `vers_brut()` in `main/autotest_reglages.cpp` gives the inverse rotation (90, 180, 270); after every press the test compares the point LVGL finally read with the aimed point and records a failure if they differ, so a test that misses cannot pass again. The screens were right; the test was wrong. **Seen on** Tab5 ST7121, commits `7b435eb` and `8f6c28d` (failing) and `176de0d` (fixed), 07/11/2026. **Evidence**: journal lines `GESTE … appui reçu 0, relâchement reçu 0, clic reçu 0` then `1, 1, 1`; 29 checks, 0 failures at `176de0d`. **Status**: resolved (in the test).
+
+#### Internal RAM down to 20 bytes while the settings are open, and the weather failing
+
+**Symptom.** With the settings open about 13 to 18 s after boot: `MEMOIRE … interne_libre=535 plus_gros_bloc=160 interne_min=20` and `mdns_send: Cannot allocate memory`. On the **normal** binary, settings never opened: `esp-aes: Failed to allocate memory for the array of DMA descriptors` then `meteo: essai raté (HTTP 0)`.
+
+**Cause (a reading, partly measured).** The weather's TLS handshake (about 65 to 76 KB of internal RAM) starts about 13 s after boot, with 96.8 KB free just before. The settings list takes about 21.5 KB of internal RAM (8.8 KB of objects and styles, 12.6 KB at the first draw) and about 22 KB of PSRAM once the glyph bitmaps go there (`e686310`). Together they empty the internal heap. My first reading, "the list alone takes 28 KB", came from a measure taken while the TLS was already running.
+
+**Solution.** Not done: TLS, `sdkconfig` and LVGL's allocation are not on the settings track. Proposed: mbedTLS in PSRAM (`4f6bd0a`, `jalon-1b` track), then measure again with the same `MEMOIRE` lines; if still too tight, put LVGL objects in PSRAM (custom allocation) or lower `SPIRAM_MALLOC_ALWAYSINTERNAL`. **Seen on** Tab5 ST7121, commits `8f6c28d` and `176de0d`, 07/11/2026. **Evidence**: `MEMOIRE` lines of the test journal and the `meteo` log lines ([mesures/6-reglages-appareil.md](mesures/6-reglages-appareil.md), section 4.3). **Status**: open (no crash or unexpected restart seen; zero margin).
+
 #### A mutation keeps the compiler busy for minutes
 
 **Cause.** The proof by mutation compiles the tests with one change in the core. A mutant that removes the exit condition of a `constexpr` loop (here `&& base < PERIODE_S` in `delai_avant_essai_s`) makes clang evaluate the loop up to its limit of 2 billion steps (`-fconstexpr-steps=2000000000`, set so that the tests which read a real response compile): 765 s of CPU measured before the compiler was stopped.
@@ -577,6 +593,22 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 - **Reste ouvert** : les touches du clavier mesurent 59 px de haut à 1280×720 (49 px à 1024×600) dans les langues à rangée d'accents (fr, nl, es, it) → six rangées ne peuvent pas dépasser 55 % de l'écran en paysage ; à cinq rangées (en, de, tr) elles font exactement 72 px.
 
 **Vu sur** banc de rendu PC (LVGL 9.5.0 logiciel, `tools/rendre.ps1`), branche `claude/reglages-ecran-aea4e2`, 06/11/2026. **Preuve** : parcours `zones-tactiles-reglages`, `zones-tactiles-installation` et `curseur-au-doigt` (`tools/rendu/scenes/scene_parcours.cpp` ; le dernier passe par un pointeur LVGL et `lv_indev_search_obj`, donc par la recherche d'objet de LVGL elle-même) dans 7 langues × 3 tailles ; quatre fautes sur cinq introduites exprès sont détectées (la cinquième, un bouton remis à 56 px, est neutralisée par `min_height`). **Statut** : résolu sur le PC pour les boutons, le curseur et l'indicateur de défilement ; touches du clavier : décision ouverte ; non vu sur une carte (doigt réel, taille physique de la cible : non vérifiés).
+
+#### Essai sur la carte : le doigt virtuel tombe sur le mauvais objet
+
+**Symptôme.** Aux deux premiers passages de l'essai des réglages sur la carte, un toucher au centre de « Affichage » ouvrait la page « Appareil », « Retour » ne faisait rien, et le bouton visé ne recevait ni appui, ni relâchement, ni clic (compteurs 0, 0, 0), alors que `lv_indev_search_obj()` trouvait ce bouton à ce point précis.
+
+**Cause.** `lv_indev.c:743` appelle `lv_display_rotate_point()` sur chaque point lu par un pointeur, parce que les pilotes tactiles donnent des coordonnées **brutes** de la dalle (`components/bsp_tab5/tab5_touch.c` le dit). Le pointeur virtuel de l'essai donnait des coordonnées logiques : le point était tourné deux fois. (639, 424) devenait (855, 639), dans la rangée « Appareil » ; (86, 43) devenait (1236, 86), sur rien. Un `grep rotation` sur `lv_indev.c` ne trouve rien : la fonction s'appelle `rotate_point`.
+
+**Solution.** `vers_brut()` dans `main/autotest_reglages.cpp` donne la rotation inverse (90, 180, 270) ; après chaque appui, l'essai compare le point que LVGL a fini par lire au point visé et note un échec s'ils diffèrent : un essai à côté ne peut plus passer. Les écrans étaient justes ; c'est l'essai qui avait tort. **Vu sur** Tab5 ST7121, commits `7b435eb` et `8f6c28d` (échec) et `176de0d` (corrigé), 07/11/2026. **Preuve** : lignes `GESTE … appui reçu 0, relâchement reçu 0, clic reçu 0` puis `1, 1, 1` ; 29 vérifications, 0 échec à `176de0d`. **Statut** : résolu (dans l'essai).
+
+#### RAM interne tombée à 20 octets pendant que les réglages sont ouverts, et la météo qui échoue
+
+**Symptôme.** Réglages ouverts 13 à 18 s après le démarrage : `MEMOIRE … interne_libre=535 plus_gros_bloc=160 interne_min=20` et `mdns_send: Cannot allocate memory`. Sur le binaire **normal**, réglages jamais ouverts : `esp-aes: Failed to allocate memory for the array of DMA descriptors` puis `meteo: essai raté (HTTP 0)`.
+
+**Cause (une lecture, en partie mesurée).** La poignée de main TLS de la météo (≈ 65 à 76 Ko de RAM interne) démarre vers 13 s après le démarrage, avec 96,8 Ko libres juste avant. La liste des réglages prend ≈ 21,5 Ko de RAM interne (8,8 Ko d'objets et de styles, 12,6 Ko au premier dessin) et ≈ 22 Ko de PSRAM depuis que les bitmaps de glyphes y vont (`e686310`). Ensemble ils vident le tas interne. Ma première lecture, « la liste seule prend 28 Ko », venait d'une mesure prise alors que le TLS tournait déjà.
+
+**Solution.** Non faite : le TLS, `sdkconfig` et l'allocation de LVGL ne sont pas sur la piste des réglages. Proposé : mbedTLS en PSRAM (`4f6bd0a`, piste `jalon-1b`), puis mesurer de nouveau avec les mêmes lignes `MEMOIRE` ; si c'est encore trop juste, mettre les objets LVGL en PSRAM (allocation personnalisée) ou baisser `SPIRAM_MALLOC_ALWAYSINTERNAL`. **Vu sur** Tab5 ST7121, commits `8f6c28d` et `176de0d`, 07/11/2026. **Preuve** : lignes `MEMOIRE` du journal de l'essai et lignes `meteo` ([mesures/6-reglages-appareil.md](mesures/6-reglages-appareil.md), section 4.3). **Statut** : ouvert (aucun plantage ni redémarrage inattendu vu ; marge nulle).
 
 #### Une mutation occupe le compilateur pendant des minutes
 
