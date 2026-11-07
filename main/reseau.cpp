@@ -66,6 +66,12 @@ constexpr std::size_t kLongMotDePasse =
 constexpr std::size_t kReseauxGardes = 24;  // lignes de la liste de l'écran
 constexpr std::size_t kPointsAccesLus = 64; // points d'accès lus à la radio (un réseau peut en avoir plusieurs)
 constexpr int64_t kDelaiScanUs = 15000000;  // une recherche sans réponse est abandonnée
+// Place minimale en mémoire interne pour lancer une recherche : l'appel à la radio (esp_hosted, liaison avec le C6) crée des
+// sémaphores et des tampons INTERNES, et s'il n'y a plus de place le pilote échoue sur un `assert` : la carte redémarre (deux fois le
+// 07/11/2026, réglages ouverts, 9,7 Ko libres, plus gros bloc 4,6 Ko). Mieux vaut refuser la recherche. Valeurs à confirmer par la
+// mesure du coût d'un scan (voir docs/mesures/memoire-interne.md).
+constexpr std::size_t kScanLibreInterneMin = 16 * 1024;
+constexpr std::size_t kScanBlocInterneMin = 8 * 1024;
 constexpr int64_t kDelaiBasculeUs = 300000; // entre la coupure de l'ancien réseau et la connexion au nouveau
 constexpr int32_t kMsgDemarrer = 1;         // messages postés à la boucle d'événements
 constexpr int32_t kMsgAbandonner = 2;
@@ -309,6 +315,14 @@ void terminer_recherche() {
 // Message « scanner ».
 void lancer_recherche() {
     if (wifi::occupe(g_essai)) {
+        terminer_recherche();
+        return;
+    }
+    if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < kScanLibreInterneMin ||
+        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) < kScanBlocInterneMin) {
+        ESP_LOGW(TAG, "recherche de réseaux refusée : mémoire interne trop juste (%u o libres, plus gros bloc %u o)",
+                 static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+                 static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)));
         terminer_recherche();
         return;
     }
