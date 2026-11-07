@@ -106,6 +106,58 @@ constexpr int cause_autre_n_arrete_jamais_l_essai() {
     return 0;
 }
 
+constexpr int une_cause_autre_ne_casse_pas_une_serie_de_preuves() {
+    w::Sortie s = w::demarrer(w::Essai{}, true);
+    s = w::sur_deconnexion(s.etat, w::raison::AUTHENTIFICATION);
+    s = w::sur_deconnexion(s.etat, 205); // CONNECTION_FAIL : ni preuve ni démenti
+    s = w::sur_deconnexion(s.etat, 2);   // AUTH_EXPIRE : idem
+    VERIFIER(s.etat.phase == Phase::Essai && s.etat.preuves == 1 && s.etat.cause_connue);
+    s = w::sur_deconnexion(s.etat, w::raison::AUTHENTIFICATION);
+    VERIFIER(s.etat.phase == Phase::Retour && s.appliquer_ancien);
+    s = w::sur_adresse_ip(s.etat);
+    VERIFIER(s.rappeler && s.resultat == Resultat::MotDePasseRefuse);
+    return 0;
+}
+
+// Suite de raisons relevée sur la carte pour un mot de passe faux (Tab5 ST7121, 07/11/2026, journal de l'essai « faux ») :
+// 8 (nous quittons l'ancien réseau), 2, 205, 2, 205, 202, puis le délai de 30 s. Seul « 202 » est sûr, et tard.
+constexpr int serie_relevee_sur_la_carte_mot_de_passe_faux() {
+    const int codes[] = {8, 2, 205, 2, 205, 202};
+    w::Sortie s = w::demarrer(w::Essai{}, true);
+    for (const int c : codes) {
+        s = w::sur_deconnexion(s.etat, c);
+        VERIFIER(s.etat.phase == Phase::Essai && !s.appliquer_ancien && !s.rappeler);
+    }
+    s = w::sur_delai_essai(s.etat);
+    VERIFIER(s.etat.phase == Phase::Retour && s.appliquer_ancien && s.etat.attendu == Resultat::MotDePasseRefuse);
+    // Si la radio avait ajouté une cause « autre » après le « 202 », le résultat serait le même.
+    s = w::demarrer(w::Essai{}, true);
+    for (const int c : codes) {
+        s = w::sur_deconnexion(s.etat, c);
+    }
+    s = w::sur_deconnexion(s.etat, 205);
+    s = w::sur_delai_essai(s.etat);
+    VERIFIER(s.etat.attendu == Resultat::MotDePasseRefuse);
+    s = w::sur_adresse_ip(s.etat);
+    VERIFIER(s.rappeler && s.resultat == Resultat::MotDePasseRefuse && s.etat.phase == Phase::Repos);
+    return 0;
+}
+
+// Réseau qui n'existe pas (même carte, même jour) : 8, 201 (+2,7 s), 201 (+7,2 s) → échec dit dès la deuxième preuve.
+constexpr int serie_relevee_sur_la_carte_reseau_introuvable() {
+    const int codes[] = {8, 201};
+    w::Sortie s = w::demarrer(w::Essai{}, true);
+    for (const int c : codes) {
+        s = w::sur_deconnexion(s.etat, c);
+        VERIFIER(s.etat.phase == Phase::Essai);
+    }
+    s = w::sur_deconnexion(s.etat, 201);
+    VERIFIER(s.etat.phase == Phase::Retour && s.appliquer_ancien && !s.rappeler);
+    s = w::sur_adresse_ip(s.etat);
+    VERIFIER(s.rappeler && s.resultat == Resultat::ReseauIntrouvable);
+    return 0;
+}
+
 constexpr int la_deconnexion_provoquee_par_nous_est_ignoree() {
     w::Sortie s = w::demarrer(w::Essai{}, true);
     for (int i = 0; i < 5;
@@ -219,6 +271,11 @@ constexpr int evenements_hors_phase_sans_effet() {
     VERIFIER(s.etat.phase == Phase::Repos && !s.rappeler && !s.adopter_nouveau);
     s = w::sur_deconnexion(repos, w::raison::AUTHENTIFICATION);
     VERIFIER(s.etat.phase == Phase::Repos && !s.appliquer_ancien && !s.rappeler);
+    // Plusieurs déconnexions de suite au repos (le Wi-Fi qui cherche son réseau) ne comptent jamais comme des preuves.
+    for (int i = 0; i < 4; ++i) {
+        s = w::sur_deconnexion(s.etat, w::raison::AUTHENTIFICATION);
+        VERIFIER(s.etat.phase == Phase::Repos && !s.appliquer_ancien && !s.rappeler && s.etat.preuves == 0);
+    }
     s = w::sur_delai_essai(repos);
     VERIFIER(s.etat.phase == Phase::Repos && !s.appliquer_ancien && !s.rappeler);
     s = w::sur_delai_retour(repos);
@@ -230,6 +287,10 @@ constexpr int evenements_hors_phase_sans_effet() {
     r = w::sur_delai_essai(r.etat);
     r = w::sur_deconnexion(r.etat, w::raison::AUTHENTIFICATION);
     VERIFIER(r.etat.phase == Phase::Retour && !r.rappeler && !r.appliquer_ancien);
+    for (int i = 0; i < 4; ++i) {
+        r = w::sur_deconnexion(r.etat, w::raison::AUCUN_POINT_D_ACCES);
+        VERIFIER(r.etat.phase == Phase::Retour && !r.rappeler && !r.appliquer_ancien);
+    }
     return 0;
 }
 
@@ -270,6 +331,9 @@ constexpr int un_nouvel_essai_repart_de_zero() {
     X(deux_codes_differents_de_la_meme_cause_comptent_ensemble)                                                        \
     X(causes_differentes_ne_s_additionnent_pas)                                                                        \
     X(cause_autre_n_arrete_jamais_l_essai)                                                                             \
+    X(une_cause_autre_ne_casse_pas_une_serie_de_preuves)                                                               \
+    X(serie_relevee_sur_la_carte_mot_de_passe_faux)                                                                    \
+    X(serie_relevee_sur_la_carte_reseau_introuvable)                                                                   \
     X(la_deconnexion_provoquee_par_nous_est_ignoree)                                                                   \
     X(delai_sans_aucune_cause_rend_autre)                                                                              \
     X(delai_garde_la_derniere_cause_vue)                                                                               \

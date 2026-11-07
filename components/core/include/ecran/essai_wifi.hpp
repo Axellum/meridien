@@ -9,8 +9,11 @@
 //  - Tous les événements arrivent dans le MÊME contexte (la boucle d'événements du système) : cette machine n'a aucun verrou.
 //  - Une cause « sûre » (mot de passe refusé, réseau introuvable) arrête l'essai plus tôt que le délai, mais seulement quand la
 //    MÊME cause a été vue SEUIL_PREUVES fois de suite : un seul échec isolé (brouillage, balise manquée) ne condamne pas un bon mot
-//    de passe. Une cause « autre » n'arrête jamais l'essai : seul le délai le fait.
-//  - La déconnexion que NOUS provoquons (quitter l'ancien réseau pour essayer le nouveau, code 8) n'est pas un échec de l'essai.
+//    de passe. Une cause « autre » n'arrête jamais l'essai et ne compte pas : elle n'est ni une preuve ni un démenti (mesuré sur
+//    la carte : pour un mot de passe faux la radio répète « 2 » et « 205 » et ne dit « 202 » qu'à la fin), seul le délai tranche ;
+//    au délai, c'est la dernière cause sûre vue qui est dite.
+//  - La déconnexion que NOUS provoquons (quitter l'ancien réseau pour essayer le nouveau, code 8) n'est pas un échec de l'essai :
+//    le code 8 n'est pas une cause sûre, il tombe donc dans « autre ».
 //  - Après un abandon (la personne a quitté l'écran), le retour arrière a lieu quand même mais le rappel n'est plus appelé.
 //  - Rien ici ne voit le SSID ni le mot de passe.
 #pragma once
@@ -72,7 +75,7 @@ struct Essai {
     Phase phase = Phase::Repos;
     bool avait_ancien = false; // il y avait un réseau à reprendre
     bool muet = false;         // abandon : plus de rappel
-    bool cause_connue = false; // au moins une déconnexion expliquée vue pendant l'essai
+    bool cause_connue = false; // au moins une cause sûre vue pendant l'essai
     Resultat derniere_cause = Resultat::Autre;
     Resultat attendu = Resultat::Autre; // ce que dira le rappel quand l'ancien réseau sera revenu
     std::uint8_t preuves = 0;           // nombre de fois de suite que derniere_cause a été vue
@@ -147,10 +150,13 @@ constexpr Sortie sur_adresse_ip(Essai e) noexcept {
 constexpr Sortie sur_deconnexion(Essai e, int code) noexcept {
     Sortie s;
     s.etat = e;
-    if (e.phase != Phase::Essai || code == raison::FIN_D_ASSOCIATION) {
+    if (e.phase != Phase::Essai) {
         return s;
     }
     const Resultat cause = resultat_pour_raison(code);
+    if (cause == Resultat::Autre) {
+        return s; // ni preuve ni démenti ; c'est aussi le sort du code 8, la déconnexion que nous provoquons nous-mêmes
+    }
     if (e.cause_connue && e.derniere_cause == cause) {
         if (e.preuves < 255) {
             ++e.preuves;
@@ -160,7 +166,7 @@ constexpr Sortie sur_deconnexion(Essai e, int code) noexcept {
         e.derniere_cause = cause;
         e.preuves = 1;
     }
-    if (cause != Resultat::Autre && e.preuves >= SEUIL_PREUVES) {
+    if (e.preuves >= SEUIL_PREUVES) {
         return detail::echec(e, cause);
     }
     s.etat = e;
