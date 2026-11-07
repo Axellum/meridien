@@ -72,24 +72,25 @@ Constaté sur les réponses réelles : des avertissements qui se suivent à la s
 | Contrôle | Résultat | Commande |
 | --- | --- | --- |
 | Tests du noyau des alertes (lecture, vue, textes, requête, planning, thèmes, pastille, réglages) | tout passe, mode « complet (compilé + exécuté) » | `python test/host/lancer.py --seulement reglages_alertes,vigie,visuel_themes` |
-| Mutations du noyau des alertes | 240 sur 240 détectées, 0 problème | `python test/host/lancer.py --mutations --seulement reglages_alertes,vigie,visuel_themes` |
-| Suite complète du noyau | 963 tests exécutés avec ASan + UBSan, tout passe (mode « complet »), puis par le crochet de chaque commit | `python test/host/lancer.py` |
+| Mutations du noyau des alertes (avant la fusion, commit `4081efb`) | 240 sur 240 détectées, 0 problème | `python test/host/lancer.py --mutations --seulement reglages_alertes,vigie,visuel_themes` |
+| Mutations après la fusion de `integration/essai-3` et la règle `hh:59:59` (commit `331c3be`) | **233 sur 233** détectées, 0 problème, sur les fichiers que la fusion touche : hôte de l'appareil + vue des alertes 90, registre + pages + traduction 79, API des réglages + réglages des alertes 64 ; sources météo par pays : 19 jouées sur 37, toutes détectées, lot arrêté faute de temps (≈ 2 minutes par mutation sous contention, fichier que la fusion ne modifie pas) : les 18 autres restent à rejouer. Le reste des 1 201 mutations (fichiers que la fusion ne touche pas) n'a **pas** été rejoué ici : c'est le travail de `.\tools\verifier.ps1` complet | `python test/host/lancer.py --mutations --seulement <fichier de test>` (lots par fichier cible de la mutation) |
+| Suite complète du noyau | 963 tests avant la fusion ; **1 026 tests** exécutés avec ASan + UBSan après la fusion et la règle `hh:59:59` (49 fichiers, 0 échec, mode « complet »), puis par le crochet de chaque commit | `python test/host/lancer.py` |
 | Mutations des réglages (hôte de l'appareil, API, registre) | 47 + 23 + 48 = 118 sur 118 détectées, 0 problème | `python test/host/lancer.py --mutations --seulement test_hote_appareil` (idem `test_api_reglages`, `test_registre_reglages`) |
-| Page du téléphone (Chromium 390×844 contre le faux appareil) | 129 vérifications sur 129 (dont 10 pour les alertes) ; poids gzip de la page avec le français 18 223 octets pour un budget de 30 720 | `python web/tests/parcours.py` |
+| Page du téléphone (Chromium 390×844 contre le faux appareil) | 146 vérifications sur 146 après la fusion (dont 10 pour les alertes) ; poids gzip de la page avec le français 18 958 octets, avec la langue la plus lourde (allemand) 19 190, pour un budget de 30 720 | `python web/tests/parcours.py` |
 | Rendus PC | scène `alertes` (9 variantes : pastille et page pour Oslo, La Palma et Eberswalde, page vide, pastille dans tous ses états, écran sans alerte) et deux scènes de réglages (`lieu-alertes`, `alertes-adresse-saisie`), en français et allemand (réglages) et en français, anglais, allemand et turc (alertes), 720×1280 | `.\tools\rendre.ps1 -Scene alertes` et `-Scene reglages -Variante lieu-alertes,alertes-adresse-saisie` |
 | Seconde lecture indépendante | les `.inc` attendus sont à jour | `python test/host/controle_python_vigie.py --verifier` |
 | Police | les 790 caractères de la table du noyau sont tous dans `roboto_700.ttf` | `controle_python_vigie.py` |
 
 ### Compilation (constatée, rien n'est flashé)
 
-**Vu sur** : PC d'Axel, ESP-IDF 5.5.5 (installation d'ESPHome, non modifiée), `CMAKE_BUILD_PARALLEL_LEVEL=4`, commit `4081efb`, 07/11/2026 12:25–12:27, verrou `build` tenu puis rendu. Aucune carte.
+**Vu sur** : PC d'Axel, ESP-IDF 5.5.5 (installation d'ESPHome, non modifiée), `CMAKE_BUILD_PARALLEL_LEVEL=4`, commit `331c3be` (fusion de `integration/essai-3` dans la branche des alertes, puis règle `hh:59:59`), 07/11/2026 13:29–13:31, verrou `build` tenu puis rendu. Aucune carte. La première compilation, du commit `4081efb` (alertes seules, 12:25–12:27), donnait 2 885 536 octets pour le Tab5 et 2 866 224 pour la 7B.
 
 | Carte | Fichier | Octets | SHA-256 | Avertissements |
 | --- | --- | ---: | --- | ---: |
-| Tab5 (`tab5`) | `build/meridien.bin` | 2 885 536 | `624210351B878636FBA8450CCDD07DBFC7CDAA9D2FA296229CB7B1B9D376EA39` | 0 |
-| Waveshare 7B | `build/7b/meridien.bin` | 2 866 224 | `AD46ECC2D631D76C629F0EC74EE05C191B8C9BB660F64B429071985F4DC64F26` | 0 |
+| Tab5 (`tab5`) | `build/meridien.bin` | 2 902 864 | `7E911A32B6411A0DE22CA6DDE58229BC8DE23F5EE14C6030ED06DD0B0E360666` | 0 |
+| Waveshare 7B | `build/7b/meridien.bin` | 2 883 472 | `03D98A66DA2B8C395614E9CBB732847A28078F46E1652D5AB4D49AA8995B51F2` | 0 |
 
-Copies, avec les `.elf` (pour décoder un plantage), dans le dossier de notes partagé `alertes-vigie-binaires\`. L'emplacement d'application des deux cartes fait 4 Mo : le Tab5 en prend ≈ 69 % (≈ 31 % libres). Par rapport à `main` au commit `9c89ad5` (Tab5 2 834 336 octets, 7B 2 814 896 octets, d'après la note de passation de l'étape 1, non remesurés ici), le firmware des alertes pèse ≈ **51 Ko de plus** sur chaque carte (+1,8 %). Cette compilation prouve que le code compile et se lie ; elle ne prouve **rien** sur le comportement : la 7B n'a été que compilée (aucun essai physique), et le Tab5 n'a pas été flashé non plus.
+Copies, avec les `.elf` (pour décoder un plantage), dans le dossier de notes partagé `alertes-vigie-binaires\fusion-essai-3\` (`tab5\` et `7b\`). L'emplacement d'application des deux cartes fait 4 Mo : le Tab5 en prend ≈ 69 % (≈ 31 % libres). Par rapport à la compilation des alertes seules (`4081efb`), la fusion ajoute ≈ **17 Ko** à chaque carte (Tab5 +17 328 octets, 7B +17 248) : la source météo par pays, le client réseau commun et le correctif de l'écran de la 7B, de l'autre côté de la fusion. Les deux mettent le firmware à ≈ 69 % de l'emplacement de 4 Mo. Cette compilation prouve que le code compile et se lie ; elle ne prouve **rien** sur le comportement : la 7B n'a été que compilée (aucun essai physique), et le Tab5 n'a pas été flashé non plus.
 
 **Ce que les rendus PC ont fait corriger.** La fin d'une alerte (« dimanche 8 novembre · 00:59 ») passait à la ligne après les deux-points (« 00: » puis « 59 ») parce que le moteur de texte de l'écran traite « : » comme une espace ; l'heure passe donc en premier (« 00:59 · dimanche 8 novembre »), voir [depannage.md](../depannage.md). Les rendus ne sont **pas** une photo de la carte : couleurs, lisibilité à 2 m et appui sont à juger sur la dalle (section 5).
 
