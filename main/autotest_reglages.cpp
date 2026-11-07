@@ -186,6 +186,27 @@ void lire_doigt(lv_indev_t *, lv_indev_data_t *donnees) {
     donnees->state = g_appuye ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }
 
+// LVGL tourne le point qu'un pointeur lui donne selon la rotation de l'écran (lv_indev.c : lv_display_rotate_point), parce que les
+// pilotes tactiles rendent des coordonnées BRUTES de la dalle (portrait 720 x 1280 sur le Tab5, voir bsp_tab5/tab5_touch.c). Le doigt
+// virtuel doit donc donner l'inverse de cette rotation pour tomber sur le point LOGIQUE visé. Premier essai (07/11/2026) : sans
+// cela le point était tourné deux fois, « Affichage » ouvrait « Appareil » et « Retour » ne touchait rien ; ce n'était pas un défaut
+// des écrans mais de l'essai.
+lv_point_t vers_brut(lv_point_t logique) {
+    lv_display_t *disp = board_get_display();
+    const int32_t w = lv_display_get_horizontal_resolution(disp); // logique : la rotation est comprise
+    const int32_t h = lv_display_get_vertical_resolution(disp);
+    switch (lv_display_get_rotation(disp)) {
+    case LV_DISPLAY_ROTATION_90:
+        return {logique.y, w - 1 - logique.x};
+    case LV_DISPLAY_ROTATION_180:
+        return {w - 1 - logique.x, h - 1 - logique.y};
+    case LV_DISPLAY_ROTATION_270:
+        return {h - 1 - logique.y, logique.x};
+    default:
+        return logique;
+    }
+}
+
 void poser(int32_t x, int32_t y, bool appuye) {
     if (g_doigt == nullptr) {
         g_doigt = lv_indev_create();
@@ -193,9 +214,18 @@ void poser(int32_t x, int32_t y, bool appuye) {
         lv_indev_set_read_cb(g_doigt, lire_doigt);
         lv_indev_set_display(g_doigt, board_get_display());
     }
-    g_position = {x, y};
+    g_position = vers_brut({x, y});
     g_appuye = appuye;
     lv_indev_read(g_doigt);
+    // Garde-fou : le point que LVGL a fini par lire (après sa propre rotation) doit être celui visé ; sinon l'essai ne prouve rien.
+    lv_point_t lu{0, 0};
+    lv_indev_get_point(g_doigt, &lu);
+    if (lu.x != x || lu.y != y) {
+        char phrase[120];
+        std::snprintf(phrase, sizeof phrase, "le point lu par LVGL (%d, %d) est le point visé (%d, %d)",
+                      static_cast<int>(lu.x), static_cast<int>(lu.y), static_cast<int>(x), static_cast<int>(y));
+        verifier(false, phrase);
+    }
 }
 
 // Ce que reçoit l'objet visé pendant le geste : sert à distinguer « le toucher n'arrive pas » de « il arrive mais rien ne suit ».
