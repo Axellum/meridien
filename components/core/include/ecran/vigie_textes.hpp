@@ -62,6 +62,12 @@ inline constexpr Mot MOTS[] = {
      {"Not given", "Nicht angegeben", "Niet opgegeven", "No indicada", "Non indicata", "Belirtilmedi"}},
     {"Reçu à", {"Received at", "Empfangen um", "Ontvangen om", "Recibido a las", "Ricevuto alle", "Alındığı saat"}},
     {"Fermer", {"Close", "Schließen", "Sluiten", "Cerrar", "Chiudi", "Kapat"}},
+    {"Aucune alerte en vigueur",
+     {"No warning in force", "Keine Warnung in Kraft", "Geen waarschuwing van kracht", "Ningún aviso en vigor",
+      "Nessuna allerta in vigore", "Yürürlükte uyarı yok"}},
+    {"Alertes relayées par Vigie",
+     {"Warnings relayed by Vigie", "Über Vigie weitergegebene Warnungen", "Door Vigie doorgegeven waarschuwingen",
+      "Avisos transmitidos por Vigie", "Allerte inoltrate da Vigie", "Vigie üzerinden aktarılan uyarılar"}},
     // --- phrases fixes ---
     {"Ceci n'est pas un service d'alerte officiel. Suivez les avis de vos autorités nationales.",
      {"This is not an official warning service. Follow the warnings of your national authorities.",
