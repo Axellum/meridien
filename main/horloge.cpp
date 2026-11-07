@@ -2,6 +2,7 @@
 
 #include "ecran/fuseaux.hpp"
 #include "ecran/heure_fr.hpp"
+#include "ecran/visuel_dates.hpp"
 
 namespace ecran {
 
@@ -50,6 +51,27 @@ bool horloge_hhmm(int64_t instant_utc_s, char *sortie, std::size_t capacite) {
     sortie[4] = static_cast<char>('0' + locale.minute % 10);
     sortie[5] = '\0';
     return true;
+}
+
+bool horloge_date_localisee(int64_t instant_utc_s, i18n::Langue langue, char *sortie, std::size_t capacite) {
+    if (sortie == nullptr || capacite == 0) {
+        return false;
+    }
+    sortie[0] = '\0';
+    const heure::AnalyseTz &analyse = fuseau_local();
+    if (!analyse.ok()) {
+        return false;
+    }
+    const heure::HeureLocale locale = heure::en_heure_locale(instant_utc_s, analyse.fuseau);
+    return visuel::formater_date(langue, locale, sortie, capacite) > 0;
+}
+
+int32_t horloge_decalage_s(int64_t instant_utc_s) {
+    const heure::AnalyseTz &analyse = fuseau_local();
+    if (!analyse.ok()) {
+        return 0;
+    }
+    return heure::en_heure_locale(instant_utc_s, analyse.fuseau).decalage_s;
 }
 
 } // namespace ecran
