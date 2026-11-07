@@ -145,6 +145,28 @@ constexpr int le_texte_d_une_alerte_se_lit_sur_sa_pastille_et_la_pastille_sur_le
     return 0;
 }
 
+constexpr int le_texte_d_une_alerte_officielle_se_lit_sur_sa_pastille_et_la_pastille_sur_le_fond() {
+    const int niveaux[] = {0, 2, 3, 4}; // inconnu, jaune, orange, rouge : le vert (1) n'est jamais montré
+    for (const ThemePrincipal *t : THEMES) {
+        for (const int n : niveaux) {
+            VERIFIER(contraste(t->texte_sur_couleur, t->officielle[n]) >= TEXTE);
+        }
+        VERIFIER(pour_chaque_arriere_plan(*t, [&](std::uint32_t fond, std::uint32_t carte) {
+            for (const int n : niveaux) {
+                if (contraste(t->officielle[n], fond) < ICONE || contraste(t->officielle[n], carte) < ICONE)
+                    return false;
+            }
+            return true;
+        }));
+        // Les trois niveaux se distinguent, et « inconnu » n'emprunte la couleur d'aucun d'eux (on ne devine pas la gravité).
+        VERIFIER(t->officielle[2] != t->officielle[3] && t->officielle[3] != t->officielle[4] &&
+                 t->officielle[2] != t->officielle[4]);
+        VERIFIER(t->officielle[0] != t->officielle[2] && t->officielle[0] != t->officielle[3] &&
+                 t->officielle[0] != t->officielle[4]);
+    }
+    return 0;
+}
+
 constexpr int la_mesure_de_contraste_donne_les_valeurs_connues_de_la_norme() {
     // Noir sur blanc : 21:1 ; gris #767676 sur blanc : 4,54:1 (le seuil classique) ; deux couleurs identiques : 1:1.
     VERIFIER(contraste(0x000000, 0xFFFFFF) > 20.9 && contraste(0x000000, 0xFFFFFF) < 21.1);
@@ -197,6 +219,9 @@ constexpr int les_themes_sont_complets_et_distincts() {
         for (int a = 1; a < 6; ++a) {
             VERIFIER(THEMES[i]->alerte[a] != 0);
         }
+        for (int n = 0; n < 5; ++n) {
+            VERIFIER(THEMES[i]->officielle[n] != 0);
+        }
         // trois niveaux de texte distincts et décroissants en contraste
         VERIFIER(THEMES[i]->texte != THEMES[i]->texte_2 && THEMES[i]->texte_2 != THEMES[i]->texte_3);
     }
@@ -215,6 +240,10 @@ constexpr int les_accesseurs_par_role_lisent_le_bon_tableau() {
     VERIFIER(couleur_uv(kThemeCiel, CategorieUv::INCONNU) == kThemeCiel.texte_3);
     VERIFIER(couleur_alerte(kThemeCiel, Alerte::GEL) == kThemeCiel.alerte[1]);
     VERIFIER(couleur_alerte(kThemeCiel, Alerte::ORAGE) == kThemeCiel.alerte[5]);
+    VERIFIER(couleur_officielle(kThemeCiel, 2) == kThemeCiel.officielle[2]);
+    VERIFIER(couleur_officielle(kThemeCiel, 4) == kThemeCiel.officielle[4]);
+    VERIFIER(couleur_officielle(kThemeCiel, -1) == kThemeCiel.officielle[0]); // hors plage : le neutre
+    VERIFIER(couleur_officielle(kThemeCiel, 5) == kThemeCiel.officielle[0]);
     // une carte pleine garde sa teinte, une carte transparente prend celle du fond
     VERIFIER(carte_sur(kThemeTableauSombre, 0x123456) == kThemeTableauSombre.carte);
     ThemePrincipal t = kThemeCiel;
@@ -231,6 +260,7 @@ constexpr int les_accesseurs_par_role_lisent_le_bon_tableau() {
     X(chaque_icone_garde_3_pour_1_sur_la_carte_et_sur_le_fond)                                                         \
     X(les_couleurs_des_grandeurs_des_barres_et_des_niveaux_gardent_3_pour_1)                                           \
     X(le_texte_d_une_alerte_se_lit_sur_sa_pastille_et_la_pastille_sur_le_fond)                                         \
+    X(le_texte_d_une_alerte_officielle_se_lit_sur_sa_pastille_et_la_pastille_sur_le_fond)                              \
     X(la_mesure_de_contraste_donne_les_valeurs_connues_de_la_norme)                                                    \
     X(le_ciel_suit_le_moment_et_le_temps)                                                                              \
     X(les_themes_sont_complets_et_distincts)                                                                           \

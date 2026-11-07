@@ -45,8 +45,11 @@ struct ThemePrincipal {
     std::uint32_t metrique[NB_METRIQUES]; // couleur de chaque grandeur
     std::uint32_t niveau_uv[5];           // faible, modéré, élevé, très élevé, extrême
     std::uint32_t alerte[6];              // indexée par Alerte (l'indice 0, AUCUNE, n'est pas utilisé)
-    Rampe rampe;                          // température -> couleur
-    std::uint32_t pluie;                  // barres de pluie
+    std::uint32_t
+        officielle[5];   // alerte officielle de Vigie, indexée par son niveau : inconnu, vert, jaune, orange, rouge
+                         // (le vert n'est jamais montré ; l'inconnu est un neutre : on ne devine pas la gravité)
+    Rampe rampe;         // température -> couleur
+    std::uint32_t pluie; // barres de pluie
 };
 
 // ---- les quatre thèmes ----
@@ -70,6 +73,7 @@ inline constexpr ThemePrincipal kThemeCiel = {
     {0x8FD6FF, 0x66B8FF, 0x7FE0A8, 0xC3A6FF, 0xFFD25C, 0xFFB454, 0xE9E4CC},
     {0x7FE0A8, 0xFFD25C, 0xFFA24D, 0xFF6B5E, 0xD79BFF},
     {0, 0x8FD6FF, 0xFF9E73, 0xFFD25C, 0x66B8FF, 0xD79BFF},
+    {0xB4C2D2, 0x7FE0A8, 0xFFD25C, 0xFFA24D, 0xFF9A90},
     {{0x8FC4FF, 0x62D8FF, 0x84E8A0, 0xFFCB52, 0xFF7555}},
     0x5CB8FF,
 };
@@ -92,6 +96,7 @@ inline constexpr ThemePrincipal kThemeTableauSombre = {
     {0x7FD1FF, 0x58B4FF, 0x6FE3B0, 0xC3A6FF, 0xFFD25C, 0xFFB454, 0xE9E4CC},
     {0x6FE3B0, 0xFFD25C, 0xFFA24D, 0xFF6B5E, 0xD79BFF},
     {0, 0x7FD1FF, 0xFF8A5C, 0xFFD25C, 0x58B4FF, 0xD79BFF},
+    {0xA3B1C0, 0x6FE3B0, 0xFFD25C, 0xFFA24D, 0xFF6B5E},
     {{0x7FB2FF, 0x5CD6FF, 0x7BE495, 0xFFC94A, 0xFF6B4A}},
     0x58B4FF,
 };
@@ -114,6 +119,7 @@ inline constexpr ThemePrincipal kThemeHorloge = {
     {0x7FD1FF, 0x58B4FF, 0x6FE3B0, 0xC3A6FF, 0xFFD25C, 0xFFB454, 0xE9E4CC},
     {0x6FE3B0, 0xFFD25C, 0xFFA24D, 0xFF6B5E, 0xD79BFF},
     {0, 0x7FD1FF, 0xFF8A5C, 0xFFD25C, 0x58B4FF, 0xD79BFF},
+    {0xA3B1C0, 0x6FE3B0, 0xFFD25C, 0xFFA24D, 0xFF6B5E},
     {{0x7FB2FF, 0x5CD6FF, 0x7BE495, 0xFFC94A, 0xFF6B4A}},
     0x58B4FF,
 };
@@ -136,6 +142,7 @@ inline constexpr ThemePrincipal kThemeClair = {
     {0x0F78B0, 0x1E6FD0, 0x1B8A5A, 0x7A4FC2, 0xB06A00, 0xC25A00, 0x7A6A22},
     {0x1B8A5A, 0xB06A00, 0xC25A00, 0xC22F2F, 0x8E3FC0},
     {0, 0x0F78B0, 0xB85200, 0x8A5A00, 0x1E6FD0, 0x8E3FC0},
+    {0x4F5C6A, 0x1B8A5A, 0x8A6400, 0xB45309, 0xC22F2F},
     {{0x2F6FDB, 0x0A88B8, 0x2E9E55, 0xC77A00, 0xD0391E}},
     0x1E78D6,
 };
@@ -154,6 +161,11 @@ constexpr std::uint32_t couleur_uv(const ThemePrincipal &t, CategorieUv c) noexc
 }
 constexpr std::uint32_t couleur_alerte(const ThemePrincipal &t, Alerte a) noexcept {
     return t.alerte[static_cast<int>(a)];
+}
+// Couleur d'une alerte officielle de Vigie : `niveau` = 0 inconnu, 1 vert, 2 jaune, 3 orange, 4 rouge (ecran::vigie::Niveau) ; hors de
+// cette plage, le neutre de l'inconnu.
+constexpr std::uint32_t couleur_officielle(const ThemePrincipal &t, int niveau) noexcept {
+    return t.officielle[niveau >= 0 && niveau <= 4 ? niveau : 0];
 }
 
 // Couleur d'une carte posée sur `fond_rgb` (mélange de la teinte de la carte et du fond selon l'opacité du thème).
