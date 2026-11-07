@@ -34,6 +34,37 @@ const LIMITE_JSON = 4096, LIMITE_IMPORT = 16384, TAILLE_PARTITION = 4 * 1024 * 1
 
 /* ---------- les tables du noyau pur (même source que le firmware) ---------- */
 const FUSEAUX = new Map([...readFileSync(path.join(NOYAU, 'fuseaux_donnees.inc'), 'utf8').matchAll(/^\{"([^"]+)", "([^"]+)"\}/gm)].map((m) => [m[1], m[2]]));
+/* Les sources de météo (fournisseurs_meteo.hpp) : la table, ce que le lecteur du firmware tolère et la liste par pays sont lus dans le noyau
+   pur, pas recopiés. La règle « proposée » est celle de proposable() et de pour_pays() ; le test C++ la garde, ici on ne fait que la rejouer. */
+const TEXTE_SOURCES = readFileSync(path.join(NOYAU, 'fournisseurs_meteo.hpp'), 'utf8');
+const SOURCES = [...TEXTE_SOURCES.matchAll(/^\s*\{"(\w+)",\s+"([^"]+)",\s+(true|false),\s+Famille::OpenMeteo,\s+"([^"]*)",\s*"([^"]*)",\s+([^}]+)\},/gm)].map((m) => (
+  { id: m[1], libelle: m[2], traduit: m[3] === 'true', modeles: m[4], pays: m[5].split(' ').filter(Boolean), limites: (m[6].match(/limite::(\w+)/g) || []).map((x) => x.slice(8)) }));
+const LECTEUR_TOLERE = (TEXTE_SOURCES.match(/LECTEUR_TOLERE\s*=\s*([^;]+);/)[1].match(/limite::(\w+)/g) || []).map((x) => x.slice(8));
+if (SOURCES.length < 2 || SOURCES[0].id !== 'auto') throw new Error('table des sources illisible : fournisseurs_meteo.hpp a changé de forme ?');
+const proposable = (f) => f.limites.every((l) => LECTEUR_TOLERE.includes(l));
+const sourceDe = (id) => SOURCES.find((f) => f.id === id);
+const nomDeSource = (f) => (f.traduit ? T(f.libelle) : f.libelle);
+const codePays = () => (etat.zone && etat.zone.code_pays) || '';
+/* « Automatique » en tête, les sources nationales du pays, puis les mondiales : comme pour_pays(). */
+const sourcesPour = (code) => [
+  SOURCES[0],
+  ...SOURCES.slice(1).filter((f) => f.pays.length && proposable(f) && f.pays.includes(String(code).toUpperCase()) && String(code).length === 2),
+  ...SOURCES.slice(1).filter((f) => !f.pays.length && proposable(f)),
+];
+const champsSource = () => {
+  const f = sourceDe(etat.source) || SOURCES[0];
+  return { source_meteo: f.id, source_meteo_nom: nomDeSource(f), source_meteo_retablie: etat.sourceRetablie,
+    sources_meteo: sourcesPour(codePays()).map((s) => ({ id: s.id, nom: nomDeSource(s) })) };
+};
+const lieu = () => ({ ...(etat.zone || { definie: false }), ...champsSource() });
+/* Une nouvelle ville : la météo gardée est effacée ; une source qui ne couvre pas son pays repasse sur « Automatique » et on s'en souvient. */
+function poserZone(z) {
+  const avant = etat.source;
+  etat.zone = z;
+  etat.meteo = null;
+  etat.source = sourcesPour(z.code_pays).some((f) => f.id === avant) ? avant : 'auto';
+  etat.sourceRetablie = avant !== etat.source;
+}
 const WMO = new Map([...readFileSync(path.join(NOYAU, 'meteo_wmo.hpp'), 'utf8').matchAll(/case (\d+): return \{"([^"]+)"/g)].map((m) => [Number(m[1]), m[2]]));
 if (FUSEAUX.size < 400 || WMO.size !== 29) throw new Error('Tables du noyau illisibles : ' + FUSEAUX.size + ' fuseaux, ' + WMO.size + ' codes météo');
 
@@ -64,7 +95,7 @@ const T = (fr, vars) => {
 /* ---------- état de l'appareil (en mémoire) ---------- */
 const etat = {
   nom: 'ecran-1a2b', version: '0.1.0', precedente: '0.0.9', demarre: Date.now(),
-  zone: null, display: { langue_ecran: 'fr', langue_assistant: 'fr', theme: 'auto', luminosite: 80 },
+  zone: null, source: 'auto', sourceRetablie: false, display: { langue_ecran: 'fr', langue_assistant: 'fr', theme: 'auto', luminosite: 80 },
   services: { stt: null, llm: null, tts: null },
   wifi: { etat: 'connecte', ssid: 'Maison', niveau: 3, force: -61, ip: '192.168.1.52' }, // adresse d'exemple, pas celle d'un vrai réseau
   maj: { dernier: null }, redemarreJusqua: 0, meteo: null, scanFin: 0,
@@ -218,11 +249,14 @@ const releveMeteo = (c, perimee) => ({ disponible: true, perimee, mise_a_jour: c
 async function meteo() {
   const z = etat.zone;
   if (!z) return { disponible: false };
-  const cle = `${z.latitude},${z.longitude}`;
+  const cle = `${z.latitude},${z.longitude},${etat.source}`;
   if (etat.meteo && etat.meteo.cle === cle && Date.now() - etat.meteo.lu < 15 * 60 * 1000) return releveMeteo(etat.meteo.brut, false);
   try {
     const u = new URL('https://api.open-meteo.com/v1/forecast');
-    u.search = new URLSearchParams({ latitude: z.latitude, longitude: z.longitude, current: 'temperature_2m,apparent_temperature,is_day,weather_code', timeformat: 'unixtime', timezone: 'auto' }).toString();
+    const demande = { latitude: z.latitude, longitude: z.longitude, current: 'temperature_2m,apparent_temperature,is_day,weather_code', timeformat: 'unixtime', timezone: 'auto' };
+    const modeles = (sourceDe(etat.source) || SOURCES[0]).modeles;
+    if (modeles) demande.models = modeles; /* « Automatique » : aucun paramètre, la même adresse qu'avant ce réglage */
+    u.search = new URLSearchParams(demande).toString();
     const rep = await fetch(u, { signal: AbortSignal.timeout(8000) });
     if (!rep.ok) throw new Error('statut');
     const c = (await rep.json()).current;
@@ -377,11 +411,22 @@ async function api(req, res, url) {
     if (q.length > 80) throw new Refus(400, 'trop_long', T('Cette recherche est trop longue.'), 'q');
     return json(res, 200, { resultats: await geocoder(q) });
   }
-  if (m === 'GET' && p === '/api/location') return json(res, 200, etat.zone || { definie: false });
+  if (m === 'GET' && p === '/api/location') return json(res, 200, lieu());
   if (m === 'PUT' && p === '/api/location') {
-    etat.zone = validerZone(await lireJson(req));
-    etat.meteo = null;
-    return json(res, 200, etat.zone);
+    const c = await lireJson(req);
+    /* `source_meteo` seul ne touche pas à la ville ; avec une ville, il est jugé sur le pays de la NOUVELLE ville (comme api_reglages.hpp). */
+    const demande = c && typeof c === 'object' && 'source_meteo' in c ? c.source_meteo : undefined;
+    const seule = demande !== undefined && !('nom' in c);
+    const z = seule ? etat.zone : validerZone(c);
+    let choisie = null;
+    if (demande !== undefined) {
+      choisie = typeof demande === 'string' ? sourceDe(demande) : null;
+      if (!choisie) throw new Refus(422, 'source_inconnue', T('Cette source météo n’existe pas.'), 'source_meteo');
+      if (!sourcesPour(z ? z.code_pays : '').some((f) => f.id === choisie.id)) throw new Refus(422, 'source_indisponible', T('Cette source météo ne couvre pas le pays de la ville.'), 'source_meteo');
+    }
+    if (!seule) poserZone(z);
+    if (choisie) { etat.source = choisie.id; etat.sourceRetablie = false; etat.meteo = null; }
+    return json(res, 200, lieu());
   }
   if (m === 'GET' && p === '/api/weather') return json(res, 200, await meteo());
   /* affichage */
@@ -432,7 +477,7 @@ async function api(req, res, url) {
     if (f.format !== 'ecran-autonome-reglages' || !Number.isInteger(f.version) || f.version > 1) throw new Refus(422, 'format', T('Ce fichier ne vient pas de cet écran.'));
     const appliques = [], ignores = [], erreurs = [], aFaire = [];
     const essayer = (nom, fn) => { try { const r = fn(); aFaire.push(() => r()); appliques.push(nom); } catch (e) { if (e instanceof Refus) erreurs.push({ champ: nom, message: e.message }); else throw e; } };
-    if (f.zone) essayer('zone', () => { const z = validerZone(f.zone); return () => { etat.zone = z; etat.meteo = null; }; });
+    if (f.zone) essayer('zone', () => { const z = validerZone(f.zone); return () => poserZone(z); });
     if (f.affichage) {
       const brut = { ...f.affichage };
       if (brut.langue !== undefined && brut.langue_ecran === undefined) brut.langue_ecran = brut.langue; // sauvegarde faite avant la séparation des deux langues
