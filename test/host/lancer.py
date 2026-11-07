@@ -164,6 +164,7 @@ from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (page de régla
 from mutations_wifi import MUTATIONS_WIFI  # noqa: E402  (Wi-Fi : essai avec retour arrière, classement des réseaux)
 from mutations_visuel import MUTATIONS_VISUEL  # noqa: E402  (écran principal : icônes, lune et soleil, échelles)
 from mutations_reglages_ecran import MUTATIONS_REGLAGES_ECRAN  # noqa: E402  (réglages sur l'écran et installation guidée : voir ce fichier)
+from mutations_surf import MUTATIONS_SURF  # noqa: E402  (noyau surf : spot, requêtes, lecture, vent, marée, note, créneau)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
@@ -182,6 +183,7 @@ MUTATIONS += MUTATIONS_REGLAGES_ECRAN
 MUTATIONS += MUTATIONS_HOTE_APPAREIL
 MUTATIONS += MUTATIONS_MATERIEL_TAB5
 MUTATIONS += MUTATIONS_GZIP
+MUTATIONS += MUTATIONS_SURF
 
 
 @functools.lru_cache(maxsize=None)
