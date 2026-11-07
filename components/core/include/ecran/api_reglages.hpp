@@ -75,7 +75,7 @@ struct Tampons {
 
 struct InfoSysteme {
     std::string_view nom{};    // « ecran-f6b6 »
-    std::string_view modele{}; // « M5Stack Tab5 »
+    std::string_view modele{}; // nom de la carte sur laquelle tourne le firmware (« M5Stack Tab5 », « Waveshare 7B »)
     std::string_view version{};
     std::string_view compile_le{}; // « 2026-11-06T11:20:00Z », ou vide si inconnu
     std::string_view partition{};

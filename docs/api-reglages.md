@@ -37,7 +37,7 @@ The pairing token is a **6-digit code shown on the device's screen** (ADR-0003).
 
 | Route | Role |
 |---|---|
-| `GET /api/status` | Public. `{"nom","modele","version","mode","appairage","langue"}`: `mode` = `station` (on the home Wi-Fi) or `point_d_acces` (commissioning); `appairage` = `"requis"` or `"ok"` depending on whether the request carries a valid token; `langue` = code of the **screen language** (§6), so that the page can speak the right language before pairing. Nothing else (no IP address, no SSID). |
+| `GET /api/status` | Public. `{"nom","modele","version","mode","appairage","langue"}`: `mode` = `station` (on the home Wi-Fi) or `point_d_acces` (commissioning); `appairage` = `"requis"` or `"ok"` depending on whether the request carries a valid token; `langue` = code of the **screen language** (§6), so that the page can speak the right language before pairing. `modele` = the name of the board the firmware runs on, read from the board layer (« M5Stack Tab5 » or « Waveshare 7B »). Nothing else (no IP address, no SSID). |
 | `POST /api/pair` | Body `{"code":"123456"}` → `200 {"jeton":"<32 bytes hex>"}`. Wrong code → `403`, "That code isn’t right. Look at the device’s screen." **5 failed attempts → 60 s lock** (`429`, "Too many attempts. Try again in 60 seconds.", with `reessayer_dans`). |
 | `DELETE /api/pair` | Closes the current session → `204`. |
 
@@ -354,7 +354,7 @@ Le jeton d'appairage est un **code à 6 chiffres affiché sur l'écran de l'appa
 
 | Route | Rôle |
 |---|---|
-| `GET /api/status` | Public. `{"nom","modele","version","mode","appairage","langue"}` : `mode` = `station` (sur le Wi-Fi de la maison) ou `point_d_acces` (mise en service) ; `appairage` = `"requis"` ou `"ok"` selon que la requête porte un jeton valide ; `langue` = code de la **langue de l'écran** (§6), pour que la page parle la bonne langue avant l'appairage. Rien d'autre (pas d'adresse IP, pas de SSID). |
+| `GET /api/status` | Public. `{"nom","modele","version","mode","appairage","langue"}` : `mode` = `station` (sur le Wi-Fi de la maison) ou `point_d_acces` (mise en service) ; `appairage` = `"requis"` ou `"ok"` selon que la requête porte un jeton valide ; `langue` = code de la **langue de l'écran** (§6), pour que la page parle la bonne langue avant l'appairage. `modele` = le nom de la carte sur laquelle tourne le firmware, lu dans la couche carte (« M5Stack Tab5 » ou « Waveshare 7B »). Rien d'autre (pas d'adresse IP, pas de SSID). |
 | `POST /api/pair` | Corps `{"code":"123456"}` → `200 {"jeton":"<32 octets hex>"}`. Mauvais code → `403`, « Ce code n’est pas le bon. Regardez l’écran de l’appareil. ». **5 essais ratés → verrou 60 s** (`429`, « Trop d’essais. Réessayez dans 60 secondes. », avec `reessayer_dans`). |
 | `DELETE /api/pair` | Ferme la session courante → `204`. |
 

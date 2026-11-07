@@ -33,6 +33,7 @@
 #include "mdns.h"
 
 #include "appairage.h"
+#include "board.h"
 #include "commande_serie.h"
 #include "ecran/api_reglages.hpp"
 #include "ecran/fournisseurs_meteo.hpp"
@@ -108,7 +109,8 @@ class HoteAppareil {
         const EtatReseau reseau = reseau_etat();
         api::InfoSysteme s;
         s.nom = g_nom;
-        s.modele = "M5Stack Tab5";
+        const board_info_t *carte = board_get_info();
+        s.modele = (carte != nullptr && carte->board_name != nullptr) ? carte->board_name : "";
         const esp_app_desc_t *app = esp_app_get_description();
         if (app != nullptr) {
             std::snprintf(version_, sizeof(version_), "%s", app->version);
