@@ -45,4 +45,8 @@ void zone_lire_e5(ZoneMeteo *zone, PositionE5 *position);
 // Efface la météo de l'ancien lieu et réveille la tâche pour une requête immédiate.
 void meteo_client_zone_changee();
 
+// Même chose quand la SOURCE change (main/reglages.cpp) : efface en plus le relevé gardé en NVS (il est indexé par la position
+// seulement : il montrerait la météo de l'ancienne source jusqu'à la prochaine réponse) et réveille la tâche.
+void meteo_client_source_changee();
+
 } // namespace ecran

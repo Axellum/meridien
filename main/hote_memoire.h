@@ -22,6 +22,8 @@ class HoteMemoire final : public HoteReglages {
     bool internet = true;                  // faux : la recherche de lieu répond « sans connexion »
     bool recherche_instantanee = true;     // faux : la recherche Wi-Fi dure 0,8 s (on voit « Recherche des réseaux… »)
     ApercuMeteo meteo;                     // aperçu de la zone choisie
+    std::string code_pays = "FR";          // pays de la ville montrée : dicte la liste des sources météo proposées
+    bool source_retablie = false;          // vrai : l'écran dit que la source est repassée sur « Automatique »
     InfoAppareil info;                     // version, adresse de la page, code d'appairage
     int64_t delai_connexion_ms = 1200;     // temps avant la réponse simulée du Wi-Fi (-1 : jamais, pour voir le délai)
     int64_t delai_test_ms = 1500;
@@ -55,6 +57,8 @@ class HoteMemoire final : public HoteReglages {
     std::size_t lieu_resultats(LieuTrouve *sortie, std::size_t max) override;
     void lieu_choisir(std::size_t rang) override;
     ApercuMeteo meteo_apercu() override;
+    meteo::fournisseurs::Liste sources_meteo() override;
+    bool source_meteo_retablie() override { return source_retablie; }
 
     void tester_service(std::string_view service) override;
     ResultatTest resultat_test(std::string_view service) override;

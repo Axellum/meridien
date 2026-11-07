@@ -240,10 +240,10 @@ Reponse obtenir(const Requete &requete, LireCorps lire, void *utilisateur) {
     config.event_handler = sur_evenement_http;
     config.user_data = &rec;
     config.crt_bundle_attach =
-        esp_crt_bundle_attach; // certificats racine du paquet d'ESP-IDF (Mozilla) : le serveur est vérifié
-    config.buffer_size = 2048; // en-têtes de réponse
-    config.buffer_size_tx =
-        1024; // ligne de requête (851 octets au plus pour Open-Meteo, test_meteo_appareil.cpp) : 512 par défaut ne suffit pas
+        esp_crt_bundle_attach;    // certificats racine du paquet d'ESP-IDF (Mozilla) : le serveur est vérifié
+    config.buffer_size = 2048;    // en-têtes de réponse
+    config.buffer_size_tx = 1024; // ligne de requête : 885 octets au plus avec le plus long `models=` d'Open-Meteo
+                                  // (test_meteo_appareil.cpp, ADR-0010) ; 512 par défaut ne suffit pas
     config.keep_alive_enable = false;
 
     // Un seul TLS à la fois dans tout le firmware (verrou_tls.h) : la poignée de main demande ≈ 65 Ko de RAM interne, et la carte

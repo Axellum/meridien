@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <new>
 #include <string_view>
@@ -14,6 +15,7 @@
 #include "freertos/task.h"
 #include "nvs.h"
 
+#include "ecran/fournisseurs_meteo.hpp"
 #include "ecran/meteo_cache.hpp"
 #include "ecran/meteo_planning.hpp"
 #include "ecran/meteo_requete.hpp"
@@ -23,6 +25,7 @@
 #include "http_commun.h"
 #include "meteo_etat.h"
 #include "meteo_interne.h"
+#include "reglages.h"
 #include "reseau.h"
 
 namespace ecran {
@@ -139,11 +142,14 @@ bool lire_corps(std::string_view corps, void *utilisateur) {
 }
 
 // Un aller-retour complet. Les tampons sont pris en PSRAM par le client commun (http_commun.h) et rendus avant de sortir. La météo
-// lue est écrite dans `sortie` (seulement si l'issue est `Ok`).
-Essai interroger(const PositionE5 &position, meteo::Meteo &sortie) {
+// lue est écrite dans `sortie` (seulement si l'issue est `Ok`). `modeles` : la valeur de `models=` de la source choisie (vide pour
+// « Automatique » : l'adresse est alors celle d'avant ce réglage, à l'octet près). La première ligne de la requête fait 885 octets au
+// plus avec le plus long modèle de la table (test_meteo_appareil.cpp) ; esp_http_client envoie les en-têtes par morceaux, seule cette
+// ligne et le premier en-tête doivent tenir dans `buffer_size_tx` (1024 octets, http_commun.cpp).
+Essai interroger(const PositionE5 &position, std::string_view modeles, meteo::Meteo &sortie) {
     Essai e;
     char url[meteo::TAILLE_REQUETE_MAX];
-    if (meteo::construire_requete(position.latitude_e5, position.longitude_e5, url, sizeof(url)) == 0) {
+    if (meteo::construire_requete(position.latitude_e5, position.longitude_e5, url, sizeof(url), modeles) == 0) {
         e.issue = Issue::Requete;
         return e;
     }
@@ -486,9 +492,14 @@ void tache_meteo(void *) {
         ZoneMeteo zone = {};
         PositionE5 position = {};
         zone_lire_e5(&zone, &position);
-        ESP_LOGI(TAG, "requête Open-Meteo pour « %s » (%d échec(s) de suite jusqu'ici)", zone.nom, meteo_etat_echecs());
+        // La source choisie, relue à chaque requête : changer de source (écran ou page) agit à la requête d'après, ou tout de suite.
+        char source[16] = {};
+        reglages_source_meteo(source, sizeof(source));
+        const std::string_view modeles = meteo::fournisseurs::modeles_de(source);
+        ESP_LOGI(TAG, "requête Open-Meteo pour « %s », source « %s » (%d échec(s) de suite jusqu'ici)", zone.nom,
+                 source, meteo_etat_echecs());
         Travail *tr = travail();
-        const Essai e = tr != nullptr ? interroger(position, tr->meteo) : Essai{Issue::Memoire};
+        const Essai e = tr != nullptr ? interroger(position, modeles, tr->meteo) : Essai{Issue::Memoire};
         // Pile : marge restante la plus basse depuis le début de la tâche (le pic est la prise de contact TLS, juste faite).
         ESP_LOGI(TAG, "pile de la tâche : %u octets jamais utilisés sur %u",
                  static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)), static_cast<unsigned>(kPileOctets));
@@ -497,8 +508,16 @@ void tache_meteo(void *) {
         if (e.issue == Issue::Ok) {
             PositionE5 maintenant = {};
             zone_lire_e5(nullptr, &maintenant);
+            char source_apres[16] = {};
+            reglages_source_meteo(source_apres, sizeof(source_apres));
             if (!(maintenant == position)) {
                 ESP_LOGI(TAG, "la zone a changé pendant la requête : réponse écartée, nouvelle requête");
+                immediat = true;
+            } else if (std::strcmp(source, source_apres) != 0) {
+                // Une réponse de l'ancien modèle ne doit jamais s'afficher sous la nouvelle source.
+                ESP_LOGI(TAG,
+                         "la source a changé pendant la requête (« %s » -> « %s ») : réponse écartée, nouvelle requête",
+                         source, source_apres);
                 immediat = true;
             } else if (!meteo_etat_publier(tr->meteo)) {
                 ESP_LOGE(TAG, "réponse lue mais non publiée : pas de place pour l'état de la météo");
@@ -539,6 +558,22 @@ void meteo_client_zone_changee() {
     if (g_tache != nullptr) {
         xTaskNotifyGive(g_tache);
     }
+}
+
+void meteo_client_source_changee() {
+    // Le relevé gardé en NVS ne connaît que la position : il montrerait la météo de l'ancienne source (au prochain démarrage, avant
+    // la première réponse). On l'efface ; la tâche en redemande un à la nouvelle source.
+    nvs_handle_t h = 0;
+    if (nvs_open(kEspaceNvs, NVS_READWRITE, &h) == ESP_OK) {
+        const esp_err_t err = nvs_erase_key(h, kCleCache);
+        if (err == ESP_OK) {
+            nvs_commit(h);
+        } else if (err != ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGW(TAG, "relevé gardé non effacé après le changement de source : %s", esp_err_to_name(err));
+        }
+        nvs_close(h);
+    }
+    meteo_client_zone_changee();
 }
 
 void meteo_client_demarrer() {
