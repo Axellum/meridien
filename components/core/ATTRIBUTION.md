@@ -23,3 +23,16 @@ Texte de la licence MIT de posix_tz_db : voir [outils/posix_tz_db/LICENSE](outil
   https://open-meteo.com/en/docs, page lue le 06/11/2026. Les données météo d'Open-Meteo sont sous licence
   **CC BY 4.0** (attribution à afficher dans l'application, voir `docs/recherche/03-…`, §1) ; le tableau des codes
   est un standard de l'Organisation météorologique mondiale. Les libellés français sont une traduction du projet.
+
+## Données du noyau « surf » (`include/ecran/surf_*.hpp`, `test/host/donnees/surf_*`)
+
+- **Open-Meteo** — API Marine (`marine-api.open-meteo.com/v1/marine`, vagues, houle, température de la mer, niveau de la mer,
+  page lue le 07/11/2026 : https://open-meteo.com/en/docs/marine-weather-api) et API de prévision (vent à 10 m). Données sous
+  licence **CC BY 4.0** (https://creativecommons.org/licenses/by/4.0/), à créditer avec un lien vers https://open-meteo.com
+  partout où elles sont montrées. Les 30 réponses réelles gardées comme données de test (15 lieux × mer et vent, capturées le
+  07/11/2026 par `test/host/capturer_surf.py`) sont reproduites **telles quelles, sans modification** ; le noyau les lit et arrondit
+  les valeurs (nombres entiers : centimètres, dixièmes de seconde et de km/h).
+- La formule du vent par rapport à la plage, le barème de la note et le meilleur créneau ne viennent d'aucune source : ils sont
+  écrits par le projet ([ADR-0013](../../docs/decisions/0013-surf-donnees-note-et-limites.md)).
+- La formulation de licence de chaque fournisseur de modèles de vagues derrière l'API Marine (services nationaux, ECMWF…) n'a **pas
+  été examinée** : seule la licence de l'API d'Open-Meteo est citée ici.
