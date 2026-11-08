@@ -58,21 +58,11 @@ inline int composer_choix_profil(reglages::ProfilAccueil actuel, const ActionsPr
     return n;
 }
 
-// L'entrée du premier anneau : la famille « Profil ». À ne poser que si `n` >= 2 (un second anneau d'un seul choix n'offre rien) :
-// `ajouter_famille_profil` le fait.
+// L'entrée du premier anneau : la famille « Profil » et ses `n` choix. QUAND la poser (au moins deux choix, en dernier) est décidé par le
+// noyau pur : roue::profil_a_proposer et roue::entrees_du_premier_anneau (ecran/roue_entrees.hpp), que l'appareil et le banc de rendu
+// partagent.
 inline EntreeRoue entree_profil(const ChoixRoue *choix, int n) noexcept {
     return {visuel::texte_c("Profil"), ICONE_PROFIL, nullptr, choix, n};
-}
-
-// Pose « Profil ▸ » à la suite de `sortie[n]` quand au moins deux choix existent (Auto et un profil épinglable) et qu'il reste une place au
-// premier anneau. Rend le nouveau nombre d'entrées.
-inline int ajouter_famille_profil(EntreeRoue *sortie, int n, reglages::ProfilAccueil actuel,
-                                  const ActionsProfil &actions, ChoixRoue *choix) noexcept {
-    const int nb = composer_choix_profil(actuel, actions, choix);
-    if (nb >= 2 && n < ENTREES_ROUE_MAX) {
-        sortie[n++] = entree_profil(choix, nb);
-    }
-    return n;
 }
 
 } // namespace ecran

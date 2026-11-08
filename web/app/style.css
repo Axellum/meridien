@@ -88,6 +88,17 @@ progress{width:100%;height:10px;margin-top:12px;accent-color:var(--ac)}
 .lieu .i{color:var(--ac)}
 .lieu:active{background:var(--soft)}
 
+/* ---- mer : registre des spots, plage de vent ---- */
+.spots{margin-top:6px;border:1px solid var(--trait);border-radius:14px;overflow:hidden;background:var(--champ)}
+.spot{display:flex;align-items:center;gap:8px;padding:0 6px 0 14px}
+.spot+.spot{border-top:1px solid var(--trait)}
+.spot-choix{flex:1;min-width:0;display:flex;align-items:center;gap:12px;min-height:56px;overflow-wrap:anywhere}
+.spot-choix input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--ac)}
+.spot .lien{flex:none}
+.duo{display:flex;gap:10px;align-items:flex-end}
+.duo>div{flex:1;min-width:0}
+.champ input:disabled{opacity:.55}
+
 /* ---- lignes dépliables, réseaux ---- */
 .rang{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 2px;border:0;border-top:1px solid var(--trait);background:transparent;text-align:left}
 .rang>div{flex:1;min-width:0}

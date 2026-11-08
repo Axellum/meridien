@@ -50,6 +50,9 @@ sautes = []        # (étape, raison) : étapes que l'appareil réel ne fait pas
 resultats = []     # (nom, ok, détail)
 registre = []      # toutes les réponses /api/ vues par le navigateur : {url, statut, corps, requete}
 hotes = set()      # tous les hôtes joints par le navigateur (la page ne doit parler qu'à l'appareil)
+hors_appareil = []         # les requêtes du navigateur vers un autre hôte que l'appareil : {url, methode}
+vigie_interceptees = []    # les lectures chez Vigie que le parcours a interceptées : {url, methode, entetes}
+hotes_vigie = set()        # les hôtes de Vigie que la page a tenté de joindre, tous interceptés (la seule exception à « ne parler qu'à l'appareil »)
 erreurs_console = []
 
 
@@ -107,7 +110,13 @@ def nouveau_contexte(nav, largeur=390, sombre=False):
                 pass
 
     page.route("**/api/**", intercepter)
-    page.on("request", lambda r: hotes.add(urllib.parse.urlsplit(r.url).netloc))
+    installer_vigie(page)   # toute lecture de la liste des spots est interceptée, sur toutes les pages : un « Tab » depuis le champ des alertes arrive dans le champ de la mer
+    def noter_requete(r):
+        hote = urllib.parse.urlsplit(r.url).netloc
+        hotes.add(hote)
+        if hote != urllib.parse.urlsplit(BASE).netloc:
+            hors_appareil.append({"url": r.url, "methode": r.method})
+    page.on("request", noter_requete)
     page.on("console", lambda m: erreurs_console.append(m.text) if m.type in ("error", "warning") else None)
     page.on("pageerror", lambda e: erreurs_console.append("pageerror : " + str(e)))
     return ctx, page
@@ -131,6 +140,115 @@ def catalogue(code):
 def norm(texte):
     """Espaces normalisés (l'espace insécable devient une espace) : on compare ce qu'on lit, pas la typographie."""
     return " ".join(texte.split())
+
+
+# ---- Carte « La mer » : la PAGE lit la liste des spots chez Vigie (GET <adresse>/v1/surf/spots) ; le parcours INTERCEPTE cette lecture avec une liste
+# SYNTHÉTIQUE (spots inventés : aucune vraie donnée de spot dans le dépôt) et note chaque requête interceptée. ----
+VIGIE_ESSAI = "https://vigie-essai.test"   # adresse de Vigie choisie par le parcours (domaine en .test : ne se résout jamais)
+NOM_LONG = "Pointe de l’Étoile-Filante-Fict🌊 du Grand Nord"   # 46 points de code ; le 32e est un émoji (deux unités UTF-16 : une coupe naïve le casserait)
+NOM_COUPE = "".join(list(NOM_LONG)[:32]).rstrip()
+assert len(list(NOM_LONG)) > 32 and len(NOM_COUPE) == 32 and NOM_COUPE.endswith("🌊")
+SPOTS_ESSAI = {"count": 6, "built_utc": "2026-11-08T00:00:00Z", "attribution": "liste d'essai, spots inventés", "spots": [
+    {"id": "spot-essai-un", "name": "Plage de l’Écluse", "osm_name": "Plage de l'Ecluse", "place": "Port-Essai", "note": "champ ignoré"},
+    {"id": "spot-essai-deux", "name": "Baie des Essais", "osm_name": "Baie des Essais", "place": "Île-Test"},
+    {"id": "spot-essai-trois", "name": NOM_LONG, "place": "Anse-Fictive"},
+    {"id": "spot-essai-quatre", "name": "Grande Plage", "place": "Ville-Un"},
+    {"id": "spot-essai-cinq", "name": "Grande Plage", "place": "Ville-Deux"},
+    {"id": "spot-essai-six", "name": "", "osm_name": "Crique sans nom", "place": "Hameau-Dernier"},
+]}
+# Une seconde liste, servie à l'adresse VIGIE_ESSAI : 10 spots qui répondent à « lot » (la page n'en montre que 8) et un identifiant que l'appareil refuserait.
+SPOTS_LOT = {"count": 11, "spots": [{"id": f"spot-lot-{i:02d}", "name": f"Spot de lot {i:02d}", "place": "Lieu-Lot"} for i in range(1, 11)]
+             + [{"id": "Mauvais Id", "name": "Spot invalide", "place": "Lieu-Lot"}]}
+UN = {"id": "spot-essai-un", "nom": "Plage de l’Écluse"}
+DEUX = {"id": "spot-essai-deux", "nom": "Baie des Essais"}
+TROIS = {"id": "spot-essai-trois", "nom": NOM_COUPE}
+QUATRE = {"id": "spot-essai-quatre", "nom": "Grande Plage"}
+PHRASE_VENT = "La plage de vent doit être en nœuds entiers, de 1 à 60, le minimum sous le maximum."
+SPION_FETCH = """(() => { const f = window.fetch.bind(window); window.__vigie = [];
+  window.fetch = (u, i) => { const url = typeof u === 'string' ? u : u.url;
+    if (url.includes('/v1/surf/spots')) window.__vigie.push({url, credentials: i && i.credentials, accept: i && i.headers && i.headers.Accept, signal: !!(i && i.signal)});
+    return f(u, i); }; })()"""
+
+
+def liste_par_adresse(url):
+    return SPOTS_LOT if urllib.parse.urlsplit(url).netloc == urllib.parse.urlsplit(VIGIE_ESSAI).netloc else SPOTS_ESSAI
+
+
+vigie = {"reponse": liste_par_adresse}   # ce que « Vigie » répond : une liste, un statut (int), "illisible", "coupure", "silence", ou une fonction(url)
+vigie_en_attente = []                    # les lectures laissées sans réponse ("silence") : le test les abandonne proprement avant de fermer la page
+
+
+def liberer_vigie():
+    while vigie_en_attente:
+        try:
+            vigie_en_attente.pop().abort()
+        except Exception:  # noqa: BLE001 : la page a déjà annulé la requête
+            pass
+
+
+def installer_vigie(page):
+    """Intercepte toute lecture de la liste des spots par la page. Rien ne part vers le réseau."""
+    def gestionnaire(route):
+        r = route.request
+        vigie_interceptees.append({"url": r.url, "methode": r.method, "entetes": dict(r.headers)})
+        hotes_vigie.add(urllib.parse.urlsplit(r.url).netloc)
+        rep = vigie["reponse"](r.url) if callable(vigie["reponse"]) else vigie["reponse"]
+        cors = {"access-control-allow-origin": "*"}   # sans cet en-tête, le navigateur refuserait la réponse venue d'une autre origine
+        if rep == "coupure":
+            route.abort()
+        elif rep == "silence":
+            vigie_en_attente.append(route)   # Vigie ne répond jamais (le délai de 15 s de la page)
+        elif rep == "illisible":
+            route.fulfill(status=200, content_type="application/json", headers=cors, body="{pas du json")
+        elif isinstance(rep, int):
+            route.fulfill(status=rep, content_type="application/json", headers=cors, body="{}")
+        else:
+            route.fulfill(status=200, content_type="application/json", headers=cors, body=json.dumps(rep))
+    page.route("**/v1/surf/spots", gestionnaire)
+
+
+def sea(page):
+    return api(page, "GET", "/api/sea")[1]
+
+
+def attendre_que(page, condition, delai=8.0):
+    """Interroge `condition` jusqu'à ce qu'elle soit vraie (ou `delai` secondes). Rend sa dernière valeur.
+    L'attente passe par Playwright (page.wait_for_timeout) et non par time.sleep : seul un appel à Playwright laisse tourner les gestionnaires de routes
+    (sans cela, les requêtes interceptées ne seraient jamais notées pendant l'attente)."""
+    fin, valeur = time.time() + delai, None
+    while time.time() < fin:
+        valeur = condition()
+        if valeur:
+            return valeur
+        page.wait_for_timeout(100)
+    return valeur
+
+
+def capturer(page, carte, nom):
+    """Capture de la carte seule, à la largeur de la fenêtre (390 px), sans la bulle « Enregistré » qui la recouvrirait.
+    La fenêtre est allongée le temps de la capture : une carte plus haute que 844 px serait coupée, et la barre d'onglets collée en haut la recouvrirait."""
+    page.evaluate("(() => { const t = document.getElementById('toast'); if (t) t.hidden = true; })()")
+    taille = page.viewport_size
+    page.set_viewport_size({"width": taille["width"], "height": 1500})
+    try:
+        carte.screenshot(path=str(CAPTURES / nom))
+    finally:
+        page.set_viewport_size(taille)
+
+
+def puts_sea():
+    """Corps des requêtes PUT /api/sea faites PAR LA PAGE (les appels du test passent par page.request et ne sont pas notés)."""
+    return [json.loads(r["requete"]) for r in registre if r["url"].endswith("/api/sea") and r["requete"]]
+
+
+def lignes_registre(carte):
+    """Les spots enregistrés tels que la carte les montre : [nom, coché], dans l'ordre affiché."""
+    return carte.evaluate("c => [...c.querySelectorAll('.spot')].map(l => [l.querySelector('.spot-choix span').textContent, l.querySelector('input').checked])")
+
+
+def tout_le_texte(carte):
+    """Tout ce que la carte dit à la personne : texte, libellés accessibles et indications des champs."""
+    return carte.evaluate("c => c.textContent + ' ' + [...c.querySelectorAll('[aria-label],[placeholder]')].map(e => (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('placeholder') || '')).join(' ')")
 
 
 # Le service qui a donné la météo, tel que /api/weather le nomme (`fournisseur`) : identifiant -> (phrase du catalogue, nom, lien).
@@ -440,7 +558,7 @@ def main():
                 page.locator("#llm-modele").fill("modele-essai-b")
                 sans_null(page, "service testé")
                 page.screenshot(path=str(CAPTURES / "06-test-ok.png"))
-                page.get_by_role("button", name="Enregistrer").click()
+                page.locator("#det-llm").get_by_role("button", name="Enregistrer").click()   # la carte « La mer » a le sien aussi
                 expect(page.locator("#toast")).to_contain_text("Enregistré")
                 expect(page.get_by_role("button", name=re.compile("^Réfléchir"))).to_contain_text("clé enregistrée")
                 page.reload()
@@ -592,6 +710,507 @@ def main():
                 verifier("alertes : réglages remis comme avant le pas", all(a[k] == depart[k] for k in ("actives", "adresse", "periode_min", "niveau_min")), str(a))
             etape("Alertes officielles : niveau, période, adresse", t_alertes, page)
 
+            def t_mer():
+                cat = catalogue("fr")
+                carte = page.locator("#mer")
+                champ = carte.locator("#mer-q")
+                resultats = carte.locator(".resultats button")
+                retours = carte.locator("#mer-retours")
+                vmin, vmax = carte.locator("#mer-vent-min"), carte.locator("#mer-vent-max")
+                enregistrer_vent = carte.get_by_role("button", name=cat["action.enregistrer"], exact=True)
+                _, alertes_depart = api(page, "GET", "/api/alerts")
+                pub = alertes_depart["adresse_publique"]
+                n0 = len(vigie_interceptees)
+                page.add_init_script(SPION_FETCH)   # note les appels fetch vers Vigie (options passées par la page) à partir du prochain chargement
+                page.reload()
+                expect(carte).to_be_visible()
+                try:
+                    # ---- départ : registre vide, onglet, carte ----
+                    code, mer0 = api(page, "GET", "/api/sea")
+                    verifier("mer : le faux appareil démarre avec un registre vide, la plage 12 à 25 et les limites du contrat",
+                             code == 200 and mer0 == {"spots": [], "choisi": "", "vent_min_kn": 12, "vent_max_kn": 25, "spots_max": 12, "vent_plafond_kn": 60}, str(mer0))
+                    liens = [norm(x) for x in page.locator("nav.ancres a").all_inner_texts()]
+                    i_mer = liens.index(norm(cat["nav.mer"])) if norm(cat["nav.mer"]) in liens else -99
+                    verifier("mer : l'onglet « La mer » est juste après « Alertes » et juste avant « Assistant »",
+                             i_mer == liens.index(norm(cat["nav.alertes"])) + 1 and liens[i_mer + 1] == norm(cat["nav.assistant"]), str(liens))
+                    sections = page.evaluate("[...document.querySelectorAll('main > section')].map(s => s.id)")
+                    verifier("mer : la carte est placée entre « alertes » et « assistant »", sections[:4] == ["ville", "alertes", "mer", "assistant"], str(sections))
+                    carte.scroll_into_view_if_needed()
+                    vide = carte.locator("#mer-registre .res.info")
+                    verifier("mer : sans spot, la carte dit que l'écran n'affiche pas la mer",
+                             carte.locator("#t-mer").inner_text() == cat["mer.titre"] and vide.count() == 1 and norm(vide.inner_text()) == norm(cat["mer.vide"]), vide.all_inner_texts().__str__())
+                    verifier("mer : champ de recherche de type search, saisie automatique coupée",
+                             champ.get_attribute("type") == "search" and champ.get_attribute("autocomplete") == "off")
+                    verifier("mer : la plage de vent affiche 12 et 25, en nœuds entiers au clavier numérique, avec le texte d'aide",
+                             vmin.input_value() == "12" and vmax.input_value() == "25" and vmin.get_attribute("inputmode") == "numeric"
+                             and vmax.get_attribute("inputmode") == "numeric" and norm(carte.locator("#mer-vent-aide").inner_text()) == norm(cat["mer.vent_aide"]))
+                    credit = carte.locator("p.aide", has_text="OpenStreetMap")
+                    verifier("mer : le crédit des spots (OpenStreetMap, ODbL) est affiché", credit.count() == 1 and norm(credit.inner_text()) == norm(cat["mer.credit"]))
+                    page.wait_for_timeout(500)
+                    verifier("mer : rien n'est demandé à Vigie tant que la personne ne touche pas le champ (page chargée, 0,5 s d'attente)", len(vigie_interceptees) == n0)
+                    capturer(page, carte, "mer-1-vide.png")
+
+                    # ---- la lecture chez Vigie : au premier appui dans le champ, une seule fois ----
+                    champ.click()
+                    attendre_que(page, lambda: len(vigie_interceptees) > n0)
+                    lectures = vigie_interceptees[n0:]
+                    verifier(f"mer : au premier appui dans le champ, la page lit chez Vigie : un seul GET vers {pub}/v1/surf/spots (adresse du service public, le champ des alertes étant vide)",
+                             len(lectures) == 1 and lectures[0]["methode"] == "GET" and lectures[0]["url"] == pub + "/v1/surf/spots", str(lectures))
+                    verifier("mer : la lecture chez Vigie ne porte pas le jeton de l'appareil", len(lectures) == 1 and "authorization" not in lectures[0]["entetes"], str(lectures))
+                    spion = page.evaluate("window.__vigie")
+                    verifier("mer : la lecture chez Vigie se fait sans cookies (credentials: omit), en demandant du JSON, avec un délai (AbortController)",
+                             len(spion) == 1 and spion[0]["credentials"] == "omit" and spion[0]["accept"] == "application/json" and spion[0]["signal"] is True, str(spion))
+
+                    # ---- recherche ----
+                    def textes():
+                        return [norm(x) for x in resultats.all_inner_texts()]
+
+                    champ.fill("e")
+                    page.wait_for_timeout(300)
+                    verifier("mer : un seul caractère ne lance pas de recherche (2 au moins)", resultats.count() == 0 and retours.locator(".res").count() == 0)
+                    champ.fill("ecluse")
+                    expect(resultats).to_have_count(1)
+                    verifier("mer : « ecluse » (sans accent) trouve « Plage de l’Écluse », écrit « Nom — Lieu »", textes() == ["Plage de l’Écluse — Port-Essai"], str(textes()))
+                    champ.fill("ÉCLUSE")
+                    expect(resultats).to_have_count(1)
+                    champ.fill("l'ecluse")
+                    expect(resultats).to_have_count(1)
+                    champ.fill("port-essai")
+                    expect(resultats).to_have_count(1)
+                    champ.fill("spot-essai-un")
+                    expect(resultats).to_have_count(1)
+                    verifier("mer : la recherche ignore la casse et les accents, et porte aussi sur la ponctuation de l'apostrophe, le lieu et l'identifiant", True)
+                    champ.fill("grande")
+                    expect(resultats).to_have_count(2)
+                    verifier("mer : deux spots de même nom se distinguent par leur lieu", textes() == ["Grande Plage — Ville-Un", "Grande Plage — Ville-Deux"], str(textes()))
+                    capturer(page, carte, "mer-2-recherche.png")
+                    champ.fill("crique")
+                    expect(resultats).to_have_count(1)
+                    verifier("mer : un spot sans « name » prend « osm_name »", textes() == ["Crique sans nom — Hameau-Dernier"], str(textes()))
+                    champ.fill("essai")
+                    expect(resultats).to_have_count(6)
+                    champ.fill("zzzz")
+                    expect(retours.locator(".res.info")).to_be_visible()
+                    verifier("mer : aucun résultat → la phrase le dit, avec la recherche entre guillemets",
+                             resultats.count() == 0 and norm(retours.locator(".res.info").inner_text()) == norm(cat["mer.aucun"].replace("{q}", "zzzz")), retours.inner_text())
+                    verifier("mer : la liste de Vigie n'a été lue qu'une seule fois pour une dizaine de recherches", len(vigie_interceptees) - n0 == 1, str(len(vigie_interceptees) - n0))
+
+                    # ---- ajouter : le premier devient le spot de l'écran, le suivant ne le change pas ----
+                    champ.fill("ecluse")
+                    expect(resultats).to_have_count(1)
+                    resultats.first.click()
+                    expect(carte.locator(".spot")).to_have_count(1)
+                    m = sea(page)
+                    verifier("mer : premier spot ajouté → il est enregistré et il devient le spot choisi", m["spots"] == [UN] and m["choisi"] == UN["id"], str(m))
+                    verifier("mer : la page envoie la liste entière et le choix, rien d'autre (le lieu n'est pas dans le nom)",
+                             puts_sea()[-1] == {"spots": [UN], "choisi": UN["id"]}, str(puts_sea()[-1:]))
+                    verifier("mer : après l'ajout, le champ est vidé, les résultats cachés, et la carte montre le spot coché",
+                             champ.input_value() == "" and carte.locator(".resultats").is_hidden() and lignes_registre(carte) == [[UN["nom"], True]], str(lignes_registre(carte)))
+                    champ.fill("baie")
+                    expect(resultats).to_have_count(1)
+                    resultats.first.click()
+                    expect(carte.locator(".spot")).to_have_count(2)
+                    m = sea(page)
+                    verifier("mer : second spot ajouté en fin de liste → le choix ne bouge pas", m["spots"] == [UN, DEUX] and m["choisi"] == UN["id"], str(m))
+                    verifier("mer : le second ajout envoie la liste entière dans l'ordre et le choix inchangé", puts_sea()[-1] == {"spots": [UN, DEUX], "choisi": UN["id"]}, str(puts_sea()[-1:]))
+                    verifier("mer : la liste enregistrée est un groupe de boutons radio nommé « Spot affiché sur l’écran », un seul coché",
+                             carte.get_by_role("radiogroup", name=cat["mer.affiche"]).count() == 1 and carte.get_by_role("radio").count() == 2
+                             and lignes_registre(carte) == [[UN["nom"], True], [DEUX["nom"], False]], str(lignes_registre(carte)))
+                    verifier("mer : chaque ligne a un bouton « Retirer » dont le nom accessible cite le spot",
+                             carte.locator(".spot").first.locator("button").get_attribute("aria-label") == cat["mer.retirer_nom"].replace("{nom}", UN["nom"])
+                             and carte.locator(".spot").first.locator("button").inner_text() == cat["mer.retirer"])
+                    capturer(page, carte, "mer-3-liste.png")
+                    # choisir l'autre
+                    carte.locator(".spot").nth(1).locator("input").click()
+                    verifier("mer : choisir l'autre spot → PUT avec la liste entière et le nouveau choix",
+                             attendre_que(page, lambda: sea(page)["choisi"] == DEUX["id"]) and puts_sea()[-1] == {"spots": [UN, DEUX], "choisi": DEUX["id"]}, str(puts_sea()[-1:]))
+                    verifier("mer : la carte montre le nouveau choix", attendre_que(page, lambda: lignes_registre(carte) == [[UN["nom"], False], [DEUX["nom"], True]]), str(lignes_registre(carte)))
+                    # un doublon
+                    nb_puts = len(puts_sea())
+                    champ.fill("ecluse")
+                    expect(resultats).to_have_count(1)
+                    resultats.first.click()
+                    expect(retours.locator(".res")).to_be_visible()
+                    verifier("mer : ajouter un spot déjà dans la liste → la phrase le dit, aucune requête, rien ne change",
+                             norm(retours.locator(".res").inner_text()) == norm(cat["mer.deja"]) and len(puts_sea()) == nb_puts and sea(page)["spots"] == [UN, DEUX], retours.inner_text())
+                    # un nom de plus de 32 caractères
+                    champ.fill("pointe")
+                    expect(resultats).to_have_count(1)
+                    resultats.first.click()
+                    expect(carte.locator(".spot")).to_have_count(3)
+                    m = sea(page)
+                    nom = m["spots"][2]["nom"] if len(m["spots"]) == 3 else ""
+                    verifier("mer : un nom de plus de 32 caractères est coupé à 32 caractères Unicode (l'émoji du 32e rang reste entier), sans le lieu",
+                             m["spots"] == [UN, DEUX, TROIS] and len(nom) <= 32 and nom == NOM_COUPE and "Anse-Fictive" not in nom, repr(nom))
+                    verifier("mer : le nom envoyé est du Unicode bien formé (aucune moitié d'émoji)", nom.encode("utf-8") is not None and m["choisi"] == DEUX["id"])
+                    verifier("mer : la carte montre le nom coupé", lignes_registre(carte)[2] == [NOM_COUPE, False], str(lignes_registre(carte)))
+                    # retirer un spot qui n'est pas le choisi
+                    carte.locator(".spot").nth(2).locator("button").click()
+                    expect(carte.locator(".spot")).to_have_count(2)
+                    m = sea(page)
+                    verifier("mer : retirer un spot qui n'est pas le choisi ne change pas le choix", m["spots"] == [UN, DEUX] and m["choisi"] == DEUX["id"]
+                             and puts_sea()[-1] == {"spots": [UN, DEUX], "choisi": DEUX["id"]}, str(m))
+                    champ.fill("grande")
+                    expect(resultats).to_have_count(2)
+                    resultats.first.click()
+                    expect(carte.locator(".spot")).to_have_count(3)
+                    verifier("mer : un homonyme (autre lieu) s'ajoute comme un autre spot", sea(page)["spots"] == [UN, DEUX, QUATRE], str(sea(page)))
+
+                    # ---- Vigie injoignable : phrase dédiée, le registre reste modifiable ----
+                    vigie["reponse"] = "coupure"
+                    page.reload()
+                    expect(carte).to_be_visible()
+                    n1 = len(vigie_interceptees)
+                    page.wait_for_timeout(500)
+                    verifier("mer : après rechargement, la carte montre la liste enregistrée, sans rien demander à Vigie",
+                             lignes_registre(carte) == [[UN["nom"], False], [DEUX["nom"], True], [QUATRE["nom"], False]] and len(vigie_interceptees) == n1, str(lignes_registre(carte)))
+                    champ.click()
+                    err = retours.locator(".res.err")
+                    expect(err).to_be_visible()
+                    phrase = norm(cat["mer.injoignable"].replace("{carte}", cat["alertes.titre"]))
+                    verifier("mer : connexion coupée → la phrase d'erreur dédiée, qui nomme la carte « Alertes officielles »", norm(err.inner_text()) == phrase, err.inner_text())
+                    reessayer = retours.get_by_role("button", name=cat["action.reessayer"])
+                    verifier("mer : l'erreur propose « Réessayer »", reessayer.count() == 1)
+                    capturer(page, carte, "mer-4-erreur-vigie.png")
+                    carte.locator(".spot").nth(0).locator("input").click()
+                    verifier("mer : pendant l'erreur de Vigie, la liste enregistrée reste modifiable (choisir un autre spot)",
+                             attendre_que(page, lambda: sea(page)["choisi"] == UN["id"]), str(sea(page)))
+                    verifier("mer : l'erreur de Vigie reste affichée après cette modification", err.count() == 1)
+                    n2 = len(vigie_interceptees)
+                    champ.click()
+                    attendre_que(page, lambda: len(vigie_interceptees) > n2)
+                    expect(err).to_be_visible()
+                    verifier("mer : après un échec, un nouvel appui dans le champ refait la lecture, une seule fois", len(vigie_interceptees) == n2 + 1, str(len(vigie_interceptees) - n2))
+                    n2 = len(vigie_interceptees)
+                    champ.press_sequentially("abc")
+                    page.wait_for_timeout(400)
+                    verifier("mer : après un échec, taper ne relance pas la lecture à chaque frappe", len(vigie_interceptees) == n2 and err.count() == 1, str(len(vigie_interceptees) - n2))
+                    for repond, quoi in ((500, "statut 500"), ("illisible", "réponse qui n'est pas du JSON"), ({"count": 0}, "JSON sans liste de spots")):
+                        vigie["reponse"] = repond
+                        n3 = len(vigie_interceptees)
+                        reessayer.click()
+                        attendre_que(page, lambda n3=n3: len(vigie_interceptees) > n3)
+                        expect(err).to_be_visible()
+                        verifier(f"mer : {quoi} → la même phrase d'erreur, une seule requête par « Réessayer »", norm(err.inner_text()) == phrase and len(vigie_interceptees) == n3 + 1, err.inner_text())
+                    vigie["reponse"] = liste_par_adresse
+                    n4 = len(vigie_interceptees)
+                    reessayer.click()
+                    expect(err).to_have_count(0)
+                    champ.fill("baie")
+                    expect(resultats).to_have_count(1)
+                    verifier("mer : « Réessayer » avec une Vigie rétablie → l'erreur disparaît et la recherche répond", len(vigie_interceptees) == n4 + 1 and textes() == ["Baie des Essais — Île-Test"], str(textes()))
+                    champ.fill("")
+
+                    # ---- retirer : le choix passe au spot qui prend la place ----
+                    carte.locator(".spot").nth(0).locator("button").click()
+                    expect(carte.locator(".spot")).to_have_count(2)
+                    m = sea(page)
+                    verifier("mer : retirer le spot choisi (le premier) → le choix passe au spot qui prend sa place",
+                             m["spots"] == [DEUX, QUATRE] and m["choisi"] == DEUX["id"] and puts_sea()[-1] == {"spots": [DEUX, QUATRE], "choisi": DEUX["id"]}, str(m))
+                    carte.locator(".spot").nth(1).locator("input").click()
+                    attendre_que(page, lambda: sea(page)["choisi"] == QUATRE["id"])
+                    attendre_que(page, lambda: lignes_registre(carte) == [[DEUX["nom"], False], [QUATRE["nom"], True]])
+                    carte.locator(".spot").nth(1).locator("button").click()
+                    expect(carte.locator(".spot")).to_have_count(1)
+                    m = sea(page)
+                    verifier("mer : retirer le spot choisi quand il est le dernier → le choix passe au précédent", m["spots"] == [DEUX] and m["choisi"] == DEUX["id"], str(m))
+                    carte.locator(".spot").nth(0).locator("button").click()
+                    expect(carte.locator("#mer-registre .res.info")).to_be_visible()
+                    m = sea(page)
+                    verifier("mer : retirer le dernier spot → registre vide, choix vide, et la phrase « aucun spot » revient",
+                             m["spots"] == [] and m["choisi"] == "" and puts_sea()[-1] == {"spots": [], "choisi": ""}
+                             and norm(carte.locator("#mer-registre .res.info").inner_text()) == norm(cat["mer.vide"]), str(m))
+
+                    # ---- plage de vent ----
+                    nb_puts = len(puts_sea())
+                    vmin.fill("20")
+                    vmax.fill("10")
+                    enregistrer_vent.click()
+                    err_vent = carte.locator("#mer-vent-retours .res.err")
+                    expect(err_vent).to_be_visible()
+                    verifier("mer : minimum au-dessus du maximum → la phrase de l'appareil, dans la langue de l'écran, sous les champs",
+                             norm(err_vent.inner_text()) == norm(PHRASE_VENT), err_vent.inner_text())
+                    verifier("mer : le refus n'a rien enregistré (12 et 25 sur l'appareil)", (sea(page)["vent_min_kn"], sea(page)["vent_max_kn"]) == (12, 25))
+                    verifier("mer : la page a envoyé les deux nombres entiers tels quels ; le champ minimum est signalé (le corps contenait vent_min_kn)",
+                             puts_sea()[-1] == {"vent_min_kn": 20, "vent_max_kn": 10} and vmin.get_attribute("aria-invalid") == "true" and vmax.get_attribute("aria-invalid") is None,
+                             str(puts_sea()[-1:]))
+                    capturer(page, carte, "mer-5-vent-refuse.png")
+                    nb_puts = len(puts_sea())
+                    vmin.fill("1.5")
+                    enregistrer_vent.click()
+                    expect(err_vent).to_be_visible()
+                    verifier("mer : un nombre non entier est arrêté par la page (aucune requête), avec sa phrase",
+                             len(puts_sea()) == nb_puts and vmin.get_attribute("aria-invalid") == "true" and norm(err_vent.inner_text()) == norm(cat["mer.vent_entiers"]), err_vent.inner_text())
+                    vmin.fill("")
+                    enregistrer_vent.click()
+                    expect(err_vent).to_be_visible()
+                    verifier("mer : un champ vide est arrêté de la même façon", len(puts_sea()) == nb_puts and norm(err_vent.inner_text()) == norm(cat["mer.vent_entiers"]), err_vent.inner_text())
+                    vmin.fill("14")
+                    vmax.fill("28")
+                    enregistrer_vent.click()
+                    verifier("mer : 14 à 28 nœuds → enregistré sur l'appareil, mention d'erreur effacée, seuls les deux nombres sont envoyés",
+                             attendre_que(page, lambda: (sea(page)["vent_min_kn"], sea(page)["vent_max_kn"]) == (14, 28)) and puts_sea()[-1] == {"vent_min_kn": 14, "vent_max_kn": 28}
+                             and err_vent.count() == 0 and vmin.get_attribute("aria-invalid") is None, str(puts_sea()[-1:]))
+                    page.reload()
+                    expect(carte).to_be_visible()
+                    verifier("mer : après rechargement de la page, la plage de vent relue est 14 à 28", vmin.input_value() == "14" and vmax.input_value() == "28", f"{vmin.input_value()} / {vmax.input_value()}")
+
+                    # ---- adresse de Vigie du champ des alertes (avec des « / » en trop, que la page retire) ----
+                    api(page, "PUT", "/api/alerts", {"adresse": VIGIE_ESSAI})
+
+                    def alertes_barres(route):
+                        if route.request.method != "GET":
+                            return route.fallback()
+                        rep = route.fetch()
+                        j = rep.json()
+                        j["adresse"] = VIGIE_ESSAI + "///"
+                        route.fulfill(status=rep.status, content_type="application/json", body=json.dumps(j))
+                    page.route("**/api/alerts", alertes_barres)
+                    page.reload()
+                    expect(carte).to_be_visible()
+                    n5 = len(vigie_interceptees)
+                    champ.click()
+                    attendre_que(page, lambda: len(vigie_interceptees) > n5)
+                    lectures = vigie_interceptees[n5:]
+                    verifier(f"mer : avec une adresse dans « Alertes officielles », la page lit chez elle ({VIGIE_ESSAI}), sans « / » final, et plus chez le service public",
+                             len(lectures) == 1 and lectures[0]["url"] == VIGIE_ESSAI + "/v1/surf/spots", str(lectures))
+                    page.unroute("**/api/alerts")
+                    champ.fill("lot")
+                    expect(resultats).to_have_count(8)
+                    verifier("mer : dix spots répondent à « lot » → la page en montre 8 au plus", resultats.count() == 8)
+                    champ.fill("invalide")
+                    expect(retours.locator(".res.info")).to_be_visible()
+                    verifier("mer : un spot de Vigie dont l'identifiant serait refusé par l'appareil n'est pas proposé", resultats.count() == 0 and norm(retours.locator(".res.info").inner_text()) == norm(cat["mer.aucun"].replace("{q}", "invalide")))
+                    champ.fill("")
+
+                    # ---- liste pleine : 12 spots ----
+                    pleins = [{"id": f"spot-plein-{i:02d}", "nom": f"Spot plein {i:02d} ".ljust(32, "x")} for i in range(1, 13)]
+                    pleins[11]["nom"] = "W" * 32   # 32 lettres larges, sans espace : la ligne doit se couper, pas déborder
+                    code, m = api(page, "PUT", "/api/sea", {"spots": pleins, "choisi": pleins[0]["id"]})
+                    verifier("mer : 12 spots (le maximum) sont acceptés", code == 200 and len(m["spots"]) == 12, str(code))
+                    page.reload()
+                    expect(carte).to_be_visible()
+                    n6 = len(vigie_interceptees)
+                    verifier("mer : liste pleine → le champ de recherche est désactivé et une phrase le dit",
+                             champ.is_disabled() and carte.locator("#mer-pleine").is_visible() and norm(carte.locator("#mer-pleine").inner_text()) == norm(cat["mer.pleine"].replace("{n}", "12"))
+                             and carte.locator(".spot").count() == 12, carte.locator("#mer-pleine").inner_text())
+                    r = page.evaluate(DEPASSEMENTS)
+                    verifier("mer : 12 spots aux noms de 32 caractères, 390 px : pas de défilement horizontal", r["defilement"] <= r["largeur"] and not r["sortis"], json.dumps(r))
+                    verifier("mer : champ désactivé → aucune lecture chez Vigie", len(vigie_interceptees) == n6)
+                    carte.locator(".spot").nth(11).locator("button").click()
+                    expect(carte.locator(".spot")).to_have_count(11)
+                    verifier("mer : un spot retiré de la liste pleine → le champ redevient utilisable, la phrase disparaît",
+                             champ.is_enabled() and carte.locator("#mer-pleine").is_hidden())
+                    sans_null(page, "carte Mer")
+
+                    # ---- le contrat côté faux appareil (la page en dépend) ----
+                    api(page, "PUT", "/api/sea", {"spots": [], "choisi": ""})
+                    A, B = {"id": "a-1", "nom": "Alpha"}, {"id": "b_2", "nom": "Bêta"}
+
+                    def refus(corps, ident, champ_attendu):
+                        code, r = api(page, "PUT", "/api/sea", corps)
+                        e = r.get("erreur", {}) if isinstance(r, dict) else {}
+                        return code == 422 and e.get("id") == ident and e.get("champ") == champ_attendu and bool(e.get("message"))
+                    cas = [({"spots": "x"}, "spots_invalide", "spots"), ({"spots": [3]}, "spots_invalide", "spots"), ({"spots": [{"id": "a"}]}, "spots_invalide", "spots"),
+                           ({"spots": [{"id": "A-1", "nom": "x"}]}, "spot_invalide", "spots"), ({"spots": [{"id": "a\u0000b", "nom": "x"}]}, "spot_invalide", "spots"),
+                           ({"spots": [{"id": "a" * 65, "nom": "x"}]}, "spot_invalide", "spots"), ({"spots": [{"id": "a", "nom": ""}]}, "nom_invalide", "spots"),
+                           ({"spots": [{"id": "a", "nom": "x" * 33}]}, "nom_invalide", "spots"), ({"spots": [{"id": "a", "nom": "   "}]}, "nom_invalide", "spots"),
+                           ({"spots": [{"id": "a", "nom": "a\u0007b"}]}, "nom_invalide", "spots"), ({"spots": [A, A]}, "spot_double", "spots"),
+                           ({"spots": [{"id": f"s{i}", "nom": "n"} for i in range(13)]}, "trop_de_spots", "spots"),
+                           ({"spots": [A], "choisi": "b_2"}, "choix_inconnu", "choisi"), ({"spots": [A], "choisi": ""}, "choix_inconnu", "choisi"),
+                           ({"spots": [], "choisi": "a-1"}, "choix_inconnu", "choisi"), ({"choisi": 3}, "choix_inconnu", "choisi"),
+                           ({"vent_min_kn": 12.5}, "vent_invalide", "vent_min_kn"), ({"vent_max_kn": 25.5}, "vent_invalide", "vent_max_kn"),
+                           ({"vent_min_kn": "12"}, "vent_invalide", "vent_min_kn"), ({"vent_min_kn": 0, "vent_max_kn": 25}, "vent_invalide", "vent_min_kn"),
+                           ({"vent_min_kn": 30}, "vent_invalide", "vent_min_kn"), ({"vent_max_kn": 61}, "vent_invalide", "vent_max_kn"),
+                           ({"vent_max_kn": 10}, "vent_invalide", "vent_max_kn"), ({"vent_min_kn": 12, "vent_max_kn": 12}, "vent_invalide", "vent_min_kn")]
+                    ratees = [c[0] for c in cas if not refus(*c)]
+                    verifier(f"mer : le faux appareil refuse comme le contrat ({len(cas)} cas : id, nom, doublon, liste pleine, choix, vent ; id stable et champ)", not ratees, str(ratees[:3]))
+                    code, rien = api(page, "PUT", "/api/sea", {"spots": [A], "vent_min_kn": 5, "vent_max_kn": 5})
+                    verifier("mer : tout ou rien → une liste valide avec un vent refusé n'enregistre aucun des deux", code == 422 and sea(page)["spots"] == [] and sea(page)["vent_min_kn"] == 14, str(sea(page)))
+                    code, m = api(page, "PUT", "/api/sea", {"spots": [{**A, "lat": 1}, B]})
+                    verifier("mer : spots sans choisi sur un registre vide → le premier ; les champs en trop d'un objet sont ignorés",
+                             code == 200 and m["spots"] == [A, B] and m["choisi"] == "a-1" and set(m) == {"spots", "choisi", "vent_min_kn", "vent_max_kn", "spots_max", "vent_plafond_kn"}, str(m))
+                    api(page, "PUT", "/api/sea", {"choisi": "b_2"})
+                    code, m = api(page, "PUT", "/api/sea", {"spots": [A, B, {"id": "c", "nom": "Ç"}]})
+                    verifier("mer : spots sans choisi → l'appareil garde le même spot choisi s'il est encore dans la liste", m["choisi"] == "b_2", str(m))
+                    code, m = api(page, "PUT", "/api/sea", {"spots": [A]})
+                    verifier("mer : spots sans choisi, le spot choisi n'y est plus → le premier", m["choisi"] == "a-1", str(m))
+                    code, m = api(page, "PUT", "/api/sea", {})
+                    verifier("mer : un PUT qui ne change rien répond 200 avec l'état enregistré", code == 200 and m["spots"] == [A] and m["choisi"] == "a-1", str(m))
+                    code, m = api(page, "PUT", "/api/sea", {"spots": []})
+                    verifier("mer : spots vide sans choisi → choisi vide", code == 200 and m["spots"] == [] and m["choisi"] == "", str(m))
+                finally:
+                    page.unroute("**/api/alerts")
+                    api(page, "PUT", "/api/alerts", {"adresse": alertes_depart["adresse"]})
+                    api(page, "PUT", "/api/sea", {"spots": [], "choisi": "", "vent_min_kn": 12, "vent_max_kn": 25})
+                    vigie["reponse"] = liste_par_adresse
+                _, a = api(page, "GET", "/api/alerts")
+                verifier("mer : adresse des alertes et registre remis comme avant le pas",
+                         a["adresse"] == alertes_depart["adresse"] and sea(page) == {"spots": [], "choisi": "", "vent_min_kn": 12, "vent_max_kn": 25, "spots_max": 12, "vent_plafond_kn": 60}, str(sea(page)))
+            if REEL:
+                sauter("Mer : registre des spots, recherche chez Vigie (interceptée), plage de vent", "le parcours remplit le registre de l'appareil et change l'adresse des alertes : il ne se joue que contre le faux appareil")
+            else:
+                etape("Mer : registre des spots, recherche chez Vigie (interceptée), plage de vent", t_mer, page)
+
+            def t_mer_delai():
+                # Le délai de 15 s de la lecture chez Vigie : horloge simulée du navigateur (aucune attente réelle)
+                c8, p8 = nouveau_contexte(nav)
+                try:
+                    p8.clock.install()
+                    vigie["reponse"] = "silence"
+                    appairer(p8)
+                    carte = p8.locator("#mer")
+                    retours = carte.locator("#mer-retours")
+                    n = len(vigie_interceptees)
+                    carte.locator("#mer-q").click()
+                    attendre_que(p8, lambda: len(vigie_interceptees) > n)
+                    p8.clock.fast_forward(13000)
+                    verifier("mer : Vigie qui ne répond pas, 13 s après → la page attend encore (« Chargement… », pas d'erreur)",
+                             len(vigie_interceptees) == n + 1 and retours.locator(".res.err").count() == 0 and retours.locator(".res.info").count() == 1, retours.inner_text())
+                    p8.clock.fast_forward(3000)
+                    expect(retours.locator(".res.err")).to_be_visible()
+                    verifier("mer : au-delà de 15 s sans réponse, la page abandonne et dit que Vigie est injoignable",
+                             norm(retours.locator(".res.err").inner_text()) == norm(catalogue("fr")["mer.injoignable"].replace("{carte}", catalogue("fr")["alertes.titre"])), retours.inner_text())
+                finally:
+                    vigie["reponse"] = liste_par_adresse
+                    liberer_vigie()
+                    c8.close()
+            if REEL:
+                sauter("Mer : délai de 15 s de la lecture chez Vigie", "joué seulement contre le faux appareil (comme l'étape précédente)")
+            else:
+                etape("Mer : délai de 15 s de la lecture chez Vigie", t_mer_delai)
+
+            def t_mer_langues():
+                # Allemand et turc : tous les états de la carte « La mer », sans mot français, phrases de l'appareil dans la langue de l'écran
+                fr = catalogue("fr")
+                ids_page = list(lire_yaml(RACINE / "i18n" / "page.yaml"))
+                c9, p9 = nouveau_contexte(nav, largeur=360)
+                langue_depart = None
+                try:
+                    appairer(p9)
+                    langue_depart = api(p9, "GET", "/api/display")[1]["langue_ecran"]
+                    for code, capture in (("de", "mer-6-allemand.png"), ("tr", "mer-7-turc.png")):
+                        cat = catalogue(code)
+                        traduits = lire_yaml(RACINE / "i18n" / f"{code}.yaml")
+                        vigie["reponse"] = liste_par_adresse
+                        api(p9, "PUT", "/api/display", {"langue_ecran": code})
+                        api(p9, "PUT", "/api/sea", {"spots": [], "choisi": "", "vent_min_kn": 12, "vent_max_kn": 25})
+                        p9.reload()
+                        expect(p9.locator("#ville")).to_be_visible()
+                        carte = p9.locator("#mer")
+                        champ, retours, resultats = carte.locator("#mer-q"), carte.locator("#mer-retours"), carte.locator(".resultats button")
+                        err_vent = carte.locator("#mer-vent-retours .res.err")
+                        enregistrer = carte.get_by_role("button", name=cat["action.enregistrer"], exact=True)
+                        vus = []   # tout ce que la carte a dit, état après état
+
+                        def noter(vus=vus, carte=carte):
+                            vus.append(tout_le_texte(carte))
+
+                        # 1. registre vide
+                        liens = [norm(x) for x in p9.locator("nav.ancres a").all_inner_texts()]
+                        verifier(f"{code} : l'onglet « {cat['nav.mer']} » est après « {cat['nav.alertes']} » et avant « {cat['nav.assistant']} »",
+                                 norm(cat["nav.mer"]) in liens and liens.index(norm(cat["nav.mer"])) == liens.index(norm(cat["nav.alertes"])) + 1
+                                 and liens[liens.index(norm(cat["nav.mer"])) + 1] == norm(cat["nav.assistant"]), str(liens))
+                        verifier(f"{code} : état vide — titre, phrase, champ, crédit, plage de vent, aide, bouton, dans la langue",
+                                 carte.locator("#t-mer").inner_text() == cat["mer.titre"] and norm(carte.locator("#mer-registre .res.info").inner_text()) == norm(cat["mer.vide"])
+                                 and norm(carte.locator("label[for=mer-q]").inner_text()) == norm(cat["mer.ajouter"]) and champ.get_attribute("placeholder") == cat["mer.recherche_ph"]
+                                 and norm(carte.locator("p.aide", has_text="OpenStreetMap").inner_text()) == norm(cat["mer.credit"])
+                                 and norm(carte.locator("#mer-vent-l").inner_text()) == norm(cat["mer.vent"]) and norm(carte.locator("label[for=mer-vent-min]").inner_text()) == norm(cat["mer.vent_min"])
+                                 and norm(carte.locator("label[for=mer-vent-max]").inner_text()) == norm(cat["mer.vent_max"]) and norm(carte.locator("#mer-vent-aide").inner_text()) == norm(cat["mer.vent_aide"])
+                                 and norm(enregistrer.inner_text()) == norm(cat["action.enregistrer"]))
+                        noter()
+                        # 2. recherche, aucun résultat, ajout, doublon
+                        champ.click()
+                        champ.fill("ecluse")
+                        expect(resultats).to_have_count(1)
+                        champ.fill("zzzz")
+                        expect(retours.locator(".res.info")).to_be_visible()
+                        verifier(f"{code} : aucun résultat — phrase dans la langue, recherche citée", norm(retours.locator(".res.info").inner_text()) == norm(cat["mer.aucun"].replace("{q}", "zzzz")), retours.inner_text())
+                        noter()
+                        for requete, attendu in (("ecluse", UN["nom"]), ("baie", DEUX["nom"])):
+                            champ.fill(requete)
+                            expect(resultats).to_have_count(1)
+                            resultats.first.click()
+                            attendre_que(p9, lambda attendu=attendu, carte=carte: any(attendu == ligne[0] for ligne in lignes_registre(carte)))
+                        verifier(f"{code} : deux spots ajoutés, le premier est coché", lignes_registre(carte) == [[UN["nom"], True], [DEUX["nom"], False]], str(lignes_registre(carte)))
+                        verifier(f"{code} : liste — groupe « {cat['mer.affiche']} », bouton « {cat['mer.retirer']} » et son nom accessible dans la langue",
+                                 carte.get_by_role("radiogroup", name=cat["mer.affiche"]).count() == 1 and carte.locator(".spot").first.locator("button").inner_text() == cat["mer.retirer"]
+                                 and carte.locator(".spot").first.locator("button").get_attribute("aria-label") == cat["mer.retirer_nom"].replace("{nom}", UN["nom"]))
+                        noter()
+                        champ.fill("ecluse")
+                        expect(resultats).to_have_count(1)
+                        resultats.first.click()
+                        expect(retours.locator(".res")).to_be_visible()
+                        verifier(f"{code} : doublon — phrase dans la langue", norm(retours.locator(".res").inner_text()) == norm(cat["mer.deja"]), retours.inner_text())
+                        noter()
+                        # 3. plage de vent : la phrase de l'appareil arrive dans la langue de l'écran ; la phrase de la page aussi
+                        carte.locator("#mer-vent-min").fill("20")
+                        carte.locator("#mer-vent-max").fill("10")
+                        enregistrer.click()
+                        expect(err_vent).to_be_visible()
+                        phrase = traduits[PHRASE_VENT]
+                        verifier(f"{code} : vent refusé — la phrase de l'appareil est traduite (et n'est pas le français)", norm(err_vent.inner_text()) == norm(phrase) and phrase != PHRASE_VENT, err_vent.inner_text())
+                        noter()
+                        capturer(p9, carte, capture)
+                        carte.locator("#mer-vent-min").fill("1.5")
+                        enregistrer.click()
+                        expect(err_vent).to_be_visible()
+                        verifier(f"{code} : vent non entier — phrase de la page dans la langue", norm(err_vent.inner_text()) == norm(cat["mer.vent_entiers"]), err_vent.inner_text())
+                        noter()
+                        # 4. lecture chez Vigie en cours (Vigie ne répond pas), puis Vigie injoignable
+                        vigie["reponse"] = "silence"
+                        p9.reload()
+                        expect(carte).to_be_visible()
+                        champ.click()
+                        expect(retours.locator(".res.info")).to_be_visible()
+                        verifier(f"{code} : lecture chez Vigie en cours — « {cat['mer.chargement']} »", norm(retours.locator(".res.info").inner_text()) == norm(cat["mer.chargement"]), retours.inner_text())
+                        noter()
+                        liberer_vigie()
+                        vigie["reponse"] = "coupure"
+                        p9.reload()
+                        expect(carte).to_be_visible()
+                        champ.click()
+                        expect(retours.locator(".res.err")).to_be_visible()
+                        verifier(f"{code} : Vigie injoignable — phrase et « {cat['action.reessayer']} » dans la langue, la carte « {cat['alertes.titre']} » nommée",
+                                 norm(retours.locator(".res.err").inner_text()) == norm(cat["mer.injoignable"].replace("{carte}", cat["alertes.titre"]))
+                                 and retours.get_by_role("button", name=cat["action.reessayer"]).count() == 1, retours.inner_text())
+                        noter()
+                        # 5. liste pleine, 360 px
+                        pleins = [{"id": f"spot-plein-{i:02d}", "nom": f"Spot plein {i:02d}"} for i in range(1, 13)]
+                        api(p9, "PUT", "/api/sea", {"spots": pleins, "choisi": pleins[0]["id"]})
+                        p9.reload()
+                        expect(carte).to_be_visible()
+                        verifier(f"{code} : liste pleine — phrase dans la langue, champ désactivé",
+                                 champ.is_disabled() and norm(carte.locator("#mer-pleine").inner_text()) == norm(cat["mer.pleine"].replace("{n}", "12")), carte.locator("#mer-pleine").inner_text())
+                        noter()
+                        r = p9.evaluate(DEPASSEMENTS)
+                        verifier(f"{code} : 360 px, 12 spots, pas de défilement horizontal", r["defilement"] <= r["largeur"] and not r["sortis"], json.dumps(r))
+                        # bilan : aucun français, aucun identifiant brut dans tout ce que la carte a dit
+                        dit = norm(" ".join(vus))
+                        bruts = [i for i in ids_page if i in dit]
+                        verifier(f"{code} : aucun identifiant brut (« mer.vide ») dans la carte", not bruts, str(bruts[:4]))
+                        propres = [v for k, v in fr.items() if "{" not in v and len(v) >= 6 and v != cat.get(k)]
+                        restes = sorted({norm(v) for v in propres if norm(v) in dit})
+                        verifier(f"{code} : aucun texte français dans la carte ({len(vus)} états, libellés accessibles compris)", not restes, str(restes[:4]))
+                        cles = [k for k in fr if k.startswith("mer.")] + ["nav.mer", "alertes.titre", "action.reessayer", "action.enregistrer"]
+                        morceaux = sorted({norm(m) for k in cles if fr[k] != cat[k] for m in re.split(r"\{[^}]*\}", fr[k]) if len(norm(m)) >= 4})
+                        restes = [m for m in morceaux if m in dit]
+                        verifier(f"{code} : aucun morceau français des phrases à trous dans la carte", not restes, str(restes[:4]))
+                finally:
+                    vigie["reponse"] = liste_par_adresse
+                    try:
+                        api(p9, "PUT", "/api/sea", {"spots": [], "choisi": "", "vent_min_kn": 12, "vent_max_kn": 25})
+                        if langue_depart:
+                            api(p9, "PUT", "/api/display", {"langue_ecran": langue_depart})
+                    except Exception:  # noqa: BLE001
+                        pass
+                    liberer_vigie()
+                    c9.close()
+            if REEL:
+                sauter("Mer : allemand et turc, tous les états de la carte", "joué seulement contre le faux appareil (comme l'étape « Mer »)")
+            else:
+                etape("Mer : allemand et turc, tous les états de la carte", t_mer_langues)
+
             def t_wifi():
                 page.get_by_role("button", name="Changer de réseau").click()
                 page.get_by_role("button", name=re.compile("^Voisin_5G")).click()
@@ -735,7 +1354,7 @@ def main():
                         expect(p4.locator("#ville")).to_be_visible()
                         expect(p4.locator("html")).to_have_attribute("lang", code)
                         cat = catalogue(code)
-                        sections = ["ville", "alertes", "assistant", "ecran", "wifi", "appareil"]
+                        sections = ["ville", "alertes", "mer", "assistant", "ecran", "wifi", "appareil"]
                         liens = [norm(x) for x in p4.locator("nav.ancres a").all_inner_texts()]
                         verifier(f"{code} : onglets, titre de carte et titre de l'onglet du navigateur dans la langue",
                                  liens == [norm(cat["nav." + s]) for s in sections] and p4.locator("#t-ville").inner_text() == cat["ville.titre"] and p4.title() == cat["app.titre"], str(liens))
@@ -822,7 +1441,13 @@ def main():
             except subprocess.TimeoutExpired:
                 srv.kill()
 
-    verifier("la page ne parle qu'à l'appareil (aucune police, image, script ou CDN externe)", hotes == {urllib.parse.urlsplit(BASE).netloc}, str(sorted(hotes)))
+    appareil = urllib.parse.urlsplit(BASE).netloc
+    verifier("la page ne parle qu'à l'appareil (aucune police, image, script ou CDN externe) ; seule exception : la lecture GET /v1/surf/spots chez l'adresse de Vigie "
+             "(celle du test, ou le service public par défaut), interceptée par le parcours : aucune de ces requêtes n'a atteint le réseau",
+             hotes - {appareil} <= hotes_vigie
+             and all(r["methode"] == "GET" and urllib.parse.urlsplit(r["url"]).path == "/v1/surf/spots" and urllib.parse.urlsplit(r["url"]).netloc in hotes_vigie for r in hors_appareil)
+             and len(hors_appareil) == len(vigie_interceptees),
+             f"hôtes {sorted(hotes)} ; {len(hors_appareil)} requête(s) hors appareil, {len(vigie_interceptees)} interceptée(s) ; {hors_appareil[:2]}")
     graves = [m for m in erreurs_console if "Failed to load resource" not in m]
     verifier("console du navigateur : aucune erreur JavaScript", not graves, "; ".join(graves[:3]))
     echecs = [r for r in resultats if not r[1]]

@@ -100,6 +100,7 @@ const etat = {
   nom: 'ecran-1a2b', version: '0.1.0', precedente: '0.0.9', demarre: Date.now(),
   zone: null, source: 'auto', sourceRetablie: false, display: { langue_ecran: 'fr', langue_assistant: 'fr', theme: 'auto', luminosite: 80, profil: 'auto' },
   alertes: { actives: true, adresse: '', periode_min: 15, niveau_min: 'yellow' },
+  mer: { spots: [], choisi: '', vent_min_kn: 12, vent_max_kn: 25 }, // registre vide au départ : l'écran n'a pas de bouton « Mer »
   services: { stt: null, llm: null, tts: null },
   wifi: { etat: 'connecte', ssid: 'Maison', niveau: 3, force: -61, ip: '192.168.1.52' }, // adresse d'exemple, pas celle d'un vrai réseau
   maj: { dernier: null }, redemarreJusqua: 0, meteo: null, scanFin: 0,
@@ -231,6 +232,58 @@ function validerAlertes(a) {
   return r;
 }
 const alertesVue = () => ({ ...etat.alertes, adresse_publique: ADRESSE_VIGIE_PUBLIQUE, niveaux: NIVEAUX_ALERTE });
+/* Mer (docs/api-reglages.md §15) : le registre des spots que l'écran peut montrer (12 au plus, un seul choisi) et la plage de vent du verdict du
+   kite. Tout ou rien : rien n'est écrit dans `etat.mer` tant que toutes les valeurs ne sont pas jugées bonnes. La liste des spots de Vigie n'est
+   PAS servie ici : c'est la page qui la lit chez Vigie. */
+const SPOTS_MAX = 12, VENT_PLAFOND_KN = 60, NOM_SPOT_MAX = 32;
+const merVue = () => ({ spots: etat.mer.spots.map((s) => ({ id: s.id, nom: s.nom })), choisi: etat.mer.choisi, vent_min_kn: etat.mer.vent_min_kn,
+  vent_max_kn: etat.mer.vent_max_kn, spots_max: SPOTS_MAX, vent_plafond_kn: VENT_PLAFOND_KN });
+function validerMer(c) {
+  const refus = (id, phrase, champ) => new Refus(422, id, phrase, champ);
+  let spots = etat.mer.spots;
+  if (c.spots !== undefined) {
+    const invalide = () => refus('spots_invalide', T('Les spots doivent former une liste d’objets avec un identifiant et un nom.'), 'spots');
+    if (!Array.isArray(c.spots)) throw invalide();
+    if (c.spots.length > SPOTS_MAX) throw refus('trop_de_spots', T('La liste est pleine : 12 spots au plus.'), 'spots');
+    const vus = new Set();
+    spots = c.spots.map((s) => {
+      if (!s || typeof s !== 'object' || Array.isArray(s) || typeof s.id !== 'string' || typeof s.nom !== 'string') throw invalide();
+      /* id : lettres minuscules, chiffres, « - » et « _ », 64 octets au plus (de l'ASCII : un octet par caractère) */
+      if (!/^[a-z0-9_-]{1,64}$/.test(s.id)) throw refus('spot_invalide', T('Cet identifiant de spot n’est pas valide.'), 'spots');
+      /* nom : 1 à 32 caractères (points de code), UTF-8 bien formé, aucun caractère de contrôle, pas seulement des espaces */
+      /* Un « \u0000 » n'est pas refusé : le décodeur JSON de l'appareil le remplace par U+FFFD (précision du 08/11/2026). */
+      const nom = s.nom.replace(/\u0000/g, '�');
+      const n = [...nom].length;
+      if (!nom.isWellFormed() || n < 1 || n > NOM_SPOT_MAX || /[\u0001-\u001f\u007f-\u009f]/.test(nom) || nom.trim() === '') {
+        throw refus('nom_invalide', T('Le nom d’un spot doit faire de 1 à 32 caractères.'), 'spots');
+      }
+      if (vus.has(s.id)) throw refus('spot_double', T('Ce spot est déjà dans la liste.'), 'spots');
+      vus.add(s.id);
+      return { id: s.id, nom };
+    });
+  }
+  /* choisi : dans la liste telle qu'elle sera après le changement ; « » seulement pour une liste vide. Absent : même spot s'il y est encore, sinon le premier. */
+  let choisi = etat.mer.choisi;
+  if (c.choisi !== undefined) {
+    const connu = typeof c.choisi === 'string' && (spots.length ? spots.some((s) => s.id === c.choisi) : c.choisi === '');
+    if (!connu) throw refus('choix_inconnu', T('Le spot choisi n’est pas dans la liste.'), 'choisi');
+    choisi = c.choisi;
+  } else if (!spots.some((s) => s.id === choisi)) choisi = spots.length ? spots[0].id : '';
+  /* vent : nœuds entiers, 0 < min < max <= 60 ; si un seul est envoyé, le couple (celui envoyé, celui enregistré) est jugé ; 12.5 est refusé, pas arrondi */
+  let vmin = etat.mer.vent_min_kn, vmax = etat.mer.vent_max_kn;
+  /* `champ` d'un refus de vent : « vent_min_kn » si le corps envoyé contient vent_min_kn, sinon « vent_max_kn » (précision du 08/11/2026) */
+  const champVent = c.vent_min_kn !== undefined ? 'vent_min_kn' : 'vent_max_kn';
+  const vent = (champ) => {
+    if (!Number.isInteger(c[champ])) throw refus('vent_invalide', T('La plage de vent doit être en nœuds entiers, de 1 à 60, le minimum sous le maximum.'), champVent);
+    return c[champ];
+  };
+  if (c.vent_min_kn !== undefined) vmin = vent('vent_min_kn');
+  if (c.vent_max_kn !== undefined) vmax = vent('vent_max_kn');
+  if ((c.vent_min_kn !== undefined || c.vent_max_kn !== undefined) && !(vmin > 0 && vmin < vmax && vmax <= VENT_PLAFOND_KN)) {
+    throw refus('vent_invalide', T('La plage de vent doit être en nœuds entiers, de 1 à 60, le minimum sous le maximum.'), champVent);
+  }
+  return { spots, choisi, vent_min_kn: vmin, vent_max_kn: vmax };
+}
 function validerUrl(u) {
   let url;
   try { url = new URL(String(u)); } catch (e) { throw new Refus(422, 'url_invalide', T('Cette adresse n’est pas valide.'), 'url'); }
@@ -477,6 +530,12 @@ async function api(req, res, url) {
   if (m === 'PUT' && p === '/api/alerts') {
     Object.assign(etat.alertes, validerAlertes(await lireJson(req)));
     return json(res, 200, alertesVue());
+  }
+  /* mer : registre des spots et plage de vent */
+  if (m === 'GET' && p === '/api/sea') return json(res, 200, merVue());
+  if (m === 'PUT' && p === '/api/sea') {
+    Object.assign(etat.mer, validerMer(await lireJson(req)));
+    return json(res, 200, merVue());
   }
   /* services */
   if (m === 'GET' && p === '/api/presets') return json(res, 200, presets());

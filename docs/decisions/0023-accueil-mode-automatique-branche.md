@@ -153,9 +153,13 @@
   3. **L'appareil n'offre que ce qu'il dessine** : « Auto » et « Météo » (`accueil::profil_offert`, `PROFILS_DISPONIBLES` du pilote).
      Surf, Vent·Bateau et Côte n'existent ni dans le registre, ni dans l'API, ni dans la roue : un profil de plus = une ligne dans
      `PROFILS_ACCUEIL`, dans le registre, dans `PROFILS_DISPONIBLES`, et son glyphe. La famille « Profil ▸ » n'est posée que si au
-     moins deux choix sont offerts.
+     moins deux choix sont offerts (`roue::profil_a_proposer`, noyau pur, testé).
   4. **La roue** : « Profil ▸ » est la **dernière entrée du premier anneau** (Réglages, Détails, Alertes quand une alerte est en
-     vigueur, puis Profil : jamais plus de quatre boutons sur six). Son second anneau : « Auto » et « Météo ». Le choix **en vigueur
+     vigueur, Mer quand un spot est choisi (ADR-0024), puis Profil : jamais plus de cinq boutons sur six). QUELLES entrées et dans quel
+     ordre, c'est le **noyau pur** `ecran/roue_entrees.hpp` d'ADR-0024, étendu d'un identifiant `Entree::Profil` et d'un champ
+     `Presences::profil` (faux par défaut : tout appelant qui ne le donne pas garde ses quatre entrées) ; l'appareil et le banc de rendu
+     lisent la même liste, et les tests prouvent que l'arrivée de « Profil » ne déplace aucune autre entrée, « Mer » comprise. Son
+     second anneau : « Auto » et « Météo ». Le choix **en vigueur
      est marqué** comme la famille dépliée du premier anneau (filet et icône à la couleur d'accent, `ChoixRoue::actif`) ; il reste
      touchable, et le choisir de nouveau **n'écrit rien**. Toucher un choix **écrit le réglage puis déclenche tout de suite** le
      passage de l'accueil (l'écran suit sans attendre les 500 ms). Les trois icônes sont des glyphes de la police de la roue (ADR-0021)
@@ -167,8 +171,8 @@
      rouge garde son bandeau agrandi (une alerte officielle ne cède jamais sa place) ; la décision des règles est **suspendue, pas
      perdue** : dépingler rend la main aux règles au passage suivant, qui est déclenché à l'instant.
   6. **ADR-0017** : la famille « Profil » donne `Demande::choix` = 2 (les mots sont mesurés à l'ouverture comme pour toute famille) ;
-     la position du moyeu a été **remesurée** avec la nouvelle forme du premier anneau (jusqu'à quatre boutons dont une famille), aux
-     trois tailles : le journal du banc dit « tient » à chaque fois (voir la page de mesures).
+     la position du moyeu a été **remesurée** avec la nouvelle forme du premier anneau (jusqu'à cinq boutons dont une famille : alerte,
+     mer et profil ensemble), aux trois tailles : le journal du banc dit « tient » à chaque fois (voir la page de mesures).
 - **Alternatives écartées** :
   - *Mettre « Profil » en premier anneau avant « Réglages »* : « Réglages » reste le premier bouton, celui que tout le monde atteint
     (les essais du banc le touchent par son rang).
@@ -177,7 +181,7 @@
   - *Mettre le profil dans le blob « affichage »* : il aurait fallu le migrer (taille, version) sans que rien ne l'exige.
   - *Une durée d'épinglage (« jusqu'à demain »)* : non demandé ; l'épinglage dure jusqu'à ce qu'on le retire.
 - **À valider par Axel** (choix faits par l'auteur, pas par la consigne) :
-  10. « Profil ▸ » **en dernière place** du premier anneau ;
+  10. « Profil ▸ » **en dernière place** du premier anneau, **après « Mer »** quand les deux existent (la mer garde donc son rang) ;
   11. le **choix en vigueur marqué** par la couleur d'accent (filet + icône), la même marque que la famille dépliée : à juger à un mètre ;
   12. le **mot de la famille dépliée n'est plus dessiné** au premier anneau (le moyeu le dit) ;
   13. les **icônes** : un écran de tableau de bord (Profil), un « A » dans une flèche circulaire (Auto), un soleil derrière un nuage (Météo) ;
@@ -191,6 +195,8 @@
   - la **place de la rangée « Profil »** sur la page « Affichage » de l'écran de réglages à 1024×600 : vue sur les rendus, pas sur la carte.
 - **Limites** : le panneau « Pourquoi cet écran ? », l'état « nuit », Surf, Vent·Bateau et Côte ne sont **pas** faits ; l'indice d'appui
   long (« une seule fois ») n'existe pas dans le dépôt et n'a **pas** été construit ; rien de ce qui touche à la mer n'est dans cette PR.
-- **Conflits possibles** avec les PR de la mer (empilées sur `claude/mer-noyau`) : elles ajoutent aussi un glyphe à la roue
-  (`roue_glyphes.json`, `mdi_roue.ttf`, `ui_roue_icones.inc`, `main/assets/README.md`) et une entrée à `composer_entrees` ; le fichier de
-  police est binaire : au second merge, **régénérer** `mdi_roue.ttf` avec `generer_police_roue.py --source …` depuis le manifeste fusionné.
+- **Fusion avec la pile de la mer** (faite le 08/11/2026, `origin/main` = PR #15) : la mer avait ajouté elle aussi un glyphe à la roue
+  (`roue_glyphes.json`, `mdi_roue.ttf`, `ui_roue_icones.inc`, `main/assets/README.md`) et une entrée à `composer_entrees`. Le manifeste
+  fusionné compte **huit glyphes** (les cinq d'avant, dont `waves` pour « Mer », plus les trois du profil) ; `mdi_roue.ttf` a été
+  **régénéré** depuis lui (2 140 octets, `--verifier` vert), pas fusionné à la main. La liste du premier anneau est celle du noyau pur
+  d'ADR-0024, étendue ici (voir 4).

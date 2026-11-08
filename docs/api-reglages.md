@@ -15,7 +15,7 @@ Written on 06/11/2026 (track B), languages added on 06/11/2026. **Design contrac
 Original decisions: [ADR-0002](decisions/0002-assistant-vocal-en-cascade.md) (three services), [ADR-0003](decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md) (page served by the device, local HTTP, pairing token, secrets, update), [ADR-0006](decisions/0006-ecran-en-sept-langues.md) (seven languages).
 
 > **Firmware status — milestone “réglages”, 06/11/2026: subset V1, Wi-Fi station mode only (no access point, no captive portal).** Served by `main/serveur_web.cpp` on port 80; the logic is in the pure core (`components/core/include/ecran/api_reglages.hpp`), tested on the PC with mutations. **Compiled, not yet observed on a board** (see [mesures/reglages.md](mesures/reglages.md)).
-> - **Real**: `GET /api/status`, `POST` and `DELETE /api/pair`, `GET /api/system`, `GET` and `PUT /api/location`, `GET` and `PUT /api/display`, `GET` and `PUT /api/alerts` (§14), `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (read-only), the static files (gzip).
+> - **Real**: `GET /api/status`, `POST` and `DELETE /api/pair`, `GET /api/system`, `GET` and `PUT /api/location`, `GET` and `PUT /api/display`, `GET` and `PUT /api/alerts` (§14), `GET` and `PUT /api/sea` (§15), `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (read-only), the static files (gzip).
 > - **Empty, without error** (the page opens without a red message): `GET /api/services` (nothing configured), `GET /api/presets` (none), `GET /api/update` (`inactif`).
 > - **`501` `non_disponible`**, with the sentence “This function is not available on this screen yet.” in the screen language: Wi-Fi scan and change, saving and testing the STT / LLM / TTS services, export / import, update and rollback.
 > - **Known gaps with the text below**: `GET /api/geocode` is **synchronous for the page** (the request waits up to 30 s for the answer, so it holds the server's single task: rule 7 is not kept for this one route), but the network work is done by the search module's own low-priority task, never by the server's task or the screen's; beyond 5 open connections the oldest is closed instead of answering `503` (rule 8); `validee` is always `true` (no rollback yet); `compile_le` is the local time of the build PC, without “Z”; the `fuseau` reported is the saved city's, and it is also the zone the on-screen clock uses (ADR-0012); a time zone that is not in the table of 468 names shows no time on screen (never Paris time), and `Africa/Casablanca` is a known limit of that table.
@@ -324,6 +324,33 @@ What is sent to the Vigie address: the chosen city's position rounded to three d
 
 Changing a value reaches the network client within about 5 s; it then asks Vigie at once if the request changed, but never twice within one minute.
 
+## 15. Sea (Vigie)
+
+Written on 08/11/2026 with [ADR-0025](decisions/0025-mer-ecriture-du-registre-des-spots-lot-e.md). The sea page of the screen ([ADR-0022](decisions/0022-mer-la-page-lot-c.md)) shows the sea of **one chosen spot**, read from Vigie ([ADR-0019](decisions/0019-mer-client-et-registre-de-spots.md)). The device keeps a short list of spots (12 at most) and says which one is chosen; this group sets them. Until a spot is chosen the device sends nothing to Vigie for the sea, and the long-press wheel has no "Sea" button ([ADR-0024](decisions/0024-mer-l-entree-de-la-roue-lot-d.md)).
+
+`GET /api/sea` →
+```json
+{"spots": [{"id": "an-id-of-vigies-list", "nom": "A beach"}], "choisi": "an-id-of-vigies-list",
+ "vent_min_kn": 12, "vent_max_kn": 25, "spots_max": 12, "vent_plafond_kn": 60}
+```
+`choisi` is `""` and `spots` is `[]` on a device where nothing was chosen. The values above are **examples of the shape**, not data that was read.
+
+`PUT /api/sea` accepts the four modifiable fields (`spots`, `choisi`, `vent_min_kn`, `vent_max_kn`), each optional (absent = unchanged), and answers like `GET` with the saved values. **All or nothing**: if one value is refused, nothing is saved.
+
+| Field | Rule |
+|---|---|
+| `spots` | the **whole** list, in the order to keep: 0 to 12 objects `{"id": …, "nom": …}` (other fields of an object are ignored). `id`: the identifier of the spot in Vigie's list, lower-case letters, digits, `-` and `_`, 64 bytes at most. `nom`: the name to show, 1 to 32 characters, well-formed UTF-8, no control character, not only spaces. Two objects with the same `id` are refused. An empty list switches the sea off (no request, no "Sea" button). |
+| `choisi` | the `id` of the spot whose sea the screen shows; it must be in the list as it will be after the change. `""` only for an empty list. Absent: the device stays on the same spot if it is still in the list, otherwise on the first one. |
+| `vent_min_kn`, `vent_max_kn` | the wind range, in **whole knots**, that Vigie uses for the kite verdict: `0 < min < max <= 60` (defaults 12 and 25). If only one is sent, the pair (the one sent, the one saved) is judged. `12.5` is refused, not rounded. |
+
+**Where the list of spots comes from.** The device does **not** serve it. The page reads it from Vigie itself: `GET <address>/v1/surf/spots`, where the address is `adresse` of `GET /api/alerts` or, when it is empty, `adresse_publique` (51 spots on 08/11/2026, 20 405 bytes, 4 695 gzipped). The page keeps from each spot only its `id`, its `name` and its `place` (to tell two beaches of the same name apart), and sends the device `id` and `nom`. The device does not check that an `id` is in Vigie's list: an unknown spot makes Vigie answer 404 and the device asks again at its normal pace (ADR-0019). Vigie's answers carry the credit of the spot data (OpenStreetMap contributors, ODbL): the page shows it next to the list.
+
+What the device sends to Vigie for the sea: `GET <address>/v1/embedded/frame?device_type=generic&spot=<id>`, plus `&wind_min_kn=…&wind_max_kn=…` when the range is not 12 to 25. No position, no key, no device identifier.
+
+`422` errors (field in `champ`): `spots_invalide` ("The spots must be a list of objects with an identifier and a name."), `spot_invalide` ("This spot identifier isn’t valid."), `nom_invalide` ("A spot name must have 1 to 32 characters."), `spot_double` ("This spot is already in the list."), `trop_de_spots` ("The list is full: 12 spots at most."), `choix_inconnu` ("The chosen spot isn’t in the list."), `vent_invalide` ("The wind range must be whole knots from 1 to 60, the minimum below the maximum."). `champ` is `spots` for the first five, `choisi` for `choix_inconnu`, and for `vent_invalide` `vent_min_kn` when the request carries a `vent_min_kn`, otherwise `vent_max_kn` (the pair is judged as a whole). A request is refused with `400` `illisible` when its body is not a JSON object. A spot name that contains `\u0000` is not refused: the JSON reader turns it into U+FFFD, like everywhere else on the device. Two writers (the page and, later, the screen) are not coordinated: the last write wins.
+
+Changing a value reaches the sea client within about 5 s; it then asks Vigie at once if the request changed, but never twice within one minute.
+
 ---
 
 # Français
@@ -333,7 +360,7 @@ Rédigé le 06/11/2026 (piste B), langues ajoutées le 06/11/2026. **Contrat de 
 Décisions d'origine : [ADR-0002](decisions/0002-assistant-vocal-en-cascade.md) (trois services), [ADR-0003](decisions/0003-reglages-par-page-web-et-meteo-open-meteo.md) (page servie par l'appareil, HTTP local, jeton d'appairage, secrets, mise à jour), [ADR-0006](decisions/0006-ecran-en-sept-langues.md) (sept langues).
 
 > **État du firmware — jalon « réglages », 06/11/2026 : sous-ensemble V1, mode station Wi-Fi seulement (ni point d'accès, ni portail captif).** Servi par `main/serveur_web.cpp` sur le port 80 ; la logique est dans le noyau pur (`components/core/include/ecran/api_reglages.hpp`), testée sur le PC avec des mutations. **Compilé, pas encore constaté sur une carte** (voir [mesures/reglages.md](mesures/reglages.md)).
-> - **Réel** : `GET /api/status`, `POST` et `DELETE /api/pair`, `GET /api/system`, `GET` et `PUT /api/location`, `GET` et `PUT /api/display`, `GET` et `PUT /api/alerts` (§14), `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (lecture seule), les fichiers statiques (gzip).
+> - **Réel** : `GET /api/status`, `POST` et `DELETE /api/pair`, `GET /api/system`, `GET` et `PUT /api/location`, `GET` et `PUT /api/display`, `GET` et `PUT /api/alerts` (§14), `GET` et `PUT /api/sea` (§15), `GET /api/weather`, `GET /api/geocode`, `GET /api/wifi` (lecture seule), les fichiers statiques (gzip).
 > - **Vide, sans erreur** (la page s'ouvre sans message rouge) : `GET /api/services` (rien de réglé), `GET /api/presets` (aucun), `GET /api/update` (`inactif`).
 > - **`501` `non_disponible`**, avec la phrase « Cette fonction n’est pas encore disponible sur cet écran. » dans la langue de l'écran : scan et changement de Wi-Fi, enregistrement et test des services STT / LLM / TTS, export / import, mise à jour et retour arrière.
 > - **Écarts connus avec le texte ci-dessous** : `GET /api/geocode` est **synchrone pour la page** (la requête attend la réponse jusqu'à 30 s, donc garde l'unique tâche du serveur : la règle 7 n'est pas tenue pour cette seule route), mais le travail réseau est fait par la tâche d'arrière-plan du module de recherche, jamais par celle du serveur ni par celle de l'écran ; au-delà de 5 connexions ouvertes, la plus ancienne est fermée au lieu de répondre `503` (règle 8) ; `validee` vaut toujours `true` (pas encore de retour arrière) ; `compile_le` est l'heure locale du PC de compilation, sans « Z » ; le `fuseau` rendu est celui de la ville enregistrée, et c'est aussi celui que l'horloge de l'écran utilise (ADR-0012) ; un fuseau absent de la table de 468 noms n'affiche aucune heure à l'écran (jamais l'heure de Paris), et `Africa/Casablanca` est une limite connue de cette table.
@@ -641,3 +668,30 @@ Ce qui part vers l'adresse de Vigie : la position de la ville choisie arrondie �
 Erreurs `422` (champ dans `champ`) : `actives_invalide` (« Les alertes doivent être activées ou désactivées. »), `adresse_invalide` (« L’adresse de Vigie doit commencer par https://. »), `periode_invalide` (« La période doit être un nombre entier de minutes, de 10 à 180. »), `niveau_inconnu` (« Ce niveau d’alerte n’existe pas. »).
 
 Un changement arrive au client réseau en 5 s environ ; il interroge alors Vigie tout de suite si la requête a changé, mais jamais deux fois en moins d'une minute.
+
+## 15. Mer (Vigie)
+
+Écrit le 08/11/2026 avec l'[ADR-0025](decisions/0025-mer-ecriture-du-registre-des-spots-lot-e.md). La page mer de l'écran ([ADR-0022](decisions/0022-mer-la-page-lot-c.md)) montre la mer d'**un seul spot choisi**, lue chez Vigie ([ADR-0019](decisions/0019-mer-client-et-registre-de-spots.md)). L'appareil garde une courte liste de spots (12 au plus) et dit lequel est choisi ; ce groupe les règle. Tant qu'aucun spot n'est choisi, l'appareil n'envoie rien à Vigie pour la mer, et la roue d'appui long n'a pas de bouton « Mer » ([ADR-0024](decisions/0024-mer-l-entree-de-la-roue-lot-d.md)).
+
+`GET /api/sea` →
+```json
+{"spots": [{"id": "un-identifiant-de-la-liste-de-vigie", "nom": "Une plage"}], "choisi": "un-identifiant-de-la-liste-de-vigie",
+ "vent_min_kn": 12, "vent_max_kn": 25, "spots_max": 12, "vent_plafond_kn": 60}
+```
+`choisi` vaut `""` et `spots` vaut `[]` sur un appareil où rien n'a été choisi. Les valeurs ci-dessus sont des **exemples de forme**, pas des données lues.
+
+`PUT /api/sea` accepte les quatre champs modifiables (`spots`, `choisi`, `vent_min_kn`, `vent_max_kn`), chacun facultatif (absent = inchangé), et répond comme `GET` avec les valeurs enregistrées. **Tout ou rien** : si une valeur est refusée, rien n'est enregistré.
+
+| Champ | Règle |
+|---|---|
+| `spots` | la liste **entière**, dans l'ordre à garder : 0 à 12 objets `{"id": …, "nom": …}` (les autres champs d'un objet sont ignorés). `id` : l'identifiant du spot dans la liste de Vigie, lettres minuscules, chiffres, `-` et `_`, 64 octets au plus. `nom` : le nom affiché, 1 à 32 caractères, UTF-8 bien formé, aucun caractère de contrôle, pas seulement des espaces. Deux objets de même `id` sont refusés. Une liste vide coupe la mer (aucune requête, aucun bouton « Mer »). |
+| `choisi` | l'`id` du spot dont l'écran montre la mer ; il doit être dans la liste telle qu'elle sera après le changement. `""` seulement pour une liste vide. Absent : l'appareil reste sur le même spot s'il est toujours dans la liste, sinon sur le premier. |
+| `vent_min_kn`, `vent_max_kn` | la plage de vent, en **nœuds entiers**, que Vigie utilise pour le verdict du kite : `0 < min < max <= 60` (défauts 12 et 25). Si un seul est envoyé, le couple (celui envoyé, celui enregistré) est jugé. `12.5` est refusé, pas arrondi. |
+
+**D'où vient la liste des spots.** L'appareil ne la sert **pas**. La page la lit elle-même chez Vigie : `GET <adresse>/v1/surf/spots`, où l'adresse est `adresse` de `GET /api/alerts` ou, si elle est vide, `adresse_publique` (51 spots le 08/11/2026, 20 405 octets, 4 695 en gzip). La page ne garde de chaque spot que son `id`, son `name` et son `place` (pour distinguer deux plages de même nom) et envoie à l'appareil `id` et `nom`. L'appareil ne vérifie pas qu'un `id` est dans la liste de Vigie : un spot inconnu fait répondre 404 à Vigie et l'appareil redemande à son rythme normal (ADR-0019). Les réponses de Vigie portent le crédit des données de spots (contributeurs d'OpenStreetMap, ODbL) : la page l'affiche à côté de la liste.
+
+Ce que l'appareil envoie à Vigie pour la mer : `GET <adresse>/v1/embedded/frame?device_type=generic&spot=<id>`, plus `&wind_min_kn=…&wind_max_kn=…` quand la plage n'est pas 12 à 25. Aucune position, aucune clé, aucun identifiant de l'appareil.
+
+Erreurs `422` (champ dans `champ`) : `spots_invalide` (« Les spots doivent former une liste d’objets avec un identifiant et un nom. »), `spot_invalide` (« Cet identifiant de spot n’est pas valide. »), `nom_invalide` (« Le nom d’un spot doit faire de 1 à 32 caractères. »), `spot_double` (« Ce spot est déjà dans la liste. »), `trop_de_spots` (« La liste est pleine : 12 spots au plus. »), `choix_inconnu` (« Le spot choisi n’est pas dans la liste. »), `vent_invalide` (« La plage de vent doit être en nœuds entiers, de 1 à 60, le minimum sous le maximum. »). `champ` vaut `spots` pour les cinq premières, `choisi` pour `choix_inconnu`, et pour `vent_invalide` `vent_min_kn` si la requête porte un `vent_min_kn`, sinon `vent_max_kn` (le couple est jugé d'un bloc). Un corps qui n'est pas un objet JSON est refusé en `400` `illisible`. Un nom de spot qui contient `\u0000` n'est pas refusé : le lecteur JSON le transforme en U+FFFD, comme partout ailleurs sur l'appareil. Deux écrivains (la page et, plus tard, l'écran) ne sont pas coordonnés : la dernière écriture gagne.
+
+Un changement atteint le client de la mer en 5 s environ ; il interroge alors Vigie tout de suite si la requête a changé, mais jamais deux fois en une minute.

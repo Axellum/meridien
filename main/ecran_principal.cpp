@@ -14,6 +14,7 @@
 #include "ecran/horloge_materielle.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_synthese.hpp"
+#include "ecran/roue_entrees.hpp"
 #include "ecran/vigie_bandeau.hpp"
 #include "ecran/vigie_vue.hpp"
 #include "ecran/visuel_vue.hpp"
@@ -23,11 +24,13 @@
 #include "meteo_zone.h"
 #include "reglages.h"
 #include "reglages_alertes.h"
+#include "reglages_mer.h"
 #include "reseau.h"
 #include "textes_principal.h"
 #include "ui_alertes.h"
 #include "ui_bonjour.h"
 #include "ui_details.h"
+#include "ui_mer_ouvrir.h"
 #include "ui_principal.h"
 #include "ui_reglages.h"
 #include "ui_roue.h"
@@ -194,24 +197,51 @@ void choisir_profil(reglages::ProfilAccueil profil) {
 void choisir_profil_auto() { choisir_profil(reglages::ProfilAccueil::Auto); }
 void choisir_profil_meteo() { choisir_profil(reglages::ProfilAccueil::Meteo); }
 
-// LE PREMIER ANNEAU de la roue d'appui long (ADR-0021) : « Réglages », « Détails » (les sept grandeurs retirées de l'accueil, page de
-// ADR-0020), « Alertes » quand la page des alertes existe, puis « Profil ▸ » (ADR-0023) : une famille dont le second anneau offre « Auto »
-// et les profils que l'appareil dessine, le profil en vigueur marqué. Rien d'autre au premier anneau (ni Affichage, ni Assistant) :
-// « Détails » est un bouton direct, pas une famille, puisqu'il n'y a qu'une page. Pour une entrée de plus : UNE ligne ici, et son glyphe
+// « Mer » : la page mer (ui_mer_ouvrir.h, ADR-0022) sur le spot choisi dans le registre, dans le thème du réglage comme les alertes. La
+// page s'ouvre même si la mer de ce spot n'est pas encore arrivée : elle le dit en toutes lettres.
+void ouvrir_mer() { ui_mer_ouvrir(theme_du_reglage()); }
+
+// L'entrée « Mer » existe-t-elle à cet instant ? Quand un spot est choisi dans le registre (ADR-0019). Un registre vide (appareil neuf,
+// ou rien ne l'a encore écrit) ne montre aucun bouton vers une page qui n'aurait rien à dire.
+bool mer_atteignable() { return reglages_mer_demande().presente; }
+
+// LE PREMIER ANNEAU de la roue d'appui long (ADR-0021, ADR-0024 et ADR-0023). QUELLES entrées et dans quel ordre, c'est le noyau pur
+// (ecran/roue_entrees.hpp, testé, partagé avec le banc de rendu) : « Réglages » et « Détails » toujours, aux deux premiers rangs ;
+// « Alertes » quand la page des alertes existe ; « Mer » quand un spot est choisi ; « Profil ▸ » en dernier, quand son second anneau a de
+// quoi choisir (« Auto » et au moins un profil que l'appareil dessine : le profil en vigueur est marqué). Ici, ce que chaque entrée
+// montre et fait : son mot, son glyphe, son action. Pour une entrée de plus : un identifiant dans le noyau, UN cas ici, et son glyphe
 // dans tools/icones/roue_glyphes.json (puis régénérer, voir docs/outils.md).
 // Les chaînes sont des littéraux ou la table de traduction : elles vivent aussi longtemps que la roue est ouverte. `choix_profil` (au moins
 // reglages::NOMBRE_PROFILS_ACCUEIL cases) doit vivre jusqu'à ui_roue_ouvrir.
 int composer_entrees(EntreeRoue *sortie, ChoixRoue *choix_profil) {
-    int n = 0;
-    sortie[n++] = {texte_principal::t(texte_principal::kReglages), ICONE_REGLAGES, ui_reglages_ouvrir, nullptr, 0};
-    sortie[n++] = {visuel::texte_c("Détails"), ICONE_DETAILS, ui_details_ouvrir, nullptr, 0};
-    if (alertes_atteignables()) {
-        sortie[n++] = {visuel::texte_c("Alertes"), ICONE_ALERTES, ouvrir_alertes, nullptr, 0};
-    }
     ActionsProfil actions;
     actions.choisir[static_cast<std::size_t>(reglages::ProfilAccueil::Auto)] = choisir_profil_auto;
     actions.choisir[static_cast<std::size_t>(reglages::ProfilAccueil::Meteo)] = choisir_profil_meteo;
-    return ajouter_famille_profil(sortie, n, reglages_affichage().profil, actions, choix_profil);
+    const int nb_profil = composer_choix_profil(reglages_affichage().profil, actions, choix_profil);
+    const roue::Liste liste = roue::entrees_du_premier_anneau(
+        {alertes_atteignables(), mer_atteignable(), roue::profil_a_proposer(nb_profil)});
+    int n = 0;
+    for (int i = 0; i < liste.n; i++) {
+        switch (liste.entree[i]) {
+        case roue::Entree::Reglages:
+            sortie[n++] = {texte_principal::t(texte_principal::kReglages), ICONE_REGLAGES, ui_reglages_ouvrir, nullptr,
+                           0};
+            break;
+        case roue::Entree::Details:
+            sortie[n++] = {visuel::texte_c("Détails"), ICONE_DETAILS, ui_details_ouvrir, nullptr, 0};
+            break;
+        case roue::Entree::Alertes:
+            sortie[n++] = {visuel::texte_c("Alertes"), ICONE_ALERTES, ouvrir_alertes, nullptr, 0};
+            break;
+        case roue::Entree::Mer:
+            sortie[n++] = {visuel::texte_c("Mer"), ICONE_MER, ouvrir_mer, nullptr, 0};
+            break;
+        case roue::Entree::Profil:
+            sortie[n++] = entree_profil(choix_profil, nb_profil);
+            break;
+        }
+    }
+    return n;
 }
 
 // Appui long sur l'écran principal : la roue s'ouvre au point d'appui (x, y), en pixels de l'écran.

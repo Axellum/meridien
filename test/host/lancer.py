@@ -101,6 +101,10 @@ def lancer(cxx, mode):
     from controle_cartes import controle_cartes  # noqa: PLC0415  (cartes : partitions, broches du C6, hygiène des fichiers de la 7B)
 
     echecs += controle_cartes()
+
+    from controle_python_mer import controle_mer  # noqa: PLC0415  (mer : trames enregistrées relues par un lecteur Python indépendant)
+
+    echecs += controle_mer()
     print("\nRÉSULTAT :", "tout passe" if echecs == 0 else f"{echecs} fichier(s) en échec")
     return 1 if echecs else 0
 
@@ -179,7 +183,14 @@ from mutations_accueil import MUTATIONS_ACCUEIL  # noqa: E402  (accueil : pluie 
 from mutations_reglages_ecran import MUTATIONS_REGLAGES_ECRAN  # noqa: E402  (réglages sur l'écran et installation guidée : voir ce fichier)
 from mutations_roue_geometrie import MUTATIONS_ROUE_GEOMETRIE  # noqa: E402  (roue d'appui long : mesures, pivotement, mots, toucher)
 from mutations_roue_commande import MUTATIONS_ROUE_COMMANDE  # noqa: E402  (roue d'appui long : écran, demande, dépliement, décision du toucher)
+from mutations_roue_entrees import MUTATIONS_ROUE_ENTREES  # noqa: E402  (roue d'appui long : quelles entrées au premier anneau, dans quel ordre)
 from mutations_surf import MUTATIONS_SURF  # noqa: E402  (noyau surf : spot, requêtes, lecture, vent, marée, note, créneau)
+from mutations_mer import MUTATIONS_MER  # noqa: E402  (noyau mer : CRC, trame SEA/ACT/CRIT, noms du contrat, fraîcheur, courbe de marée)
+from mutations_mer_client import MUTATIONS_MER_CLIENT  # noqa: E402  (client de la mer : requête, rythme, registre des spots, réparation de la NVS)
+from mutations_mer_textes import MUTATIONS_MER_TEXTES  # noqa: E402  (mots de la page mer : heures, âges, unités, vigilance, bandeau)
+from mutations_mer_page import MUTATIONS_MER_PAGE  # noqa: E402  (page mer composée : verdicts montrés, barres, courbe de marée, bandeau)
+from mutations_mer_geometrie import MUTATIONS_MER_GEOMETRIE  # noqa: E402  (mise en page de la page mer : zones, échelle, cartes, détail)
+from mutations_mer_api import MUTATIONS_MER_API  # noqa: E402  (écriture du registre des spots par la page de réglages : liste, choix, plage de vent, routes)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
@@ -199,12 +210,19 @@ MUTATIONS += MUTATIONS_GEOCODAGE
 MUTATIONS += MUTATIONS_REGLAGES_ECRAN
 MUTATIONS += MUTATIONS_ROUE_GEOMETRIE
 MUTATIONS += MUTATIONS_ROUE_COMMANDE
+MUTATIONS += MUTATIONS_ROUE_ENTREES
 MUTATIONS += MUTATIONS_HOTE_APPAREIL
 MUTATIONS += MUTATIONS_MATERIEL_TAB5
 MUTATIONS += MUTATIONS_VIGIE
 MUTATIONS += MUTATIONS_GZIP
 MUTATIONS += MUTATIONS_FUSEAUX
 MUTATIONS += MUTATIONS_SURF
+MUTATIONS += MUTATIONS_MER
+MUTATIONS += MUTATIONS_MER_CLIENT
+MUTATIONS += MUTATIONS_MER_TEXTES
+MUTATIONS += MUTATIONS_MER_PAGE
+MUTATIONS += MUTATIONS_MER_GEOMETRIE
+MUTATIONS += MUTATIONS_MER_API
 MUTATIONS += MUTATIONS_ACCUEIL_AUTO
 MUTATIONS += MUTATIONS_ACCUEIL_PILOTE
 MUTATIONS += MUTATIONS_ACCUEIL_CARTES

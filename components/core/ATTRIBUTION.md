@@ -36,3 +36,20 @@ Texte de la licence MIT de posix_tz_db : voir [outils/posix_tz_db/LICENSE](outil
   écrits par le projet ([ADR-0013](../../docs/decisions/0013-surf-donnees-note-et-limites.md)).
 - La formulation de licence de chaque fournisseur de modèles de vagues derrière l'API Marine (services nationaux, ECMWF…) n'a **pas
   été examinée** : seule la licence de l'API d'Open-Meteo est citée ici.
+
+## Données du noyau « mer » (`include/ecran/mer_*.hpp`, `test/host/donnees/mer_*`)
+
+- **Vigie** (instance publique `vigie.auxfilsdesidees.fr`, trame embarquée `GET /v1/embedded/frame?spot=…`, lignes `SEA`, `ACT`,
+  `CRIT`). Les six trames réelles gardées comme données de test (spots de la côte française, capturées le 08/11/2026 par
+  `test/host/capturer_mer.py`) sont reproduites **telles quelles, sans modification**, avec les autres lignes qu'elles portent ; le noyau
+  les lit et arrondit les valeurs (nombres entiers : centimètres, dixièmes).
+- Ce que le bloc mer contient vient, d'après le `SOURCES.md` de `vigie-api` (lu le 08/11/2026) : de l'**API Marine d'Open-Meteo**
+  (**CC BY 4.0**, https://open-meteo.com/en/licence) avec le modèle de vagues **MFWAM** de Météo-France (produit Copernicus Marine,
+  « Generated using E.U. Copernicus Marine Service Information; https://doi.org/10.48670/moi-00017 ») ; d'une **marée calculée par Vigie**
+  à partir du modèle **EOT20** (Hart-Davis, Piccioni, Dettmering, Schwatke, Passaro et Seitz, 2021, DGFI-TUM, **CC BY 4.0**,
+  https://doi.org/10.17882/79489 ; constantes arrondies par Vigie, « pas pour la navigation »). Le coefficient de marée est une
+  estimation de Vigie, pas celui du SHOM. Ces crédits sont à montrer là où la page mer montrera ces données (elle n'existe pas encore).
+- Les lignes `HAZ` des mêmes trames (séismes, volcans, crues, cyclones du monde entier : EMSC, USGS, NOAA NWS, NHC…) viennent d'autres
+  sources : leur licence de redistribution n'a **pas été examinée** pour ce dépôt, et aucun test n'en lit le contenu.
+- Les verdicts, les critères et les seuils sont ceux de Vigie, pas d'une règle officielle ; ils ne sont **pas faits pour la sécurité**
+  ([ADR-0018](../../docs/decisions/0018-mer-trame-vigie-et-vues.md)).

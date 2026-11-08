@@ -10,6 +10,7 @@
 #include "boot_info.h"
 #include "commande_serie.h"
 #include "ecran_principal.h"
+#include "mer_client.h"
 #include "meteo_client.h"
 #include "reglages.h"
 #include "reseau.h"
@@ -63,6 +64,9 @@ extern "C" void app_main(void) {
     ecran::
         vigie_client_demarrer(); // alertes officielles de Vigie : premier essai 60 à 120 s après que le réseau et l'heure soient prêts
     ecran::memoire_jalon("après le lancement de la tâche des alertes (pile 12 Ko)");
+    // Mer du spot choisi (ADR-0019) : la tâche n'est créée que si le registre des spots n'est pas vide (appareil neuf : rien n'est créé,
+    // rien n'est demandé à Vigie, aucune mémoire de plus). Premier essai 120 à 180 s après que le réseau et l'heure soient prêts.
+    ecran::mer_client_demarrer();
     ecran::serveur_web_demarrer(); // page de réglages sur le port 80 dès que l'adresse IP est obtenue
     ecran::memoire_jalon("après le lancement de la tâche du serveur web");
     ecran::commande_serie_demarrer();

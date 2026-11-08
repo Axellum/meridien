@@ -9,8 +9,8 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 const $ = (s, r = document) => r.querySelector(s);
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const NOMS = { stt: ['svc.stt', 'mic'], llm: ['svc.llm', 'chat'], tts: ['svc.tts', 'speaker'] };
-const SECTIONS = ['ville', 'alertes', 'assistant', 'ecran', 'wifi', 'appareil'];
-const S = { statut: null, systeme: null, zone: null, meteo: null, display: null, alertes: null, services: null, presets: null, wifi: null, maj: null, tests: {} };
+const SECTIONS = ['ville', 'alertes', 'mer', 'assistant', 'ecran', 'wifi', 'appareil'];
+const S = { statut: null, systeme: null, zone: null, meteo: null, display: null, alertes: null, mer: null, vigie: null, services: null, presets: null, wifi: null, maj: null, tests: {} };
 let jeton = '';
 try { jeton = sessionStorage.getItem('jeton') || ''; } catch (e) { /* stockage refusé : la page redemandera le code */ }
 
@@ -172,11 +172,11 @@ async function demarrer(ancre) {
   if (st.langue && st.langue !== CAT.code) await appliquerLangue(st.langue);
   if (st.appairage !== 'ok') { oublier(); montrerAppairage(); return; }
   S.statut = st;
-  const [sys, zone, disp, svc, pre, wifi, maj, alr] = await Promise.allSettled(
-    ['/api/system', '/api/location', '/api/display', '/api/services', '/api/presets', '/api/wifi', '/api/update', '/api/alerts'].map((c) => api('GET', c)));
+  const [sys, zone, disp, svc, pre, wifi, maj, alr, mer] = await Promise.allSettled(
+    ['/api/system', '/api/location', '/api/display', '/api/services', '/api/presets', '/api/wifi', '/api/update', '/api/alerts', '/api/sea'].map((c) => api('GET', c)));
   if (!jeton) return; /* une réponse 401 a déjà ramené à l'appairage */
   const val = (r) => (r.status === 'fulfilled' ? r.value : null);
-  Object.assign(S, { systeme: val(sys), zone: val(zone), display: val(disp), alertes: val(alr), services: val(svc), presets: val(pre), wifi: val(wifi), maj: val(maj) });
+  Object.assign(S, { systeme: val(sys), zone: val(zone), display: val(disp), alertes: val(alr), mer: val(mer), services: val(svc), presets: val(pre), wifi: val(wifi), maj: val(maj) });
   S.meteo = null;
   construirePage();
   if (ancre && document.getElementById(ancre)) document.getElementById(ancre).scrollIntoView();
@@ -189,7 +189,7 @@ function construirePage() {
   $('#racine').replaceChildren(h('div', { class: 'page' },
     h('header', { class: 'haut' }, h('div', { class: 'top' }, h('span', { class: 'logo' }, ico('tablet')),
       h('div', {}, h('b', { text: t('app.titre') }), h('small', { id: 'sous-titre' }))), nav),
-    h('main', {}, carteVille(), carteAlertes(), carteAssistant(), carteEcran(), carteWifi(), carteAppareil())));
+    h('main', {}, carteVille(), carteAlertes(), carteMer(), carteAssistant(), carteEcran(), carteWifi(), carteAppareil())));
   majSousTitre();
   const liens = [...nav.querySelectorAll('a')];
   const actif = (id) => liens.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === '#' + id)));
@@ -549,6 +549,184 @@ function carteAlertes() {
       h('p', { class: 'aide', id: 'alertes-periode-aide', text: t('alertes.periode_aide') })),
     h('div', { class: 'f' }, h('label', { class: 'lab', for: 'alertes-adresse', text: t('alertes.adresse') }), h('div', { class: 'champ' }, adresse),
       h('p', { class: 'aide', id: 'alertes-adresse-aide', text: t('alertes.adresse_aide') }), retoursAdresse));
+}
+
+/* ---------- mer : le registre des spots (Vigie) ---------- */
+/* L'appareil garde 12 spots au plus et dit lequel l'écran montre (docs/api-reglages.md §15). La liste des spots que Vigie connaît n'est PAS
+   servie par l'appareil : c'est la page qui la lit chez Vigie, une fois par adresse, quand on touche le champ de recherche. L'appareil, lui,
+   ne reçoit que l'identifiant et le nom. Tant qu'aucun spot n'est choisi, l'écran n'a pas de bouton « Mer ». */
+const SPOT_NOM_MAX = 32, SPOT_RESULTATS_MAX = 8, SPOT_RECHERCHE_MIN = 2, DELAI_VIGIE_MS = 15000;
+const SPOT_ID = /^[a-z0-9_-]{1,64}$/;
+/* Sans casse, sans accents, apostrophe droite : « ecluse » trouve « l’Écluse ». */
+const sansAccents = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘]/g, "'").toLowerCase();
+const texteNet = (x) => (typeof x === 'string' ? x.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').trim() : '');
+/* Le nom envoyé à l'appareil : 32 caractères Unicode au plus, coupés sur une frontière de caractère affiché quand le navigateur sait les
+   compter (jamais au milieu d'un accent ou d'une paire de substitution), sans espace au bout. Le lieu n'est jamais ajouté au nom. */
+function nomCourt(nom) {
+  const net = String(nom).trim();
+  if (Array.from(net).length <= SPOT_NOM_MAX) return net;
+  let morceaux;
+  try { morceaux = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(net), (x) => x.segment); } catch (e) { morceaux = Array.from(net); }
+  let sortie = '', n = 0;
+  for (const m of morceaux) {
+    const k = Array.from(m).length;
+    if (n + k > SPOT_NOM_MAX) break;
+    sortie += m; n += k;
+  }
+  return sortie.trimEnd();
+}
+/* L'adresse de Vigie : celle des alertes, sinon celle du service public ; sans « / » final. */
+const adresseVigie = () => {
+  const a = S.alertes;
+  return a ? String(a.adresse || a.adresse_publique || '').replace(/\/+$/, '') : '';
+};
+/* GET <adresse>/v1/surf/spots, sans cookie ni jeton (le jeton de l'appareil n'a rien à faire chez Vigie), 15 s au plus.
+   De chaque spot, on ne garde que id, name (à défaut osm_name, place, id) et place ; un id que l'appareil refuserait est écarté. */
+async function lireSpotsVigie(adresse) {
+  if (!/^https:\/\//i.test(adresse)) throw new Error('address');
+  const ctrl = new AbortController();
+  const delai = setTimeout(() => ctrl.abort(), DELAI_VIGIE_MS);
+  try {
+    const rep = await fetch(adresse + '/v1/surf/spots', { credentials: 'omit', headers: { Accept: 'application/json' }, signal: ctrl.signal });
+    if (rep.status !== 200) throw new Error('status');
+    const j = await rep.json();
+    if (!j || !Array.isArray(j.spots)) throw new Error('shape');
+    const vus = new Set();
+    return j.spots.flatMap((s) => {
+      const id = s && typeof s.id === 'string' ? s.id : '';
+      if (!SPOT_ID.test(id) || vus.has(id)) return [];
+      vus.add(id);
+      const lieu = texteNet(s.place);
+      const nom = [s.name, s.osm_name, s.place].map(texteNet).find((x) => x) || id;
+      return [{ id, nom, lieu, cherche: [nom, lieu, id].map(sansAccents) }];
+    });
+  } finally { clearTimeout(delai); }
+}
+/* Une lecture par adresse : le résultat (ou la lecture en cours) reste dans S.vigie ; une lecture ratée est refaite à la demande. */
+function listeVigie() {
+  const adresse = adresseVigie();
+  if (S.vigie && S.vigie.adresse === adresse && !S.vigie.echec) return S.vigie.promesse;
+  const v = { adresse, echec: false, spots: null };
+  v.promesse = lireSpotsVigie(adresse).then((spots) => { v.spots = spots; return spots; }, (e) => { v.echec = true; throw e; });
+  S.vigie = v;
+  return v.promesse;
+}
+const listeLue = () => !!(S.vigie && S.vigie.adresse === adresseVigie() && S.vigie.spots);
+function carteMer() {
+  if (!S.mer) return carte('mer', 'waves', t('mer.titre'), retour('err', t('erreur.interne')));
+  const registre = h('div', { class: 'f', id: 'mer-registre' });
+  const champ = h('input', { id: 'mer-q', type: 'search', placeholder: t('mer.recherche_ph'), autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'search' });
+  const retours = h('div', { id: 'mer-retours', 'aria-live': 'polite' });
+  const resultats = h('ul', { class: 'resultats', hidden: true });
+  const pleine = h('p', { class: 'aide', id: 'mer-pleine', hidden: true });
+  const videResultats = () => { resultats.replaceChildren(); resultats.hidden = true; };
+  /* Un changement du registre = un PUT avec la liste entière (tout ou rien) ; l'appareil répond comme GET et la carte se redessine depuis S.mer,
+     que le PUT ait réussi ou non (comme les alertes : en cas de refus, la carte montre ce que l'appareil a vraiment retenu). */
+  const envoyer = async (corps) => {
+    registre.querySelectorAll('input,button').forEach((x) => { x.disabled = true; });
+    try { S.mer = await api('PUT', '/api/sea', corps); toast(t('toast.enregistre')); return true; } catch (e) { toast(msg(e), true); return false; } finally { dessiner(); }
+  };
+  const choisir = (id) => envoyer({ spots: S.mer.spots, choisi: id });
+  const retirer = (id) => {
+    const m = S.mer, i = m.spots.findIndex((s) => s.id === id), reste = m.spots.filter((s) => s.id !== id);
+    /* Le spot retiré était montré : l'écran passe à celui qui prend sa place, ou au dernier s'il était le dernier. */
+    const prochain = m.choisi !== id ? m.choisi : (reste[i] || reste[reste.length - 1] || { id: '' }).id;
+    return envoyer({ spots: reste, choisi: prochain });
+  };
+  const ajouter = async (spot) => {
+    const m = S.mer;
+    if (m.spots.some((s) => s.id === spot.id)) { retours.replaceChildren(retour('info', t('mer.deja'))); return; }
+    /* Le premier spot ajouté devient celui de l'écran ; les suivants ne changent pas le choix. */
+    const choisi = m.spots.some((s) => s.id === m.choisi) ? m.choisi : spot.id;
+    resultats.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    if (await envoyer({ spots: [...m.spots, { id: spot.id, nom: nomCourt(spot.nom) }], choisi })) { champ.value = ''; videResultats(); retours.replaceChildren(); } else {
+      resultats.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+    }
+  };
+  function dessiner() {
+    const m = S.mer;
+    registre.replaceChildren(...(m.spots.length ? [
+      h('span', { class: 'lab', id: 'mer-affiche', text: t('mer.affiche') }),
+      h('div', { class: 'spots', role: 'radiogroup', 'aria-labelledby': 'mer-affiche' }, m.spots.map((s) => h('div', { class: 'spot' },
+        h('label', { class: 'spot-choix' }, h('input', { type: 'radio', name: 'mer-choisi', value: s.id, checked: s.id === m.choisi, onchange: () => choisir(s.id) }), h('span', { text: s.nom })),
+        h('button', { type: 'button', class: 'lien', 'aria-label': t('mer.retirer_nom', { nom: s.nom }), text: t('mer.retirer'), onclick: () => retirer(s.id) }))))
+    ] : [retour('info', t('mer.vide'))]));
+    const complete = m.spots.length >= m.spots_max;
+    champ.disabled = complete;
+    pleine.hidden = !complete;
+    pleine.textContent = complete ? t('mer.pleine', { n: m.spots_max }) : '';
+    if (complete) { videResultats(); retours.replaceChildren(); }
+  }
+  /* Recherche : dès 2 caractères, sans casse ni accents, sur le nom, le lieu et l'identifiant ; 8 résultats au plus. La lecture de la liste chez
+     Vigie part au premier appui dans le champ ou à la première frappe. Si elle rate, la phrase le dit ; elle est refaite à l'appui suivant
+     dans le champ ou sur « Réessayer » (pas à chaque frappe). */
+  let seq = 0, echec = false;
+  const erreurVigie = () => h('div', {}, retour('err', t('mer.injoignable', { carte: t('alertes.titre') })),
+    h('button', { type: 'button', class: 'lien', text: t('action.reessayer'), onclick: () => chercher(true) }));
+  async function chercher(relancer) {
+    const mon = ++seq, q = champ.value.trim();
+    videResultats(); retours.replaceChildren();
+    if (S.mer.spots.length >= S.mer.spots_max) return;
+    if (echec && !relancer) { retours.replaceChildren(erreurVigie()); return; }
+    let spots;
+    if (listeLue()) spots = S.vigie.spots;
+    else {
+      echec = false;
+      retours.replaceChildren(retour('info', t('mer.chargement')));
+      try { spots = await listeVigie(); } catch (e) {
+        if (mon === seq) { echec = true; retours.replaceChildren(erreurVigie()); }
+        return;
+      }
+      if (mon !== seq) return;
+      retours.replaceChildren();
+    }
+    if (q.length < SPOT_RECHERCHE_MIN) return;
+    const cle = sansAccents(q);
+    const trouves = spots.filter((s) => s.cherche.some((x) => x.includes(cle)));
+    if (!trouves.length) { retours.replaceChildren(retour('info', t('mer.aucun', { q }))); return; }
+    resultats.replaceChildren(...trouves.slice(0, SPOT_RESULTATS_MAX).map((s) => h('li', {}, h('button', { type: 'button', class: 'lieu', onclick: () => ajouter(s) },
+      ico('pin'), h('div', {}, h('b', { text: s.nom }), s.lieu ? ' — ' + s.lieu : null)))));
+    resultats.hidden = false;
+  }
+  champ.addEventListener('input', () => chercher(false));
+  champ.addEventListener('focus', () => { if (!listeLue()) chercher(true); });
+  /* Plage de vent du verdict du kite : deux nombres entiers de nœuds. Seul « est-ce un entier ? » est jugé ici ; 0 < min < max <= 60 l'est par l'appareil. */
+  const vent = (id, libelle, valeur) => {
+    const input = h('input', { id, type: 'text', inputmode: 'numeric', pattern: '[0-9]*', autocomplete: 'off', spellcheck: 'false', maxlength: '3', value: String(valeur), 'aria-describedby': 'mer-vent-aide' });
+    return [input, h('div', {}, h('label', { class: 'lab', for: id, text: libelle }), h('div', { class: 'champ' }, input))];
+  };
+  const [vmin, boiteMin] = vent('mer-vent-min', t('mer.vent_min'), S.mer.vent_min_kn);
+  const [vmax, boiteMax] = vent('mer-vent-max', t('mer.vent_max'), S.mer.vent_max_kn);
+  const retoursVent = h('div', { id: 'mer-vent-retours', 'aria-live': 'polite' });
+  const boutonVent = h('button', { type: 'button', class: 'btn', text: t('action.enregistrer') });
+  boutonVent.addEventListener('click', async () => {
+    [vmin, vmax].forEach((x) => x.removeAttribute('aria-invalid'));
+    retoursVent.replaceChildren();
+    const entier = /^\d+$/;
+    const [a, b] = [vmin.value.trim(), vmax.value.trim()];
+    if (!entier.test(a) || !entier.test(b)) {
+      if (!entier.test(a)) vmin.setAttribute('aria-invalid', 'true');
+      if (!entier.test(b)) vmax.setAttribute('aria-invalid', 'true');
+      retoursVent.replaceChildren(retour('err', t('mer.vent_entiers')));
+      return;
+    }
+    boutonVent.disabled = true;
+    try {
+      S.mer = await api('PUT', '/api/sea', { vent_min_kn: Number(a), vent_max_kn: Number(b) });
+      vmin.value = String(S.mer.vent_min_kn); vmax.value = String(S.mer.vent_max_kn);
+      toast(t('toast.enregistre'));
+    } catch (e) {
+      (e && { vent_min_kn: [vmin], vent_max_kn: [vmax] }[e.champ] || [vmin, vmax]).forEach((x) => x.setAttribute('aria-invalid', 'true'));
+      retoursVent.replaceChildren(retour('err', msg(e)));
+    }
+    boutonVent.disabled = false;
+  });
+  dessiner();
+  return carte('mer', 'waves', t('mer.titre'), registre,
+    h('div', { class: 'f' }, h('label', { class: 'lab', for: 'mer-q', text: t('mer.ajouter') }), h('div', { class: 'champ' }, ico('search'), champ),
+      pleine, retours, resultats, h('p', { class: 'aide', text: t('mer.credit') })),
+    h('div', { class: 'f', role: 'group', 'aria-labelledby': 'mer-vent-l' }, h('span', { class: 'lab', id: 'mer-vent-l', text: t('mer.vent') }),
+      h('div', { class: 'duo' }, boiteMin, boiteMax), h('p', { class: 'aide', id: 'mer-vent-aide', text: t('mer.vent_aide') }), retoursVent, boutonVent));
 }
 
 /* ---------- écran ---------- */
