@@ -33,6 +33,9 @@ idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp
 # Ecran principal (session ecran-principal). Ajoute par target_sources() apres l'enregistrement, et non dans la liste SRCS
 # ci-dessus, pour ne pas toucher a la ligne que les autres sessions (meteo, reglages) modifient aussi : un merge sans conflit.
 target_sources(${COMPONENT_LIB} PRIVATE "ecran_principal.cpp" "ui_principal.cpp" "ui_meteo_icones.cpp")
+# Page "Details" (session page-details, ADR-0020) : les sept grandeurs retirees de l'accueil, sur une page plein ecran. ui_details.cpp est
+# du LVGL pur (rendu aussi sur le PC) ; ui_details_ouvrir.cpp est la colle de l'appareil. Rien ne l'ouvre encore : la roue d'appui long.
+target_sources(${COMPONENT_LIB} PRIVATE "ui_details.cpp" "ui_details_ouvrir.cpp")
 # Alertes officielles de Vigie (session alertes-vigie) : client reseau, etat partage, reglages. Meme raison : target_sources() et non la
 # liste SRCS. Le client ne depend ni de meteo_client.cpp ni du client HTTPS commun.
 target_sources(${COMPONENT_LIB} PRIVATE "vigie_etat.cpp" "vigie_client.cpp" "reglages_alertes.cpp" "ui_alertes.cpp")
