@@ -41,7 +41,7 @@ target_sources(${COMPONENT_LIB} PRIVATE "ui_details.cpp" "ui_details_ouvrir.cpp"
 target_sources(${COMPONENT_LIB} PRIVATE "vigie_etat.cpp" "vigie_client.cpp" "reglages_alertes.cpp" "ui_alertes.cpp")
 # Mer d'un spot (ADR-0018 et ADR-0019) : client reseau (trame de Vigie), etat partage, registre des spots. Meme raison : target_sources() et
 # non la liste SRCS. Le client passe par le client HTTPS commun (http_commun.cpp).
-target_sources(${COMPONENT_LIB} PRIVATE "mer_etat.cpp" "mer_client.cpp" "reglages_mer.cpp")
+target_sources(${COMPONENT_LIB} PRIVATE "mer_etat.cpp" "mer_client.cpp" "mer_liste_client.cpp" "reglages_mer.cpp")
 # Page mer (ADR-0022) : la page (LVGL pur, rendue aussi sur le PC) et sa colle (ecran de la carte, horloge, registre des spots). Elle s'ouvre
 # par l'entree « Mer » de la roue d'appui long (ecran_principal.cpp, ADR-0024).
 target_sources(${COMPONENT_LIB} PRIVATE "ui_mer.cpp" "ui_mer_ouvrir.cpp")
@@ -67,7 +67,7 @@ endif()
 # qui les ouvre (ui_reglages_ouvrir.cpp : ecran de la carte, police, hote) et l'hote de l'appareil (hote_appareil_esp.cpp : memoire
 # permanente, Wi-Fi, lieu, redemarrage) sont compiles tels quels. Le bouchon de ui_reglages_ouvrir() ("Reglages : bientot") a
 # ete retire quand la colle est arrivee.
-target_sources(${COMPONENT_LIB} PRIVATE "ui_commun.cpp" "ui_reglages.cpp" "ui_installation.cpp" "ui_clavier.cpp"
+target_sources(${COMPONENT_LIB} PRIVATE "ui_commun.cpp" "ui_reglages.cpp" "ui_reglages_mer.cpp" "ui_installation.cpp" "ui_clavier.cpp"
                "ui_reglages_ouvrir.cpp" "hote_appareil_esp.cpp" "wifi_stocke.cpp")
 # Essai des reglages SUR LA CARTE, sans doigt (main/autotest_reglages.cpp) : un pointeur virtuel rejoue les gestes sur le vrai LVGL,
 # trois phases separees par un vrai redemarrage, constats au journal serie. JAMAIS dans le binaire normal (OFF par defaut) :

@@ -448,3 +448,12 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Maximum, en nœuds": "En yüksek (knot)"
 "Pour le verdict du kite. Par défaut 12 à 25 nœuds.": "Kite kararı için. Varsayılan 12 ile 25 knot."
 "Chaque champ doit contenir un nombre entier de nœuds.": "Her alanda knot cinsinden tam bir sayı olmalı."
+
+# --- Écran : La mer, réglages sur l’écran (08/11/2026) ---
+"Pas de connexion : la liste des spots demande Internet.": "Bağlantı yok: nokta listesi için internet gerekir."
+"Vigie ne propose aucun spot pour le moment.": "Vigie şu anda hiç nokta sunmuyor."
+"Déjà ajouté": "Zaten eklendi"
+"Mémoire insuffisante pour afficher la liste.": "Listeyi göstermek için bellek yetersiz."
+"La liste est longue : seuls les premiers spots sont montrés.": "Liste uzun: yalnızca ilk noktalar gösteriliyor."
+"Les spots ne sont pas lisibles pour le moment.": "Noktalar şu anda okunamıyor."
+"Enregistrement impossible : réessayez.": "Kaydedilemedi: tekrar dene."

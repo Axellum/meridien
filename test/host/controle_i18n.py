@@ -9,6 +9,10 @@
    i18n/page.yaml) et chaque texte que le faux appareil (web/faux-serveur/serveur.mjs) passe à T() est une clé des
    fichiers de langue.
 
+4. Chaque texte français que main/*.cpp passe à `T("…")` ou à `remplir("…", …)` est une clé de la table. Une espace insécable avant « : », ou une
+   apostrophe droite au lieu de « ’ », suffit à ne pas trouver la clé : le texte reste alors en français dans les six autres
+   langues, sans erreur nulle part (vu le 08/11/2026 sur deux phrases de la page « La mer »).
+
 Code de sortie non nul = un contrôle a échoué. Utilisable seul : python test/host/controle_i18n.py
 """
 
@@ -33,6 +37,7 @@ RETOURS_BOOT = re.compile(r"\breturn\s+" + LITTERAL + r"\s*;")
 LISTE_TEST = re.compile(r"BONJOUR\[\]\s*=\s*\{(.*?)\};", re.DOTALL)
 LISTE_PHRASES = re.compile(r"PHRASES\[\]\s*=\s*\{(.*?)\};", re.DOTALL)
 LITTERAUX = re.compile(LITTERAL)
+TEXTE_PASSE_A_T = re.compile(r"\b(?:T|remplir)\(\s*" + LITTERAL + r"\s*[,)]")
 
 
 def _generateur():
@@ -106,6 +111,30 @@ def controle_phrases_de_l_api():
     return echecs
 
 
+def controle_textes_passes_a_t():
+    """Chaque littéral passé à T("…") ou à remplir("…", …) dans main/*.cpp est une clé de la table de traduction. Retourne le
+    nombre d'échecs."""
+    dossier = RACINE / "main"
+    if not dossier.exists():
+        print("  saute   main/ absent : textes passés à T() non comparés")
+        return 0
+    _, _, cles, _ = _generateur().sorties_attendues()
+    table = {c for c, _section in cles}
+    total = 0
+    inconnus = []
+    for chemin in sorted(dossier.glob("*.cpp")):
+        for m in TEXTE_PASSE_A_T.findall(chemin.read_text(encoding="utf-8")):
+            total += 1
+            texte = _sans_echappements(m)
+            if texte not in table:
+                inconnus.append(f"{chemin.name} : {texte!r}")
+    if inconnus:
+        print(f"  ECHEC   main/ passe à T() un texte absent de la table de traduction ({len(inconnus)}) : {inconnus[:3]}")
+        return 1
+    print(f"  ok      {total} textes passés à T() ou remplir() dans main/*.cpp : tous sont une clé de la table de traduction")
+    return 0
+
+
 def controle_i18n():
     """Retourne le nombre de contrôles en échec (0 = tout passe) ; affiche ce qui a été vérifié."""
     echecs = 0
@@ -126,6 +155,7 @@ def controle_i18n():
         echecs += 1
 
     echecs += controle_phrases_de_l_api()
+    echecs += controle_textes_passes_a_t()
 
     if not UI_BONJOUR.exists() or not BOOT_INFO.exists():
         print("  saute   main/ui_bonjour.cpp ou main/boot_info.cpp absent : textes de l'écran « Bonjour » non comparés")

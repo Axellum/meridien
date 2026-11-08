@@ -234,6 +234,51 @@ ApercuMeteo HoteMemoire::meteo_apercu() { return meteo; }
 
 meteo::fournisseurs::Liste HoteMemoire::sources_meteo() { return meteo::fournisseurs::pour_pays(code_pays); }
 
+// ---- la mer ----------------------------------------------------------------------------------------------------------------
+
+bool HoteMemoire::mer_registre(mer::Registre &sortie) {
+    sortie = registre_mer;
+    return true;
+}
+
+// Comme l'appareil : un registre refusé par les règles du noyau ne change rien.
+bool HoteMemoire::mer_enregistrer(const mer::Registre &nouveau) {
+    if (!mer::registre_valide(nouveau)) {
+        return false;
+    }
+    registre_mer = nouveau;
+    ++registres_mer_enregistres;
+    return true;
+}
+
+void HoteMemoire::mer_liste_demander() {
+    ++listes_mer_demandees;
+    if (liste_mer_etat_ == ListeMer::EnCours) {
+        return;
+    }
+    if (liste_mer_instantanee) {
+        liste_mer_etat_ = issue_liste_mer;
+        return;
+    }
+    liste_mer_etat_ = ListeMer::EnCours;
+    liste_mer_debut_ms_ = maintenant_ms();
+}
+
+ListeMer HoteMemoire::mer_liste_etat() {
+    if (liste_mer_etat_ == ListeMer::EnCours && maintenant_ms() - liste_mer_debut_ms_ >= 1200) {
+        liste_mer_etat_ = issue_liste_mer;
+    }
+    return liste_mer_etat_;
+}
+
+bool HoteMemoire::mer_liste_copier(mer::liste::Liste &sortie) {
+    if (mer_liste_etat() != ListeMer::Terminee) {
+        return false;
+    }
+    sortie = liste_vigie;
+    return true;
+}
+
 // ---- appareil ------------------------------------------------------------------------------------------------------------
 
 void HoteMemoire::tester_service(std::string_view service) {

@@ -2,7 +2,7 @@
 // telle quelle, avec un hôte en mémoire (main/hote_memoire.cpp) à la place de la mémoire permanente, du Wi-Fi et de la météo.
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
+// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_reglages_mer.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
 // rendu-langues: toutes
 // rendu-langues-defaut: fr de tr
 // rendu-tailles: 1280x720 720x1280

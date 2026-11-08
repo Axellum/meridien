@@ -742,6 +742,64 @@ int reinitialiser_remet_les_alertes_par_defaut() {
     return 0;
 }
 
+// ---- la mer (ADR-0026) -------------------------------------------------------------------------------------------------
+
+int le_registre_de_la_mer_passe_par_la_porte_de_la_page_web() {
+    Banc b;
+    VERIFIER(mer::ajouter(b.ports.registre_mer, "spot-a", "Spot A") == mer::ErreurRegistre::Aucune);
+    mer::Registre lu;
+    VERIFIER(b.hote.mer_registre(lu) && lu.nombre == 1 &&
+             mer::detail::longueur_bornee(lu.spots[0].id, sizeof lu.spots[0].id) == 6);
+    // Un changement fait ailleurs (la page web) se voit tout de suite : l'hôte n'en garde aucune copie.
+    VERIFIER(mer::ajouter(b.ports.registre_mer, "spot-b", "Spot B") == mer::ErreurRegistre::Aucune);
+    VERIFIER(b.hote.mer_registre(lu) && lu.nombre == 2);
+    // Un registre illisible ne laisse pas croire que `sortie` est à jour.
+    b.ports.registre_mer_lisible = false;
+    lu = mer::Registre{};
+    VERIFIER(!b.hote.mer_registre(lu) && lu.nombre == 0);
+    return 0;
+}
+
+int enregistrer_la_mer_passe_par_la_porte_et_un_refus_ne_change_rien() {
+    Banc b;
+    mer::Registre r;
+    VERIFIER(mer::ajouter(r, "spot-a", "Spot A") == mer::ErreurRegistre::Aucune);
+    VERIFIER(b.hote.mer_enregistrer(r) && b.ports.enregistrements_mer == 1 && b.ports.registre_mer.nombre == 1);
+    // Une plage de vent refusée par l'API l'est aussi par l'écran.
+    mer::Registre mauvais = r;
+    mauvais.vent_min_kn = 30;
+    mauvais.vent_max_kn = 20;
+    VERIFIER(!b.hote.mer_enregistrer(mauvais) && b.ports.enregistrements_mer == 1 &&
+             b.ports.registre_mer.vent_min_kn == 12);
+    // Une écriture qui échoue (mémoire permanente) est annoncée, pas avalée.
+    b.ports.ecriture_mer_ok = false;
+    VERIFIER(!b.hote.mer_enregistrer(r) && b.ports.enregistrements_mer == 1);
+    return 0;
+}
+
+int la_liste_de_vigie_se_demande_et_ne_se_copie_qu_une_fois_terminee() {
+    Banc b;
+    mer::liste::Liste copie;
+    VERIFIER(b.hote.mer_liste_etat() == ListeMer::Inactive);
+    VERIFIER(!b.hote.mer_liste_copier(copie)); // rien n'a été demandé
+    b.hote.mer_liste_demander();
+    VERIFIER(b.ports.demandes_liste_mer == 1 && b.hote.mer_liste_etat() == ListeMer::EnCours);
+    VERIFIER(!b.hote.mer_liste_copier(copie) && copie.nombre == 0); // pas prête : rien de copié
+    VERIFIER(mer::liste::analyser(R"({"spots":[{"id":"spot-a","name":"Spot A","place":"Port-Exemple"}]})",
+                                  b.ports.liste_mer) == mer::liste::Issue::Ok);
+    b.ports.liste_mer_etat = ListeMer::Terminee;
+    VERIFIER(b.hote.mer_liste_etat() == ListeMer::Terminee);
+    VERIFIER(b.hote.mer_liste_copier(copie) && copie.nombre == 1);
+    VERIFIER(mer::liste::id_du_spot(copie.spots[0]) == "spot-a" &&
+             mer::liste::lieu_du_spot(copie.spots[0]) == "Port-Exemple");
+    // Les autres issues sont rendues telles quelles : l'écran dit chacune avec sa phrase.
+    for (const ListeMer e : {ListeMer::Vide, ListeMer::SansConnexion, ListeMer::Echec}) {
+        b.ports.liste_mer_etat = e;
+        VERIFIER(b.hote.mer_liste_etat() == e && !b.hote.mer_liste_copier(copie));
+    }
+    return 0;
+}
+
 #define LISTE(X)                                                                                                       \
     X(affichage_passe_par_la_porte_de_la_page_web)                                                                     \
     X(un_seul_champ_change_a_la_fois)                                                                                  \
@@ -781,7 +839,10 @@ int reinitialiser_remet_les_alertes_par_defaut() {
     X(alertes_passent_par_la_porte_de_la_page_web)                                                                     \
     X(alertes_hors_plage_ou_hors_liste_sont_refusees)                                                                  \
     X(adresse_des_alertes_saisie_sur_l_ecran)                                                                          \
-    X(reinitialiser_remet_les_alertes_par_defaut)
+    X(reinitialiser_remet_les_alertes_par_defaut)                                                                      \
+    X(le_registre_de_la_mer_passe_par_la_porte_de_la_page_web)                                                         \
+    X(enregistrer_la_mer_passe_par_la_porte_et_un_refus_ne_change_rien)                                                \
+    X(la_liste_de_vigie_se_demande_et_ne_se_copie_qu_une_fois_terminee)
 
 } // namespace
 

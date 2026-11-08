@@ -5,7 +5,7 @@
 // mémoire permanente, le vrai Wi-Fi (l'hôte est en mémoire vive, main/hote_memoire.cpp).
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
+// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_reglages_mer.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
 // rendu-langues: toutes
 // rendu-langues-defaut: fr
 // rendu-tailles: 1280x720 720x1280
@@ -15,6 +15,8 @@
 #include "ecran/texte_modele.hpp"
 #include "ecran/visuel_textes.hpp"
 #include "ui_reglages_interne.h"
+
+#include <string>
 
 namespace {
 
@@ -312,6 +314,104 @@ void service_essai(const banc::Contexte &ctx) {
            "le résultat apparaît tout seul");
 }
 
+// La page « La mer » au doigt (ADR-0026) : choisir un spot, régler le vent, retirer un spot, en ajouter un de la liste de Vigie. Spots
+// inventés (parcours_outils.h). Chaque geste doit changer le registre de l'hôte, la page doit montrer ce que l'hôte a gardé.
+void mer_au_doigt(const banc::Contexte &ctx) {
+    preparer(ctx, "mer-au-doigt", Interface::Reglages);
+    mer_liste_fictive();
+    mer_spots_gardes(3, 0);
+    ecran::ui_aller("section:1:2");
+    tourner();
+    ecran::mer::Registre &r = g_hote.registre_mer;
+    exiger(r.nombre == 3 && r.choisi == 0, "départ : trois spots, le premier affiché");
+    exiger(existe("Ajouter un spot") && existe("Retirer") && existe("Plage de vent"), "les trois rangées de la page");
+
+    // Choisir : toucher le nom d'un spot l'affiche sur l'écran « Mer ».
+    exiger(toucher_texte("Baie des Mouettes"), "toucher un spot");
+    exiger(r.choisi == 1, "le spot touché devient le spot affiché");
+
+    // La plage de vent : un nœud par appui, la page se redessine avec la valeur gardée.
+    const int min0 = r.vent_min_kn;
+    exiger(toucher_texte("+"), "« + » du minimum");
+    exiger(r.vent_min_kn == min0 + 1, "« + » décale le minimum d'un nœud");
+    exiger(toucher_texte("−"), "« − » du minimum");
+    exiger(r.vent_min_kn == min0, "« − » le ramène");
+    std::fprintf(stderr, "vent après les appuis : %d à %d\n", static_cast<int>(r.vent_min_kn),
+                 static_cast<int>(r.vent_max_kn));
+
+    // Retirer : le premier « Retirer » ôte le premier spot ; le spot affiché reste le même.
+    exiger(toucher("Retirer"), "retirer le premier spot");
+    exiger(r.nombre == 2, "un spot de moins");
+    exiger(std::strcmp(r.spots[r.choisi].nom, "Baie des Mouettes") == 0, "le spot affiché est resté le même");
+    exiger(!affiche("Plage du Nord"), "le spot retiré a disparu de la page");
+
+    // Ajouter : la liste de Vigie, les spots déjà gardés grisés, un toucher ajoute et revient à la page.
+    exiger(toucher("Ajouter un spot"), "ouvrir « Ajouter un spot »");
+    exiger(affiche("Anse de l’Étoile"), "la liste de Vigie est montrée");
+    exiger(existe("Déjà ajouté"), "les spots déjà gardés sont marqués");
+    exiger(toucher_texte("Anse de l’Étoile"), "toucher un spot de la liste");
+    exiger(r.nombre == 3, "le spot est ajouté");
+    exiger(std::strcmp(r.spots[2].nom, "Anse de l’Étoile") == 0, "il arrive en dernier");
+    exiger(std::strcmp(r.spots[r.choisi].nom, "Baie des Mouettes") == 0, "l'ajout ne change pas le spot affiché");
+    exiger(affiche("Anse de l’Étoile") && !existe("Tapez le nom d’un spot"),
+           "retour sur la page « La mer », qui montre le nouveau spot");
+}
+
+// Le plancher du vent : un bouton dont le décalage serait refusé est grisé et n'envoie rien.
+void mer_vent_plancher(const banc::Contexte &ctx) {
+    preparer(ctx, "mer-vent-plancher", Interface::Reglages);
+    mer_spots_gardes(1, 0);
+    ecran::mer::Registre &r = g_hote.registre_mer;
+    r.vent_min_kn = 1;
+    r.vent_max_kn = 2;
+    ecran::ui_aller("section:1:2");
+    tourner();
+    exiger(!toucher_texte("−"), "« − » du minimum à 1 nœud est grisé");
+    exiger(!toucher_texte("+"), "« + » du minimum touche le maximum : grisé");
+    exiger(r.vent_min_kn == 1 && r.vent_max_kn == 2, "rien n'a été envoyé");
+    exiger(g_hote.registres_mer_enregistres == 0, "l'hôte n'a rien enregistré");
+}
+
+// La recherche dans la liste de Vigie : sans accents ni majuscules, puis « Aucun spot ne correspond ».
+void mer_recherche_au_doigt(const banc::Contexte &ctx) {
+    preparer(ctx, "mer-recherche-au-doigt", Interface::Reglages);
+    mer_liste_fictive();
+    mer_spots_gardes(3, 0);
+    ecran::ui_aller("section:1:2/spot");
+    tourner();
+    exiger(affiche("Plage du Sud") && affiche("Anse de l’Étoile"), "au départ la liste entière");
+    exiger(toucher("Rechercher"), "ouvrir le clavier");
+    taper_texte("etoile");
+    exiger(toucher("Rechercher"), "lancer la recherche");
+    exiger(affiche("Anse de l’Étoile"), "« etoile » trouve « Anse de l’Étoile »");
+    exiger(!affiche("Plage du Sud"), "les autres spots disparaissent");
+    exiger(existe("Modifier"), "le bouton propose de retaper");
+    ecran::ui_simuler_saisie("zzzz", true); // comme si la personne avait retapé puis touché « OK »
+    // La phrase est traduite puis son « {q} » remplacé par la recherche, comme sur l'écran.
+    std::string aucun = ecran::i18n::tr_c("Aucun spot ne correspond à “{q}”.");
+    const std::size_t pos = aucun.find("{q}");
+    exiger(pos != std::string::npos, "la phrase traduite garde son « {q} »");
+    aucun.replace(pos, 3, "zzzz");
+    exiger(affiche(aucun.c_str()), "aucun résultat : la phrase le dit");
+    exiger(g_hote.registres_mer_enregistres == 0, "chercher n'enregistre rien");
+}
+
+// Pas de connexion, puis « Réessayer » quand Internet revient.
+void mer_liste_reessayer(const banc::Contexte &ctx) {
+    preparer(ctx, "mer-liste-reessayer", Interface::Reglages);
+    mer_liste_fictive();
+    g_hote.issue_liste_mer = ecran::ListeMer::SansConnexion;
+    ecran::ui_aller("section:1:2/spot");
+    tourner();
+    exiger(existe("Pas de connexion : la liste des spots demande Internet."), "la phrase d'absence de connexion");
+    exiger(existe("Réessayer"), "« Réessayer » est proposé");
+    exiger(!affiche("Plage du Nord"), "aucune liste n'est montrée");
+    g_hote.issue_liste_mer = ecran::ListeMer::Terminee;
+    exiger(toucher("Réessayer"), "réessayer");
+    exiger(g_hote.listes_mer_demandees >= 2, "la lecture a été redemandée");
+    exiger(affiche("Plage du Nord"), "la liste arrive");
+}
+
 void dire_zones(const char *quoi) {
     std::fprintf(
         stderr, // la sortie standard est jetée par rendre.py quand le rendu réussit ; l'erreur standard est affichée
@@ -332,6 +432,8 @@ void zones_tactiles_reglages(const banc::Contexte &ctx) {
     g_hote.definir_texte("llm.url", "http://192.168.1.20:11434/v1");
     g_hote.definir_texte("llm.modele", "mistral-small");
     g_hote.definir_texte("llm.cle", "cle-factice"); // une clé enregistrée : le bouton « Effacer » apparaît
+    mer_liste_fictive();                            // la mer : trois spots gardés, la liste de Vigie sous la main
+    mer_spots_gardes(3, 1);
     const char *const chemins[] = {"liste",
                                    "section:0",
                                    "section:0/wifi",
@@ -340,6 +442,8 @@ void zones_tactiles_reglages(const banc::Contexte &ctx) {
                                    "section:1",
                                    "section:1/ville",
                                    "section:1/source",
+                                   "section:1:2",
+                                   "section:1:2/spot",
                                    "section:2",
                                    "section:3",
                                    "section:4:0",
@@ -438,6 +542,10 @@ namespace banc {
 const Scene kScenes[] = {
     {"zones-tactiles-reglages", "Parcours : zones tactiles des réglages", zones_tactiles_reglages},
     {"zones-tactiles-installation", "Parcours : zones tactiles de l'installation", zones_tactiles_installation},
+    {"mer-au-doigt", "Parcours : la mer, choisir, régler le vent, retirer, ajouter", mer_au_doigt},
+    {"mer-vent-plancher", "Parcours : plage de vent, boutons grisés aux limites", mer_vent_plancher},
+    {"mer-recherche-au-doigt", "Parcours : recherche d'un spot dans la liste de Vigie", mer_recherche_au_doigt},
+    {"mer-liste-reessayer", "Parcours : liste de Vigie sans connexion puis « Réessayer »", mer_liste_reessayer},
     {"curseur-au-doigt", "Parcours : curseur saisi au doigt", curseur_au_doigt},
     {"installation-complete", "Parcours : installation de bout en bout", installation_complete},
     {"reprise-apres-redemarrage", "Parcours : reprise de l'installation à l'étape 3", reprise_apres_redemarrage},

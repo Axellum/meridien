@@ -373,4 +373,55 @@ inline void preparer(const banc::Contexte &ctx, const char *nom, Interface quoi,
     tourner();
 }
 
+// ---- la mer (ADR-0026) : des spots INVENTÉS (aucun spot ni aucune commune réels de Vigie) -------------------------------------------------
+
+struct SpotFictif {
+    const char *id;
+    const char *nom;
+    const char *lieu;
+};
+inline constexpr SpotFictif kSpotsFictifs[] = {
+    {"plage-du-nord", "Plage du Nord", "Port-Marée"},
+    {"baie-des-mouettes", "Baie des Mouettes", "Saint-Cormoran"},
+    {"cap-houle", "Cap Houle", "Cap-Houle"},
+    {"grande-plage", "Grande Plage", "Port-Marée"},
+    {"pointe-du-vent", "Pointe du Vent", "Saint-Cormoran"},
+    {"dunes-blanches", "Dunes Blanches", "Val-de-Sable"},
+    {"anse-de-l-etoile", "Anse de l’Étoile", "Val-de-Sable"}, // accents : « etoile » doit la trouver
+    {"ile-aux-galets", "Île aux Galets", "Anse-Brisée"},
+    {"crique-aux-algues", "Crique aux Algues", "Anse-Brisée"},
+    {"plage-des-pins", "Plage des Pins", "Cap-Houle"},
+    {"banc-de-sable", "Banc de Sable", "Port-Marée"},
+    {"rocher-du-phare", "Rocher du Phare", "Saint-Cormoran"},
+    {"estuaire-calme", "Estuaire Calme", "Val-de-Sable"},
+    {"plage-du-sud", "Plage du Sud", "Anse-Brisée"},
+    {"lagune-bleue", "Lagune Bleue", "Cap-Houle"},
+    {"digue-ouest", "Digue Ouest", "Port-Marée"},
+};
+inline constexpr std::size_t kNombreSpotsFictifs = sizeof(kSpotsFictifs) / sizeof(kSpotsFictifs[0]);
+
+// Ce que « Ajouter un spot » trouve chez Vigie : les seize spots inventés, tous.
+inline void mer_liste_fictive() {
+    g_hote.liste_vigie = {};
+    for (const SpotFictif &s : kSpotsFictifs) {
+        ecran::mer::liste::SpotVigie &d = g_hote.liste_vigie.spots[g_hote.liste_vigie.nombre++];
+        std::snprintf(d.id, sizeof d.id, "%s", s.id);
+        std::snprintf(d.nom, sizeof d.nom, "%s", s.nom);
+        std::snprintf(d.lieu, sizeof d.lieu, "%s", s.lieu);
+    }
+}
+
+// Les spots gardés par l'appareil : les `n` premiers de la liste inventée, `choisi` affiché.
+inline void mer_spots_gardes(std::size_t n, std::size_t choisi) {
+    g_hote.registre_mer = {};
+    for (std::size_t i = 0; i < n && i < kNombreSpotsFictifs; ++i) {
+        exiger(ecran::mer::ajouter(g_hote.registre_mer, kSpotsFictifs[i].id, kSpotsFictifs[i].nom) ==
+                   ecran::mer::ErreurRegistre::Aucune,
+               "un spot inventé est refusé par le registre");
+    }
+    if (choisi < g_hote.registre_mer.nombre) {
+        g_hote.registre_mer.choisi = static_cast<std::uint8_t>(choisi);
+    }
+}
+
 } // namespace parcours

@@ -68,6 +68,14 @@ inline constexpr Rangee RANGEES_ALERTES[] = {
     {Genre::Reglage, "alertes.periode", Editeur::Curseur, true},
     {Genre::Reglage, "alertes.adresse", Editeur::Clavier, true},
 };
+// « La mer » : les spots enregistrés (toucher = afficher celui-là, « Retirer » = l'ôter), « Ajouter un spot » (liste de Vigie, lue par
+// l'appareil lui-même, ADR-0026) et la plage de vent qui colore la page mer. Rien de tout cela n'est un réglage du registre : c'est le
+// registre des spots (ecran/mer_spots.hpp), enregistré à part par reglages_mer.h, comme le fait la page web (/api/sea).
+inline constexpr Rangee RANGEES_MER[] = {
+    {Genre::Info, "info.mer_spots", Editeur::Aucun, true},
+    {Genre::Action, "action.mer_ajouter", Editeur::Aucun, true},
+    {Genre::Info, "info.mer_vent", Editeur::Aucun, true},
+};
 inline constexpr Rangee RANGEES_LANGUE[] = {
     {Genre::Reglage, "langue.ecran", Editeur::Pastilles, true},
     {Genre::Reglage, "langue.assistant", Editeur::Pastilles, true},
@@ -120,6 +128,7 @@ inline constexpr Page PAGES[] = {
     detail::page("reseau", Section::Reseau, "Wi-Fi", detail::RANGEES_RESEAU),
     detail::page("lieu", Section::LieuMeteo, "Ville", detail::RANGEES_LIEU),
     detail::page("alertes", Section::LieuMeteo, "Alertes", detail::RANGEES_ALERTES),
+    detail::page("mer", Section::LieuMeteo, "La mer", detail::RANGEES_MER),
     detail::page("langue", Section::Langue, "Langue", detail::RANGEES_LANGUE),
     detail::page("affichage", Section::Affichage, "Affichage", detail::RANGEES_AFFICHAGE),
     detail::page("assistant_stt", Section::AssistantVocal, "Comprendre ma voix", detail::RANGEES_STT),
