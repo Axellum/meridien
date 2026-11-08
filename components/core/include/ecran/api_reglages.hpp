@@ -523,6 +523,7 @@ template <class Hote> class Api {
             e.champ("langue_assistant", i18n::code(a.langue_assistant));
             e.champ("theme", reglages::code(a.theme));
             e.champ_entier("luminosite", a.luminosite);
+            e.champ("profil", reglages::code(a.profil));
             for (std::string_view liste : {"langues", "langues_assistant"}) {
                 e.cle(liste);
                 e.ouvrir_tableau();
@@ -538,6 +539,11 @@ template <class Hote> class Api {
             e.ouvrir_tableau();
             for (std::string_view th : reglages::THEMES)
                 e.chaine(th);
+            e.fermer_tableau();
+            e.cle("profils");
+            e.ouvrir_tableau();
+            for (std::string_view pr : reglages::PROFILS_ACCUEIL)
+                e.chaine(pr);
             e.fermer_tableau();
             e.fermer_objet();
         });
@@ -561,6 +567,8 @@ template <class Hote> class Api {
             return erreur(t, 422, "theme_inconnu", "Ce thème n’existe pas.", "theme");
         case reglages::ErreurAffichage::Luminosite:
             return erreur(t, 422, "luminosite", "La luminosité doit être entre 5 et 100 %.", "luminosite");
+        case reglages::ErreurAffichage::Profil:
+            return erreur(t, 422, "profil_inconnu", "Ce profil n’existe pas.", "profil");
         case reglages::ErreurAffichage::Aucune:
             break;
         }

@@ -219,6 +219,8 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Clair": "Açık"
 "Sombre": "Koyu"
 "Luminosité": "Parlaklık"
+"Profil": "Profil"
+"Auto : l’écran choisit seul, selon la pluie et les alertes. Météo : l’écran reste sur la météo (une alerte officielle s’affiche quand même).": "Otomatik: ekran yağışa ve uyarılara göre kendisi seçer. Hava durumu: ekran hava durumunda kalır (resmî bir uyarı yine de görünür)."
 "Enregistré": "Kaydedildi"
 
 # --- Page de réglages : Wi-Fi ---
@@ -292,6 +294,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Cette langue n’est pas disponible pour l’écran.": "Bu dil ekran için kullanılamıyor."
 "Cette langue n’est pas disponible pour l’assistant.": "Bu dil asistan için kullanılamıyor."
 "Ce thème n’existe pas.": "Bu tema yok."
+"Ce profil n’existe pas.": "Bu profil yok."
 "La luminosité doit être entre 5 et 100 %.": "Parlaklık 5 ile 100 % arasında olmalı."
 "Cette adresse n’est pas valide.": "Bu adres geçerli değil."
 "L’adresse doit commencer par http:// ou https://.": "Adres http:// veya https:// ile başlamalı."

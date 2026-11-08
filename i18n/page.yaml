@@ -111,6 +111,10 @@
 "theme.clair": "Clair"
 "theme.sombre": "Sombre"
 "ecran.luminosite": "Luminosité"
+"ecran.profil": "Profil"
+"ecran.profil_aide": "Auto : l’écran choisit seul, selon la pluie et les alertes. Météo : l’écran reste sur la météo (une alerte officielle s’affiche quand même)."
+"profil.auto": "Auto"
+"profil.meteo": "Météo"
 "toast.enregistre": "Enregistré"
 
 # --- Page de réglages : alertes officielles ---

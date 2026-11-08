@@ -219,6 +219,8 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Clair": "Light"
 "Sombre": "Dark"
 "Luminosité": "Brightness"
+"Profil": "Profile"
+"Auto : l’écran choisit seul, selon la pluie et les alertes. Météo : l’écran reste sur la météo (une alerte officielle s’affiche quand même).": "Auto: the screen picks what to show, based on rain and alerts. Weather: the screen stays on the weather (an official alert still appears)."
 "Enregistré": "Saved"
 
 # --- Page de réglages : Wi-Fi ---
@@ -292,6 +294,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Cette langue n’est pas disponible pour l’écran.": "This language isn’t available for the screen."
 "Cette langue n’est pas disponible pour l’assistant.": "This language isn’t available for the assistant."
 "Ce thème n’existe pas.": "This theme doesn’t exist."
+"Ce profil n’existe pas.": "This profile doesn’t exist."
 "La luminosité doit être entre 5 et 100 %.": "Brightness must be between 5 and 100%."
 "Cette adresse n’est pas valide.": "This address isn’t valid."
 "L’adresse doit commencer par http:// ou https://.": "The address must start with http:// or https://."

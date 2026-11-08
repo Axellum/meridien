@@ -219,6 +219,8 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Clair": "Hell"
 "Sombre": "Dunkel"
 "Luminosité": "Helligkeit"
+"Profil": "Profil"
+"Auto : l’écran choisit seul, selon la pluie et les alertes. Météo : l’écran reste sur la météo (une alerte officielle s’affiche quand même).": "Auto: Der Bildschirm wählt selbst, je nach Regen und Warnungen. Wetter: Der Bildschirm bleibt beim Wetter (eine amtliche Warnung erscheint trotzdem)."
 "Enregistré": "Gespeichert"
 
 # --- Page de réglages : Wi-Fi ---
@@ -292,6 +294,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Cette langue n’est pas disponible pour l’écran.": "Diese Sprache ist für das Display nicht verfügbar."
 "Cette langue n’est pas disponible pour l’assistant.": "Diese Sprache ist für den Assistenten nicht verfügbar."
 "Ce thème n’existe pas.": "Dieses Design gibt es nicht."
+"Ce profil n’existe pas.": "Dieses Profil gibt es nicht."
 "La luminosité doit être entre 5 et 100 %.": "Die Helligkeit muss zwischen 5 und 100 % liegen."
 "Cette adresse n’est pas valide.": "Diese Adresse ist ungültig."
 "L’adresse doit commencer par http:// ou https://.": "Die Adresse muss mit http:// oder https:// beginnen."

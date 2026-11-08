@@ -219,6 +219,8 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Clair": "Chiaro"
 "Sombre": "Scuro"
 "Luminosité": "Luminosità"
+"Profil": "Profilo"
+"Auto : l’écran choisit seul, selon la pluie et les alertes. Météo : l’écran reste sur la météo (une alerte officielle s’affiche quand même).": "Auto: lo schermo sceglie da solo, in base alla pioggia e alle allerte. Meteo: lo schermo resta sul meteo (un’allerta ufficiale compare comunque)."
 "Enregistré": "Salvato"
 
 # --- Page de réglages : Wi-Fi ---
@@ -292,6 +294,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Cette langue n’est pas disponible pour l’écran.": "Questa lingua non è disponibile per lo schermo."
 "Cette langue n’est pas disponible pour l’assistant.": "Questa lingua non è disponibile per l’assistente."
 "Ce thème n’existe pas.": "Questo tema non esiste."
+"Ce profil n’existe pas.": "Questo profilo non esiste."
 "La luminosité doit être entre 5 et 100 %.": "La luminosità deve essere tra 5 e 100 %."
 "Cette adresse n’est pas valide.": "Questo indirizzo non è valido."
 "L’adresse doit commencer par http:// ou https://.": "L’indirizzo deve iniziare con http:// o https://."
