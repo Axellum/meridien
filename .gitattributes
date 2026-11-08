@@ -3,3 +3,8 @@
 *.sh text eol=lf
 # Captures gzip des tests (octets du fil) : jamais de conversion de fins de ligne, sinon gzip.decompress échoue.
 test/host/donnees/*.gz binary
+# Trames de Vigie (le CRC-32 est calculé sur leurs octets : LF seulement) et les fichiers qui en sont tirés : jamais de conversion de fins de ligne,
+# sinon controle_python_mer.py lit un CRC faux sur un poste Windows (autocrlf=true).
+test/host/donnees/mer_*.txt text eol=lf
+test/host/donnees/mer_*.inc text eol=lf
+test/host/donnees/attendu_mer_*.inc text eol=lf

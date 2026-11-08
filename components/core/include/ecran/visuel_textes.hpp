@@ -62,6 +62,8 @@ inline constexpr Texte TEXTES[] = {
     {"Aller à", {"Go to", "Gehe zu", "Ga naar", "Ir a", "Vai a", "Git"}},
     // « Détails » : le bouton du premier anneau ; mêmes traductions que le titre de la page (grandeurs.hpp, ADR-0020).
     {"Détails", {"Details", "Details", "Details", "Detalles", "Dettagli", "Ayrıntılar"}},
+    // « Mer » : le bouton du premier anneau quand un spot de mer est choisi ; mêmes traductions que le titre de la page (mer_textes.hpp, ADR-0022).
+    {"Mer", {"Sea", "Meer", "Zee", "Mar", "Mare", "Deniz"}},
     // Réglages > Appareil : la ligne qui ouvre l'écran de diagnostic (qui n'a plus de bouton sur l'écran principal).
     {"Diagnostic", {"Diagnostics", "Diagnose", "Diagnose", "Diagnóstico", "Diagnostica", "Tanılama"}},
     // --- indice UV ---

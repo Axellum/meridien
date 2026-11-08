@@ -1,12 +1,13 @@
 // Scène « roue » : la roue d'appui long (main/ui_roue.cpp, ADR-0021) ouverte par-dessus l'écran principal (main/ui_principal.cpp), tous
-// deux compilés tels quels. Le premier anneau porte « Réglages », « Détails » et « Alertes » comme sur l'appareil ; les variantes « famille-* »
+// deux compilés tels quels. Le premier anneau porte « Réglages », « Détails », « Alertes » et « Mer » comme sur l'appareil (QUELLES entrées
+// et dans quel ordre : le noyau pur ecran/roue_entrees.hpp, le même que celui de l'appareil) ; les variantes « famille-* »
 // ajoutent une entrée de DÉMONSTRATION qui déplie un second anneau (choix inventés, glyphes d'emprunt : le firmware n'a pas encore de
 // famille). La roue s'ouvre à un point de l'écran, exprimé en millièmes de la largeur et de la hauteur : le centre, près d'un coin,
 // près d'un bord. Les variantes « parcours-* » rejouent des gestes et s'arrêtent en ECHEC (code de sortie non nul) si l'effet n'est
 // pas celui attendu : c'est ainsi que « les réglages sont toujours atteignables » est vérifié sur le PC (pas sur la carte).
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp main/ui_details.cpp
+// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp main/ui_details.cpp main/ui_mer.cpp
 // rendu-langues: fr en de nl es it tr
 // rendu-langues-defaut: fr
 // rendu-tailles: 1280x720 1024x600
@@ -18,14 +19,18 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <string_view>
 
 #include "banc.h"
 #include "ecran/grandeurs.hpp"
 #include "ecran/heure_lieu.hpp"
+#include "ecran/mer_trame.hpp"
+#include "ecran/roue_entrees.hpp"
 #include "ecran/visuel_textes.hpp"
 #include "lvgl.h"
 #include "scenes/scene_principal_donnees.hpp"
 #include "ui_details.h"
+#include "ui_mer.h"
 #include "ui_principal.h"
 #include "ui_roue.h"
 
@@ -68,6 +73,8 @@ int g_reglages = 0;
 int g_alertes = 0;
 int g_choix = 0;
 int g_details = 0;
+int g_mer_ouvertures = 0;
+bool g_avec_mer = false; // un spot de mer est choisi : la roue montre « Mer » (parcours et appui long)
 void compter_reglages() { ++g_reglages; }
 void compter_alertes() { ++g_alertes; }
 void compter_choix() { ++g_choix; }
@@ -127,13 +134,77 @@ void ouvrir_details() {
     lv_screen_load(racine);
 }
 
-// La table du premier anneau de l'appareil (ecran_principal.cpp, composer_entrees) puis, si demandé, la famille de démonstration.
-int composer(EntreeRoue *sortie, bool alertes, int choix_demo) {
+// « Mer » : ce que fait ui_mer_ouvrir() (main/ui_mer_ouvrir.cpp, la colle de l'appareil : écran de la carte, horloge, registre des spots, qui
+// ne tourne PAS sur le PC) : la page est construite sur un écran neuf, l'écran actif est gardé comme « précédent », la page est chargée d'un
+// coup ; « Fermer » recharge le précédent et supprime la page plus tard. La page elle-même (main/ui_mer.cpp) est celle de l'appareil, sur
+// une VRAIE trame de Vigie (Hossegor, 08/11/2026) lue par le vrai décodeur, trois minutes après sa génération. Le toucher de « Fermer »
+// n'est pas simulé (la page n'a pas d'entrée de toucher pour le banc) : le parcours appelle le rappel que la page appelle.
+constexpr std::string_view HOSSEGOR =
+#include "../../../test/host/donnees/mer_hossegor.inc"
+    ;
+ecran::mer::Mer g_mer; // ≈ 1,5 Ko : hors pile, et la page en garde sa propre copie
+lv_obj_t *g_page_mer = nullptr;
+lv_obj_t *g_avant_mer = nullptr;
+
+void fermer_mer() {
+    if (g_page_mer == nullptr) {
+        return;
+    }
+    lv_screen_load(g_avant_mer);
+    lv_obj_delete_async(g_page_mer);
+    g_page_mer = nullptr;
+    g_avant_mer = nullptr;
+}
+
+void ouvrir_mer() {
+    ++g_mer_ouvertures;
+    if (g_page_mer != nullptr || g_contexte == nullptr) {
+        return; // déjà ouverte : un second appel ne fait rien (comme ui_mer_ouvrir)
+    }
+    const banc::Contexte &c = *g_contexte;
+    g_mer = ecran::mer::Mer{};
+    ecran::mer::decoder(HOSSEGOR, g_mer);
+    lv_obj_t *racine = lv_obj_create(nullptr);
+    ecran::ContexteMer ctx;
+    ctx.racine = racine;
+    ctx.ttf = roboto_700_start;
+    ctx.ttf_taille = static_cast<std::size_t>(roboto_700_end - roboto_700_start);
+    ctx.largeur = c.largeur;
+    ctx.hauteur = c.hauteur;
+    ctx.theme = &ecran::visuel::kThemeCiel;
+    ctx.fermer = fermer_mer;
+    ecran::DonneesMer donnees;
+    donnees.mer = &g_mer;
+    donnees.maintenant_s = g_mer.genere_s + 180;
+    donnees.decalage_s = 3600; // UTC+1 : la France en novembre
+    if (!ecran::ui_mer_creer(ctx, donnees)) {
+        echec("la page mer n'a pas pu être créée (police)");
+    }
+    g_page_mer = racine;
+    g_avant_mer = lv_screen_active();
+    lv_screen_load(racine);
+}
+
+// La table du premier anneau de l'appareil (ecran_principal.cpp, composer_entrees) : QUELLES entrées et dans quel ordre vient du même noyau
+// pur que l'appareil (ecran/roue_entrees.hpp) ; ici leurs actions sont des compteurs. Puis, si demandé, la famille de démonstration.
+int composer(EntreeRoue *sortie, bool alertes, int choix_demo, bool mer_choisie = false) {
+    const ecran::roue::Liste liste = ecran::roue::entrees_du_premier_anneau({alertes, mer_choisie});
     int n = 0;
-    sortie[n++] = {ecran::visuel::texte_c("Réglages"), ecran::ICONE_REGLAGES, compter_reglages, nullptr, 0};
-    sortie[n++] = {ecran::visuel::texte_c("Détails"), ecran::ICONE_DETAILS, ouvrir_details, nullptr, 0};
-    if (alertes) {
-        sortie[n++] = {ecran::visuel::texte_c("Alertes"), ecran::ICONE_ALERTES, compter_alertes, nullptr, 0};
+    for (int i = 0; i < liste.n; ++i) {
+        switch (liste.entree[i]) {
+        case ecran::roue::Entree::Reglages:
+            sortie[n++] = {ecran::visuel::texte_c("Réglages"), ecran::ICONE_REGLAGES, compter_reglages, nullptr, 0};
+            break;
+        case ecran::roue::Entree::Details:
+            sortie[n++] = {ecran::visuel::texte_c("Détails"), ecran::ICONE_DETAILS, ouvrir_details, nullptr, 0};
+            break;
+        case ecran::roue::Entree::Alertes:
+            sortie[n++] = {ecran::visuel::texte_c("Alertes"), ecran::ICONE_ALERTES, compter_alertes, nullptr, 0};
+            break;
+        case ecran::roue::Entree::Mer:
+            sortie[n++] = {ecran::visuel::texte_c("Mer"), ecran::ICONE_MER, ouvrir_mer, nullptr, 0};
+            break;
+        }
     }
     if (choix_demo > 0) {
         sortie[n++] = {"Affichage", ecran::ICONE_MOYEU, nullptr, FAMILLE_HUIT, choix_demo};
@@ -169,9 +240,9 @@ ecran::ContexteRoue contexte_roue(const banc::Contexte &c) {
 }
 
 // Ouvre la roue au point (fx, fy) en millièmes de l'écran. `choix_demo` > 0 : ajoute la famille de démonstration et la déplie.
-void ouvrir_la_roue(const banc::Contexte &c, int fx, int fy, bool alertes, int choix_demo) {
+void ouvrir_la_roue(const banc::Contexte &c, int fx, int fy, bool alertes, int choix_demo, bool mer_choisie = false) {
     EntreeRoue entrees_roue[ecran::ENTREES_ROUE_MAX] = {};
-    const int n = composer(entrees_roue, alertes, choix_demo);
+    const int n = composer(entrees_roue, alertes, choix_demo, mer_choisie);
     const int32_t x = c.largeur * fx / 1000;
     const int32_t y = c.hauteur * fy / 1000;
     exiger(ecran::ui_roue_ouvrir(contexte_roue(c), entrees_roue, n, x, y), "la roue n'a pas pu s'ouvrir");
@@ -194,10 +265,11 @@ void ouvrir_la_roue(const banc::Contexte &c, int fx, int fy, bool alertes, int c
                  static_cast<unsigned>(cout.ram_statique), ecran::ui_principal_cout().objets);
 }
 
-void ouvrir(const char *variante, const banc::Contexte &c, int fx, int fy, bool alertes, int choix_demo) {
+void ouvrir(const char *variante, const banc::Contexte &c, int fx, int fy, bool alertes, int choix_demo,
+            bool mer_choisie = false) {
     g_variante = variante;
     afficher_principal(c);
-    ouvrir_la_roue(c, fx, fy, alertes, choix_demo);
+    ouvrir_la_roue(c, fx, fy, alertes, choix_demo, mer_choisie);
 }
 
 // ---- les rendus ---------------------------------------------------------------------------------------------------------------------
@@ -209,6 +281,18 @@ void coin_bas_droit(const banc::Contexte &c) { ouvrir("coin-bas-droit", c, 950, 
 void bord_droit(const banc::Contexte &c) { ouvrir("bord-droit", c, 975, 500, true, 0); }
 void bord_haut(const banc::Contexte &c) { ouvrir("bord-haut", c, 500, 60, true, 0); }
 void bord_bas(const banc::Contexte &c) { ouvrir("bord-bas", c, 500, 940, true, 0); }
+
+// Avec « Mer » : quatre boutons au premier anneau (Réglages, Détails, Alertes, Mer), ou trois sans la page des alertes. Le coin haut gauche
+// est le cas le plus serré (le moyeu s'écarte le plus du doigt, ADR-0021).
+void centre_avec_mer(const banc::Contexte &c) { ouvrir("centre-avec-mer", c, 500, 500, true, 0, true); }
+void centre_mer_sans_alertes(const banc::Contexte &c) {
+    ouvrir("centre-mer-sans-alertes", c, 500, 500, false, 0, true);
+}
+void coin_haut_gauche_avec_mer(const banc::Contexte &c) {
+    ouvrir("coin-haut-gauche-avec-mer", c, 50, 70, true, 0, true);
+}
+void coin_bas_droit_avec_mer(const banc::Contexte &c) { ouvrir("coin-bas-droit-avec-mer", c, 950, 930, true, 0, true); }
+void bord_droit_avec_mer(const banc::Contexte &c) { ouvrir("bord-droit-avec-mer", c, 975, 500, true, 0, true); }
 
 void famille_centre(const banc::Contexte &c) { ouvrir("famille-centre", c, 500, 500, true, 8); }
 void famille_quatre_centre(const banc::Contexte &c) { ouvrir("famille-quatre-centre", c, 500, 500, true, 4); }
@@ -225,7 +309,7 @@ int g_appuis_longs = 0;
 void sur_appui_long(int32_t x, int32_t y) {
     ++g_appuis_longs;
     EntreeRoue entrees_roue[ecran::ENTREES_ROUE_MAX] = {};
-    const int n = composer(entrees_roue, true, 0);
+    const int n = composer(entrees_roue, true, 0, g_avec_mer);
     exiger(ecran::ui_roue_ouvrir(contexte_roue(*g_contexte), entrees_roue, n, x, y),
            "la roue n'a pas pu s'ouvrir sur l'appui long");
 }
@@ -322,6 +406,58 @@ void parcours_details(const banc::Contexte &c) {
     exiger(lv_screen_active() == g_principal, "toucher « Réglages » a changé d'écran dans le banc");
 }
 
+// « Mer » : sans spot choisi la roue n'a pas ce bouton ; avec un spot, appui long -> roue -> toucher « Mer » ouvre la page exactement une fois
+// (la roue est fermée), « Fermer » ramène à l'accueil et supprime la page, puis la roue se rouvre et « Réglages » reste atteignable.
+void parcours_mer(const banc::Contexte &c) {
+    g_variante = "parcours-mer";
+    g_reglages = g_alertes = g_details = g_mer_ouvertures = g_appuis_longs = 0;
+    g_avec_mer = false;
+    afficher_principal(c);
+    ecran::ui_principal_sur_appui_long(sur_appui_long);
+    int32_t x = 0;
+    int32_t y = 0;
+
+    // 1. Aucun spot choisi : trois boutons (Réglages, Détails, Alertes), pas de « Mer ».
+    lv_obj_send_event(g_principal, LV_EVENT_LONG_PRESSED, nullptr);
+    exiger(ecran::ui_roue_ouverte(), "un appui long n'ouvre pas la roue");
+    exiger(ecran::ui_roue_centre_bouton(2, &x, &y), "pas de troisième bouton (Alertes)");
+    exiger(!ecran::ui_roue_centre_bouton(3, &x, &y), "la roue montre un quatrième bouton sans spot de mer choisi");
+    ecran::ui_roue_fermer();
+    tourner();
+    exiger(!ecran::ui_roue_ouverte(), "la roue ne se ferme pas");
+
+    // 2. Un spot choisi : quatre boutons, « Mer » est le dernier et il n'y en a pas de cinquième.
+    g_avec_mer = true;
+    lv_obj_send_event(g_principal, LV_EVENT_LONG_PRESSED, nullptr);
+    exiger(ecran::ui_roue_ouverte() && g_appuis_longs == 2, "la roue ne se rouvre pas pour le spot choisi");
+    exiger(!ecran::ui_roue_centre_bouton(4, &x, &y), "la roue montre un cinquième bouton");
+    exiger(ecran::ui_roue_centre_bouton(3, &x, &y), "pas de quatrième bouton (Mer)");
+    exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Mer » laisse la roue ouverte");
+    tourner();
+    exiger(g_mer_ouvertures == 1 && g_reglages == 0 && g_alertes == 0 && g_details == 0,
+           "toucher « Mer » n'ouvre pas la page exactement une fois");
+    exiger(ecran::ui_roue_cout().objets == 0, "la roue fermée garde un objet LVGL");
+    exiger(g_page_mer != nullptr && lv_screen_active() == g_page_mer,
+           "la page mer n'est pas l'écran actif après le toucher");
+    exiger(g_avant_mer == g_principal, "la page mer ne garde pas l'accueil comme écran précédent");
+
+    // 3. « Fermer » (le rappel de la page) ramène à l'accueil et supprime la page.
+    lv_obj_t *page = g_page_mer;
+    fermer_mer();
+    tourner();
+    exiger(lv_screen_active() == g_principal, "« Fermer » ne ramène pas à l'accueil");
+    exiger(g_page_mer == nullptr && !lv_obj_is_valid(page), "« Fermer » laisse la page mer en mémoire");
+
+    // 4. Les réglages restent atteignables par la roue après la visite de la page.
+    lv_obj_send_event(g_principal, LV_EVENT_LONG_PRESSED, nullptr);
+    exiger(ecran::ui_roue_ouverte() && g_appuis_longs == 3, "la roue ne se rouvre pas après « Fermer »");
+    exiger(ecran::ui_roue_centre_bouton(0, &x, &y), "pas de premier bouton (Réglages)");
+    exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Réglages » laisse la roue ouverte");
+    tourner();
+    exiger(g_reglages == 1 && g_mer_ouvertures == 1, "« Réglages » n'est plus atteignable après la page mer");
+    g_avec_mer = false;
+}
+
 // Une famille : toucher son bouton déplie le second anneau, toucher un choix ferme la roue et lance l'action du choix ; avec la famille
 // dépliée, « Réglages » reste atteignable.
 void parcours_famille(const banc::Contexte &c) {
@@ -368,6 +504,11 @@ const Scene kScenes[] = {
     {"bord-droit", "Près du bord droit", bord_droit},
     {"bord-haut", "Près du bord haut", bord_haut},
     {"bord-bas", "Près du bord bas", bord_bas},
+    {"centre-avec-mer", "Au centre, Réglages, Détails, Alertes et Mer", centre_avec_mer},
+    {"centre-mer-sans-alertes", "Au centre, Réglages, Détails et Mer (aucune alerte)", centre_mer_sans_alertes},
+    {"coin-haut-gauche-avec-mer", "Près du coin haut gauche, avec Mer", coin_haut_gauche_avec_mer},
+    {"coin-bas-droit-avec-mer", "Près du coin bas droit, avec Mer", coin_bas_droit_avec_mer},
+    {"bord-droit-avec-mer", "Près du bord droit, avec Mer", bord_droit_avec_mer},
     {"famille-centre", "Famille de démonstration, 8 choix, au centre", famille_centre},
     {"famille-quatre-centre", "Famille de démonstration, 4 choix, au centre", famille_quatre_centre},
     {"famille-coin", "Famille de démonstration, 8 choix, près d'un coin", famille_coin},
@@ -375,6 +516,8 @@ const Scene kScenes[] = {
     {"famille-bord-bas", "Famille de démonstration, 6 choix, près du bord bas", famille_bord_bas},
     {"parcours-reglages", "Parcours : appui long, Réglages, Alertes, toucher dans le vide", parcours_reglages},
     {"parcours-details", "Parcours : appui long, Détails, Fermer, Réglages encore atteignable", parcours_details},
+    {"parcours-mer", "Parcours : appui long, Mer (seulement avec un spot), Fermer, Réglages encore atteignable",
+     parcours_mer},
     {"parcours-famille", "Parcours : famille dépliée, Réglages encore atteignable", parcours_famille},
 };
 const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
