@@ -6,7 +6,8 @@
 #
 # Dépôt public depuis le 08/11/2026 (privé avant : minutes facturables). Les jobs lourds ne tournent que quand il le faut :
 #   - pull_request : tests-noyau, ruff, clang-format, gitleaks, firmware-tab5 ;
-#   - push sur main et lancement manuel : en plus mutations-noyau (longue) et parcours-web (réseau).
+#   - push sur main et lancement manuel : en plus parcours-web (réseau) ;
+#   - lancement manuel seulement : mutations-noyau (très longue, voir plus bas).
 name: CI
 
 on:
@@ -79,9 +80,10 @@ jobs:
   # Chaque mutation du noyau doit faire échouer le test qui la vise. Compilation seule : pas besoin des détecteurs.
   # clang++-18 comme sur le PC d'Axel, où toutes les mutations sont détectées. Attention : la liste en compte 1 530
   # (206 le 06/11/2026) et le lancement du 08/11/2026 a atteint la limite de 150 minutes sans finir (docs/outils.md).
+  # Retiré des push le 08/11/2026 sur la parole d'Axel : il ne part plus qu'à la main (workflow_dispatch).
   mutations-noyau:
     name: mutations-noyau
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     steps:
