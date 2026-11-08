@@ -27,6 +27,12 @@
       "ou": "bouton « Détails » du premier anneau (les sept tuiles de grandeurs, ADR-0020)"
     },
     {
+      "id": "mer",
+      "mdi": "waves",
+      "point": "F078D",
+      "ou": "bouton « Mer » du premier anneau (la page mer, ADR-0024)"
+    },
+    {
       "id": "moyeu",
       "mdi": "compass-rose",
       "point": "F1382",
@@ -35,7 +41,7 @@
   ],
   "sortie": {
     "fichier": "main/assets/mdi_roue.ttf",
-    "sha256": "2265e9fca6b10aa53792a53046d45b454a557b88eb91627dbd4417f267d4dc85",
-    "taille": 1380
+    "sha256": "9f4f0f0586ca160248d884ea9ffb84e4c5810ef50c7d32b74170179946e6a873",
+    "taille": 1564
   }
 }

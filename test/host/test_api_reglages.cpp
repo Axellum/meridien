@@ -7,9 +7,11 @@
 #include "ecran/api_reglages.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/json_mini.hpp"
+#include "ecran/mer_spots.hpp"
 #include "mini.hpp"
 
 namespace api = ecran::api;
+namespace mer = ecran::mer;
 namespace ap = ecran::appairage;
 namespace json = ecran::json;
 namespace i18n = ecran::i18n;
@@ -36,6 +38,11 @@ struct FauxHote {
     rg::Alertes al{};
     int enreg_alertes = 0;
     bool alertes_ecriture_ok = true;
+    mer::Registre registre_mer{}; // le registre des spots de la page mer, tel que l'appareil le garde
+    int enreg_mer = 0;
+    bool mer_ecriture_ok = true;
+    bool mer_en_memoire =
+        true; // faux : l'appareil n'a pas pu garder son registre en mémoire (PSRAM pleine au démarrage)
     api::MeteoApercu meteo{};
     bool meteo_dispo = false;
     api::InfoSysteme sys{};
@@ -84,6 +91,20 @@ struct FauxHote {
         if (!alertes_ecriture_ok)
             return false;
         al = a;
+        return true;
+    }
+    constexpr bool mer_lire(mer::Registre &r) {
+        if (!mer_en_memoire)
+            return false;
+        r = registre_mer;
+        return true;
+    }
+    constexpr bool mer_enregistrer(const mer::Registre &r) {
+        ++enreg_mer;
+        // Comme l'appareil (reglages_mer_enregistrer) : un registre que le noyau ne reconnaît pas pour valide n'est pas gardé.
+        if (!mer_ecriture_ok || !mer::registre_valide(r))
+            return false;
+        registre_mer = r;
         return true;
     }
     constexpr bool zone_lire(rg::Zone &z) {
@@ -153,6 +174,8 @@ struct Banc {
     char travail[16384]{};
     char brouillon[4100]{}; // pour fabriquer un corps ou une requête très long
     char jeton[ap::JETON_CARACTERES + 1]{};
+    mer::Registre mer_actuel{}; // les deux registres de travail de /api/sea (en PSRAM sur l'appareil)
+    mer::Registre mer_neuf{};
 
     constexpr Banc() { moteur.appairage().nouveau_code(123456); }
 
@@ -162,6 +185,8 @@ struct Banc {
         t.cap_sortie = sizeof sortie;
         t.travail = travail;
         t.cap_travail = sizeof travail;
+        t.mer_actuel = &mer_actuel;
+        t.mer_neuf = &mer_neuf;
         return t;
     }
     constexpr api::Reponse appeler(Methode m, sv chemin, sv requete = {}, sv corps = {}, sv jeton_ = {}) {
@@ -282,6 +307,8 @@ constexpr Route ROUTES_PROTEGEES[] = {
     {Methode::Put, "/api/display"},
     {Methode::Get, "/api/alerts"},
     {Methode::Put, "/api/alerts"},
+    {Methode::Get, "/api/sea"},
+    {Methode::Put, "/api/sea"},
     {Methode::Get, "/api/weather"},
     {Methode::Get, "/api/geocode"},
     {Methode::Get, "/api/wifi"},
@@ -312,7 +339,7 @@ constexpr int sans_jeton_valide_tout_est_refuse_en_401() {
         VERIFIER(r.statut == 401);
     }
     VERIFIER(b.hote.enreg_zone == 0 && b.hote.enreg_affichage == 0 && b.hote.telechargements == 0);
-    VERIFIER(b.hote.enreg_alertes == 0);
+    VERIFIER(b.hote.enreg_alertes == 0 && b.hote.enreg_mer == 0);
     return 0;
 }
 
@@ -901,6 +928,208 @@ constexpr int echec_d_ecriture_des_alertes_donne_500() {
     return 0;
 }
 
+// ---- registre des spots de la page mer (docs/api-reglages.md §15, ADR-0025) ---------------------------------------------
+
+constexpr sv DEUX_SPOTS = R"({"spots":[{"id":"spot-un","nom":"Un"},{"id":"spot-deux","nom":"Deux"}]})";
+
+constexpr int mer_lue_vide_avec_ses_bornes() {
+    Banc b;
+    VERIFIER(b.connecter());
+    const api::Reponse r = b.avec_jeton(Methode::Get, "/api/sea");
+    VERIFIER(r.statut == 200 && json_ok(r));
+    VERIFIER(taille_de(r, "spots") == 0 && existe(r, "spots") && texte_est(r, "choisi", ""));
+    VERIFIER(entier_est(r, "vent_min_kn", 12) && entier_est(r, "vent_max_kn", 25));
+    VERIFIER(entier_est(r, "spots_max", 12) &&
+             entier_est(r, "vent_plafond_kn", 60)); // pour que la page n'ait aucun nombre écrit en dur
+    VERIFIER(b.hote.enreg_mer == 0);
+    return 0;
+}
+
+constexpr int mer_ecrite_la_liste_entiere_puis_relue_telle_que_gardee() {
+    Banc b;
+    VERIFIER(b.connecter());
+    api::Reponse r = b.avec_jeton(Methode::Put, "/api/sea", {}, DEUX_SPOTS);
+    VERIFIER(r.statut == 200 && json_ok(r) && b.hote.enreg_mer == 1);
+    VERIFIER(taille_de(r, "spots") == 2 && texte_est(r, "spots[0].id", "spot-un") &&
+             texte_est(r, "spots[0].nom", "Un"));
+    VERIFIER(texte_est(r, "spots[1].id", "spot-deux") && texte_est(r, "spots[1].nom", "Deux"));
+    VERIFIER(texte_est(r, "choisi", "spot-un")); // le premier spot ajouté est le choisi
+    VERIFIER(b.hote.registre_mer.nombre == 2 && mer::registre_valide(b.hote.registre_mer));
+    const api::Reponse relu = b.avec_jeton(Methode::Get, "/api/sea");
+    VERIFIER(relu.statut == 200 && texte_est(relu, "spots[1].id", "spot-deux") && texte_est(relu, "choisi", "spot-un"));
+    VERIFIER(b.hote.enreg_mer == 1);
+    return 0;
+}
+
+constexpr int mer_choix_et_plage_de_vent_champ_par_champ() {
+    Banc b;
+    VERIFIER(b.connecter());
+    auto put = [&](sv corps) { return b.avec_jeton(Methode::Put, "/api/sea", {}, corps); };
+    VERIFIER(put(DEUX_SPOTS).statut == 200);
+    api::Reponse r = put(R"({"choisi":"spot-deux"})");
+    VERIFIER(r.statut == 200 && texte_est(r, "choisi", "spot-deux") && taille_de(r, "spots") == 2);
+    VERIFIER(b.hote.registre_mer.choisi == 1 && b.hote.enreg_mer == 2);
+    r = put(R"({"vent_min_kn":10})");
+    VERIFIER(r.statut == 200 && entier_est(r, "vent_min_kn", 10) && entier_est(r, "vent_max_kn", 25));
+    r = put(R"({"vent_max_kn":30})");
+    VERIFIER(r.statut == 200 && entier_est(r, "vent_min_kn", 10) && entier_est(r, "vent_max_kn", 30));
+    VERIFIER(texte_est(r, "choisi", "spot-deux") && b.hote.enreg_mer == 4);
+    VERIFIER(b.hote.registre_mer.vent_min_kn == 10 && b.hote.registre_mer.vent_max_kn == 30);
+    return 0;
+}
+
+constexpr int mer_sans_choisi_le_meme_spot_reste_choisi() {
+    Banc b;
+    VERIFIER(b.connecter());
+    auto put = [&](sv corps) { return b.avec_jeton(Methode::Put, "/api/sea", {}, corps); };
+    VERIFIER(put(DEUX_SPOTS).statut == 200 && put(R"({"choisi":"spot-deux"})").statut == 200);
+    // « spot-deux » passe au rang 2 : il reste le spot choisi
+    api::Reponse r = put(
+        R"({"spots":[{"id":"spot-trois","nom":"Trois"},{"id":"spot-un","nom":"Un"},{"id":"spot-deux","nom":"Deux"}]})");
+    VERIFIER(r.statut == 200 && texte_est(r, "choisi", "spot-deux") && taille_de(r, "spots") == 3);
+    // « spot-deux » part : le premier de la liste prend la place
+    r = put(R"({"spots":[{"id":"spot-trois","nom":"Trois"},{"id":"spot-un","nom":"Un"}]})");
+    VERIFIER(r.statut == 200 && texte_est(r, "choisi", "spot-trois"));
+    // une liste vide coupe la mer
+    r = put(R"({"spots":[]})");
+    VERIFIER(r.statut == 200 && taille_de(r, "spots") == 0 && texte_est(r, "choisi", ""));
+    VERIFIER(!mer::demande_du_registre(b.hote.registre_mer).presente);
+    return 0;
+}
+
+constexpr int mer_inchangee_n_ecrit_rien() {
+    Banc b;
+    VERIFIER(b.connecter());
+    auto put = [&](sv corps) { return b.avec_jeton(Methode::Put, "/api/sea", {}, corps); };
+    VERIFIER(put("{}").statut == 200 && b.hote.enreg_mer == 0); // un registre vide qu'on « remet » vide
+    VERIFIER(put(DEUX_SPOTS).statut == 200 && b.hote.enreg_mer == 1);
+    VERIFIER(put(DEUX_SPOTS).statut == 200);
+    VERIFIER(put(R"({"choisi":"spot-un","vent_min_kn":12,"vent_max_kn":25})").statut == 200);
+    VERIFIER(put("{}").statut == 200);
+    // pas d'écriture en mémoire permanente, et le client réseau n'est pas réveillé pour rien
+    VERIFIER(b.hote.enreg_mer == 1);
+    return 0;
+}
+
+constexpr int mer_refusee_tout_ou_rien_avec_le_champ_fautif() {
+    Banc b;
+    VERIFIER(b.connecter());
+    auto put = [&](sv corps) { return b.avec_jeton(Methode::Put, "/api/sea", {}, corps); };
+    VERIFIER(put(DEUX_SPOTS).statut == 200);
+    const int ecritures = b.hote.enreg_mer;
+    VERIFIER(est_erreur(put(R"({"spots":"x"})"), 422, "spots_invalide", "spots"));
+    VERIFIER(est_erreur(put(R"({"spots":[{"id":"Mauvais Id","nom":"X"}]})"), 422, "spot_invalide", "spots"));
+    VERIFIER(est_erreur(put(R"({"spots":[{"id":"a","nom":""}]})"), 422, "nom_invalide", "spots"));
+    VERIFIER(est_erreur(put(R"({"spots":[{"id":"a","nom":"A"},{"id":"a","nom":"B"}]})"), 422, "spot_double", "spots"));
+    VERIFIER(est_erreur(put(R"({"spots":[],"choisi":"x"})"), 422, "choix_inconnu", "choisi"));
+    VERIFIER(est_erreur(put(R"({"choisi":"inconnu"})"), 422, "choix_inconnu", "choisi"));
+    VERIFIER(est_erreur(put(R"({"vent_min_kn":30,"vent_max_kn":20})"), 422, "vent_invalide", "vent_min_kn"));
+    VERIFIER(est_erreur(put(R"({"vent_min_kn":12.5})"), 422, "vent_invalide", "vent_min_kn")); // refusé, pas arrondi
+    VERIFIER(est_erreur(put(R"({"vent_max_kn":61})"), 422, "vent_invalide", "vent_max_kn"));
+    VERIFIER(est_erreur(put(R"({"vent_max_kn":10})"), 422, "vent_invalide",
+                        "vent_max_kn")); // sous le minimum enregistré (12)
+    // des champs valides à côté d'un refus ne sont pas appliqués
+    VERIFIER(
+        est_erreur(put(R"({"spots":[{"id":"a","nom":"A"}],"vent_min_kn":99})"), 422, "vent_invalide", "vent_min_kn"));
+    VERIFIER(est_erreur(put("[]"), 400, "illisible"));
+    VERIFIER(est_erreur(put("pas du json"), 400, "illisible"));
+    VERIFIER(b.hote.enreg_mer == ecritures && b.hote.registre_mer.nombre == 2 && b.hote.registre_mer.vent_min_kn == 12);
+    VERIFIER(texte_est(b.avec_jeton(Methode::Get, "/api/sea"), "spots[0].id", "spot-un"));
+    return 0;
+}
+
+constexpr int mer_treize_spots_trop() {
+    Banc b;
+    VERIFIER(b.connecter());
+    // 13 objets : 13 × 24 octets, très en dessous des 4 Ko
+    constexpr sv TREIZE =
+        R"({"spots":[{"id":"s01","nom":"S"},{"id":"s02","nom":"S"},{"id":"s03","nom":"S"},{"id":"s04","nom":"S"},)"
+        R"({"id":"s05","nom":"S"},{"id":"s06","nom":"S"},{"id":"s07","nom":"S"},{"id":"s08","nom":"S"},)"
+        R"({"id":"s09","nom":"S"},{"id":"s10","nom":"S"},{"id":"s11","nom":"S"},{"id":"s12","nom":"S"},{"id":"s13","nom":"S"}]})";
+    VERIFIER(est_erreur(b.avec_jeton(Methode::Put, "/api/sea", {}, TREIZE), 422, "trop_de_spots", "spots"));
+    VERIFIER(b.hote.enreg_mer == 0);
+    return 0;
+}
+
+constexpr int mer_douze_spots_aux_noms_les_plus_longs_tiennent_dans_la_reponse() {
+    Banc b;
+    VERIFIER(b.connecter());
+    // 12 spots de 32 lettres « é » (64 octets chacun, le pire nom valide) et d'identifiants de 42 octets.
+    char corps[4096] = {};
+    std::size_t p = 0;
+    auto ecrire = [&](sv t) {
+        for (const char c : t)
+            corps[p++] = c;
+    };
+    ecrire(R"({"spots":[)");
+    for (int i = 0; i < 12; ++i) {
+        if (i > 0)
+            ecrire(",");
+        ecrire(R"({"id":"s)");
+        corps[p++] = static_cast<char>('a' + i);
+        for (int k = 0; k < 40; ++k)
+            ecrire("-");
+        ecrire(R"(","nom":")");
+        for (int k = 0; k < 32; ++k)
+            ecrire("é");
+        ecrire(R"("})");
+    }
+    ecrire("]}");
+    const api::Reponse r = b.avec_jeton(Methode::Put, "/api/sea", {}, sv(corps, p));
+    VERIFIER(r.statut == 200 && json_ok(r) && taille_de(r, "spots") == 12);
+    VERIFIER(b.hote.registre_mer.nombre == 12);
+    return 0;
+}
+
+constexpr int mer_un_nom_avec_des_guillemets_reste_du_json_valide() {
+    Banc b;
+    VERIFIER(b.connecter());
+    const api::Reponse r =
+        b.avec_jeton(Methode::Put, "/api/sea", {}, R"({"spots":[{"id":"a","nom":"La \"Plage\" \\ d’été"}]})");
+    VERIFIER(r.statut == 200 && json_ok(r) && texte_est(r, "spots[0].nom", "La \"Plage\" \\ d’été"));
+    return 0;
+}
+
+constexpr int echec_d_ecriture_du_registre_mer_donne_500() {
+    Banc b;
+    VERIFIER(b.connecter());
+    b.hote.mer_ecriture_ok = false;
+    const api::Reponse r = b.avec_jeton(Methode::Put, "/api/sea", {}, DEUX_SPOTS);
+    VERIFIER(est_erreur(r, 500, "interne"));
+    VERIFIER(b.hote.enreg_mer == 1 &&
+             b.hote.registre_mer.nombre == 0); // l'ancien état reste, et la réponse ne dit pas deux spots
+    b.hote.mer_ecriture_ok = true;
+    VERIFIER(taille_de(b.avec_jeton(Methode::Get, "/api/sea"), "spots") == 0);
+    return 0;
+}
+
+constexpr int registre_mer_absent_donne_500_sans_rien_ecraser() {
+    Banc b;
+    VERIFIER(b.connecter());
+    // l'appareil n'a pas pu garder son registre en mémoire : lire comme écrire disent « problème », jamais « registre vide »
+    b.hote.mer_en_memoire = false;
+    VERIFIER(est_erreur(b.avec_jeton(Methode::Get, "/api/sea"), 500, "interne"));
+    VERIFIER(est_erreur(b.avec_jeton(Methode::Put, "/api/sea", {}, DEUX_SPOTS), 500, "interne"));
+    VERIFIER(b.hote.enreg_mer == 0);
+    // les deux registres de travail manquent (mémoire du serveur) : même réponse, le reste de l'API répond
+    b.hote.mer_en_memoire = true;
+    api::Tampons t = b.tampons();
+    t.mer_actuel = nullptr;
+    t.mer_neuf = nullptr;
+    api::Requete rq;
+    rq.methode = Methode::Put;
+    rq.chemin = "/api/sea";
+    rq.corps = DEUX_SPOTS;
+    rq.jeton = sv(b.jeton);
+    VERIFIER(est_erreur(b.moteur.traiter(rq, t), 500, "interne"));
+    rq.methode = Methode::Get;
+    VERIFIER(est_erreur(b.moteur.traiter(rq, t), 500, "interne"));
+    rq.chemin = "/api/alerts";
+    VERIFIER(b.moteur.traiter(rq, t).statut == 200);
+    VERIFIER(b.hote.enreg_mer == 0 && b.hote.registre_mer.nombre == 0);
+    return 0;
+}
+
 // ---- météo --------------------------------------------------------------------------------------------------------------
 
 constexpr int meteo_absente_ou_invalide() {
@@ -1138,8 +1367,8 @@ constexpr int jamais_de_secret_dans_les_reponses() {
     b.hote.meteo_dispo = true;
     b.hote.meteo.valide = true;
     b.hote.reponse_geocodage = GEOCODAGE_LYON;
-    constexpr sv GET[] = {"/api/system", "/api/location", "/api/display", "/api/alerts", "/api/weather",
-                          "/api/wifi",   "/api/services", "/api/presets", "/api/update"};
+    constexpr sv GET[] = {"/api/system",  "/api/location", "/api/display",  "/api/alerts",  "/api/sea",
+                          "/api/weather", "/api/wifi",     "/api/services", "/api/presets", "/api/update"};
     for (sv chemin : GET) {
         const api::Reponse r = b.avec_jeton(Methode::Get, chemin);
         VERIFIER(r.statut == 200 && json_ok(r));
@@ -1200,6 +1429,13 @@ constexpr sv PHRASES[] = {
     "Ce niveau d’alerte n’existe pas.",
     "Cette source météo n’existe pas.",
     "Cette source météo ne couvre pas le pays de la ville.",
+    "Les spots doivent former une liste d’objets avec un identifiant et un nom.",
+    "Cet identifiant de spot n’est pas valide.",
+    "Le nom d’un spot doit faire de 1 à 32 caractères.",
+    "Ce spot est déjà dans la liste.",
+    "La liste est pleine : 12 spots au plus.",
+    "Le spot choisi n’est pas dans la liste.",
+    "La plage de vent doit être en nœuds entiers, de 1 à 60, le minimum sous le maximum.",
 };
 
 constexpr int chaque_phrase_existe_dans_les_sept_langues() {
@@ -1217,7 +1453,7 @@ constexpr int chaque_phrase_existe_dans_les_sept_langues() {
     return 0;
 }
 
-constexpr int NB_SCENARIOS = 28;
+constexpr int NB_SCENARIOS = 35;
 
 // Un scénario d'erreur ou de message par numéro ; `chemin` dit où lire la phrase dans la réponse.
 constexpr api::Reponse scenario(Banc &b, int k, sv &chemin) {
@@ -1286,8 +1522,26 @@ constexpr api::Reponse scenario(Banc &b, int k, sv &chemin) {
         return put("/api/alerts", R"({"adresse":"http://vigie.exemple.fr"})");
     case 26:
         return put("/api/alerts", R"({"periode_min":9})");
-    default: // 27
+    case 27:
         return put("/api/alerts", R"({"niveau_min":"vert"})");
+    case 28:
+        return put("/api/sea", R"({"spots":"x"})");
+    case 29:
+        return put("/api/sea", R"({"spots":[{"id":"Mauvais Id","nom":"X"}]})");
+    case 30:
+        return put("/api/sea", R"({"spots":[{"id":"a","nom":""}]})");
+    case 31:
+        return put("/api/sea", R"({"spots":[{"id":"a","nom":"A"},{"id":"a","nom":"B"}]})");
+    case 32:
+        return put(
+            "/api/sea",
+            R"({"spots":[{"id":"s01","nom":"S"},{"id":"s02","nom":"S"},{"id":"s03","nom":"S"},{"id":"s04","nom":"S"},)"
+            R"({"id":"s05","nom":"S"},{"id":"s06","nom":"S"},{"id":"s07","nom":"S"},{"id":"s08","nom":"S"},)"
+            R"({"id":"s09","nom":"S"},{"id":"s10","nom":"S"},{"id":"s11","nom":"S"},{"id":"s12","nom":"S"},{"id":"s13","nom":"S"}]})");
+    case 33:
+        return put("/api/sea", R"({"choisi":"inconnu"})");
+    default: // 34
+        return put("/api/sea", R"({"vent_min_kn":30,"vent_max_kn":20})");
     }
 }
 
@@ -1357,6 +1611,17 @@ constexpr int chaque_message_de_l_api_est_traduit_dans_chaque_langue() {
     X(alertes_inchangees_n_ecrivent_rien)                                                                              \
     X(alertes_refusees_tout_ou_rien)                                                                                   \
     X(echec_d_ecriture_des_alertes_donne_500)                                                                          \
+    X(mer_lue_vide_avec_ses_bornes)                                                                                    \
+    X(mer_ecrite_la_liste_entiere_puis_relue_telle_que_gardee)                                                         \
+    X(mer_choix_et_plage_de_vent_champ_par_champ)                                                                      \
+    X(mer_sans_choisi_le_meme_spot_reste_choisi)                                                                       \
+    X(mer_inchangee_n_ecrit_rien)                                                                                      \
+    X(mer_refusee_tout_ou_rien_avec_le_champ_fautif)                                                                   \
+    X(mer_treize_spots_trop)                                                                                           \
+    X(mer_douze_spots_aux_noms_les_plus_longs_tiennent_dans_la_reponse)                                                \
+    X(mer_un_nom_avec_des_guillemets_reste_du_json_valide)                                                             \
+    X(echec_d_ecriture_du_registre_mer_donne_500)                                                                      \
+    X(registre_mer_absent_donne_500_sans_rien_ecraser)                                                                 \
     X(meteo_absente_ou_invalide)                                                                                       \
     X(meteo_valide_avec_libelle_dans_la_langue_de_l_ecran)                                                             \
     X(la_meteo_nomme_le_service_qui_l_a_donnee_et_dit_le_repli)                                                        \

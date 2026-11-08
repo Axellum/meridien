@@ -4,6 +4,10 @@
    page.yaml est utilisé, et aucune chaîne du code ne ressemble à du français (lettres accentuées, mots courants).
 2. web/faux-serveur/serveur.mjs : chaque texte français passé à `T('…')` est une clé de i18n/en.yaml (donc de toutes les
    langues : le générateur impose les mêmes clés), et aucune phrase traduisible n'est écrite en dur hors de `T()`.
+3. La carte « La mer » (08/11/2026) : la section « Page de réglages : mer » existe dans les six langues avec les mêmes clés,
+   dans le même ordre que i18n/page.yaml ; chaque texte est traduit (≠ français), garde ses marqueurs `{noms}`, suit le glossaire
+   (« spot » en fr/en/nl/es/it, « Spot » en allemand, « nokta » en turc, « kite » toujours « kite ») et tutoie (allemand, néerlandais,
+   espagnol). Le glossaire est contrôlé aussi sur la section « Appareil : messages de l'API, mer ».
 
 Utilisable seul : python web/tests/controle_langues.py   (code de sortie non nul = au moins un écart).
 """
@@ -17,6 +21,12 @@ APP_JS = RACINE / "web" / "app" / "app.js"
 SERVEUR = RACINE / "web" / "faux-serveur" / "serveur.mjs"
 PAGE_YAML = RACINE / "i18n" / "page.yaml"
 EN_YAML = RACINE / "i18n" / "en.yaml"
+SECTION_MER = "Page de réglages : mer (08/11/2026)"
+SECTION_MER_API = "Appareil : messages de l'API, mer (08/11/2026)"
+LANGUES_MER = ["en", "de", "nl", "es", "it", "tr"]
+SPOT = {"en": "spot", "de": "Spot", "nl": "spot", "es": "spot", "it": "spot", "tr": "nokta"}  # glossaire (« Spot » : nom commun allemand)
+POLITESSE = {"de": r"\b(Sie|Ihnen|Ihre[nmrs]?|Ihr)\b", "nl": r"\b(u|uw)\b", "es": r"\b(usted|ustedes)\b"}  # on tutoie
+MARQUEURS = re.compile(r"\{[^}]*\}")
 
 LIGNE = re.compile(r'^"((?:[^"\\]|\\["\\])*)": "((?:[^"\\]|\\["\\])*)"$')
 ID_PAGE = re.compile(r"^[a-z]+(\.[a-z0-9_]+)+$")
@@ -45,6 +55,21 @@ def lire_yaml(chemin):
         m = LIGNE.match(ligne)
         if m:
             sortie[sans_echappements(m.group(1))] = sans_echappements(m.group(2))
+    return sortie
+
+
+def sections_yaml(chemin):
+    """Les sections `# --- Titre ---` d'un fichier de langue : {titre: [(clé, valeur), …]} dans l'ordre du fichier."""
+    sortie, courante = {}, None
+    for ligne in chemin.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^# --- (.+) ---$", ligne)
+        if m:
+            courante = m.group(1)
+            sortie.setdefault(courante, [])
+            continue
+        m = LIGNE.match(ligne)
+        if m and courante is not None:
+            sortie[courante].append((sans_echappements(m.group(1)), sans_echappements(m.group(2))))
     return sortie
 
 
@@ -164,16 +189,57 @@ def controler_serveur():
     return ecarts, trouves
 
 
+def controler_mer():
+    """La carte « La mer » : mêmes clés, même ordre, vraiment traduit, marqueurs, glossaire, tutoiement dans les six langues."""
+    ecarts = []
+    page = sections_yaml(PAGE_YAML).get(SECTION_MER)
+    if not page:
+        return [f"page.yaml : section « {SECTION_MER} » absente"], 0
+    ids_section = [i for i, _ in page]
+    ids_mer = [i for i in lire_yaml(PAGE_YAML) if i.startswith("mer.") or i == "nav.mer"]
+    if sorted(ids_section) != sorted(ids_mer):
+        ecarts.append(f"page.yaml : les identifiants mer.* / nav.mer ne sont pas tous dans la section « {SECTION_MER} » : {sorted(set(ids_mer) ^ set(ids_section))[:5]}")
+    cles_fr = list(dict.fromkeys(v for _, v in page))  # la clé d'un fichier de langue est le texte français ; nav.mer et mer.titre disent la même chose
+    cles_api = None
+    for code in LANGUES_MER:
+        sections = sections_yaml(RACINE / "i18n" / f"{code}.yaml")
+        sec, api = sections.get(SECTION_MER), sections.get(SECTION_MER_API)
+        if sec is None or api is None:
+            ecarts.append(f"{code}.yaml : section « {SECTION_MER if sec is None else SECTION_MER_API} » absente")
+            continue
+        cles = [k for k, _ in sec]
+        if cles != cles_fr:
+            ecarts.append(f"{code}.yaml : section « {SECTION_MER} » : clés ou ordre différents de page.yaml (manque {[k for k in cles_fr if k not in cles][:2]}, en trop {[k for k in cles if k not in cles_fr][:2]})")
+        if cles_api is None:
+            cles_api = [k for k, _ in api]
+        elif [k for k, _ in api] != cles_api:
+            ecarts.append(f"{code}.yaml : section « {SECTION_MER_API} » : clés ou ordre différents des autres langues")
+        for k, v in sec + api:
+            if v == k:
+                ecarts.append(f"{code}.yaml : texte non traduit : {k[:50]!r}")
+            if sorted(MARQUEURS.findall(k)) != sorted(MARQUEURS.findall(v)):
+                ecarts.append(f"{code}.yaml : marqueurs {{…}} différents : {k[:50]!r}")
+            if "spot" in k.lower() and SPOT[code] not in (v if code == "de" else v.lower()):
+                ecarts.append(f"{code}.yaml : glossaire — « {SPOT[code]} » attendu pour « spot » : {v[:60]!r}")
+            if "kite" in k.lower() and "kite" not in v.lower():
+                ecarts.append(f"{code}.yaml : glossaire — « kite » reste « kite » : {v[:60]!r}")
+            if code in POLITESSE and re.search(POLITESSE[code], v):
+                ecarts.append(f"{code}.yaml : vouvoiement (on tutoie) : {v[:60]!r}")
+    return ecarts, len(cles_fr)
+
+
 def main():
     ecarts_page, nb_ids = controler_page()
     ecarts_serveur, nb_t = controler_serveur()
-    for e in ecarts_page + ecarts_serveur:
+    ecarts_mer, nb_mer = controler_mer()
+    for e in ecarts_page + ecarts_serveur + ecarts_mer:
         print("ECART", e)
-    if ecarts_page or ecarts_serveur:
+    if ecarts_page or ecarts_serveur or ecarts_mer:
         return 1
     print(
         f"ok : app.js sans texte français ({nb_ids} identifiants, tous cités, aucun inconnu) ; "
-        f"serveur.mjs : {nb_t} textes passés à T(), tous dans les fichiers de langue"
+        f"serveur.mjs : {nb_t} textes passés à T(), tous dans les fichiers de langue ; "
+        f"carte « La mer » : {nb_mer} textes, mêmes clés et même ordre dans les six langues, traduits, glossaire respecté"
     )
     return 0
 

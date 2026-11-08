@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <new>
 #include <string_view>
 
 #include "esp_app_desc.h"
@@ -44,6 +45,7 @@
 #include "meteo_zone.h"
 #include "reglages.h"
 #include "reglages_alertes.h"
+#include "reglages_mer.h"
 #include "reseau.h"
 #include "web_fichiers.h"
 
@@ -68,6 +70,10 @@ char g_nom[16] = {};                   // « ecran-f6b6 »
 char g_corps[api::CORPS_MAX + 1] = {}; // corps de la requête en cours (un octet de plus : voir sur_api)
 char *g_sortie = nullptr;
 char *g_travail = nullptr;
+// Les deux registres de travail de /api/sea (≈ 2,3 Ko chacun) : en PSRAM comme les deux tampons ci-dessus, pas sur la pile du serveur.
+// Un seul fil de serveur traite les requêtes, une seule requête à la fois (g_corps est partagé de la même façon).
+mer::Registre *g_mer_actuel = nullptr;
+mer::Registre *g_mer_neuf = nullptr;
 httpd_handle_t g_serveur = nullptr;
 
 // ---- l'appareil vu par l'API ---------------------------------------------------------------------------------------------
@@ -78,6 +84,10 @@ class HoteAppareil {
     bool enregistrer_affichage(const reglages::Affichage &a) { return reglages_enregistrer_affichage(a); }
     reglages::Alertes alertes() const { return reglages_alertes(); }
     bool enregistrer_alertes(const reglages::Alertes &a) { return reglages_alertes_enregistrer(a); }
+    // Le registre des spots de la page mer (ADR-0025) : le noyau décide de tout, ceci ne fait que lire et écrire. `reglages_mer_enregistrer`
+    // écrit la NVS puis réveille le client réseau ; il refuse (faux) un registre que le noyau ne reconnaît pas pour valide.
+    bool mer_lire(mer::Registre &sortie) { return reglages_mer(sortie); }
+    bool mer_enregistrer(const mer::Registre &r) { return reglages_mer_enregistrer(r); }
     bool zone_lire(reglages::Zone &z) { return reglages_zone_lire(z); }
     bool zone_enregistrer(const reglages::Zone &z) { return reglages_zone_enregistrer(z); }
     // La source de la météo : l'identifiant est lu dans la table des sources (données statiques), la vue reste valable après l'appel.
@@ -301,6 +311,9 @@ esp_err_t sur_api(httpd_req_t *req) {
     t.cap_sortie = kTailleSortie;
     t.travail = g_travail;
     t.cap_travail = kTailleTravail;
+    // nullptr si la mémoire a manqué au démarrage : /api/sea répond 500, le reste de l'API n'en souffre pas
+    t.mer_actuel = g_mer_actuel;
+    t.mer_neuf = g_mer_neuf;
     const api::Reponse rep = g_api.traiter(rq, t);
     ESP_LOGI(TAG, "%s %.*s -> %d", nom_methode(req->method), static_cast<int>(uri.chemin.size()), uri.chemin.data(),
              rep.statut);
@@ -358,6 +371,15 @@ char *allouer(size_t taille) {
         p = heap_caps_malloc(taille, MALLOC_CAP_8BIT);
     }
     return static_cast<char *>(p);
+}
+
+// Un registre de spots remis à zéro dans la mémoire des tampons (PSRAM d'abord, comme `allouer`), ou nullptr.
+mer::Registre *allouer_registre() {
+    void *p = heap_caps_calloc(1, sizeof(mer::Registre), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (p == nullptr) {
+        p = heap_caps_calloc(1, sizeof(mer::Registre), MALLOC_CAP_8BIT);
+    }
+    return p != nullptr ? new (p) mer::Registre() : nullptr;
 }
 
 bool demarrer_http() {
@@ -441,6 +463,17 @@ void tache_serveur(void *) {
         ESP_LOGE(TAG, "tampons du serveur non alloués : la page n'est pas servie");
         vTaskDelete(nullptr);
         return;
+    }
+    g_mer_actuel = allouer_registre();
+    g_mer_neuf = allouer_registre();
+    if (g_mer_actuel == nullptr || g_mer_neuf == nullptr) {
+        // Pas de quoi servir /api/sea : il répondra 500 « interne » (jamais un registre vide), la page et le reste de l'API tournent.
+        ESP_LOGW(TAG, "registres de travail de /api/sea non alloués : la page ne règle pas les spots de la mer");
+        // le registre est trivialement destructible ; heap_caps_free(nullptr) ne fait rien
+        heap_caps_free(g_mer_actuel);
+        heap_caps_free(g_mer_neuf);
+        g_mer_actuel = nullptr;
+        g_mer_neuf = nullptr;
     }
 
     // 2. Le code d'appairage est tiré avant d'ouvrir le port : aucune requête ne peut tomber sur un appareil sans code.
