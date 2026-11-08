@@ -27,6 +27,7 @@ Ordre des champs de `Att` dans test_mer_trame.cpp / test_mer_vue.cpp (la structu
 import argparse
 import json
 import math
+import re
 import sys
 import zlib
 from decimal import ROUND_HALF_UP, Decimal
@@ -35,6 +36,9 @@ from pathlib import Path
 ICI = Path(__file__).resolve().parent
 DONNEES = ICI / "donnees"
 ENTETE = "// FICHIER GÉNÉRÉ par test/host/controle_python_mer.py : ne pas modifier à la main.\n"
+RACINE = ICI.parents[1]
+POLICE = RACINE / "main" / "assets" / "roboto_700.ttf"
+TEXTES_HPP = RACINE / "components" / "core" / "include" / "ecran" / "mer_textes.hpp"
 
 SPOTS = ["hossegor", "la_torche", "rochebonne", "port_vieux", "govelle", "ondarraitz"]
 ACTIVITES = ["surf", "kite", "boat", "shore_fishing"]
@@ -265,6 +269,49 @@ def litteral(octets: bytes) -> str:
     return ENTETE + 'R"MER(' + texte + ')MER"\n'
 
 
+def decoder_litteral(litteral: str) -> str:
+    """Le texte d'un littéral C++ : `\\xNN` est un octet (le source écrit « · » et « ° » ainsi), le reste est du UTF-8."""
+    octets = bytearray()
+    i = 0
+    while i < len(litteral):
+        if litteral[i] == "\\" and litteral[i + 1] == "x":
+            octets.append(int(litteral[i + 2 : i + 4], 16))
+            i += 4
+        elif litteral[i] == "\\":
+            octets += litteral[i + 1].encode("utf-8")
+            i += 2
+        else:
+            octets += litteral[i].encode("utf-8")
+            i += 1
+    return octets.decode("utf-8")
+
+
+def caracteres_des_textes() -> set:
+    """Chaque caractère des littéraux de mer_textes.hpp (les commentaires ne s'affichent pas : ils sont écartés)."""
+    code = "\n".join(re.sub(r"//.*$", "", ligne) for ligne in TEXTES_HPP.read_text(encoding="utf-8").splitlines())
+    trouves = set()
+    for litteral in re.findall(r'"((?:[^"\\\n]|\\.)*)"', code):
+        trouves |= set(decoder_litteral(litteral))
+    return {c for c in trouves if ord(c) >= 0x20}
+
+
+def controle_glyphes() -> int:
+    """0 si chaque caractère des textes de la page mer est dans la police embarquée (sinon il s'afficherait en rectangle vide)."""
+    try:
+        from fontTools.ttLib import TTFont  # noqa: PLC0415  (outil de développement, pas toujours installé)
+    except ImportError:
+        print("  saute   fonttools absent (pip install fonttools) : caractères de mer_textes.hpp non comparés à la police")
+        return 0
+    cmap = TTFont(POLICE).getBestCmap() or {}
+    caracteres = caracteres_des_textes()
+    manque = sorted(c for c in caracteres if ord(c) not in cmap)
+    if manque:
+        print(f"  ECHEC   caractères de mer_textes.hpp absents de {POLICE.name} : {', '.join(f'U+{ord(c):04X} {c}' for c in manque)}")
+        return 1
+    print(f"  ok      les {len(caracteres)} caractères des textes de la page mer sont tous dans {POLICE.name}")
+    return 0
+
+
 def controle_mer(verifier: bool = True) -> int:
     """Appelé par lancer.py : 0 si tous les .inc sont à jour. Sans `verifier`, les réécrit."""
     mauvais = 0
@@ -289,6 +336,8 @@ def controle_mer(verifier: bool = True) -> int:
                 print(f"  écrit   {nom}")
     if verifier and mauvais == 0:
         print(f"\nmer : {len(SPOTS)} trames lues en Python seul, tous les .inc sont à jour")
+    if verifier:
+        mauvais += controle_glyphes()
     return mauvais
 
 
