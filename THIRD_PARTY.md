@@ -69,8 +69,8 @@ How to read this file. **Read** = the licence file or the source headers of the 
 - **MET Norway, rules of use that bind the device** (terms of service and Locationforecast documentation): an identifying
   `User-Agent` (a request without one, or with a generic library name, is answered 403), fewer than 20 requests per second, never
   repeat a request before the `Expires` time, coordinates truncated to at most 4 decimals, no schedule on the hour. Ours names the
-  application and the repository `github.com/Axellum/meridien`; **that repository is private today, so the contact is not reachable by
-  MET Norway until publication** ([docs/publication.md](docs/publication.md)). Anyone who redistributes a binary must put their own contact there.
+  application and the repository `github.com/Axellum/meridien`; **that repository has been public since 08/11/2026, so the contact is reachable
+  (what MET Norway does with it was not tried)** ([docs/publication.md](docs/publication.md)). Anyone who redistributes a binary must put their own contact there.
 - **NWS, credit.** No credit is required for general use. The NWS asks that nothing suggests an endorsement or an affiliation (its
   name and logo are protected); the screen and the page therefore add « This device is neither approved nor sponsored by the
   National Weather Service. » next to the data. « Public domain » is the wording of the disclaimer page, which covers the NWS web pages; the
@@ -169,8 +169,8 @@ nommée à chaque ligne). **Non vérifié** = non lu : ne pas s'y fier. Les vers
 - **MET Norway, règles d'usage qui lient l'appareil** (conditions d'utilisation et documentation de Locationforecast) : un
   `User-Agent` qui identifie (une requête sans lui, ou avec un nom de bibliothèque générique, reçoit 403), moins de 20 requêtes par
   seconde, ne jamais répéter une requête avant l'heure d'`Expires`, coordonnées tronquées à 4 décimales au plus, aucune
-  planification à l'heure pile. Le nôtre nomme l'application et le dépôt `github.com/Axellum/meridien` ; **ce dépôt est privé
-  aujourd'hui, donc MET Norway ne peut pas joindre le contact avant la publication** ([docs/publication.md](docs/publication.md)). Qui redistribue un binaire y met son propre contact.
+  planification à l'heure pile. Le nôtre nomme l'application et le dépôt `github.com/Axellum/meridien` ; **ce dépôt est public
+  depuis le 08/11/2026, donc le contact est joignable (ce que MET Norway en fait n'a pas été essayé)** ([docs/publication.md](docs/publication.md)). Qui redistribue un binaire y met son propre contact.
 - **NWS, mention.** Aucune mention n'est exigée pour un usage général. Le NWS demande que rien ne suggère une approbation ou une
   affiliation (son nom et son logo sont protégés) : l'écran et la page ajoutent donc « Cet appareil n’est ni approuvé ni parrainé par le
   National Weather Service. » à côté des données. « Domaine public » est la formulation de la page de mise en garde, qui vise les pages web du NWS ; la

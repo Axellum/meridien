@@ -22,5 +22,5 @@
   the screen and the phone page do with real answers, and the fallback after a real outage are not verified. Details:
   [docs/decisions/0014-met-norway-et-nws-comme-sources.md](../docs/decisions/0014-met-norway-et-nws-comme-sources.md),
   [docs/mesures/fournisseurs-meteo.md](../docs/mesures/fournisseurs-meteo.md), [docs/api-reglages.md](../docs/api-reglages.md). The contact
-  in the `User-Agent` is the private repository's page until publication. German and Turkish texts are still not reviewed by a speaker of
+  in the `User-Agent` is the repository's page (private until 08/11/2026, public since). German and Turkish texts are still not reviewed by a speaker of
   the language.
