@@ -2,8 +2,8 @@
 // du kite. NVS (espace « mer », clé « registre », un blob versionné écrit d'un seul coup). Toutes les règles (identifiants, noms,
 // doublons, plage de vent, ce que devient une NVS abîmée) sont dans le noyau pur ecran/mer_spots.hpp, testé sur le PC ; ce fichier ne
 // fait que lire, écrire et prévenir le client réseau.
-// Ce fichier est PUR (aucun en-tête ESP-IDF). Aucune route web, aucune page ni aucun écran ne l'écrit encore (lots suivants) : tant que
-// rien ne l'écrit, le registre est vide et l'appareil ne demande rien à Vigie.
+// Ce fichier est PUR (aucun en-tête ESP-IDF). Seule la route web /api/sea (page de réglages, ADR-0025) l'écrit ; aucun écran de l'appareil
+// ne le fait encore : tant que rien ne l'a écrit, le registre est vide et l'appareil ne demande rien à Vigie.
 #pragma once
 
 #include <cstdint>
