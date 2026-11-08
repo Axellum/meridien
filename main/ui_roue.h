@@ -25,11 +25,13 @@ namespace ecran {
 #include "ui_roue_icones.inc"
 
 // Un choix du second anneau d'une famille : son mot (déjà traduit), son icône (un glyphe de ui_roue_icones.inc : jamais nul, une icône
-// n'est jamais un rectangle vide) et ce qu'il fait.
+// n'est jamais un rectangle vide) et ce qu'il fait. `actif` : c'est le choix en vigueur (le profil épinglé, ou « Auto »), marqué comme
+// la famille dépliée du premier anneau : filet et icône à la couleur d'accent ; il reste touchable (le choisir de nouveau ne change rien).
 struct ChoixRoue {
     const char *texte;
     const char *icone;
     void (*action)();
+    bool actif = false;
 };
 
 // Une entrée du premier anneau. UNE commande (`action`, `choix` nul) ou UNE famille (`choix` : `nb_choix` choix, `action` nul).

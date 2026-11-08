@@ -233,14 +233,18 @@ void dessiner(lv_event_t *evenement) {
     for (int i = 0; i < g.roue.premier.n; ++i) {
         dessiner_bouton(pc, g.roue.premier.bouton[i], g.entrees[i].icone, g.sous == i && !g.sous_second, g.famille == i,
                         g.est_famille[i]);
-        dessiner_mot(pc, g.roue.premier.bouton[i].mot, g.entrees[i].texte);
+        // Le mot de la famille dépliée n'est pas redit : le moyeu l'affiche déjà, et son mot (posé dans l'axe du bouton, vers l'extérieur)
+        // passerait sous les disques du second anneau (« Profil » perdait son « l » sous « Météo »).
+        if (g.famille != i) {
+            dessiner_mot(pc, g.roue.premier.bouton[i].mot, g.entrees[i].texte);
+        }
     }
     dessiner_moyeu(pc);
     if (g.famille >= 0 && g.famille < g.n) {
         bande(pc, g.second, g.m.rayon_2, g.m.diametre_2, t.accent);
         for (int j = 0; j < g.second.n; ++j) {
             const ChoixRoue &choix = g.choix[g.famille][j];
-            dessiner_bouton(pc, g.second.bouton[j], choix.icone, g.sous == j && g.sous_second, false, false);
+            dessiner_bouton(pc, g.second.bouton[j], choix.icone, g.sous == j && g.sous_second, choix.actif, false);
             dessiner_mot(pc, g.second.bouton[j].mot, choix.texte);
         }
     }

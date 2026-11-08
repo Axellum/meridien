@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "lvgl.h"
 
+#include "ecran/accueil_epinglage.hpp"
 #include "ecran/accueil_pilote.hpp"
 #include "ecran/horloge_materielle.hpp"
 #include "ecran/i18n.hpp"
@@ -30,6 +31,7 @@
 #include "ui_principal.h"
 #include "ui_reglages.h"
 #include "ui_roue.h"
+#include "ui_roue_profil.h"
 #include "vigie_etat.h"
 #include "vue_depuis_detail.h"
 
@@ -60,6 +62,8 @@ char g_ville[sizeof(ZoneMeteo::nom)] = {};
 // Le mode automatique de l'accueil (ADR-0023) : le pilote garde l'état de la décision d'un passage au suivant (le dernier changement de
 // profil, le gel pendant un toucher). Un seul, lu et écrit par la tâche LVGL.
 accueil::Pilote g_pilote;
+lv_timer_t *g_minuteur =
+    nullptr; // le passage `rafraichir` (500 ms) : « Profil » le déclenche tout de suite quand la personne choisit
 
 // Un doigt est-il posé sur l'écran à cet instant ? Lu sur le périphérique tactile lui-même : peu importe quel objet reçoit l'appui
 // (l'écran, la pastille de l'alerte), et la roue ouverte par-dessus n'en est pas un.
@@ -167,19 +171,47 @@ bool alertes_atteignables() {
     return lecture.valide();
 }
 
+// « Profil » de la roue (ADR-0023) : toucher un profil écrit le réglage « Profil » (NVS, comme la page de réglages et la page web), puis
+// le passage de l'accueil est déclenché tout de suite : épingler Météo ou revenir à Auto se voit à l'instant, sans attendre les 500 ms.
+// Choisir le profil déjà en vigueur ne change rien (rien n'est écrit).
+void choisir_profil(reglages::ProfilAccueil profil) {
+    reglages::Affichage a = reglages_affichage();
+    if (a.profil == profil) {
+        return;
+    }
+    a.profil = profil;
+    if (!reglages_enregistrer_affichage(a)) {
+        ESP_LOGE(TAG, "profil de l'accueil « %.*s » non enregistré", static_cast<int>(reglages::code(profil).size()),
+                 reglages::code(profil).data());
+        return;
+    }
+    ESP_LOGI(TAG, "profil de l'accueil : %.*s", static_cast<int>(reglages::code(profil).size()),
+             reglages::code(profil).data());
+    if (g_minuteur != nullptr) {
+        lv_timer_ready(g_minuteur);
+    }
+}
+void choisir_profil_auto() { choisir_profil(reglages::ProfilAccueil::Auto); }
+void choisir_profil_meteo() { choisir_profil(reglages::ProfilAccueil::Meteo); }
+
 // LE PREMIER ANNEAU de la roue d'appui long (ADR-0021) : « Réglages », « Détails » (les sept grandeurs retirées de l'accueil, page de
-// ADR-0020) et, quand la page des alertes existe, « Alertes ». Rien d'autre au premier anneau (ni Profil, ni Affichage, ni Assistant) :
+// ADR-0020), « Alertes » quand la page des alertes existe, puis « Profil ▸ » (ADR-0023) : une famille dont le second anneau offre « Auto »
+// et les profils que l'appareil dessine, le profil en vigueur marqué. Rien d'autre au premier anneau (ni Affichage, ni Assistant) :
 // « Détails » est un bouton direct, pas une famille, puisqu'il n'y a qu'une page. Pour une entrée de plus : UNE ligne ici, et son glyphe
 // dans tools/icones/roue_glyphes.json (puis régénérer, voir docs/outils.md).
-// Les chaînes sont des littéraux ou la table de traduction : elles vivent aussi longtemps que la roue est ouverte.
-int composer_entrees(EntreeRoue *sortie) {
+// Les chaînes sont des littéraux ou la table de traduction : elles vivent aussi longtemps que la roue est ouverte. `choix_profil` (au moins
+// reglages::NOMBRE_PROFILS_ACCUEIL cases) doit vivre jusqu'à ui_roue_ouvrir.
+int composer_entrees(EntreeRoue *sortie, ChoixRoue *choix_profil) {
     int n = 0;
     sortie[n++] = {texte_principal::t(texte_principal::kReglages), ICONE_REGLAGES, ui_reglages_ouvrir, nullptr, 0};
     sortie[n++] = {visuel::texte_c("Détails"), ICONE_DETAILS, ui_details_ouvrir, nullptr, 0};
     if (alertes_atteignables()) {
         sortie[n++] = {visuel::texte_c("Alertes"), ICONE_ALERTES, ouvrir_alertes, nullptr, 0};
     }
-    return n;
+    ActionsProfil actions;
+    actions.choisir[static_cast<std::size_t>(reglages::ProfilAccueil::Auto)] = choisir_profil_auto;
+    actions.choisir[static_cast<std::size_t>(reglages::ProfilAccueil::Meteo)] = choisir_profil_meteo;
+    return ajouter_famille_profil(sortie, n, reglages_affichage().profil, actions, choix_profil);
 }
 
 // Appui long sur l'écran principal : la roue s'ouvre au point d'appui (x, y), en pixels de l'écran.
@@ -189,7 +221,8 @@ void ouvrir_roue(int32_t x, int32_t y) {
         return;
     }
     EntreeRoue entrees[ENTREES_ROUE_MAX] = {};
-    const int n = composer_entrees(entrees);
+    ChoixRoue choix_profil[reglages::NOMBRE_PROFILS_ACCUEIL] = {};
+    const int n = composer_entrees(entrees, choix_profil);
     ContexteRoue ctx;
     ctx.couche = lv_display_get_layer_top(board_get_display());
     ctx.ttf = roboto_700_start;
@@ -274,9 +307,10 @@ void rafraichir(lv_timer_t *) {
         }
     }
 
-    // Le mode automatique : les mesures de cet instant, et la décision du noyau pur. Aucun réglage n'épingle un profil pour l'instant
-    // (aucune mesure ne l'épingle) : le mode est toujours « Auto ». Les données de mer, les spots et le seuil de vent n'existent pas
-    // encore sur l'appareil : le noyau ne peut donc choisir que Météo, et ne bascule jamais sur une entrée qu'il ne connaît pas.
+    // Le mode automatique : les mesures de cet instant, et la décision du noyau pur. Le réglage « Profil » (ADR-0023, page web, écran de
+    // réglages et roue d'appui long) dit si un profil est épinglé : « Auto » n'épingle rien, et une valeur hors table non plus. Les données
+    // de mer, les spots et le seuil de vent n'existent pas encore sur l'appareil : le noyau ne peut donc choisir que Météo, et ne bascule
+    // jamais sur une entrée qu'il ne connaît pas.
     accueil::Mesures mesures;
     mesures.maintenant_s = entrees.maintenant_s;
     mesures.fuseau = entrees.fuseau;
@@ -290,6 +324,9 @@ void rafraichir(lv_timer_t *) {
     mesures.pluie_dans_min = entrees.meteo.pluie_dans_min;
     mesures.niveau_alerte = entrees.bandeau.present ? entrees.bandeau.niveau : vigie::Niveau::Inconnu;
     mesures.toucher = doigt_pose();
+    const accueil::Epinglage epinglage = accueil::epinglage_de(reglages_affichage().profil);
+    mesures.epingle = epinglage.epingle;
+    mesures.profil_epingle = epinglage.profil;
     entrees.mode_auto = g_pilote.avancer(mesures);
 
     ui_principal_mettre_a_jour(entrees);
@@ -345,7 +382,7 @@ void ecran_principal_creer(const BootInfo &boot) {
     // Carte neuve ou redémarrage au milieu de l'installation guidée : elle reprend ici, par-dessus l'écran principal (demande de
     // reglages-ecran ; sans cet appel les réglages marchent mais l'installation ne reprend pas au démarrage).
     ui_installation_ouvrir_si_necessaire();
-    lv_timer_create(rafraichir, kPeriodeMs, nullptr);
+    g_minuteur = lv_timer_create(rafraichir, kPeriodeMs, nullptr);
 
     const CoutEcran cout = ui_principal_cout();
     const CoutRoue cout_roue = ui_roue_cout();
