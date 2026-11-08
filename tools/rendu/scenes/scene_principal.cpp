@@ -1,6 +1,8 @@
-// Scène « principal » : l'écran principal (main/ui_principal.cpp), compilé tel quel, avec le thème par défaut (« Ciel »). Grande
-// horloge, date, météo du moment, grandeurs (vent, pluie, humidité, pression, UV, soleil, lune), heure par heure, sept jours,
-// alertes. Données fixées à la place du temps réel et de la météo (scene_principal_donnees.hpp).
+// Scène « principal » : l'écran principal (main/ui_principal.cpp), compilé tel quel, avec le thème par défaut (« Ciel »). L'accueil :
+// lieu, grande horloge, date, météo du moment, courbe des 12 heures, bandeau (pluie à venir, alerte officielle), cinq jours.
+// Données fixées à la place du temps réel et de la météo (scene_principal_donnees.hpp). Les variantes « esquisse », « calme »,
+// « alerte-* » et « esquisse-perimee » reprennent les états de l'esquisse retenue (Lorient, dimanche 08 h 45) : les rendre avec
+// -Instant 2026-11-08T07:45:00Z.
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
 // rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp
@@ -85,6 +87,38 @@ void pires_cas(const banc::Contexte &c) {
     afficher(c, entrees(c, 0, v));
 }
 
+// L'esquisse « croquis aéré » (voir scene_principal_donnees.hpp) : à rendre avec -Instant 2026-11-08T07:45:00Z (dimanche 08 h 45).
+void esquisse(const banc::Contexte &c) {
+    ecran::EntreesPrincipal e = entrees(c, 0, vue_esquisse(c.instant_utc_s));
+    e.bandeau = alerte_vent(c.instant_utc_s);
+    afficher(c, e);
+}
+
+// La même, tout juste périmée : le relevé date de 07 h 52 (« Données de 07:52 · périmées »), l'alerte officielle reste en vigueur.
+void esquisse_perimee(const banc::Contexte &c) {
+    VueMeteo v = vue_esquisse(c.instant_utc_s);
+    v.perimee = true;
+    v.instant_s = c.instant_utc_s - 53 * 60;
+    ecran::EntreesPrincipal e = entrees(c, 0, v);
+    e.bandeau = alerte_vent(c.instant_utc_s);
+    afficher(c, e);
+}
+
+// Ni pluie ni alerte : une seule puce calme, la place gagnée reste vide.
+void calme(const banc::Contexte &c) { afficher(c, entrees(c, 0, sans_pluie(vue_esquisse(c.instant_utc_s)))); }
+
+// Une alerte officielle sans pluie, puis une alerte avec deux autres en vigueur et de la pluie.
+void alerte_seule(const banc::Contexte &c) {
+    ecran::EntreesPrincipal e = entrees(c, 0, sans_pluie(vue_esquisse(c.instant_utc_s)));
+    e.bandeau = alerte_vent(c.instant_utc_s);
+    afficher(c, e);
+}
+void alerte_et_autres(const banc::Contexte &c) {
+    ecran::EntreesPrincipal e = entrees(c, 0, vue_esquisse(c.instant_utc_s));
+    e.bandeau = alerte_vent(c.instant_utc_s, 2);
+    afficher(c, e);
+}
+
 } // namespace
 
 namespace banc {
@@ -103,6 +137,11 @@ const Scene kScenes[] = {
     {"meteo-absente", "Aucune météo reçue", meteo_absente},
     {"attente", "Au démarrage : heure en attente", attente},
     {"pires-cas", "Pires cas de largeur", pires_cas},
+    {"esquisse", "Esquisse : Lorient, dimanche 08 h 45 (-Instant 2026-11-08T07:45:00Z)", esquisse},
+    {"esquisse-perimee", "Esquisse, météo périmée", esquisse_perimee},
+    {"calme", "Rien à signaler (ni pluie ni alerte)", calme},
+    {"alerte-seule", "Alerte officielle sans pluie", alerte_seule},
+    {"alerte-et-autres", "Alerte officielle + 2 autres et pluie", alerte_et_autres},
 };
 const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
 

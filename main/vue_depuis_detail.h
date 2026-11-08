@@ -99,6 +99,10 @@ inline VueMeteo vue_depuis_detail(const MeteoDetail &d, const char *ville) noexc
         p.proba_pct = pct(j.proba_precip_pct);
         p.pluie_dix_mm = dix(j.precipitation_mm);
         p.uv_dix = dix(j.uv_max);
+        p.vent_dix_kmh = dix(j.vent_max_kmh);
+        p.direction_deg = (j.direction_vent_dominante_deg >= 0 && j.direction_vent_dominante_deg <= 360)
+                              ? j.direction_vent_dominante_deg
+                              : INCONNU;
     }
     v.nb_jours = nj;
     return v;

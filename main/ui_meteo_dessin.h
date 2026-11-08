@@ -105,6 +105,44 @@ inline void rect_degrade_h(const Pinceau &pc, int x, int y, int w, int h, int ra
     lv_draw_rect(pc.couche, &d, &zone);
 }
 
+// Rectangle translucide avec un filet : le verre des cartes de l'accueil et ses puces (fond `fond` à `fond_opa`, contour `bord` à
+// `bord_opa`, épaisseur `epaisseur` en pixels ; le contour est dessiné DANS le rectangle).
+inline void rect_bord(const Pinceau &pc, int x, int y, int w, int h, int rayon, std::uint32_t fond,
+                      std::uint8_t fond_opa, std::uint32_t bord, std::uint8_t bord_opa, int epaisseur) {
+    if (w <= 0 || h <= 0) {
+        return;
+    }
+    lv_draw_rect_dsc_t d;
+    lv_draw_rect_dsc_init(&d);
+    d.radius = rayon;
+    d.bg_color = couleur(fond);
+    d.bg_opa = fond_opa;
+    d.border_color = couleur(bord);
+    d.border_opa = bord_opa;
+    d.border_width = epaisseur;
+    const lv_area_t zone = {x, y, x + w - 1, y + h - 1};
+    lv_draw_rect(pc.couche, &d, &zone);
+}
+
+// Rectangle à dégradé vertical, la couleur ET l'opacité variant de `haut` à `bas` : les voiles sous les courbes. Une bande étroite
+// dont les deux bouts reprennent un dégradé GLOBAL (calculé par l'appelant à ses deux ordonnées) donne le même résultat qu'un
+// dégradé unique sous toute la courbe, sans polygone.
+inline void rect_degrade_v(const Pinceau &pc, int x, int y, int w, int h, std::uint32_t haut, std::uint8_t haut_opa,
+                           std::uint32_t bas, std::uint8_t bas_opa) {
+    if (w <= 0 || h <= 0) {
+        return;
+    }
+    lv_draw_rect_dsc_t d;
+    lv_draw_rect_dsc_init(&d);
+    d.bg_opa = LV_OPA_COVER;
+    d.bg_grad.dir = LV_GRAD_DIR_VER;
+    d.bg_grad.stops_count = 2;
+    d.bg_grad.stops[0] = {couleur(haut), haut_opa, 0};
+    d.bg_grad.stops[1] = {couleur(bas), bas_opa, 255};
+    const lv_area_t zone = {x, y, x + w - 1, y + h - 1};
+    lv_draw_rect(pc.couche, &d, &zone);
+}
+
 inline void disque(const Pinceau &pc, int cx, int cy, int rayon, std::uint32_t rgb, std::uint8_t opa = LV_OPA_COVER) {
     rect(pc, cx - rayon, cy - rayon, 2 * rayon, 2 * rayon, LV_RADIUS_CIRCLE, rgb, opa);
 }
