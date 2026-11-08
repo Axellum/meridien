@@ -25,6 +25,7 @@
 #include "textes_principal.h"
 #include "ui_alertes.h"
 #include "ui_bonjour.h"
+#include "ui_details.h"
 #include "ui_principal.h"
 #include "ui_reglages.h"
 #include "ui_roue.h"
