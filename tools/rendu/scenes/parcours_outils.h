@@ -22,6 +22,8 @@ namespace parcours {
 
 inline ecran::HoteMemoire g_hote;
 inline int g_fermetures = 0; // combien de fois l'interface a rendu la main à l'écran principal
+inline int g_diagnostics =
+    0; // combien de fois la ligne « Diagnostic » de la page Appareil a demandé l'écran de diagnostic
 inline const char *g_nom = "";
 
 [[noreturn]] inline void echec(const char *quoi) {
@@ -362,6 +364,7 @@ inline void preparer(const banc::Contexte &ctx, const char *nom, Interface quoi,
     c.hauteur = ctx.hauteur;
     c.hote = &g_hote;
     c.fermer = fermer_interface;
+    c.ouvrir_diagnostic = [] { ++g_diagnostics; };
     if (quoi == Interface::Installation) {
         ecran::ui_installation_creer(c);
     } else {
