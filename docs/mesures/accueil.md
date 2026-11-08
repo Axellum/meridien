@@ -21,7 +21,7 @@ Compilé avec ESP-IDF 5.5.5, `CMAKE_BUILD_PARALLEL_LEVEL=4`, `idf.py size` (lu d
 | 7B | Flash utilisée | 2 822 748 o | 2 835 166 o | +12 418 o |
 | 7B | `meridien.bin` | 2 928 912 o | 2 941 664 o | +12 752 o |
 
-- **Objets LVGL : 10 avant, 10 après** (racine, six zones, bouton Réglages, pastille d'alerte, anneau tactile) : la zone du bandeau remplace celle des tuiles ; lu dans `ui_principal_cout()` (`main/ui_principal.cpp`).
+- **Objets LVGL : 10 avant, 10 après** (racine, six zones, bouton Réglages, pastille d'alerte, anneau tactile) : la zone du bandeau remplace celle des tuiles ; lu dans `ui_principal_cout()` (`main/ui_principal.cpp`). *Mise à jour du 08/11/2026 : le bouton Réglages a disparu au profit de la roue d'appui long (ADR-0021), l'accueil compte maintenant 9 objets, voir [roue.md](roue.md).*
 - **Polices TinyTTF : 7 avant, 6 après** (avant : 190, 124, 42, 34, 28, 23 et 19 px de référence ; après : 168, 54, 36, 32, 28 et 24). La plus grande police de la température passe de 124 à 54 px, celle de l'heure de 190 à 168 px : moins de glyphes en cache à la construction. **Non mesuré** sur carte.
 - **Mémoire du dessin** : `LV_OS_NONE` et une seule unité de dessin logicielle (`sdkconfig`, `CONFIG_LV_OS_NONE=y`, `CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=1`) : LVGL exécute chaque tâche de dessin au moment où elle est créée (`lv_draw_finalize_task_creation` puis `lv_draw_dispatch`, `src/draw/sw/lv_draw_sw.c`), elles ne s'empilent donc pas. Le dessin de l'accueil ne réserve rien de plus que des tableaux sur la pile (deux à sept points par courbe). C'est une lecture du code de LVGL 9.5.0 : **la RAM libre en marche n'est pas mesurée**.
 
@@ -41,7 +41,7 @@ LVGL 9.5.0, dessin logiciel, RGB565, clang. `.\tools\rendre.ps1 -Scene principal
 
 **Écarts avec l'esquisse retenue** (rendu du PC comparé aux PNG `accueil-1280`, `accueil-7b`, `etat-perime`, `etat-calme`) :
 
-1. Pas de pastille « Auto · Météo » (décision d'Axel) ; le bouton Réglages (rond sombre) reste au bout droit de la zone du lieu.
+1. Pas de pastille « Auto · Météo » (décision d'Axel) ; le bouton Réglages (rond sombre) reste au bout droit de la zone du lieu. *(Retiré depuis : les réglages s'ouvrent par la roue d'appui long, ADR-0021.)*
 2. La date porte l'année (« dimanche 8 novembre 2026 ») : c'est le format de l'appareil.
 3. Le libellé du temps est celui de la table du noyau (« Partiellement nuageux », pas « Éclaircies »).
 4. Les repères d'heure s'écrivent « 8h », pas « 08h » (format existant de l'appareil).

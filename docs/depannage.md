@@ -621,6 +621,44 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 `tools
 endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy compilation on the PC. Wait for the other session's build to end (the `build` lock of `verrous.py`), or, if you know what you are doing, `-Forcer`.
 
+#### The wheel's glass band is drawn on the wrong side of the hub
+
+**Symptom.** With the wheel open at the centre of the screen, the buttons sit below the hub but a dark blob appears above it, on nothing.
+
+**Cause.** The angles of `ecran::roue` (`Bouton::angle`) are documented as trigonometric (90 = up), which is true only when the buttons are **above** the hub: `disposer` computes `y = hub.y - r sin(angle)` then, but `y = hub.y + r sin(angle)` when `Roue::dessous` is true (angle 90 = down). The first version of `bande()` in `main/ui_roue.cpp` always converted with `360 - angle` for LVGL's clockwise arcs, so with `dessous` the arc was mirrored top to bottom.
+
+**Solution.** `bande()` uses the angle as is when `dessous`, `360 - angle` otherwise (`main/ui_roue.cpp`). The header comment of `roue_geometrie.hpp` (`Bouton::angle`) should say it; it was not changed in this lot (the geometry module stays as ADR-0017 left it).
+
+- **Seen on**: PC render (LVGL 9.5.0, clang 23.1.5), branch `claude/roue-lvgl-6352a9`, 2026-11-08; no board.
+- **Evidence**: the PNGs `roue-centre-1280x720` before (blob above the hub) and after (band under the buttons), looked at.
+- **Status**: resolved on the PC renders; not seen on a screen.
+
+
+#### GCC 14.2 stops with "internal compiler error: in gimple_add_tmp_var" on `g.second = roue::Anneau{};`
+
+**Symptom.** `idf.py build` (ESP-IDF 5.5.5, GCC 14.2.0) fails on `main/ui_roue.cpp` with `internal compiler error: in gimple_add_tmp_var, at gimplify.cc:802`, the caret under the `{}` of `g.second = roue::Anneau{};`. clang (the PC bench and the tests) compiles the same line without a word.
+
+**Cause.** `ecran::roue::Anneau` is an aggregate with default member initialisers and an array of eight `Bouton` (`roue_geometrie.hpp`); assigning a freshly value-initialised temporary of it to a member of a namespace-scope object makes this GCC build a temporary variable at a moment when it has no function to put it in. Not investigated further (no GCC bug report written).
+
+**Solution.** Assign a constant instead of a temporary: `const roue::Anneau ANNEAU_VIDE = {};` at the top of `main/ui_roue.cpp`, then `g.second = ANNEAU_VIDE;` (three places). Do not "simplify" it back.
+
+- **Seen on**: ESP-IDF 5.5.5, riscv32-esp-elf GCC 14.2.0 (`esp-14.2.0_20260121`), `-DBOARD=waveshare-7b`, branch `claude/roue-lvgl-6352a9`, 2026-11-08.
+- **Evidence**: the build log (`FAILED: esp-idf/main/CMakeFiles/__idf_main.dir/ui_roue.cpp.obj`), then both boards (`waveshare-7b` and `tab5`) compiled and linked after the change.
+- **Status**: resolved (both boards compile); the firmware has not been run on a board.
+
+
+#### `idf.py` ends with code 0 and builds nothing when started from Git Bash
+
+**Symptom.** `.\tools\idf.ps1 ... build` run from a script launched by the Bash tool (Git Bash) prints `MSys/Mingw is no longer supported ...` and ends at once with exit code 0, in about one second; `build/<board>/` stays empty. A "successful" exit code proves nothing here.
+
+**Cause.** Git Bash exports `MSYSTEM`; ESP-IDF's `idf.py` refuses to run in an MSYS shell and quits without an error code.
+
+**Solution.** Start the build from PowerShell (the `PowerShell` tool, or a console), never from a shell that inherits `MSYSTEM` (`AGENTS.md`: "PowerShell, never Git Bash"), and check for `Successfully created esp32p4 image` and the size of `meridien.bin`, not the exit code.
+
+- **Seen on**: Windows 11, ESP-IDF 5.5.5 through `tools/idf.ps1`, 2026-11-08; no board.
+- **Evidence**: the same script, run from PowerShell, compiled 1 742 steps and produced `meridien.bin`.
+- **Status**: understood; nothing to fix in the repository.
+
 ---
 
 ## Version Française
@@ -1243,3 +1281,41 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 `tools
 endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une seconde compilation lourde sur le PC. Attendre la fin de la compilation de l'autre session (verrou `build` de `verrous.py`) ou, en connaissance de cause, `-Forcer`.
+
+#### La bande de verre de la roue est dessinée du mauvais côté du moyeu
+
+**Symptôme.** La roue ouverte au centre de l'écran : les boutons sont sous le moyeu, mais une tache sombre apparaît au-dessus, sur rien.
+
+**Cause.** Les angles de `ecran::roue` (`Bouton::angle`) sont documentés « sens trigonométrique, 90 : en haut », ce qui n'est vrai que quand les boutons sont **au-dessus** du moyeu : `disposer` calcule alors `y = moyeu.y - r sin(angle)`, mais `y = moyeu.y + r sin(angle)` quand `Roue::dessous` est vrai (angle 90 : en bas). La première version de `bande()` dans `main/ui_roue.cpp` convertissait toujours par `360 - angle` pour les arcs de LVGL (sens horaire), donc avec `dessous` l'arc était en miroir haut-bas.
+
+**Solution.** `bande()` prend l'angle tel quel quand `dessous`, `360 - angle` sinon (`main/ui_roue.cpp`). Le commentaire de `roue_geometrie.hpp` (`Bouton::angle`) devrait le dire ; il n'a pas été changé dans ce lot (le module de géométrie reste tel que l'ADR-0017 l'a laissé).
+
+- **Vu sur** : rendu du PC (LVGL 9.5.0, clang 23.1.5), branche `claude/roue-lvgl-6352a9`, 08/11/2026 ; aucune carte.
+- **Preuve** : les PNG `roue-centre-1280x720` avant (tache au-dessus du moyeu) et après (bande sous les boutons), regardés.
+- **Statut** : résolu sur les rendus du PC ; pas vu sur un écran.
+
+
+#### GCC 14.2 plante (« internal compiler error: in gimple_add_tmp_var ») sur `g.second = roue::Anneau{};`
+
+**Symptôme.** `idf.py build` (ESP-IDF 5.5.5, GCC 14.2.0) échoue sur `main/ui_roue.cpp` avec `internal compiler error: in gimple_add_tmp_var, at gimplify.cc:802`, le curseur sous les `{}` de `g.second = roue::Anneau{};`. clang (le banc du PC et les tests) compile la même ligne sans rien dire.
+
+**Cause.** `ecran::roue::Anneau` est un agrégat à valeurs par défaut avec un tableau de huit `Bouton` (`roue_geometrie.hpp`) ; affecter à un membre d'un objet de portée de namespace un temporaire fraîchement initialisé fait poser à ce GCC une variable temporaire à un moment où il n'a pas de fonction pour la loger. Pas creusé plus loin (aucun rapport de bogue GCC écrit).
+
+**Solution.** Affecter une constante plutôt qu'un temporaire : `const roue::Anneau ANNEAU_VIDE = {};` en tête de `main/ui_roue.cpp`, puis `g.second = ANNEAU_VIDE;` (trois endroits). Ne pas le « simplifier » en sens inverse.
+
+- **Vu sur** : ESP-IDF 5.5.5, riscv32-esp-elf GCC 14.2.0 (`esp-14.2.0_20260121`), `-DBOARD=waveshare-7b`, branche `claude/roue-lvgl-6352a9`, 08/11/2026.
+- **Preuve** : le journal du build (`FAILED: esp-idf/main/CMakeFiles/__idf_main.dir/ui_roue.cpp.obj`), puis les deux cartes (`waveshare-7b` et `tab5`) compilées et liées après le changement.
+- **Statut** : résolu (les deux cartes compilent) ; le firmware n'a pas été lancé sur une carte.
+
+
+#### `idf.py` finit avec le code 0 sans rien compiler quand il est lancé depuis Git Bash
+
+**Symptôme.** `.\tools\idf.ps1 ... build` lancé depuis un script démarré par l'outil Bash (Git Bash) affiche `MSys/Mingw is no longer supported ...` et se termine aussitôt avec le code 0, en environ une seconde ; `build/<carte>/` reste vide. Un code de sortie « réussi » ne prouve rien ici.
+
+**Cause.** Git Bash exporte `MSYSTEM` ; l'`idf.py` d'ESP-IDF refuse de tourner dans un shell MSYS et s'arrête sans code d'erreur.
+
+**Solution.** Lancer la compilation depuis PowerShell (l'outil `PowerShell`, ou une console), jamais depuis un shell qui hérite de `MSYSTEM` (`AGENTS.md` : « PowerShell, jamais Git Bash »), et chercher `Successfully created esp32p4 image` et la taille de `meridien.bin`, pas le code de sortie.
+
+- **Vu sur** : Windows 11, ESP-IDF 5.5.5 par `tools/idf.ps1`, 08/11/2026 ; aucune carte.
+- **Preuve** : le même script, lancé depuis PowerShell, a compilé 1 742 étapes et produit `meridien.bin`.
+- **Statut** : compris ; rien à corriger dans le dépôt.
