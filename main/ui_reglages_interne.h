@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <new>
 #include <string_view>
 
 #include "lvgl.h"
@@ -83,6 +84,7 @@ enum class TypeEcran : uint8_t {
     ConnexionWifi,  // essai de connexion avec compte à rebours
     RechercheVille, // saisie + résultats
     ListeSource,    // les sources de la météo proposées pour le pays de la ville (ADR-0010)
+    RechercheSpot,  // « Ajouter un spot » : la liste de Vigie, lue par l'appareil, et une recherche dedans (ADR-0026)
     Etape,          // une étape de l'installation guidée ; a = numéro de l'étape
 };
 
@@ -122,6 +124,46 @@ void ajouter_timer(lv_obj_t *ecran, void (*cb)(lv_timer_t *), uint32_t periode_m
 void rangee_pour(lv_obj_t *parent, const registre::Reglage &r, const registre::Rangee &rangee);
 void rangee_action_ou_info(lv_obj_t *parent, std::string_view id);
 void construire_page(lv_obj_t *corps, const registre::Page &page);
+
+// Briques de page partagées avec ui_reglages_mer.cpp (définies dans ui_reglages.cpp).
+lv_obj_t *creer_carte(lv_obj_t *parent); // fond de surface, colonne
+// Une rangée-bouton : le titre à gauche, la valeur (facultative) à droite. `cb` nul : la rangée ne répond pas au toucher.
+lv_obj_t *creer_rangee_bouton(lv_obj_t *parent, const char *titre, const char *valeur, lv_event_cb_t cb, void *donnee);
+bool est_le_dessus(lv_timer_t *t); // le minuteur appartient à l'écran du dessus de la pile
+// Fait de `champ` le champ de saisie de l'éditeur affiché (rendu PC et essais : ui_simuler_saisie) ; l'oublie à sa suppression.
+void champ_actuel_definir(lv_obj_t *champ);
+
+// ---- la mer (ui_reglages_mer.cpp, ADR-0026) ----------------------------------------------------------------------------------
+// Les trois rangées de la page « La mer » : info.mer_spots, action.mer_ajouter, info.mer_vent.
+void rangee_mer_spots(lv_obj_t *parent);
+void rangee_mer_ajouter(lv_obj_t *parent);
+void rangee_mer_vent(lv_obj_t *parent);
+lv_obj_t *construire_recherche_spot(Entree &e);
+
+// Un gros objet (le registre des spots : 2,3 Ko ; la liste de Vigie : 16,6 Ko) hors de la pile de LVGL. lv_malloc range tout en PSRAM
+// d'abord (main/lvgl_memoire.cpp) : la mémoire interne, trop juste, n'est pas touchée. `ok()` faux : la place a manqué.
+template <typename T> class Gros {
+  public:
+    Gros() {
+        void *m = lv_malloc(sizeof(T));
+        p_ = m != nullptr ? new (m) T() : nullptr;
+    }
+    ~Gros() {
+        if (p_ != nullptr) {
+            p_->~T();
+            lv_free(p_);
+        }
+    }
+    Gros(const Gros &) = delete;
+    Gros &operator=(const Gros &) = delete;
+    bool ok() const { return p_ != nullptr; }
+    T &operator*() const { return *p_; }
+    T *operator->() const { return p_; }
+    T *get() const { return p_; }
+
+  private:
+    T *p_;
+};
 
 // Résumé d'une valeur pour la rangée d'un réglage (texte de l'option choisie, nombre + unité, texte, « •••••»).
 void resume_reglage(const registre::Reglage &r, char *sortie, std::size_t capacite);

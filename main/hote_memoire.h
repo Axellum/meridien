@@ -36,6 +36,15 @@ class HoteMemoire final : public HoteReglages {
     int redemarrages = 0; // combien de fois l'écran a demandé un redémarrage / une réinitialisation (essais)
     int reinitialisations = 0;
 
+    // ---- la mer (ADR-0026) : le registre des spots et la liste de Vigie, inventés pour le rendu et les essais
+    mer::Registre registre_mer;    // les spots gardés (vide au départ) et la plage de vent
+    mer::liste::Liste liste_vigie; // ce que « Ajouter un spot » trouve chez Vigie
+    ListeMer issue_liste_mer =
+        ListeMer::Terminee;            // comment finit la prochaine lecture : Terminee, Vide, SansConnexion ou Echec
+    bool liste_mer_instantanee = true; // faux : la lecture dure 1,2 s (on voit « Lecture de la liste… »)
+    int listes_mer_demandees = 0;      // combien de lectures l'écran a demandées (essais)
+    int registres_mer_enregistres = 0; // combien de fois l'écran a enregistré le registre (essais)
+
     // ---- HoteReglages
     int32_t nombre(std::string_view id) override;
     void definir_nombre(std::string_view id, int32_t valeur) override;
@@ -59,6 +68,12 @@ class HoteMemoire final : public HoteReglages {
     ApercuMeteo meteo_apercu() override;
     meteo::fournisseurs::Liste sources_meteo() override;
     bool source_meteo_retablie() override { return source_retablie; }
+
+    bool mer_registre(mer::Registre &sortie) override;
+    bool mer_enregistrer(const mer::Registre &nouveau) override;
+    void mer_liste_demander() override;
+    ListeMer mer_liste_etat() override;
+    bool mer_liste_copier(mer::liste::Liste &sortie) override;
 
     void tester_service(std::string_view service) override;
     ResultatTest resultat_test(std::string_view service) override;
@@ -89,6 +104,8 @@ class HoteMemoire final : public HoteReglages {
     InfoWifi wifi_;
     RechercheLieu recherche_lieu_ = RechercheLieu::Inactive;
     std::vector<std::string> trouves_;
+    int64_t liste_mer_debut_ms_ = -1;
+    ListeMer liste_mer_etat_ = ListeMer::Inactive;
     int64_t test_debut_ms_[3] = {-1, -1, -1};
     EtatTest test_etat_[3] = {EtatTest::Inactif, EtatTest::Inactif, EtatTest::Inactif};
     installation::Progression progression_;

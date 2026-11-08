@@ -37,8 +37,9 @@ void ui_installation_creer(const ContexteReglages &ctx);
 // Ouvre un écran précis (essais et rendu PC ; l'appareil n'en a pas besoin). Un chemin = une base, puis éventuellement « / » et un
 // écran ouvert par-dessus :
 //   bases : « liste », « section:<n>[:<onglet>] » (n = 0 à 5), « etape:<n> » (installation, n = 1 à 7) ;
-//   par-dessus : « wifi », « wifi-mdp:<ssid> », « connexion:<ssid>[:<mot de passe>] », « ville », « editeur:<identifiant du réglage> ».
-// Exemples : « section:4:1 », « etape:2/wifi », « section:0/connexion:Maison:secret123 ».
+//   par-dessus : « wifi », « wifi-mdp:<ssid> », « connexion:<ssid>[:<mot de passe>] », « ville », « spot » (ajouter un spot de mer :
+//   la liste de Vigie et sa recherche), « editeur:<identifiant du réglage> ».
+// Exemples : « section:4:1 », « etape:2/wifi », « section:0/connexion:Maison:secret123 », « section:1:2/spot ».
 void ui_aller(const char *chemin);
 
 // Comme si la personne venait de toucher sa langue à la première étape (« Continuer » devient possible). Rendu PC et essais.

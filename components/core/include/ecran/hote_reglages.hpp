@@ -19,6 +19,8 @@
 #include "ecran/changement_wifi.hpp"
 #include "ecran/fournisseurs_meteo.hpp"
 #include "ecran/installation.hpp"
+#include "ecran/mer_liste.hpp"
+#include "ecran/mer_spots.hpp"
 
 namespace ecran {
 
@@ -60,6 +62,13 @@ struct ApercuMeteo {
     // service lu directement n'a pas répondu et que la météo vient d'Open-Meteo en attendant (ADR-0014).
     meteo::fournisseurs::Famille origine = meteo::fournisseurs::Famille::OpenMeteo;
 };
+
+// ---- la mer ----------------------------------------------------------------------------------------------------------------
+
+// La lecture de la liste des spots de Vigie par l'appareil (ADR-0026). `Terminee` : la liste est prête (`mer_liste_copier`) ; `Vide` :
+// Vigie a répondu mais sans aucun spot utilisable ; `SansConnexion` : pas de réseau, ou Vigie injoignable ; `Echec` : Vigie a répondu
+// autre chose qu'une liste (refus, réponse trop grande ou illisible).
+enum class ListeMer : uint8_t { Inactive, EnCours, Terminee, Vide, SansConnexion, Echec };
 
 // ---- services et appareil -------------------------------------------------------------------------------------------------
 
@@ -114,6 +123,18 @@ class HoteReglages {
     // Vrai quand le dernier changement de ville a remis « Automatique » parce que l'ancienne source ne couvre pas le nouveau pays :
     // l'écran le dit en une phrase (jamais de retour muet). Retombe à faux dès que la source est choisie ou que la ville change encore.
     virtual bool source_meteo_retablie() = 0;
+
+    // ---- la mer (ADR-0026) : le registre des spots de l'écran « Mer », le même que celui de la page web (ADR-0019, ADR-0025)
+    // Copie le registre courant dans `sortie` (≈ 2,3 Ko : à la charge de l'appelant). Faux, `sortie` inchangée, s'il n'est pas lisible.
+    virtual bool mer_registre(mer::Registre &sortie) = 0;
+    // Valide, garde puis réveille le client réseau. Faux, rien de changé, si le registre est refusé (mer::registre_valide) ou si
+    // l'écriture échoue.
+    virtual bool mer_enregistrer(const mer::Registre &nouveau) = 0;
+    // Lance la lecture de la liste de Vigie (asynchrone, hors de la tâche de l'interface). Sans effet si une lecture est en cours.
+    virtual void mer_liste_demander() = 0;
+    virtual ListeMer mer_liste_etat() = 0;
+    // Copie la liste lue dans `sortie` (≈ 16,6 Ko : à la charge de l'appelant, en PSRAM). Faux tant que l'état n'est pas `Terminee`.
+    virtual bool mer_liste_copier(mer::liste::Liste &sortie) = 0;
 
     // ---- appareil
     virtual void tester_service(std::string_view service) = 0; // « stt », « llm » ou « tts »

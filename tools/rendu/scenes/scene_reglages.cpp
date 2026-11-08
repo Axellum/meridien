@@ -3,7 +3,7 @@
 // de la météo. L'installation guidée a sa propre scène (scene_installation.cpp) ; les gestes rejoués sont dans scene_parcours.cpp.
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
+// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_reglages_mer.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
 // rendu-langues: toutes
 // rendu-langues-defaut: fr de tr
 // rendu-tailles: 1280x720 720x1280 1024x600
@@ -210,6 +210,86 @@ void appareil(const banc::Contexte &ctx) {
     aller("section:5");
 }
 
+// La mer (ADR-0026). Fixtures INVENTÉES (parcours_outils.h) : seize spots chez « Vigie », trois gardés par l'appareil, le deuxième affiché.
+void mer_vide(const banc::Contexte &ctx) {
+    en_service(ctx);
+    mer_liste_fictive();
+    aller("section:1:2");
+}
+
+void mer_spots(const banc::Contexte &ctx) {
+    en_service(ctx);
+    mer_liste_fictive();
+    mer_spots_gardes(3, 1);
+    aller("section:1:2");
+}
+
+void mer_pleine(const banc::Contexte &ctx) {
+    en_service(ctx);
+    mer_liste_fictive();
+    mer_spots_gardes(12, 0); // le registre est plein : « Ajouter un spot » est grisé et dit pourquoi
+    aller("section:1:2");
+}
+
+void mer_vent_bornes(const banc::Contexte &ctx) {
+    en_service(ctx);
+    mer_liste_fictive();
+    mer_spots_gardes(1, 0);
+    g_hote.registre_mer.vent_min_kn = 1; // « − » du minimum grisé
+    g_hote.registre_mer.vent_max_kn = 2; // « + » du minimum grisé (il toucherait le maximum)
+    aller("section:1:2");
+}
+
+void mer_ajouter(const banc::Contexte &ctx) {
+    en_service(ctx);
+    mer_liste_fictive();
+    mer_spots_gardes(3, 1); // les trois premiers sont déjà gardés : grisés, « Déjà ajouté »
+    aller("section:1:2/spot");
+}
+
+void mer_ajouter_recherche(const banc::Contexte &ctx) {
+    en_service(ctx);
+    mer_liste_fictive();
+    mer_spots_gardes(3, 1);
+    aller("section:1:2/spot");
+    ecran::ui_simuler_saisie("etoile", true); // sans accent : « Anse de l’Étoile » doit sortir
+    tourner();
+}
+
+void mer_ajouter_aucun(const banc::Contexte &ctx) {
+    en_service(ctx);
+    mer_liste_fictive();
+    mer_spots_gardes(3, 1);
+    aller("section:1:2/spot");
+    ecran::ui_simuler_saisie("zzzz", true);
+    tourner();
+}
+
+void mer_ajouter_chargement(const banc::Contexte &ctx) {
+    en_service(ctx);
+    mer_liste_fictive();
+    g_hote.liste_mer_instantanee = false; // la lecture dure 1,2 s : on voit « Chargement de la liste des spots… »
+    aller("section:1:2/spot");
+}
+
+void mer_ajouter_sans_connexion(const banc::Contexte &ctx) {
+    en_service(ctx);
+    g_hote.issue_liste_mer = ecran::ListeMer::SansConnexion;
+    aller("section:1:2/spot");
+}
+
+void mer_ajouter_echec(const banc::Contexte &ctx) {
+    en_service(ctx);
+    g_hote.issue_liste_mer = ecran::ListeMer::Echec;
+    aller("section:1:2/spot");
+}
+
+void mer_ajouter_vide(const banc::Contexte &ctx) {
+    en_service(ctx);
+    g_hote.issue_liste_mer = ecran::ListeMer::Vide;
+    aller("section:1:2/spot");
+}
+
 } // namespace
 
 namespace banc {
@@ -224,6 +304,17 @@ const Scene kScenes[] = {
     {"lieu-vide", "Lieu et météo : pas de ville", lieu_vide},
     {"lieu-alertes", "Lieu et météo : alertes officielles (Vigie)", lieu_alertes},
     {"alertes-adresse-saisie", "Alertes officielles : saisie de l'adresse de Vigie", alertes_adresse_saisie},
+    {"mer-vide", "La mer : aucun spot gardé", mer_vide},
+    {"mer-spots", "La mer : trois spots gardés, le deuxième affiché, plage de vent", mer_spots},
+    {"mer-pleine", "La mer : douze spots gardés, « Ajouter un spot » grisé", mer_pleine},
+    {"mer-vent-bornes", "La mer : plage de vent aux limites, boutons grisés", mer_vent_bornes},
+    {"mer-ajouter", "Ajouter un spot : la liste de Vigie, les spots gardés grisés", mer_ajouter},
+    {"mer-ajouter-recherche", "Ajouter un spot : « etoile » trouve « Anse de l’Étoile »", mer_ajouter_recherche},
+    {"mer-ajouter-aucun", "Ajouter un spot : aucun spot ne correspond", mer_ajouter_aucun},
+    {"mer-ajouter-chargement", "Ajouter un spot : lecture de la liste en cours", mer_ajouter_chargement},
+    {"mer-ajouter-sans-connexion", "Ajouter un spot : pas de connexion, « Réessayer »", mer_ajouter_sans_connexion},
+    {"mer-ajouter-echec", "Ajouter un spot : Vigie n'a pas donné de liste", mer_ajouter_echec},
+    {"mer-ajouter-vide", "Ajouter un spot : Vigie ne propose aucun spot", mer_ajouter_vide},
     {"source-liste", "Source météo : liste proposée à Lyon", source_liste},
     {"source-liste-pays-bas", "Source météo : liste proposée à Amsterdam, KNMI choisi", source_liste_pays_bas},
     {"lieu-source-choisie", "Lieu et météo : un modèle national choisi, attribution", lieu_source_choisie},

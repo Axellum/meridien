@@ -144,6 +144,15 @@ MUTATIONS_REGLAGES_ECRAN = [
      "les_titres_de_section_sont_des_cles_de_traduction", "les titres de sections sont dans le désordre"),
     (HPP_ECRANS, 'detail::page("assistant_tts", Section::AssistantVocal,', 'detail::page("assistant_tts", Section::Appareil,', REGISTRE,
      "chaque_section_a_une_page_et_les_pages_suivent_l_ordre_des_sections", "la page de la voix est rangée dans la section de l'appareil"),
+    # --- la page « La mer » (ADR-0026) : trois rangées, dessinées par main/ui_reglages_mer.cpp ---
+    (HPP_ECRANS, 'detail::page("mer", Section::LieuMeteo, "La mer", detail::RANGEES_MER),',
+     'detail::page("mer", Section::Appareil, "La mer", detail::RANGEES_MER),', REGISTRE,
+     "chaque_section_a_une_page_et_les_pages_suivent_l_ordre_des_sections", "la page de la mer est rangée dans la section de l'appareil"),
+    (HPP_ECRANS, '    {Genre::Info, "info.mer_vent", Editeur::Aucun, true},\n', "", REGISTRE,
+     "les_actions_et_les_informations_sont_toutes_sur_une_page", "la plage de vent n'a plus de rangée : le réglage de la mer n'est plus sur l'écran"),
+    (HPP_ECRANS, '{Genre::Action, "action.mer_ajouter", Editeur::Aucun, true},', '{Genre::Info, "action.mer_ajouter", Editeur::Aucun, true},',
+     REGISTRE, "chaque_rangee_reglage_designe_un_reglage_du_registre_et_un_editeur_qui_convient",
+     "« Ajouter un spot » est déclaré comme une information : son genre ne correspond plus à son identifiant"),
     (HPP_ECRANS, '    {Genre::Info, "info.version", Editeur::Aucun, true},\n',
      '    {Genre::Info, "info.version", Editeur::Aucun, true},\n    {Genre::Info, "info.version", Editeur::Aucun, true},\n'
      '    {Genre::Info, "info.version", Editeur::Aucun, true},\n    {Genre::Info, "info.version", Editeur::Aucun, true},\n',

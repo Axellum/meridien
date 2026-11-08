@@ -67,10 +67,11 @@ constexpr ChampApi CONTRAT_API[] = {
 // Rangées d'écran sans réglage (actions et informations) que l'écran sait dessiner : copie de la liste de ui_reglages.cpp
 // (controle_reglages.py compare les deux).
 constexpr std::string_view ACTIONS_ET_INFOS[] = {
-    "info.wifi",         "info.meteo",           "info.telephone",
-    "info.version",      "action.tester_stt",    "action.tester_llm",
-    "action.tester_tts", "action.diagnostic",    "action.refaire_installation",
-    "action.redemarrer", "action.reinitialiser",
+    "info.wifi",          "info.meteo",           "info.telephone",
+    "info.version",       "action.tester_stt",    "action.tester_llm",
+    "action.tester_tts",  "action.diagnostic",    "action.refaire_installation",
+    "action.redemarrer",  "action.reinitialiser", "info.mer_spots",
+    "action.mer_ajouter", "info.mer_vent",
 };
 
 constexpr bool est_une_action_connue(std::string_view id) {
@@ -415,9 +416,10 @@ constexpr int chaque_section_a_une_page_et_les_pages_suivent_l_ordre_des_section
     VERIFIER(PAGES[page_de_section(Section::Reseau, 0)].id == "reseau" &&
              page_de_section(Section::Reseau, 1) == NOMBRE_PAGES);
     VERIFIER(PAGES[page_de_section(Section::Appareil, 0)].id == "appareil");
-    VERIFIER(pages_de_section(Section::LieuMeteo) == 2); // la ville, puis les alertes
+    VERIFIER(pages_de_section(Section::LieuMeteo) == 3); // la ville, les alertes, puis la mer
     VERIFIER(PAGES[page_de_section(Section::LieuMeteo, 0)].id == "lieu" &&
-             PAGES[page_de_section(Section::LieuMeteo, 1)].id == "alertes");
+             PAGES[page_de_section(Section::LieuMeteo, 1)].id == "alertes" &&
+             PAGES[page_de_section(Section::LieuMeteo, 2)].id == "mer");
     for (std::size_t p = 1; p < NOMBRE_PAGES; ++p)
         VERIFIER(static_cast<int>(PAGES[p - 1].section) <= static_cast<int>(PAGES[p].section));
     for (std::size_t p = 0; p < NOMBRE_PAGES; ++p) {
