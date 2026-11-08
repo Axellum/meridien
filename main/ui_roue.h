@@ -94,7 +94,7 @@ bool ui_roue_position(PositionRoue *position);
 bool ui_roue_centre_choix(int rang, int32_t *x, int32_t *y);
 
 // Ce que la roue coûte : objets LVGL vivants (0 fermée, 1 ouverte), minuteurs, polices gardées, et la RAM statique de son état en
-// octets (sizeof de l'état : 2 192 sur le PC, 1 436 sur la carte RISC-V 32 bits, pointeurs de 4 octets ; les polices TinyTTF et leurs glyphes sont en PSRAM, non comptés ici).
+// octets (sizeof de l'état : 2 576 sur le PC, 1 628 sur la carte RISC-V 32 bits, pointeurs de 4 octets, depuis `ChoixRoue::actif` ; les polices TinyTTF et leurs glyphes sont en PSRAM, non comptés ici).
 struct CoutRoue {
     int objets;
     int minuteurs;

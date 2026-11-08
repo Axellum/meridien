@@ -656,7 +656,7 @@ endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy
 
 #### « Hava durumu » is cut at the edge when the wheel opens in the bottom-right corner of a portrait screen
 
-**Symptom.** In Turkish, at 720×1280, with a finger at about 95 % × 93 % of the screen and the « Alertes » button present (four buttons), the second ring of « Profil ▸ » does not fit: the word « Hava durumu » (Weather) is cut by the right edge, and the bench journal says “NE TIENT PAS”. The other six languages and the sizes of the two boards (1280×720, 1024×600) fit in the same variant.
+**Symptom.** In Turkish, at 720×1280, with a finger at about 95 % × 93 % of the screen and the « Alertes » button present (four buttons), the second ring of « Profil ▸ » does not fit: the word « Hava durumu » (Weather) is cut by the right edge, and the bench journal says “NE TIENT PAS”. The other six languages and the sizes of the two boards (1280×720, 1024×600) fit in the same variant. With five buttons (an alert and a sea spot, variant `roue-profil-complet-coin`) the Turkish 720×1280 corner does not fit either (same journal line); on the two boards, five buttons fit at the centre and in the bottom-right corner.
 
 **Cause.** The geometry reserves the width of the longest choice word (`mot_choix`), but at that corner no placement leaves enough room for that word. Read in the bench journal; the geometry was not explored further.
 
@@ -1347,7 +1347,7 @@ endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une s
 
 #### « Hava durumu » est coupé au bord quand la roue s'ouvre dans le coin bas droit d'un écran en portrait
 
-**Symptôme.** En turc, à 720×1280, avec un doigt vers 95 % × 93 % de l'écran et le bouton « Alertes » présent (quatre boutons), le second anneau de « Profil ▸ » ne tient pas : le mot « Hava durumu » (Météo) est coupé par le bord droit, et le journal du banc dit « NE TIENT PAS ». Les six autres langues et les tailles des deux cartes (1280×720, 1024×600) tiennent dans la même variante.
+**Symptôme.** En turc, à 720×1280, avec un doigt vers 95 % × 93 % de l'écran et le bouton « Alertes » présent (quatre boutons), le second anneau de « Profil ▸ » ne tient pas : le mot « Hava durumu » (Météo) est coupé par le bord droit, et le journal du banc dit « NE TIENT PAS ». Les six autres langues et les tailles des deux cartes (1280×720, 1024×600) tiennent dans la même variante. Avec cinq boutons (une alerte et un spot de mer, variante `roue-profil-complet-coin`) le coin turc en 720×1280 ne tient pas non plus (même ligne du journal) ; sur les deux cartes, cinq boutons tiennent au centre et dans le coin bas droit.
 
 **Cause.** La géométrie réserve la largeur du plus long mot des choix (`mot_choix`), mais dans ce coin aucune disposition ne laisse assez de place à ce mot. Lue dans le journal du banc ; la géométrie n'a pas été explorée davantage.
 
