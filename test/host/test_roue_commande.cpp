@@ -1,4 +1,4 @@
-// Tests du noyau pur : ce que la roue d'appui long décide sans dessiner (roue_commande.hpp, ADR-0019) : l'écran de la roue d'après la
+// Tests du noyau pur : ce que la roue d'appui long décide sans dessiner (roue_commande.hpp, ADR-0021) : l'écran de la roue d'après la
 // taille de l'écran, la demande faite à la géométrie, le dépliement d'une famille (la roue reposée quand son second anneau ne tient
 // pas) et la décision d'un toucher. La géométrie elle-même est testée dans test_roue_geometrie.cpp et test_roue_balayage.cpp ; ici
 // elle sert de règle : les invariants vérifiés (dans l'écran, sans recouvrement) sont réécrits à part, ils ne passent pas par
@@ -119,7 +119,7 @@ constexpr int la_demande_borne_le_nombre_de_boutons_et_accepte_rien() {
 }
 
 constexpr int le_reglage_retenu_n_exige_que_le_premier_anneau() {
-    // ADR-0019 : la valeur retenue pour l'essai sur la carte. Si Axel tranche autrement, ce test et la constante changent ensemble.
+    // ADR-0021 : la valeur retenue pour l'essai sur la carte. Si Axel tranche autrement, ce test et la constante changent ensemble.
     VERIFIER(EXIGENCE_A_L_OUVERTURE == Exigence::PremierAnneauSeul);
     VERIFIER(GLISSEMENT_PX == 24 && INACTIVITE_MS == 15000);
     return 0;

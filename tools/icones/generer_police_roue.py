@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Génère la police d'icônes de la roue d'appui long : un SOUS-ENSEMBLE de Material Design Icons (ADR-0019), seulement les glyphes
+"""Génère la police d'icônes de la roue d'appui long : un SOUS-ENSEMBLE de Material Design Icons (ADR-0021), seulement les glyphes
 listés dans `tools/icones/roue_glyphes.json`.
 
     python tools/icones/generer_police_roue.py --source <materialdesignicons-webfont.ttf>   # écrit la police, le .inc et le manifeste

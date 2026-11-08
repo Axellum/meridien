@@ -109,7 +109,7 @@ void wifi_retour_arriere(const banc::Contexte &ctx) {
     exiger(existe("L’ancien réseau est conservé."), "l'écran dit que l'ancien réseau est conservé");
 }
 
-// Le diagnostic n'a plus de bouton ni de geste sur l'écran principal (ADR-0019) : il s'ouvre par Réglages > Appareil > Diagnostic.
+// Le diagnostic n'a plus de bouton ni de geste sur l'écran principal (ADR-0021) : il s'ouvre par Réglages > Appareil > Diagnostic.
 // Ce parcours vérifie que la ligne est là, qu'elle se touche et qu'elle demande l'écran de diagnostic.
 void diagnostic_depuis_les_reglages(const banc::Contexte &ctx) {
     preparer(ctx, "diagnostic-depuis-les-reglages", Interface::Reglages);

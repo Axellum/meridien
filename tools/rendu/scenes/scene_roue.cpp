@@ -1,4 +1,4 @@
-// Scène « roue » : la roue d'appui long (main/ui_roue.cpp, ADR-0019) ouverte par-dessus l'écran principal (main/ui_principal.cpp), tous
+// Scène « roue » : la roue d'appui long (main/ui_roue.cpp, ADR-0021) ouverte par-dessus l'écran principal (main/ui_principal.cpp), tous
 // deux compilés tels quels. Le premier anneau porte « Réglages » et « Alertes » comme sur l'appareil ; les variantes « famille-* »
 // ajoutent une entrée de DÉMONSTRATION qui déplie un second anneau (choix inventés, glyphes d'emprunt : le firmware n'a pas encore de
 // famille). La roue s'ouvre à un point de l'écran, exprimé en millièmes de la largeur et de la hauteur : le centre, près d'un coin,

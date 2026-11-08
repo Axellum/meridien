@@ -1,4 +1,4 @@
-// Noyau pur : ce qui se décide dans la roue d'appui long SANS dessiner (ADR-0019). Entre la géométrie (roue_geometrie.hpp : où est
+// Noyau pur : ce qui se décide dans la roue d'appui long SANS dessiner (ADR-0021). Entre la géométrie (roue_geometrie.hpp : où est
 // quoi) et l'interface (main/ui_roue.cpp : les objets LVGL), trois choses se calculent en nombres et se testent sur le PC :
 //   1. l'écran de la roue d'après la taille de l'écran réel (échelle de la 7B, du Tab5) ;
 //   2. la demande faite à `ouvrir` d'après les entrées de la roue, et ce qu'on exige à l'ouverture du second anneau d'une famille

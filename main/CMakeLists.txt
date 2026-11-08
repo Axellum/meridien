@@ -40,7 +40,7 @@ target_sources(${COMPONENT_LIB} PRIVATE "vigie_etat.cpp" "vigie_client.cpp" "reg
 # police, mais par target_add_binary_data() et non par EMBED_FILES : la ligne idf_component_register ci-dessus reste celle que
 # les autres sessions modifient. Symboles : _binary_icones_meteo_bin_start / _end (lus par ui_meteo_icones.cpp).
 target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_LIST_DIR}/assets/icones_meteo.bin" BINARY)
-# La roue d'appui long (ADR-0019) : ui_roue.cpp (LVGL pur, rendu aussi sur le PC) et son sous-ensemble de la police d'icônes Material
+# La roue d'appui long (ADR-0021) : ui_roue.cpp (LVGL pur, rendu aussi sur le PC) et son sous-ensemble de la police d'icônes Material
 # Design Icons (tools/icones/generer_police_roue.py -> main/assets/mdi_roue.ttf, 3 glyphes). Symboles : _binary_mdi_roue_ttf_start / _end.
 target_sources(${COMPONENT_LIB} PRIVATE "ui_roue.cpp")
 target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_LIST_DIR}/assets/mdi_roue.ttf" BINARY)

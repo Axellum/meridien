@@ -1,4 +1,4 @@
-// La roue d'appui long : l'interface LVGL (ADR-0019). Voir ui_roue.h. Rien n'est calculé ici : la géométrie vient de roue_geometrie.hpp,
+// La roue d'appui long : l'interface LVGL (ADR-0021). Voir ui_roue.h. Rien n'est calculé ici : la géométrie vient de roue_geometrie.hpp,
 // ce qu'un toucher décide de roue_commande.hpp ; ce fichier les branche sur LVGL (un objet, un minuteur, des polices) et dessine.
 #include "ui_roue.h"
 

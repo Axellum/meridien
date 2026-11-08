@@ -23,7 +23,7 @@
 // Écran principal. Chaque ZONE est un seul objet LVGL qui dessine tout son contenu dans l'événement LV_EVENT_DRAW_MAIN : six zones, la
 // pastille de l'alerte officielle et l'anneau tactile, au lieu d'une centaine d'étiquettes. Un objet LVGL coûte de la RAM interne (le
 // point étroit de cette carte), une tâche de dessin non. Les réglages ne sont plus un bouton de cet écran : un appui long ouvre la roue
-// (ui_roue.cpp, ADR-0019), dont « Réglages » est une entrée.
+// (ui_roue.cpp, ADR-0021), dont « Réglages » est une entrée.
 //
 //   accueil (thèmes « ciel », « tableau sombre », « clair »), paysage 1280 x 720
 //   +-- lieu -------------------+--------------------------+

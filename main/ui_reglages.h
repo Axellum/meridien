@@ -57,7 +57,7 @@ void ui_reglages_liberer();
 
 } // namespace ecran
 
-// Appelé par la roue d'appui long de l'écran principal (entrée « Réglages », ADR-0019) : ouvre la liste des réglages sur un écran à part, l'écran principal reste
+// Appelé par la roue d'appui long de l'écran principal (entrée « Réglages », ADR-0021) : ouvre la liste des réglages sur un écran à part, l'écran principal reste
 // dessous, intact. Défini dans ui_reglages_ouvrir.cpp (colle du firmware : afficheur de la carte, hôte, police), jamais compilé
 // par le rendu PC. À appeler dans la tâche LVGL, verrou pris.
 void ui_reglages_ouvrir();

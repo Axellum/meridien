@@ -1,4 +1,4 @@
-// La roue d'appui long (ADR-0019) : un appui long sur l'écran principal l'ouvre AU POINT D'APPUI. Le premier anneau porte les entrées
+// La roue d'appui long (ADR-0021) : un appui long sur l'écran principal l'ouvre AU POINT D'APPUI. Le premier anneau porte les entrées
 // que l'appelant donne (aujourd'hui « Réglages » et, quand une alerte est en vigueur, « Alertes »), le moyeu au centre dit « Aller à »
 // (ou le nom de la famille dépliée), le second anneau montre les choix d'une famille.
 //

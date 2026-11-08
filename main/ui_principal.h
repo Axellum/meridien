@@ -71,7 +71,7 @@ bool ui_principal_changer_theme(const visuel::ThemePrincipal &theme);
 
 // Appui long (400 ms) sur l'écran : `rappel(x, y)` est appelé dans la tâche LVGL, avec le point où le doigt est (pixels de l'écran).
 // Un doigt qui a glissé de plus que le seuil de glissement depuis qu'il s'est posé n'est pas un appui long : rien n'est appelé.
-// nullptr : rien. Sert à ouvrir la roue (ui_roue.h, ADR-0019), d'où l'on atteint les réglages : il n'y a plus de bouton « Réglages »
+// nullptr : rien. Sert à ouvrir la roue (ui_roue.h, ADR-0021), d'où l'on atteint les réglages : il n'y a plus de bouton « Réglages »
 // sur cet écran.
 void ui_principal_sur_appui_long(void (*rappel)(int32_t x, int32_t y));
 

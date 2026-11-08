@@ -1,5 +1,5 @@
 {
-  "_lisez_moi": "Les glyphes de la roue d'appui long (ADR-0019). Ajouter une entree a la roue = ajouter une ligne ici, puis `python tools/icones/generer_police_roue.py --source <materialdesignicons-webfont.ttf>`. Le nom est celui de la police source (Material Design Icons) ; l'id nomme la constante C++ ICONE_<ID> du fichier genere main/ui_roue_icones.inc. Jamais d'icone de marque (categorie « Brand / Logos », hors licence).",
+  "_lisez_moi": "Les glyphes de la roue d'appui long (ADR-0021). Ajouter une entree a la roue = ajouter une ligne ici, puis `python tools/icones/generer_police_roue.py --source <materialdesignicons-webfont.ttf>`. Le nom est celui de la police source (Material Design Icons) ; l'id nomme la constante C++ ICONE_<ID> du fichier genere main/ui_roue_icones.inc. Jamais d'icone de marque (categorie « Brand / Logos », hors licence).",
   "source": {
     "fichier": "materialdesignicons-webfont.ttf",
     "origine": "copie du dépôt Tab5 (Tab5/fonts/materialdesignicons-webfont.ttf, dépôt Axellum/M5-Tab5-ESPHome-LVGL)",

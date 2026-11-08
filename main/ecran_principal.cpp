@@ -150,7 +150,7 @@ bool alertes_atteignables() {
     return lecture.valide();
 }
 
-// LE PREMIER ANNEAU de la roue d'appui long (ADR-0019) : « Réglages » et, quand la page des alertes existe, « Alertes ». Rien d'autre
+// LE PREMIER ANNEAU de la roue d'appui long (ADR-0021) : « Réglages » et, quand la page des alertes existe, « Alertes ». Rien d'autre
 // au premier anneau (ni Profil, ni Affichage, ni Assistant). Pour une entrée de plus, par exemple « Détails » (ui_details_ouvrir(), session
 // meridien-details) : UNE ligne ici, et son glyphe dans tools/icones/roue_glyphes.json (puis régénérer, voir docs/outils.md).
 // Les chaînes sont des littéraux ou la table de traduction : elles vivent aussi longtemps que la roue est ouverte.
@@ -299,7 +299,7 @@ void ecran_principal_creer(const BootInfo &boot) {
         return;
     }
     ui_principal_sur_appui_long(
-        ouvrir_roue); // ADR-0019 : l'appui long ouvre la roue, d'où l'on atteint les réglages (ADR-0007)
+        ouvrir_roue); // ADR-0021 : l'appui long ouvre la roue, d'où l'on atteint les réglages (ADR-0007)
     ui_principal_sur_alertes(ouvrir_alertes); // ADR-0009 : la pastille de l'alerte officielle ouvre la page des alertes
 
     // Une première mise à jour avant d'afficher : jamais d'écran vide, même une demi-seconde.
