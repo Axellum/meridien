@@ -86,6 +86,13 @@ acceptable for a screen that changes once a minute (the touch response of the Se
 zone, is **not measured**). The design limits the damage: one drawing object per zone, redrawn only when its content changed (a
 hash per zone), so the clock alone is redrawn each minute.
 
+> **Update 2026-11-08 — the home screen was redone** (themes Sky, Dark board, Light; [ADR-0016](../decisions/0016-accueil-aere-pluie-et-alerte-en-bandeau.md),
+> numbers in [mesures/accueil.md](../mesures/accueil.md)). The seven quantity tiles and the old hourly strip are gone: the zones are now the
+> bar (place, Settings button), the clock, the current weather, the 12-hour curve, the banner (rain to come and official alert) and
+> five days. **LVGL objects: still 10** (the banner zone replaces the tiles zone), **fonts: 6** (the clock 168 px, the temperature 54 px, the
+> date 36 px, the day texts 32 and 28 px, the small text 24 px; the table above counts the old composition's 7). The Clock theme
+> is unchanged. The cost rows marked *board* above describe the old home screen: the new one has **not been measured on a board**.
+
 **Seen on:** PC render (clang 23.1.5, LVGL 9.5.0), commits of branch `claude/ecran-visuel-ba722a`, 2026-11-07; the *board* rows:
 Tab5 with the ST7121 screen (MAC read on the chip, not copied here), ESP32-P4, commit `cd362eb` built with the memory settings of
 jalon 1b added in a separate build directory (never committed), 2026-11-07 from 01:57 to 02:02.
@@ -188,6 +195,14 @@ Le P4 est bien plus lent que le PC : un changement de minute coûte 82 ms sur la
 est acceptable pour un écran qui change une fois par minute (la réponse au toucher du bouton Réglages, qui ne redessine que sa
 propre zone, n'est **pas mesurée**). La conception limite les dégâts : un objet de dessin par zone, redessiné seulement si son
 contenu a changé (une empreinte par zone), donc seule l'heure est redessinée chaque minute.
+
+> **Mise à jour du 08/11/2026 — l'accueil est refait** (thèmes Ciel, Tableau sombre, Clair ; [ADR-0016](../decisions/0016-accueil-aere-pluie-et-alerte-en-bandeau.md),
+> chiffres dans [mesures/accueil.md](../mesures/accueil.md)). Les sept tuiles de grandeurs et l'ancienne bande heure par heure ont disparu :
+> les zones sont maintenant la barre (lieu, bouton Réglages), l'heure, la météo du moment, la courbe des 12 heures, le bandeau (pluie à
+> venir et alerte officielle) et cinq jours. **Objets LVGL : toujours 10** (la zone du bandeau remplace celle des tuiles), **polices : 6**
+> (l'heure 168 px, la température 54 px, la date 36 px, les textes des jours 32 et 28 px, le petit texte 24 px ; le tableau ci-dessus
+> compte 7 polices pour l'ancienne composition). Le thème Horloge ne change pas. Les lignes *carte* du coût ci-dessus décrivent
+> l'ancien accueil : le nouveau n'a **pas été mesuré sur une carte**.
 
 **Vu sur :** rendu PC (clang 23.1.5, LVGL 9.5.0), commits de la branche `claude/ecran-visuel-ba722a`, 07/11/2026 ; les lignes
 *carte* : Tab5 avec l'écran ST7121 (MAC lue sur la puce, non recopiée ici), ESP32-P4, commit `cd362eb` compilé avec les réglages
