@@ -180,6 +180,7 @@ from mutations_accueil import MUTATIONS_ACCUEIL  # noqa: E402  (accueil : pluie 
 from mutations_reglages_ecran import MUTATIONS_REGLAGES_ECRAN  # noqa: E402  (réglages sur l'écran et installation guidée : voir ce fichier)
 from mutations_roue_geometrie import MUTATIONS_ROUE_GEOMETRIE  # noqa: E402  (roue d'appui long : mesures, pivotement, mots, toucher)
 from mutations_roue_commande import MUTATIONS_ROUE_COMMANDE  # noqa: E402  (roue d'appui long : écran, demande, dépliement, décision du toucher)
+from mutations_roue_entrees import MUTATIONS_ROUE_ENTREES  # noqa: E402  (roue d'appui long : quelles entrées au premier anneau, dans quel ordre)
 from mutations_surf import MUTATIONS_SURF  # noqa: E402  (noyau surf : spot, requêtes, lecture, vent, marée, note, créneau)
 from mutations_mer import MUTATIONS_MER  # noqa: E402  (noyau mer : CRC, trame SEA/ACT/CRIT, noms du contrat, fraîcheur, courbe de marée)
 from mutations_mer_client import MUTATIONS_MER_CLIENT  # noqa: E402  (client de la mer : requête, rythme, registre des spots, réparation de la NVS)
@@ -205,6 +206,7 @@ MUTATIONS += MUTATIONS_GEOCODAGE
 MUTATIONS += MUTATIONS_REGLAGES_ECRAN
 MUTATIONS += MUTATIONS_ROUE_GEOMETRIE
 MUTATIONS += MUTATIONS_ROUE_COMMANDE
+MUTATIONS += MUTATIONS_ROUE_ENTREES
 MUTATIONS += MUTATIONS_HOTE_APPAREIL
 MUTATIONS += MUTATIONS_MATERIEL_TAB5
 MUTATIONS += MUTATIONS_VIGIE
