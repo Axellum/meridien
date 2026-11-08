@@ -39,6 +39,9 @@ target_sources(${COMPONENT_LIB} PRIVATE "ui_details.cpp" "ui_details_ouvrir.cpp"
 # Alertes officielles de Vigie (session alertes-vigie) : client reseau, etat partage, reglages. Meme raison : target_sources() et non la
 # liste SRCS. Le client ne depend ni de meteo_client.cpp ni du client HTTPS commun.
 target_sources(${COMPONENT_LIB} PRIVATE "vigie_etat.cpp" "vigie_client.cpp" "reglages_alertes.cpp" "ui_alertes.cpp")
+# Mer d'un spot (ADR-0018 et ADR-0019) : client reseau (trame de Vigie), etat partage, registre des spots. Meme raison : target_sources() et
+# non la liste SRCS. Pas de page ni d'ecran dans ce lot ; le client passe par le client HTTPS commun (http_commun.cpp).
+target_sources(${COMPONENT_LIB} PRIVATE "mer_etat.cpp" "mer_client.cpp" "reglages_mer.cpp")
 # Les pixels des icônes meteo (tools/icones/generer_icones.py -> main/assets/icones_meteo.bin) sont embarqués en flash comme la
 # police, mais par target_add_binary_data() et non par EMBED_FILES : la ligne idf_component_register ci-dessus reste celle que
 # les autres sessions modifient. Symboles : _binary_icones_meteo_bin_start / _end (lus par ui_meteo_icones.cpp).
