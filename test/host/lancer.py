@@ -173,6 +173,7 @@ from mutations_vigie import MUTATIONS_VIGIE  # noqa: E402  (alertes officielles 
 from mutations_visuel import MUTATIONS_VISUEL  # noqa: E402  (écran principal : icônes, lune et soleil, échelles)
 from mutations_accueil import MUTATIONS_ACCUEIL  # noqa: E402  (accueil : pluie annoncée, courbe monotone, gélules, bandeau, mise en page)
 from mutations_reglages_ecran import MUTATIONS_REGLAGES_ECRAN  # noqa: E402  (réglages sur l'écran et installation guidée : voir ce fichier)
+from mutations_roue_geometrie import MUTATIONS_ROUE_GEOMETRIE  # noqa: E402  (roue d'appui long : mesures, pivotement, mots, toucher)
 from mutations_surf import MUTATIONS_SURF  # noqa: E402  (noyau surf : spot, requêtes, lecture, vent, marée, note, créneau)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
@@ -191,6 +192,7 @@ MUTATIONS += MUTATIONS_VISUEL
 MUTATIONS += MUTATIONS_ACCUEIL
 MUTATIONS += MUTATIONS_GEOCODAGE
 MUTATIONS += MUTATIONS_REGLAGES_ECRAN
+MUTATIONS += MUTATIONS_ROUE_GEOMETRIE
 MUTATIONS += MUTATIONS_HOTE_APPAREIL
 MUTATIONS += MUTATIONS_MATERIEL_TAB5
 MUTATIONS += MUTATIONS_VIGIE
