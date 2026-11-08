@@ -157,6 +157,7 @@ from mutations_fournisseurs import MUTATIONS_FOURNISSEURS  # noqa: E402  (source
 from mutations_fuseaux import MUTATIONS_FUSEAUX  # noqa: E402  (heure du lieu et lever/coucher du soleil : ADR-0012)
 from mutations_fournisseurs_natifs import MUTATIONS_FOURNISSEURS_NATIFS  # noqa: E402  (MET Norway et NWS : lecteurs, dates, rythme, requêtes, soleil)
 from mutations_geocodage import MUTATIONS_GEOCODAGE  # noqa: E402  (recherche de lieu : lecture, ville choisie, état)
+from mutations_grandeurs import MUTATIONS_GRANDEURS  # noqa: E402  (page « Détails » : les sept grandeurs, l'état manquant, la mise en page)
 from mutations_gzip import MUTATIONS_GZIP  # noqa: E402  (enveloppe gzip des réponses HTTP : en-tête, pied, CRC32, Content-Encoding)
 from mutations_hote_appareil import MUTATIONS_HOTE_APPAREIL  # noqa: E402  (hôte de l'appareil et lieux de la recherche : voir ce fichier)
 from mutations_i18n import MUTATIONS_I18N  # noqa: E402  (traduction en sept langues : voir ce fichier)
@@ -203,6 +204,7 @@ MUTATIONS += MUTATIONS_FUSEAUX
 MUTATIONS += MUTATIONS_SURF
 MUTATIONS += MUTATIONS_ACCUEIL_AUTO
 MUTATIONS += MUTATIONS_NVS_SECURITE
+MUTATIONS += MUTATIONS_GRANDEURS
 
 
 @functools.lru_cache(maxsize=None)
