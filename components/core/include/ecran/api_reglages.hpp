@@ -5,7 +5,7 @@
 //
 // SOUS-ENSEMBLE V1 (premier firmware qui sert la page, jalon « réglages ») :
 //   réel   : /api/status, /api/pair (POST, DELETE), /api/system, /api/location (GET, PUT), /api/display (GET, PUT), /api/alerts (GET, PUT),
-//            /api/weather, /api/geocode, /api/wifi (GET en lecture seule)
+//            /api/sea (GET, PUT : le registre des spots de la page mer, §15), /api/weather, /api/geocode, /api/wifi (GET en lecture seule)
 //   vide   : /api/services (rien de réglé), /api/presets (aucun), /api/update (inactif) : la page s'affiche sans erreur
 //   501    : changer de réseau Wi-Fi, enregistrer ou tester un service, export / import, mise à jour, retour arrière.
 //            Ces routes existent dans le contrat ; elles répondent « pas encore disponible » dans la langue de l'écran.
@@ -17,6 +17,7 @@
 // L'hôte (`Hote`) fournit (types plus bas) :
 //   reglages::Affichage affichage() const;                 bool enregistrer_affichage(const reglages::Affichage &);
 //   reglages::Alertes alertes() const;                     bool enregistrer_alertes(const reglages::Alertes &);
+//   bool mer_lire(mer::Registre &);                        bool mer_enregistrer(const mer::Registre &);   // §15, ADR-0025
 //   bool zone_lire(reglages::Zone &);                      bool zone_enregistrer(const reglages::Zone &);
 //   std::string_view source_meteo();                       bool source_meteo_enregistrer(std::string_view id);
 //   bool source_meteo_retablie();                          // source météo en service (« auto », « knmi »), ADR-0010
@@ -37,6 +38,8 @@
 #include "ecran/geocodage.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/json_mini.hpp"
+#include "ecran/mer_api.hpp"
+#include "ecran/mer_spots.hpp"
 #include "ecran/meteo_wmo.hpp"
 #include "ecran/reglages_alertes.hpp"
 #include "ecran/reglages_valeurs.hpp"
@@ -71,6 +74,10 @@ struct Tampons {
     std::size_t cap_sortie = 0;
     char *travail = nullptr; // réponse brute du géocodage (16 Ko)
     std::size_t cap_travail = 0;
+    // Deux registres de spots (≈ 2,3 Ko chacun) pour /api/sea : celui de l'appareil, puis celui qui serait enregistré. En PSRAM, jamais sur
+    // la pile du serveur. Absents (nullptr) : /api/sea répond 500 comme tout défaut interne, le reste de l'API n'en souffre pas.
+    mer::Registre *mer_actuel = nullptr;
+    mer::Registre *mer_neuf = nullptr;
 };
 
 struct InfoSysteme {
@@ -190,6 +197,10 @@ template <class Hote> class Api {
             return alertes_lire(t);
         if (est(rq, Methode::Put, "/api/alerts"))
             return alertes_ecrire(rq, t);
+        if (est(rq, Methode::Get, "/api/sea"))
+            return mer_lire(t);
+        if (est(rq, Methode::Put, "/api/sea"))
+            return mer_ecrire(rq, t);
         if (est(rq, Methode::Get, "/api/weather"))
             return meteo(t);
         if (est(rq, Methode::Get, "/api/geocode"))
@@ -611,6 +622,71 @@ template <class Hote> class Api {
         if (!(v.valeur == avant) && !hote_.enregistrer_alertes(v.valeur))
             return panne(t);
         return alertes_lire(t);
+    }
+
+    // Le registre des spots de la page mer (docs/api-reglages.md §15, ADR-0025). Les deux registres de travail viennent de `Tampons`
+    // (PSRAM) ; sans eux, ou si l'appareil n'a pas pu garder son registre en mémoire, c'est un défaut interne (500), pas un registre vide
+    // qu'on écraserait au prochain envoi.
+    constexpr Reponse mer_lire(const Tampons &t) noexcept {
+        if (t.mer_actuel == nullptr || !hote_.mer_lire(*t.mer_actuel))
+            return panne(t);
+        const mer::Registre &r = *t.mer_actuel;
+        const std::size_t n = r.nombre < mer::REGISTRE_MAX ? r.nombre : mer::REGISTRE_MAX;
+        const mer::SpotMer *choisi = mer::spot_choisi(r);
+        return corps_json(t, 200, [&](Ecrivain &e) {
+            e.ouvrir_objet();
+            e.cle("spots");
+            e.ouvrir_tableau();
+            for (std::size_t i = 0; i < n; ++i) {
+                e.ouvrir_objet();
+                e.champ("id", mer::id_du_spot(r.spots[i]));
+                e.champ("nom", mer::nom_du_spot(r.spots[i]));
+                e.fermer_objet();
+            }
+            e.fermer_tableau();
+            e.champ("choisi", choisi != nullptr ? mer::id_du_spot(*choisi) : std::string_view{});
+            e.champ_entier("vent_min_kn", r.vent_min_kn);
+            e.champ_entier("vent_max_kn", r.vent_max_kn);
+            e.champ_entier("spots_max", static_cast<std::int64_t>(mer::REGISTRE_MAX));
+            e.champ_entier("vent_plafond_kn", mer::VENT_PLAFOND_NOEUDS);
+            e.fermer_objet();
+        });
+    }
+
+    constexpr Reponse mer_ecrire(const Requete &rq, const Tampons &t) noexcept {
+        if (t.mer_actuel == nullptr || t.mer_neuf == nullptr)
+            return panne(t);
+        json::Valeur objet;
+        Reponse refus;
+        if (!lire_objet(rq, t, objet, refus))
+            return refus;
+        if (!hote_.mer_lire(*t.mer_actuel))
+            return panne(t);
+        switch (mer::valider_mer(objet, *t.mer_actuel, *t.mer_neuf)) {
+        case mer::ErreurApi::Spots:
+            return erreur(t, 422, "spots_invalide",
+                          "Les spots doivent former une liste d’objets avec un identifiant et un nom.", "spots");
+        case mer::ErreurApi::Identifiant:
+            return erreur(t, 422, "spot_invalide", "Cet identifiant de spot n’est pas valide.", "spots");
+        case mer::ErreurApi::Nom:
+            return erreur(t, 422, "nom_invalide", "Le nom d’un spot doit faire de 1 à 32 caractères.", "spots");
+        case mer::ErreurApi::Doublon:
+            return erreur(t, 422, "spot_double", "Ce spot est déjà dans la liste.", "spots");
+        case mer::ErreurApi::Plein:
+            return erreur(t, 422, "trop_de_spots", "La liste est pleine : 12 spots au plus.", "spots");
+        case mer::ErreurApi::Choix:
+            return erreur(t, 422, "choix_inconnu", "Le spot choisi n’est pas dans la liste.", "choisi");
+        case mer::ErreurApi::Vent:
+            // Le couple est jugé d'un bloc : le champ nommé est le minimum si l'envoi en porte un, sinon le maximum.
+            return erreur(t, 422, "vent_invalide",
+                          "La plage de vent doit être en nœuds entiers, de 1 à 60, le minimum sous le maximum.",
+                          objet.champ("vent_min_kn").existe() ? "vent_min_kn" : "vent_max_kn");
+        case mer::ErreurApi::Aucune:
+            break;
+        }
+        if (!mer::egaux(*t.mer_neuf, *t.mer_actuel) && !hote_.mer_enregistrer(*t.mer_neuf))
+            return panne(t);
+        return mer_lire(t); // relu depuis l'appareil : la réponse dit ce qui est vraiment gardé
     }
 
     constexpr Reponse meteo(const Tampons &t) noexcept {

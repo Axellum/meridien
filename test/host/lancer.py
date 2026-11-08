@@ -187,6 +187,7 @@ from mutations_mer_client import MUTATIONS_MER_CLIENT  # noqa: E402  (client de 
 from mutations_mer_textes import MUTATIONS_MER_TEXTES  # noqa: E402  (mots de la page mer : heures, âges, unités, vigilance, bandeau)
 from mutations_mer_page import MUTATIONS_MER_PAGE  # noqa: E402  (page mer composée : verdicts montrés, barres, courbe de marée, bandeau)
 from mutations_mer_geometrie import MUTATIONS_MER_GEOMETRIE  # noqa: E402  (mise en page de la page mer : zones, échelle, cartes, détail)
+from mutations_mer_api import MUTATIONS_MER_API  # noqa: E402  (écriture du registre des spots par la page de réglages : liste, choix, plage de vent, routes)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
@@ -218,6 +219,7 @@ MUTATIONS += MUTATIONS_MER_CLIENT
 MUTATIONS += MUTATIONS_MER_TEXTES
 MUTATIONS += MUTATIONS_MER_PAGE
 MUTATIONS += MUTATIONS_MER_GEOMETRIE
+MUTATIONS += MUTATIONS_MER_API
 MUTATIONS += MUTATIONS_ACCUEIL_AUTO
 MUTATIONS += MUTATIONS_NVS_SECURITE
 MUTATIONS += MUTATIONS_GRANDEURS
