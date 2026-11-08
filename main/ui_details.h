@@ -44,8 +44,8 @@ void ui_details_mettre_a_jour(const grandeurs::Page &page);
 } // namespace ecran
 
 // Ouvre la page « Détails » par-dessus l'écran actif : lit la météo, l'heure et le thème, construit la page, la charge d'un coup et
-// lance un minuteur de mise à jour (500 ms). Sans effet si la page est déjà ouverte. Rien ne l'appelle encore : la roue d'appui long
-// (session meridien-roue-lvgl) y branchera « Pages ▸ Détails ». À appeler dans la tâche LVGL, verrou pris. Hors de `ecran`, comme
+// lance un minuteur de mise à jour (500 ms). Sans effet si la page est déjà ouverte. C'est la roue d'appui long (ADR-0021) qui l'appelle :
+// le bouton « Détails » de son premier anneau (ecran_principal.cpp, composer_entrees). À appeler dans la tâche LVGL, verrou pris. Hors de `ecran`, comme
 // ui_reglages_ouvrir() (ui_reglages.h) : c'est un pointeur de fonction que l'écran principal ou la roue reçoit. Défini dans
 // ui_details_ouvrir.cpp (colle du firmware), jamais compilé par le rendu PC.
 void ui_details_ouvrir();

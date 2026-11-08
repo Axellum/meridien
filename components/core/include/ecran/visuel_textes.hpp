@@ -60,6 +60,8 @@ inline constexpr Texte TEXTES[] = {
     {"Réglages", {"Settings", "Einstellungen", "Instellingen", "Ajustes", "Impostazioni", "Ayarlar"}},
     // --- la roue d'appui long (ADR-0021) : le mot du moyeu ; « Réglages » et « Alertes » sont plus haut et dans la table commune ---
     {"Aller à", {"Go to", "Gehe zu", "Ga naar", "Ir a", "Vai a", "Git"}},
+    // « Détails » : le bouton du premier anneau ; mêmes traductions que le titre de la page (grandeurs.hpp, ADR-0020).
+    {"Détails", {"Details", "Details", "Details", "Detalles", "Dettagli", "Ayrıntılar"}},
     // Réglages > Appareil : la ligne qui ouvre l'écran de diagnostic (qui n'a plus de bouton sur l'écran principal).
     {"Diagnostic", {"Diagnostics", "Diagnose", "Diagnose", "Diagnóstico", "Diagnostica", "Tanılama"}},
     // --- indice UV ---

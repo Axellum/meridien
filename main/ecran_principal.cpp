@@ -150,13 +150,15 @@ bool alertes_atteignables() {
     return lecture.valide();
 }
 
-// LE PREMIER ANNEAU de la roue d'appui long (ADR-0021) : « Réglages » et, quand la page des alertes existe, « Alertes ». Rien d'autre
-// au premier anneau (ni Profil, ni Affichage, ni Assistant). Pour une entrée de plus, par exemple « Détails » (ui_details_ouvrir(), session
-// meridien-details) : UNE ligne ici, et son glyphe dans tools/icones/roue_glyphes.json (puis régénérer, voir docs/outils.md).
+// LE PREMIER ANNEAU de la roue d'appui long (ADR-0021) : « Réglages », « Détails » (les sept grandeurs retirées de l'accueil, page de
+// ADR-0020) et, quand la page des alertes existe, « Alertes ». Rien d'autre au premier anneau (ni Profil, ni Affichage, ni Assistant) :
+// « Détails » est un bouton direct, pas une famille, puisqu'il n'y a qu'une page. Pour une entrée de plus : UNE ligne ici, et son glyphe
+// dans tools/icones/roue_glyphes.json (puis régénérer, voir docs/outils.md).
 // Les chaînes sont des littéraux ou la table de traduction : elles vivent aussi longtemps que la roue est ouverte.
 int composer_entrees(EntreeRoue *sortie) {
     int n = 0;
     sortie[n++] = {texte_principal::t(texte_principal::kReglages), ICONE_REGLAGES, ui_reglages_ouvrir, nullptr, 0};
+    sortie[n++] = {visuel::texte_c("Détails"), ICONE_DETAILS, ui_details_ouvrir, nullptr, 0};
     if (alertes_atteignables()) {
         sortie[n++] = {visuel::texte_c("Alertes"), ICONE_ALERTES, ouvrir_alertes, nullptr, 0};
     }
