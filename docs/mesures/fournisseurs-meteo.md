@@ -154,4 +154,4 @@ Prouvé sur le PC (détail et nombres exacts : [ADR-0014](../decisions/0014-met-
 - Les autres lieux : huit lieux pour MET Norway et six pour le NWS, un jour (jours courts de l'hémisphère nord), une mesure par lieu. Pas d'été, pas de tempête, pas de neige forte.
 - Le texte exact des pages officielles (lues par résumeur) et les textes intégraux des licences CC BY 4.0 et NLOD 2.0.
 - Les seuils de `skyCover` du NWS et la correspondance « sleet » / « hail » ; l'UV de MET Norway (en zone nordique, une valeur plus utile que l'UV « ciel dégagé » existe peut-être ailleurs dans la documentation : non lu).
-- Ce que le NWS ou MET Norway font quand le contact du `User-Agent` est injoignable (le dépôt est privé jusqu'à la publication) : aucun essai.
+- Ce que le NWS ou MET Norway font quand le contact du `User-Agent` est injoignable (le dépôt est public depuis le 08/11/2026, le contact est donc joignable) : aucun essai.

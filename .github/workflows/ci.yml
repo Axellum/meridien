@@ -4,7 +4,7 @@
 # Chaque action est épinglée par le SHA du commit de son tag (lu dans son dépôt, tag en commentaire), les outils
 # installés par pip ou téléchargés le sont à la version exacte utilisée sur le PC d'Axel.
 #
-# Dépôt privé : les minutes sont facturables. Les jobs lourds ne tournent donc que quand il le faut :
+# Dépôt public depuis le 08/11/2026 (privé avant : minutes facturables). Les jobs lourds ne tournent que quand il le faut :
 #   - pull_request : tests-noyau, ruff, clang-format, gitleaks, firmware-tab5 ;
 #   - push sur main et lancement manuel : en plus mutations-noyau (longue) et parcours-web (réseau).
 name: CI
@@ -37,7 +37,7 @@ jobs:
   #   - g++-14 avec ASan seul. Essai du 06/11/2026 : g++ 14.2 avec -fsanitize=undefined ne sait plus évaluer les
   #     static_assert des tests (« is not a constant expression », fuseaux.hpp:49), tant que null, bounds, pointer-overflow,
   #     nonnull-attribute, returns-nonnull-attribute et vptr sont actifs ; en retirer un seul ne suffit pas. Sans UBSan, g++
-  #     compile et exécute les 252 tests. Le détecteur de fuites est coupé, comme sur le PC (non pris en charge sous Windows).
+  #     compile et exécute tous les tests. Le détecteur de fuites est coupé, comme sur le PC (non pris en charge sous Windows).
   tests-noyau:
     name: tests-noyau
     runs-on: ubuntu-24.04
@@ -77,7 +77,8 @@ jobs:
           grep -q 'mode        : complet' noyau-gpp.log
 
   # Chaque mutation du noyau doit faire échouer le test qui la vise. Compilation seule : pas besoin des détecteurs.
-  # clang++-18 comme sur le PC d'Axel, où les 206 mutations sont détectées.
+  # clang++-18 comme sur le PC d'Axel, où toutes les mutations sont détectées. Attention : la liste en compte 1 530
+  # (206 le 06/11/2026) et le lancement du 08/11/2026 a atteint la limite de 150 minutes sans finir (docs/outils.md).
   mutations-noyau:
     name: mutations-noyau
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

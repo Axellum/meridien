@@ -4,7 +4,7 @@
 
 ---
 
-> **Summary** — Nothing is public yet. Decision of the owner, 07/11/2026: **the existing repository `Axellum/meridien` itself goes from private to public, history included.** No snapshot, no second repository (this replaces the decision of 06/11/2026). `python tools/controle_publication.py --historique` is run first, the checklist below is followed, and the owner alone flips the switch.
+> **Summary** — **The repository has been public since 08/11/2026.** Decision of the owner, 07/11/2026: **the existing repository `Axellum/meridien` itself went from private to public, history included.** No snapshot, no second repository (this replaced the decision of 06/11/2026). `python tools/controle_publication.py --historique` was run first, the checklist below was followed (its results are at the end of the list), and the flip was made on the owner's explicit go.
 
 ### Why the history goes public as it is
 
@@ -42,9 +42,20 @@ What else becomes public with the repository: the commit messages (in French), t
 8. Right after: private vulnerability reporting (the [SECURITY.md](../SECURITY.md) text assumes it), secret scanning and push protection, protection of `main` with the required checks listed in [outils.md](outils.md). The first lines of `.github/workflows/ci.yml` say “private repository: the minutes are billable”: correct them then.
 9. Say nothing about it before the owner decides.
 
+**Results on the day of the flip (08/11/2026)**, point by point:
+
+1. Everything is merged into `main` (`e7b039b`). The complete `.\tools\verifier.ps1` passed on `3fca1cc` (1,416 tests, every mutation, exit code 0, 2 h 54 min on the PC, 07/11/2026). The last commit (`e7b039b`: `std::optional::reset()` is not `constexpr` in C++17, which g++ 14.2 refuses) was checked by the 1,420 tests of a fresh clone, the 201 alert mutations and a run with the g++ 14.2 of ESP-IDF, **not** by a new complete run. CI on `e7b039b`: `tests-noyau` (both compilers), `firmware-tab5`, `ruff`, `clang-format`, `gitleaks` and `parcours-web` green; `mutations-noyau` (not required) cancelled by its 150-minute limit, see [outils.md](outils.md#continuous-integration-github-actions).
+2. The README status and [compatibilite.md](compatibilite.md) were re-read and updated on 07/11/2026.
+3. Done on 07/11/2026: 14 contact sheets of the images of today's files and of those that only exist in the history, looked at by eye. Example cities and fake Wi-Fi networks from the render data and the tests, a private IP and the end of a MAC address (categories accepted on 07/11/2026), the Vigie domain (public): nothing personal to block.
+4. Run again from a fresh clone of the remote (`e7b039b`, with the head of the pull request): 0 blocking, 0 secret; `gitleaks` over the whole history clean.
+5. The logs of the 13 Actions runs were read: no Wi-Fi password, no personal path, no e-mail address. No Actions secret or variable.
+6. Tests from a fresh clone of `main`: 1,420 tests, 0 failure, 0 modified file afterwards. **Not done** from a fresh clone: `idf.ps1 build` (the Tab5 build is done by the CI job `firmware-tab5`; the 7B build has no CI job) and the full mutation run.
+7. The flip, by `gh repo edit Axellum/meridien --visibility public --accept-visibility-change-consequences`, read back: `PUBLIC`, and the page answers without a token.
+8. Done right after, through the GitHub API and read back: private vulnerability reporting enabled; secret scanning and push protection enabled; `main` protected (the five required checks `tests-noyau`, `ruff`, `clang-format`, `gitleaks`, `firmware-tab5`; no force-push, no deletion; administrators can still push directly, as the project's workflow does). Dependabot security updates left disabled: not asked.
+
 ### Decisions left to the owner
 
-- **When to flip**, once the checklist is done.
+- **When to flip**: decided and done on 08/11/2026 (results above).
 - **Encrypted NVS or not** (ADR-0003 plans it, nothing is done): not a condition of the flip; until it is done, the [SECURITY.md](../SECURITY.md) limits are what a reader is told.
 - Decided on 07/11/2026: the working documents go public, most of them ([plan.md](plan.md), [cout.md](cout.md) (time, sessions, tokens), [recherche/](recherche/)); they are working notes in French and the README presents them as such.
 
@@ -54,7 +65,7 @@ What else becomes public with the repository: the commit messages (in French), t
 
 ---
 
-> **Résumé** — Rien n'est public. Décision du propriétaire, 07/11/2026 : **le dépôt existant `Axellum/meridien` passe lui-même de privé à public, historique compris.** Pas d'instantané, pas de second dépôt (cela remplace la décision du 06/11/2026). `python tools/controle_publication.py --historique` est lancé d'abord, la liste ci-dessous est suivie, et le propriétaire seul bascule.
+> **Résumé** — **Le dépôt est public depuis le 08/11/2026.** Décision du propriétaire, 07/11/2026 : **le dépôt existant `Axellum/meridien` est passé lui-même de privé à public, historique compris.** Pas d'instantané, pas de second dépôt (cela a remplacé la décision du 06/11/2026). `python tools/controle_publication.py --historique` a été lancé d'abord, la liste ci-dessous a été suivie (ses résultats sont à la fin de la liste), et la bascule a été faite sur le go explicite du propriétaire.
 
 ### Pourquoi l'historique devient public tel quel
 
@@ -92,8 +103,19 @@ Ce qui devient aussi public avec le dépôt : les messages de commit (en frança
 8. Juste après : signalement privé de vulnérabilités (le texte de [SECURITY.md](../SECURITY.md#version-française) le suppose), analyse de secrets et protection à la poussée, protection de `main` avec les contrôles requis listés dans [outils.md](outils.md). Les premières lignes de `.github/workflows/ci.yml` disent « dépôt privé : les minutes sont facturables » : les corriger alors.
 9. N'en rien dire avant que le propriétaire décide.
 
+**Résultats le jour de la bascule (08/11/2026)**, point par point :
+
+1. Tout est fusionné dans `main` (`e7b039b`). Le `.\tools\verifier.ps1` complet a passé sur `3fca1cc` (1 416 tests, toutes les mutations, code de sortie 0, 2 h 54 min sur le PC, 07/11/2026). Le dernier commit (`e7b039b` : `std::optional::reset()` n'est pas `constexpr` en C++17, ce que g++ 14.2 refuse) a été vérifié par les 1 420 tests d'un clone neuf, les 201 mutations des alertes et un passage avec le g++ 14.2 d'ESP-IDF, **pas** par un nouveau passage complet. CI sur `e7b039b` : `tests-noyau` (deux compilateurs), `firmware-tab5`, `ruff`, `clang-format`, `gitleaks` et `parcours-web` verts ; `mutations-noyau` (non obligatoire) annulé par sa limite de 150 minutes, voir [outils.md](outils.md#intégration-continue-github-actions).
+2. L'état du README et [compatibilite.md](compatibilite.md#version-française) ont été relus et mis à jour le 07/11/2026.
+3. Fait le 07/11/2026 : 14 planches des images des fichiers d'aujourd'hui et de celles qui n'existent que dans l'historique, regardées à l'œil. Des villes d'exemple et de faux réseaux Wi-Fi venus des données de rendu et des tests, une IP privée et la fin d'une adresse MAC (catégories acceptées le 07/11/2026), le domaine de Vigie (public) : rien de personnel à bloquer.
+4. Relancé depuis un clone neuf du dépôt distant (`e7b039b`, avec la tête de la pull request) : 0 bloquant, 0 secret ; `gitleaks` sur tout l'historique propre.
+5. Les journaux des 13 lancements d'Actions ont été lus : aucun mot de passe Wi-Fi, aucun chemin personnel, aucune adresse e-mail. Aucun secret ni variable d'Actions.
+6. Tests depuis un clone neuf de `main` : 1 420 tests, 0 échec, 0 fichier modifié ensuite. **Pas fait** depuis un clone neuf : `idf.ps1 build` (la compilation du Tab5 est faite par le job de CI `firmware-tab5` ; la 7B n'a pas de job de CI) et le passage complet des mutations.
+7. La bascule, par `gh repo edit Axellum/meridien --visibility public --accept-visibility-change-consequences`, relue : `PUBLIC`, et la page répond sans jeton.
+8. Fait juste après, par l'API de GitHub et relu : signalement privé de vulnérabilités activé ; analyse de secrets et protection à la poussée activées ; `main` protégée (les cinq contrôles requis `tests-noyau`, `ruff`, `clang-format`, `gitleaks`, `firmware-tab5` ; ni force-push ni suppression ; les administrateurs peuvent encore pousser directement, comme le fait le travail du projet). Mises à jour de sécurité de Dependabot laissées coupées : non demandées.
+
 ### Décisions qui restent au propriétaire
 
-- **Quand basculer**, une fois la liste faite.
+- **Quand basculer** : décidé et fait le 08/11/2026 (résultats ci-dessus).
 - **NVS chiffrée ou non** (l'ADR-0003 la prévoit, rien n'est fait) : pas une condition de la bascule ; en attendant, ce sont les limites de [SECURITY.md](../SECURITY.md#version-française) qu'on dit au lecteur.
 - Décidé le 07/11/2026 : les documents de travail deviennent publics, la plupart ([plan.md](plan.md), [cout.md](cout.md) (temps, sessions, tokens), [recherche/](recherche/)) ; ce sont des notes de travail en français et le README les présente comme telles.

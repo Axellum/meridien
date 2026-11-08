@@ -29,7 +29,7 @@ because they do not fit (home automation, Home Assistant and ESPHome are out of 
 
 Secrets and API keys, MAC addresses, real IP addresses, personal paths and the names of your devices. Settings and keys
 live in the device's NVS, never in the repository. If you find a secret or a security problem, do not post it in a public
-issue: use GitHub's private vulnerability reporting if it is enabled on this repository (not verified), otherwise contact
+issue: use GitHub's private vulnerability reporting (enabled on this repository on 08/11/2026), otherwise contact
 the repository owner through their GitHub profile.
 
 ### Hardware
@@ -73,8 +73,8 @@ refusées parce qu'elles ne cadrent pas (la domotique, Home Assistant et ESPHome
 
 Secrets et clés d'API, adresses MAC, adresses IP réelles, chemins personnels et noms de vos appareils. Les réglages et les
 clés vivent dans la NVS de l'appareil, jamais dans le dépôt. Si vous trouvez un secret ou un problème de sécurité, ne le
-postez pas dans une issue publique : utiliser le signalement privé de vulnérabilités de GitHub s'il est activé sur ce dépôt
-(non vérifié), sinon contacter le propriétaire du dépôt par son profil GitHub.
+postez pas dans une issue publique : utiliser le signalement privé de vulnérabilités de GitHub (activé sur ce dépôt le 08/11/2026),
+sinon contacter le propriétaire du dépôt par son profil GitHub.
 
 ### Matériel
 

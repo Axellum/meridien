@@ -8,7 +8,7 @@ Meridien is a personal project, shared in case it is useful. There is no promise
 
 ### Reporting a problem
 
-Do not post a security problem, a key or a password in a public issue. Use GitHub's private vulnerability reporting (the *Security* tab, “Report a vulnerability”) if it is enabled on the repository (not verified: it is a setting of the repository), otherwise contact the owner through their GitHub profile, [github.com/Axellum](https://github.com/Axellum).
+Do not post a security problem, a key or a password in a public issue. Use GitHub's private vulnerability reporting (the *Security* tab, “Report a vulnerability”), enabled on the repository on 08/11/2026 (read back through the GitHub API); if it is not offered to you, contact the owner through their GitHub profile, [github.com/Axellum](https://github.com/Axellum).
 
 ### Known limits
 
@@ -32,7 +32,7 @@ Meridien est un projet personnel, partagé au cas où il servirait. Aucune prome
 
 ### Signaler un problème
 
-Ne postez pas un problème de sécurité, une clé ou un mot de passe dans une issue publique. Utilisez le signalement privé de vulnérabilités de GitHub (onglet *Security*, « Report a vulnerability ») s'il est activé sur le dépôt (non vérifié : c'est un réglage du dépôt), sinon contactez le propriétaire par son profil GitHub, [github.com/Axellum](https://github.com/Axellum).
+Ne postez pas un problème de sécurité, une clé ou un mot de passe dans une issue publique. Utilisez le signalement privé de vulnérabilités de GitHub (onglet *Security*, « Report a vulnerability »), activé sur le dépôt le 08/11/2026 (relu par l'API de GitHub) ; s'il ne vous est pas proposé, contactez le propriétaire par son profil GitHub, [github.com/Axellum](https://github.com/Axellum).
 
 ### Limites connues
 
