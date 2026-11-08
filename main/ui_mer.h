@@ -10,7 +10,7 @@
 //
 // La page est une IMAGE de la mer au moment de l'ouverture : elle ne se redessine pas si une trame plus récente arrive pendant qu'elle est
 // ouverte (on la ferme et on la rouvre), comme la page des alertes. Pas de fondu : l'écran change d'un coup (AGENTS.md, préférences du
-// produit). Aucun appel ne l'ouvre encore : l'ouverture par l'appui long (ADR-0017) est un autre lot, avec l'écran de la maison.
+// produit). Elle s'ouvre par la roue d'appui long (entrée « Mer » du premier anneau, quand un spot est choisi : ADR-0024).
 #pragma once
 
 #include <cstddef>

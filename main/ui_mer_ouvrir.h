@@ -1,6 +1,6 @@
 // Ouvre la page mer (ui_mer.h) sur la mer courante de l'appareil (mer_etat.h). C'est la colle ESP-IDF de la page : l'écran de la carte,
 // l'horloge, le réseau et le registre des spots ; la page elle-même (ui_mer.cpp) n'en sait rien, pour que le rendu PC la compile telle
-// quelle. AUCUN appel ne l'ouvre dans ce lot : le brancher à l'appui long de l'écran principal est le lot suivant (ADR-0017).
+// quelle. Elle est appelée par l'entrée « Mer » de la roue d'appui long (main/ecran_principal.cpp, ADR-0024), quand un spot est choisi.
 #pragma once
 
 #include "ecran/visuel_themes.hpp"
