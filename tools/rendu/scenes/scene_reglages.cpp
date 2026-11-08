@@ -233,7 +233,7 @@ const Scene kScenes[] = {
      source_liste_norvege},
     {"lieu-source-metno", "Lieu et météo : MET Norway a répondu, attribution CC BY 4.0 et NLOD 2.0", lieu_source_metno},
     {"lieu-source-repli", "Lieu et météo : MET Norway n'a pas répondu, la météo vient d'Open-Meteo", lieu_source_repli},
-    {"lieu-source-nws", "Lieu et météo : NWS a répondu, domaine public", lieu_source_nws},
+    {"lieu-source-nws", "Lieu et météo : NWS a répondu, données ouvertes", lieu_source_nws},
     {"langue", "Langue de l'écran et de l'assistant", langue},
     {"affichage", "Affichage : thème et luminosité", affichage},
     {"assistant-stt", "Assistant : reconnaissance de la voix", assistant_stt},

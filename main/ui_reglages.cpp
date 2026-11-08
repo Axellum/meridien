@@ -752,7 +752,7 @@ void rangee_action_ou_info(lv_obj_t *parent, std::string_view id) {
                         p.texte);
             // Le service qui a RÉELLEMENT donné cette météo, avec la phrase de sa licence : là où la météo est montrée (ADR-0014).
             // Open-Meteo : CC BY 4.0 ; MET Norway : CC BY 4.0 et NLOD 2.0, les valeurs sont converties et complétées ici (« adaptées »,
-            // ce que CC BY demande d'indiquer) ; NWS : domaine public.
+            // ce que CC BY demande d'indiquer) ; NWS : données ouvertes (formule de la page de son API).
             namespace fm = meteo::fournisseurs;
             const Param pl[] = {{"lien", fm::attribution_de(m.origine).nom.data()}};
             const char *attribution =
@@ -760,7 +760,7 @@ void rangee_action_ou_info(lv_obj_t *parent, std::string_view id) {
                     ? remplir("Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)", pl, 1,
                               tampon, sizeof tampon)
                 : m.origine == fm::Famille::Nws
-                    ? remplir("Données météo : {lien} (domaine public)", pl, 1, tampon, sizeof tampon)
+                    ? remplir("Données météo : {lien} (données ouvertes)", pl, 1, tampon, sizeof tampon)
                     : remplir("Données météo : {lien} (licence CC BY 4.0)", pl, 1, tampon, sizeof tampon);
             creer_texte(c, attribution, env().f.petite, p.texte_discret);
             if (m.origine == fm::Famille::Nws) {

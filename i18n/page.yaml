@@ -57,7 +57,7 @@
 "ville.enregistree": "Ville enregistrée : {ville}"
 "meteo.attribution": "Données météo : {lien} (licence CC BY 4.0)"
 "meteo.attribution_metno": "Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)"
-"meteo.attribution_nws": "Données météo : {lien} (domaine public)"
+"meteo.attribution_nws": "Données météo : {lien} (données ouvertes)"
 "meteo.sans_parrainage": "Cet appareil n’est ni approuvé ni parrainé par le National Weather Service."
 "source.titre": "Source météo"
 "source.aide": "Le service qui fournit la météo de la ville choisie."

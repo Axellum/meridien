@@ -231,7 +231,7 @@ function carteVille() {
   const retours = h('div', { 'aria-live': 'polite' });
   const champ = h('input', { id: 'ville-q', type: 'search', placeholder: t('ville.recherche_ph'), autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'search' });
   /* Attribution exigée par les licences des données (Open-Meteo : CC BY 4.0 ; MET Norway : CC BY 4.0 et NLOD 2.0, données adaptées ;
-     NWS : domaine public, sans parrainage) : toujours visible, dans la langue de la page. Elle nomme le service qui a RÉELLEMENT donné
+     NWS : données ouvertes, sans parrainage) : toujours visible, dans la langue de la page. Elle nomme le service qui a RÉELLEMENT donné
      la météo montrée (`fournisseur` de /api/weather), pas celui qui est choisi : quand un service lu directement n'a pas répondu, la météo
      vient d'Open-Meteo et c'est lui qu'il faut citer (ADR-0014). Sans météo reçue, c'est Open-Meteo, comme avant. */
   const attribution = h('p', { class: 'aide attribution', id: 'attribution' });
@@ -240,6 +240,12 @@ function carteVille() {
   const modele = h('span', { id: 'attribution-modele' });
   const PHRASES = { 'open-meteo': 'meteo.attribution', 'met-norway': 'meteo.attribution_metno', nws: 'meteo.attribution_nws' };
   const PAR_DEFAUT = { id: 'open-meteo', nom: 'Open-Meteo', lien: 'https://open-meteo.com/' };
+  /* Les noms de licence de la phrase sont des liens vers leur texte : CC BY 4.0 demande le texte de la licence ou un lien vers elle, NLOD 2.0
+     un lien vers la licence quand c'est possible (relu mot à mot le 08/11/2026). Ces deux noms s'écrivent pareil dans toutes les langues du
+     catalogue ; l'écran de l'appareil ne peut pas porter de lien, la page oui. Adresses fixes, https seulement. */
+  const LICENCES = { 'CC BY 4.0': 'https://creativecommons.org/licenses/by/4.0/', 'NLOD 2.0': 'https://data.norge.no/nlod/en/2.0' };
+  const liensLicences = (morceaux) => morceaux.flatMap((m) => (typeof m !== 'string' ? [m]
+    : m.split(/(CC BY 4\.0|NLOD 2\.0)/).filter((x) => x !== '').map((x) => (LICENCES[x] ? h('a', { href: LICENCES[x], target: '_blank', rel: 'noopener', text: x }) : x))));
   let cleAttribution = '';
   const majAttribution = () => {
     const f = S.meteo && S.meteo.fournisseur;
@@ -247,7 +253,7 @@ function carteVille() {
     const cle = sur.id;
     if (cle === cleAttribution) return;
     cleAttribution = cle;
-    attribution.replaceChildren(...nets(tNoeuds(PHRASES[sur.id], { lien: h('a', { href: sur.lien, target: '_blank', rel: 'noopener', text: sur.nom }) }), modele,
+    attribution.replaceChildren(...nets(liensLicences(tNoeuds(PHRASES[sur.id], { lien: h('a', { href: sur.lien, target: '_blank', rel: 'noopener', text: sur.nom }) })), modele,
       sur.id === 'nws' ? ' ' + t('meteo.sans_parrainage') : null));
   };
   const source = h('select', { id: 'source-meteo', 'aria-describedby': 'source-meteo-aide', onchange: () => choisirSource(source.value) });

@@ -2,24 +2,24 @@
   "brut": {
     "index.html": 4549,
     "style.css": 7577,
-    "app.js": 47347,
-    "fr.json": 7470
+    "app.js": 48171,
+    "fr.json": 7473
   },
   "gzip": {
     "style.css": 2409,
-    "app.js": 13666,
-    "fr.json": 2688,
+    "app.js": 13991,
+    "fr.json": 2687,
     "index.html": 1086
   },
-  "total_gzip": 19849,
+  "total_gzip": 20173,
   "budget_gzip": 30720,
   "langues_gzip": {
-    "fr": 2698,
-    "en": 2587,
-    "de": 2924,
-    "nl": 2770,
-    "es": 2812,
-    "it": 2787,
-    "tr": 2832
+    "fr": 2697,
+    "en": 2584,
+    "de": 2922,
+    "nl": 2765,
+    "es": 2809,
+    "it": 2784,
+    "tr": 2831
   }
 }
