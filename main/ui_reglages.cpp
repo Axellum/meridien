@@ -14,6 +14,7 @@
 #include "ecran/presets_services.hpp"
 #include "ecran/reglages_alertes.hpp"
 #include "ecran/texte_modele.hpp"
+#include "ecran/visuel_textes.hpp"
 #include "ui_reglages_interne.h"
 
 namespace ecran::ui {
@@ -655,6 +656,13 @@ void sur_refaire(lv_event_t *) {
 
 void sur_redemarrer(lv_event_t *) { hote().redemarrer(); }
 
+// « Diagnostic » : l'écran de diagnostic existant (ecran_principal.cpp), sans rien réécrire. Les réglages restent ouverts dessous.
+void sur_diagnostic(lv_event_t *) {
+    if (env().ouvrir_diagnostic != nullptr) {
+        env().ouvrir_diagnostic();
+    }
+}
+
 void sur_nouveau_code(lv_event_t *) {
     hote().nouveau_code();
     nav_reconstruire_haut();
@@ -826,6 +834,11 @@ void rangee_action_ou_info(lv_obj_t *parent, std::string_view id) {
         } else if (r.etat != EtatTest::Inactif) {
             creer_texte(c, r.message, env().f.petite, r.etat == EtatTest::Reussi ? p.succes : p.danger);
         }
+    } else if (id == "action.diagnostic") {
+        lv_obj_t *c = creer_carte(parent);
+        lv_obj_t *b =
+            creer_bouton(c, ecran::visuel::texte_c("Diagnostic"), StyleBouton::Discret, sur_diagnostic, nullptr);
+        lv_obj_set_width(b, LV_PCT(100));
     } else if (id == "action.refaire_installation") {
         lv_obj_t *c = creer_carte(parent);
         lv_obj_t *b = creer_bouton(c, T("Refaire l’installation guidée"), StyleBouton::Discret, sur_refaire, nullptr);
@@ -1563,7 +1576,8 @@ void ui_reglages_liberer() { ui::nav_vider(); }
 
 void ui_reglages_creer(const ContexteReglages &ctx) {
     ui::nav_vider();
-    ui::env_initialiser(ctx.racine, ctx.ttf, ctx.ttf_taille, ctx.largeur, ctx.hauteur, ctx.hote, ctx.fermer);
+    ui::env_initialiser(ctx.racine, ctx.ttf, ctx.ttf_taille, ctx.largeur, ctx.hauteur, ctx.hote, ctx.fermer,
+                        ctx.ouvrir_diagnostic);
     i18n::definir_langue(i18n::langue_depuis_indice(ctx.hote->nombre("langue.ecran")));
     ui::Entree e;
     e.type = ui::TypeEcran::Liste;

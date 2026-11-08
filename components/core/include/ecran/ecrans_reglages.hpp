@@ -101,6 +101,8 @@ inline constexpr Rangee RANGEES_TTS[] = {
 inline constexpr Rangee RANGEES_APPAREIL[] = {
     {Genre::Info, "info.telephone", Editeur::Aucun, true},
     {Genre::Info, "info.version", Editeur::Aucun, true},
+    // Le diagnostic (cause du dernier redémarrage, Wi-Fi, point tactile) n'a plus de bouton ni de geste sur l'écran principal : on l'ouvre ici.
+    {Genre::Action, "action.diagnostic", Editeur::Aucun, true},
     {Genre::Action, "action.refaire_installation", Editeur::Aucun, true},
     {Genre::Action, "action.redemarrer", Editeur::Aucun, true},
     {Genre::Action, "action.reinitialiser", Editeur::Aucun, true},

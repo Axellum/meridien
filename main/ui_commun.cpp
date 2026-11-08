@@ -28,10 +28,11 @@ void env_choisir_theme() {
 }
 
 void env_initialiser(lv_obj_t *racine, const uint8_t *ttf, std::size_t ttf_taille, int32_t largeur, int32_t hauteur,
-                     HoteReglages *hote, void (*fermer)()) {
+                     HoteReglages *hote, void (*fermer)(), void (*ouvrir_diagnostic)()) {
     g_env.hote = hote;
     g_env.racine = racine;
     g_env.fermer = fermer;
+    g_env.ouvrir_diagnostic = ouvrir_diagnostic;
     g_env.largeur = largeur;
     g_env.hauteur = hauteur;
     g_env.echelle = static_cast<float>(std::min(largeur, hauteur)) / 720.0F;

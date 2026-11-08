@@ -58,6 +58,10 @@ inline constexpr Texte TEXTES[] = {
       "In attesa dell'ora di rete", "Ağ saati bekleniyor"}},
     {"Exemple", {"Example", "Beispiel", "Voorbeeld", "Ejemplo", "Esempio", "Örnek"}},
     {"Réglages", {"Settings", "Einstellungen", "Instellingen", "Ajustes", "Impostazioni", "Ayarlar"}},
+    // --- la roue d'appui long (ADR-0019) : le mot du moyeu ; « Réglages » et « Alertes » sont plus haut et dans la table commune ---
+    {"Aller à", {"Go to", "Gehe zu", "Ga naar", "Ir a", "Vai a", "Git"}},
+    // Réglages > Appareil : la ligne qui ouvre l'écran de diagnostic (qui n'a plus de bouton sur l'écran principal).
+    {"Diagnostic", {"Diagnostics", "Diagnose", "Diagnose", "Diagnóstico", "Diagnostica", "Tanılama"}},
     // --- indice UV ---
     {"Faible", {"Low", "Niedrig", "Laag", "Bajo", "Basso", "Düşük"}},
     {"Modéré", {"Moderate", "Mäßig", "Matig", "Moderado", "Moderato", "Orta"}},

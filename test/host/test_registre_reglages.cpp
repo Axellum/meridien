@@ -67,8 +67,9 @@ constexpr ChampApi CONTRAT_API[] = {
 // Rangées d'écran sans réglage (actions et informations) que l'écran sait dessiner : copie de la liste de ui_reglages.cpp
 // (controle_reglages.py compare les deux).
 constexpr std::string_view ACTIONS_ET_INFOS[] = {
-    "info.wifi",         "info.meteo",           "info.telephone",    "info.version",
-    "action.tester_stt", "action.tester_llm",    "action.tester_tts", "action.refaire_installation",
+    "info.wifi",         "info.meteo",           "info.telephone",
+    "info.version",      "action.tester_stt",    "action.tester_llm",
+    "action.tester_tts", "action.diagnostic",    "action.refaire_installation",
     "action.redemarrer", "action.reinitialiser",
 };
 

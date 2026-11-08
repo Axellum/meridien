@@ -11,6 +11,7 @@
 #include "ecran/heure_lieu.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_wmo.hpp"
+#include "ecran/roue_commande.hpp"
 #include "ecran/soleil.hpp"
 #include "ecran/visuel_astres.hpp"
 #include "ecran/visuel_dates.hpp"
@@ -19,12 +20,13 @@
 #include "ui_meteo_dessin.h"
 #include "ui_meteo_icones.h"
 
-// Écran principal. Chaque ZONE est un seul objet LVGL qui dessine tout son contenu dans l'événement LV_EVENT_DRAW_MAIN : six zones, le
-// bouton Réglages, la pastille de l'alerte officielle et l'anneau tactile, au lieu d'une centaine d'étiquettes. Un objet LVGL coûte de
-// la RAM interne (le point étroit de cette carte), une tâche de dessin non.
+// Écran principal. Chaque ZONE est un seul objet LVGL qui dessine tout son contenu dans l'événement LV_EVENT_DRAW_MAIN : six zones, la
+// pastille de l'alerte officielle et l'anneau tactile, au lieu d'une centaine d'étiquettes. Un objet LVGL coûte de la RAM interne (le
+// point étroit de cette carte), une tâche de dessin non. Les réglages ne sont plus un bouton de cet écran : un appui long ouvre la roue
+// (ui_roue.cpp, ADR-0019), dont « Réglages » est une entrée.
 //
 //   accueil (thèmes « ciel », « tableau sombre », « clair »), paysage 1280 x 720
-//   +-- lieu ----------- ⚙ --+--------------------------+
+//   +-- lieu -------------------+--------------------------+
 //   | heure                  |  courbe des 12 prochaines |
 //   | date                   |  heures : icônes, pluie,  |
 //   | météo du moment        |  maximum et minimum       |
@@ -74,7 +76,6 @@ struct Vue {
     Police heure, temperature, titre, corps, petit, mini;
     lv_obj_t *ecran = nullptr;
     lv_obj_t *zone[Z_NOMBRE] = {};
-    lv_obj_t *bouton = nullptr;
     lv_obj_t *pastille =
         nullptr; // pastille de l'alerte officielle : se dessine et reçoit l'appui (cachée sans alerte en vigueur)
     lv_obj_t *anneau = nullptr;
@@ -92,10 +93,11 @@ struct Vue {
     accueil::EpisodePluie pluie;            // la pluie à annoncer dans le bandeau (recalculée à chaque mise à jour)
     int diametre_anneau = 88;
     int objets = 0;
-    void (*appui_long)() = nullptr;
-    void (*ouvrir_reglages)() = nullptr;
+    void (*appui_long)(int32_t x, int32_t y) = nullptr;
     void (*ouvrir_alertes)() = nullptr;
     bool appui_long_fait = false;
+    lv_point_t appui_depart = {0, 0}; // où le doigt s'est posé : un doigt qui a glissé depuis n'ouvre pas la roue
+    int seuil_glissement = 0;         // en pixels de l'écran réel (roue_commande.hpp : glissement)
 };
 
 Vue g;
@@ -399,7 +401,7 @@ void calculer_disposition() {
     const Cotes c = cotes();
     const int utile = g.largeur - 2 * c.marge;
     const int y0 = px(10);
-    g.rect[Z_BARRE] = {c.marge, y0, utile - px(64), c.barre_h}; // le bouton Réglages occupe la droite
+    g.rect[Z_BARRE] = {c.marge, y0, utile, c.barre_h};
     int y = y0 + c.barre_h + px(4);
     const int bas = g.hauteur - px(12);
     const int h_horloge = g.portrait ? px(330) : px(262);
@@ -431,14 +433,6 @@ void appliquer_disposition() {
             lv_obj_set_pos(g.zone[z], r.x, r.y);
             lv_obj_set_size(g.zone[z], r.w, r.h);
         }
-    }
-    const int cote = px(48);
-    lv_obj_set_size(g.bouton, cote, cote);
-    if (g.est_accueil) { // au bout droit de la zone du lieu, à droite de l'heure
-        const Rect &b = g.rect[Z_BARRE];
-        lv_obj_set_pos(g.bouton, b.x + b.w - cote, b.y + (b.h - cote) / 2);
-    } else {
-        lv_obj_set_pos(g.bouton, g.largeur - cotes().marge - cote, px(10));
     }
     positionner_pastille_officielle(); // la barre ou le bandeau a pu changer de taille
 }
@@ -579,7 +573,7 @@ void dessiner_barre(const Ctx &c) {
         dz::texte(c.pc, *a.police, a.texte, x, centre - dz::hauteur_ligne(*a.police) / 2, c.w / 3, LV_TEXT_ALIGN_LEFT,
                   t.texte_2);
     }
-    // À droite : l'état des données (périmées, exemple), avant le bouton Réglages.
+    // À droite : l'état des données (périmées, exemple).
     int droite = c.x + c.w;
     if (m.exemple) {
         const char *s = texte_principal::t(texte_principal::kExemple);
@@ -807,8 +801,8 @@ void dessiner_barre_accueil(const Ctx &c) {
     const ThemePrincipal &t = *g.theme;
     const VueMeteo &m = g.e.meteo;
     const int centre = c.y + c.h / 2;
-    // Le bouton Réglages occupe le bout droit de la zone ; « Exemple » se pose après le lieu.
-    int bord = c.x + c.w - px(48) - px(16);
+    // « Exemple » se pose après le lieu ; la zone entière est au lieu (les réglages s'ouvrent par la roue d'appui long).
+    int bord = c.x + c.w - px(16);
     const int w_exemple = m.exemple ? largeur_etat_exemple() : 0;
     if (m.exemple) {
         bord -= w_exemple + px(16);
@@ -1583,23 +1577,6 @@ void sur_dessin(lv_event_t *evenement) {
     }
 }
 
-void sur_dessin_bouton(lv_event_t *evenement) {
-    lv_layer_t *couche = lv_event_get_layer(evenement);
-    lv_obj_t *objet = lv_event_get_target_obj(evenement);
-    lv_area_t a;
-    lv_obj_get_coords(objet, &a);
-    const dz::Pinceau pc = {couche, g.theme};
-    const ThemePrincipal &t = *g.theme;
-    const int w = lv_area_get_width(&a);
-    const bool appuye = lv_obj_has_state(objet, LV_STATE_PRESSED);
-    const int cx = a.x1 + w / 2;
-    const int cy = a.y1 + w / 2;
-    dz::disque(pc, cx, cy, w / 2, appuye ? t.accent : (t.carte_opa > 0 ? t.carte : t.filet),
-               appuye ? LV_OPA_COVER : std::max<int>(t.carte_opa, 160));
-    icones::piece(couche, Piece::reglages, w * 6 / 10, cx - w * 3 / 10, cy - w * 3 / 10,
-                  appuye ? t.texte_sur_couleur : t.texte);
-}
-
 // La pastille de l'alerte officielle : un seul objet qui se dessine (couleur du niveau, icône, texte de l'émetteur, « +N ») et reçoit
 // l'appui. Elle voit son propre état « appuyé » : un voile clair le montre, sans redessiner toute la barre.
 void sur_dessin_pastille(lv_event_t *evenement) {
@@ -1672,6 +1649,9 @@ void sur_toucher(lv_event_t *evenement) {
     switch (lv_event_get_code(evenement)) {
     case LV_EVENT_PRESSED:
         g.appui_long_fait = false;
+        if (lv_indev_t *indev = lv_indev_active(); indev != nullptr) {
+            lv_indev_get_point(indev, &g.appui_depart);
+        }
         [[fallthrough]];
     case LV_EVENT_PRESSING: {
         // Après un appui long, le doigt est encore posé : LVGL continue d'envoyer les événements à cet écran. L'anneau est sur la
@@ -1695,21 +1675,23 @@ void sur_toucher(lv_event_t *evenement) {
         break;
     case LV_EVENT_LONG_PRESSED:
         if (g.appui_long != nullptr) {
+            // La roue s'ouvre là où le doigt est, s'il n'a pas glissé depuis qu'il s'est posé (un glissement n'est pas un appui long).
+            lv_point_t p = g.appui_depart;
+            if (lv_indev_t *indev = lv_indev_active(); indev != nullptr) {
+                lv_indev_get_point(indev, &p);
+            }
+            if (roue::a_glisse({g.appui_depart.x, g.appui_depart.y}, {p.x, p.y}, g.seuil_glissement)) {
+                break;
+            }
             g.appui_long_fait = true;
             if (g.anneau != nullptr) {
                 montrer(g.anneau, false);
             }
-            g.appui_long();
+            g.appui_long(p.x, p.y);
         }
         break;
     default:
         break;
-    }
-}
-
-void sur_bouton_reglages(lv_event_t *evenement) {
-    if (lv_event_get_code(evenement) == LV_EVENT_CLICKED && g.ouvrir_reglages != nullptr) {
-        g.ouvrir_reglages();
     }
 }
 
@@ -1825,6 +1807,7 @@ bool ui_principal_creer(lv_obj_t *ecran, const RessourcesPrincipal &ressources, 
     const float ref_h = g.portrait ? 1280.0F : 720.0F;
     g.echelle = std::min(static_cast<float>(largeur) / ref_l, static_cast<float>(hauteur) / ref_h);
     g.diametre_anneau = px(88);
+    g.seuil_glissement = roue::glissement(roue::ecran_de(largeur, hauteur));
     g.ecran = ecran;
 
     // Tailles de référence. L'accueil : l'heure 168, la température du moment 54, la date 36, le texte des jours 32 et 28, le plus petit
@@ -1863,16 +1846,8 @@ bool ui_principal_creer(lv_obj_t *ecran, const RessourcesPrincipal &ressources, 
                             reinterpret_cast<void *>(static_cast<std::intptr_t>(z)));
     }
 
-    // Bouton Réglages (ADR-0007) : rond, en haut à droite, zone tactile élargie. Un appui long sur le bouton ne bascule pas l'écran :
-    // les événements d'un bouton ne remontent pas à l'écran.
-    g.bouton = creer_zone(ecran);
-    lv_obj_add_flag(g.bouton, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_ext_click_area(g.bouton, px(28));
-    lv_obj_add_event_cb(g.bouton, sur_bouton_reglages, LV_EVENT_CLICKED, nullptr);
-    lv_obj_add_event_cb(g.bouton, sur_dessin_bouton, LV_EVENT_DRAW_MAIN, nullptr);
-
     // Pastille de l'alerte officielle (ADR-0009) : cachée tant qu'aucune alerte n'est en vigueur (pas de bandeau permanent), placée par
-    // positionner_pastille_officielle. Comme le bouton Réglages, ses événements ne remontent pas à l'écran : pas d'appui long dessus.
+    // positionner_pastille_officielle. Ses événements ne remontent pas à l'écran : pas d'appui long dessus.
     g.pastille = creer_zone(ecran);
     lv_obj_add_flag(g.pastille, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(g.pastille, LV_OBJ_FLAG_HIDDEN);
@@ -2047,15 +2022,12 @@ bool ui_principal_changer_theme(const ThemePrincipal &theme) {
     for (int z = 0; z < Z_NOMBRE; ++z) {
         lv_obj_invalidate(g.zone[z]);
     }
-    lv_obj_invalidate(g.bouton);
     lv_obj_invalidate(g.pastille);
     lv_obj_invalidate(g.ecran);
     return true;
 }
 
-void ui_principal_sur_appui_long(void (*rappel)()) { g.appui_long = rappel; }
-
-void ui_principal_sur_reglages(void (*rappel)()) { g.ouvrir_reglages = rappel; }
+void ui_principal_sur_appui_long(void (*rappel)(int32_t x, int32_t y)) { g.appui_long = rappel; }
 
 void ui_principal_sur_alertes(void (*rappel)()) { g.ouvrir_alertes = rappel; }
 

@@ -5,7 +5,7 @@
 // et son contenu restent dessous, intacts. « Retour » sur le premier écran recharge l'écran qui était affiché et supprime celui-ci
 // avec toute sa pile. Transitions instantanées, sans fondu (AGENTS.md, préférences du produit).
 //
-// Appelé dans la tâche LVGL, verrou d'affichage déjà pris (bouton « Réglages » de l'écran principal).
+// Appelé dans la tâche LVGL, verrou d'affichage déjà pris (entrée « Réglages » de la roue d'appui long de l'écran principal).
 #include "ui_reglages.h"
 
 #include <cstddef>
@@ -17,6 +17,7 @@
 #include "lvgl.h"
 #include "src/draw/lv_draw_buf_private.h" // la structure des gestionnaires de tampons (LVGL ne l'ouvre qu'avec LV_USE_PRIVATE_API)
 
+#include "ecran_principal.h"
 #include "hote_appareil_esp.h"
 
 // Police Roboto Bold embarquée (main/assets/roboto_700.ttf, EMBED_FILES de main/CMakeLists.txt).
@@ -81,6 +82,7 @@ bool ouvrir_ecran(ecran::ContexteReglages &ctx) {
     ctx.hauteur = carte->height;
     ctx.hote = &ecran::hote_de_l_appareil();
     ctx.fermer = fermer;
+    ctx.ouvrir_diagnostic = ecran::ecran_principal_ouvrir_diagnostic; // Réglages > Appareil > Diagnostic
     return true;
 }
 

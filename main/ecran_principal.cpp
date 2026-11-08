@@ -27,6 +27,7 @@
 #include "ui_bonjour.h"
 #include "ui_principal.h"
 #include "ui_reglages.h"
+#include "ui_roue.h"
 #include "vigie_etat.h"
 #include "vue_depuis_detail.h"
 
@@ -34,6 +35,9 @@
 // ui_meteo_icones.cpp) : EMBED_FILES de main/CMakeLists.txt.
 extern const uint8_t roboto_700_start[] asm("_binary_roboto_700_ttf_start");
 extern const uint8_t roboto_700_end[] asm("_binary_roboto_700_ttf_end");
+// Sous-ensemble de la police d'icônes Material Design Icons pour la roue (main/assets/mdi_roue.ttf, target_add_binary_data).
+extern const uint8_t mdi_roue_start[] asm("_binary_mdi_roue_ttf_start");
+extern const uint8_t mdi_roue_end[] asm("_binary_mdi_roue_ttf_end");
 
 namespace ecran {
 
@@ -46,19 +50,24 @@ constexpr int kJournalToutesLesN = 120; // une minute à 500 ms
 
 lv_obj_t *g_ecran_principal = nullptr;
 lv_obj_t *g_ecran_diagnostic = nullptr;
+lv_obj_t *g_diag_retour = nullptr; // l'écran d'où le diagnostic a été ouvert (les réglages), pour y revenir
 int g_compteur = 0;
 bool g_heure_journalisee = false;
 char g_ville[sizeof(ZoneMeteo::nom)] = {};
 
-void vers_diagnostic() {
-    if (g_ecran_diagnostic != nullptr) {
-        lv_screen_load(g_ecran_diagnostic);
-    }
-}
-
 void vers_principal() {
     if (g_ecran_principal != nullptr) {
         lv_screen_load(g_ecran_principal);
+    }
+}
+
+// Appui long sur l'écran de diagnostic : on rend l'écran d'où l'on venait (les réglages, ouverts dessous et intacts), sinon l'écran
+// principal. Sans cela le diagnostic rendrait l'écran principal et laisserait les réglages « déjà ouverts » sans écran pour les fermer.
+void revenir_du_diagnostic() {
+    lv_obj_t *cible = (g_diag_retour != nullptr && lv_obj_is_valid(g_diag_retour)) ? g_diag_retour : g_ecran_principal;
+    g_diag_retour = nullptr;
+    if (cible != nullptr) {
+        lv_screen_load(cible);
     }
 }
 
@@ -128,9 +137,63 @@ void ouvrir_alertes() {
     ESP_LOGI(TAG, "page des alertes ouverte : %u alerte(s) en vigueur", static_cast<unsigned>(vue.nombre));
 }
 
+// La page des alertes existe-t-elle à cet instant ? Comme la pastille : alertes activées, heure sûre, une réponse de Vigie en mémoire.
+bool alertes_atteignables() {
+    if (!reglages_alertes().actives) {
+        return false;
+    }
+    const int64_t instant = static_cast<int64_t>(std::time(nullptr));
+    if (!rtc::heure_affichable(reseau_etat().heure_synchronisee, instant)) {
+        return false;
+    }
+    const VigieLecture lecture;
+    return lecture.valide();
+}
+
+// LE PREMIER ANNEAU de la roue d'appui long (ADR-0019) : « Réglages » et, quand la page des alertes existe, « Alertes ». Rien d'autre
+// au premier anneau (ni Profil, ni Affichage, ni Assistant). Pour une entrée de plus, par exemple « Détails » (ui_details_ouvrir(), session
+// meridien-details) : UNE ligne ici, et son glyphe dans tools/icones/roue_glyphes.json (puis régénérer, voir docs/outils.md).
+// Les chaînes sont des littéraux ou la table de traduction : elles vivent aussi longtemps que la roue est ouverte.
+int composer_entrees(EntreeRoue *sortie) {
+    int n = 0;
+    sortie[n++] = {texte_principal::t(texte_principal::kReglages), ICONE_REGLAGES, ui_reglages_ouvrir, nullptr, 0};
+    if (alertes_atteignables()) {
+        sortie[n++] = {visuel::texte_c("Alertes"), ICONE_ALERTES, ouvrir_alertes, nullptr, 0};
+    }
+    return n;
+}
+
+// Appui long sur l'écran principal : la roue s'ouvre au point d'appui (x, y), en pixels de l'écran.
+void ouvrir_roue(int32_t x, int32_t y) {
+    const board_info_t *carte = board_get_info();
+    if (carte == nullptr || g_ecran_principal == nullptr || ui_roue_ouverte()) {
+        return;
+    }
+    EntreeRoue entrees[ENTREES_ROUE_MAX] = {};
+    const int n = composer_entrees(entrees);
+    ContexteRoue ctx;
+    ctx.couche = lv_display_get_layer_top(board_get_display());
+    ctx.ttf = roboto_700_start;
+    ctx.ttf_taille = static_cast<size_t>(roboto_700_end - roboto_700_start);
+    ctx.mdi = mdi_roue_start;
+    ctx.mdi_taille = static_cast<size_t>(mdi_roue_end - mdi_roue_start);
+    ctx.largeur = carte->width;
+    ctx.hauteur = carte->height;
+    ctx.theme = &theme_du_reglage();
+    if (!ui_roue_ouvrir(ctx, entrees, n, x, y)) {
+        // Les réglages doivent rester atteignables même si la roue ne peut pas se construire (police ou mémoire) : on les ouvre tout de suite.
+        ESP_LOGE(TAG, "roue non ouverte en (%d, %d) : les réglages s'ouvrent directement", static_cast<int>(x),
+                 static_cast<int>(y));
+        ui_reglages_ouvrir();
+        return;
+    }
+    ESP_LOGI(TAG, "roue ouverte en (%d, %d) : %d entrée(s)", static_cast<int>(x), static_cast<int>(y), n);
+}
+
 // Appelé par LVGL (dans sa tâche, verrou pris) deux fois par seconde.
 void rafraichir(lv_timer_t *) {
     ui_principal_changer_theme(theme_du_reglage()); // rien si le thème n'a pas changé depuis la page de réglages
+    ui_roue_changer_theme(theme_du_reglage());      // la roue, si elle est ouverte, suit le thème
     const EtatReseau etat = reseau_etat();
 
     EntreesPrincipal entrees = {};
@@ -207,15 +270,24 @@ void rafraichir(lv_timer_t *) {
 
 } // namespace
 
+void ecran_principal_ouvrir_diagnostic() {
+    if (g_ecran_diagnostic == nullptr || lv_screen_active() == g_ecran_diagnostic) {
+        return;
+    }
+    g_diag_retour = lv_screen_active(); // les réglages, d'où la ligne « Diagnostic » a été touchée
+    lv_screen_load(g_ecran_diagnostic);
+}
+
 void ecran_principal_creer(const BootInfo &boot) {
     const board_info_t *carte = board_get_info();
     lv_display_t *affichage = board_get_display();
 
     // Écran de diagnostic : l'écran « Bonjour » des phases 1a et 1b (cause du dernier redémarrage, état du Wi-Fi, point tactile,
-    // bouton Redémarrer). Il garde l'écran actif par défaut ; l'écran principal est créé à part puis chargé.
+    // bouton Redémarrer). Il garde l'écran actif par défaut ; l'écran principal est créé à part puis chargé. On l'atteint par
+    // Réglages > Appareil > Diagnostic (ecran_principal_ouvrir_diagnostic) ; son appui long rend l'écran d'où l'on venait.
     ui_bonjour_creer(boot);
     g_ecran_diagnostic = lv_display_get_screen_active(affichage);
-    ui_bonjour_sur_appui_long(vers_principal);
+    ui_bonjour_sur_appui_long(revenir_du_diagnostic);
 
     g_ecran_principal = lv_obj_create(nullptr);
     const size_t libre_interne_avant = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
@@ -226,9 +298,8 @@ void ecran_principal_creer(const BootInfo &boot) {
         g_ecran_principal = nullptr; // l'appui long de l'écran de diagnostic ne charge alors rien
         return;
     }
-    ui_principal_sur_appui_long(vers_diagnostic);
-    ui_principal_sur_reglages(
-        ui_reglages_ouvrir);                  // ADR-0007 : les réglages restent atteignables depuis l'écran principal
+    ui_principal_sur_appui_long(
+        ouvrir_roue); // ADR-0019 : l'appui long ouvre la roue, d'où l'on atteint les réglages (ADR-0007)
     ui_principal_sur_alertes(ouvrir_alertes); // ADR-0009 : la pastille de l'alerte officielle ouvre la page des alertes
 
     // Une première mise à jour avant d'afficher : jamais d'écran vide, même une demi-seconde.
@@ -240,12 +311,13 @@ void ecran_principal_creer(const BootInfo &boot) {
     lv_timer_create(rafraichir, kPeriodeMs, nullptr);
 
     const CoutEcran cout = ui_principal_cout();
+    const CoutRoue cout_roue = ui_roue_cout();
     ESP_LOGI(TAG,
-             "écran principal %dx%d chargé (%d objets LVGL, %d polices) ; appui long (400 ms) : écran de diagnostic ; "
-             "mémoire "
-             "interne libre %u -> %u o",
+             "écran principal %dx%d chargé (%d objets LVGL, %d polices) ; appui long (400 ms) : roue (1 objet LVGL "
+             "tant qu'elle est "
+             "ouverte, %u o de RAM statique) ; mémoire interne libre %u -> %u o",
              static_cast<int>(carte->width), static_cast<int>(carte->height), cout.objets, cout.polices,
-             static_cast<unsigned>(libre_interne_avant),
+             static_cast<unsigned>(cout_roue.ram_statique), static_cast<unsigned>(libre_interne_avant),
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
 }
 

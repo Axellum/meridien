@@ -1,5 +1,6 @@
 // Écran principal : grande horloge, date, météo du moment, grandeurs (vent, pluie, humidité, pression, UV, soleil, lune), prévision
-// heure par heure et sur sept jours, alertes, bouton Réglages. Fond en dégradé qui suit l'heure du jour et le temps.
+// heure par heure et sur sept jours, alertes. Fond en dégradé qui suit l'heure du jour et le temps. Les réglages s'ouvrent par la roue
+// d'appui long (ui_roue.h).
 //
 // LVGL PUR (contrat d'interface n° 3) : ce fichier et ses voisins (ui_principal.cpp, ui_meteo_*.cpp) n'incluent AUCUN en-tête
 // ESP-IDF, ni FreeRTOS, ni journal. Ils reçoivent leurs données par paramètre, la police et les icônes par leurs octets, afin que
@@ -68,12 +69,11 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees);
 // que l'écran (les thèmes de visuel_themes.hpp sont des constantes).
 bool ui_principal_changer_theme(const visuel::ThemePrincipal &theme);
 
-// Appui long (400 ms) sur l'écran : `rappel` est appelé dans la tâche LVGL. nullptr : rien. Sert à ouvrir l'écran de diagnostic.
-void ui_principal_sur_appui_long(void (*rappel)());
-
-// Bouton « Réglages » (ADR-0007), en haut à droite : `rappel` est appelé dans la tâche LVGL sur un appui court. nullptr : le bouton
-// est dessiné mais ne fait rien. Le branchement sur ui_reglages_ouvrir() est dans ecran_principal.cpp.
-void ui_principal_sur_reglages(void (*rappel)());
+// Appui long (400 ms) sur l'écran : `rappel(x, y)` est appelé dans la tâche LVGL, avec le point où le doigt est (pixels de l'écran).
+// Un doigt qui a glissé de plus que le seuil de glissement depuis qu'il s'est posé n'est pas un appui long : rien n'est appelé.
+// nullptr : rien. Sert à ouvrir la roue (ui_roue.h, ADR-0019), d'où l'on atteint les réglages : il n'y a plus de bouton « Réglages »
+// sur cet écran.
+void ui_principal_sur_appui_long(void (*rappel)(int32_t x, int32_t y));
 
 // Pastille de l'alerte officielle (ADR-0009) : `rappel` est appelé dans la tâche LVGL sur un appui court sur la pastille, qui n'est
 // tactile que tant qu'une alerte est en vigueur (EntreesPrincipal::bandeau.present). Le branchement sur la page des alertes est dans
