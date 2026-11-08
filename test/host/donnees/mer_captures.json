@@ -1,0 +1,110 @@
+{
+ "govelle": {
+  "content_type": "text/plain; charset=utf-8",
+  "genere_utc": 1794143750,
+  "http": 200,
+  "lignes_par_balise": {
+   "ACT": 4,
+   "CRIT": 15,
+   "DAY": 25,
+   "END": 1,
+   "HAZ": 12,
+   "HEAD": 1,
+   "RAIN5M": 5,
+   "SEA": 1,
+   "ZONE": 5
+  },
+  "octets": 5022,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/embedded/frame?device_type=generic&spot=le-pouliguen-plage-de-la-govelle"
+ },
+ "hossegor": {
+  "content_type": "text/plain; charset=utf-8",
+  "genere_utc": 1794143738,
+  "http": 200,
+  "lignes_par_balise": {
+   "ACT": 4,
+   "CRIT": 15,
+   "DAY": 25,
+   "END": 1,
+   "HAZ": 12,
+   "HEAD": 1,
+   "RAIN5M": 5,
+   "SEA": 1,
+   "ZONE": 5
+  },
+  "octets": 4992,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/embedded/frame?device_type=generic&spot=soorts-hossegor-plage-sud-point-d-or"
+ },
+ "la_torche": {
+  "content_type": "text/plain; charset=utf-8",
+  "genere_utc": 1794143740,
+  "http": 200,
+  "lignes_par_balise": {
+   "ACT": 4,
+   "CRIT": 15,
+   "DAY": 25,
+   "END": 1,
+   "HAZ": 12,
+   "HEAD": 1,
+   "RAIN5M": 5,
+   "SEA": 1,
+   "ZONE": 5
+  },
+  "octets": 5019,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/embedded/frame?device_type=generic&spot=beuzec-plage-de-la-torche"
+ },
+ "ondarraitz": {
+  "content_type": "text/plain; charset=utf-8",
+  "genere_utc": 1794143753,
+  "http": 200,
+  "lignes_par_balise": {
+   "ACT": 4,
+   "CRIT": 15,
+   "DAY": 25,
+   "END": 1,
+   "HAZ": 12,
+   "HEAD": 1,
+   "RAIN5M": 5,
+   "SEA": 1,
+   "ZONE": 5
+  },
+  "octets": 5001,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/embedded/frame?device_type=generic&spot=hendaye-ondarraitz"
+ },
+ "port_vieux": {
+  "content_type": "text/plain; charset=utf-8",
+  "genere_utc": 1794143747,
+  "http": 200,
+  "lignes_par_balise": {
+   "ACT": 4,
+   "CRIT": 15,
+   "DAY": 25,
+   "END": 1,
+   "HAZ": 12,
+   "HEAD": 1,
+   "RAIN5M": 5,
+   "SEA": 1,
+   "ZONE": 5
+  },
+  "octets": 5019,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/embedded/frame?device_type=generic&spot=biarritz-plage-du-port-vieux"
+ },
+ "rochebonne": {
+  "content_type": "text/plain; charset=utf-8",
+  "genere_utc": 1794143744,
+  "http": 200,
+  "lignes_par_balise": {
+   "ACT": 4,
+   "CRIT": 15,
+   "DAY": 25,
+   "END": 1,
+   "HAZ": 12,
+   "HEAD": 1,
+   "RAIN5M": 5,
+   "SEA": 1,
+   "ZONE": 5
+  },
+  "octets": 5017,
+  "url": "https://vigie.auxfilsdesidees.fr/v1/embedded/frame?device_type=generic&spot=saint-malo-plage-de-rochebonne"
+ }
+}

@@ -101,6 +101,10 @@ def lancer(cxx, mode):
     from controle_cartes import controle_cartes  # noqa: PLC0415  (cartes : partitions, broches du C6, hygiène des fichiers de la 7B)
 
     echecs += controle_cartes()
+
+    from controle_python_mer import controle_mer  # noqa: PLC0415  (mer : trames enregistrées relues par un lecteur Python indépendant)
+
+    echecs += controle_mer()
     print("\nRÉSULTAT :", "tout passe" if echecs == 0 else f"{echecs} fichier(s) en échec")
     return 1 if echecs else 0
 
@@ -177,6 +181,7 @@ from mutations_reglages_ecran import MUTATIONS_REGLAGES_ECRAN  # noqa: E402  (r�
 from mutations_roue_geometrie import MUTATIONS_ROUE_GEOMETRIE  # noqa: E402  (roue d'appui long : mesures, pivotement, mots, toucher)
 from mutations_roue_commande import MUTATIONS_ROUE_COMMANDE  # noqa: E402  (roue d'appui long : écran, demande, dépliement, décision du toucher)
 from mutations_surf import MUTATIONS_SURF  # noqa: E402  (noyau surf : spot, requêtes, lecture, vent, marée, note, créneau)
+from mutations_mer import MUTATIONS_MER  # noqa: E402  (noyau mer : CRC, trame SEA/ACT/CRIT, noms du contrat, fraîcheur, courbe de marée)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
@@ -202,6 +207,7 @@ MUTATIONS += MUTATIONS_VIGIE
 MUTATIONS += MUTATIONS_GZIP
 MUTATIONS += MUTATIONS_FUSEAUX
 MUTATIONS += MUTATIONS_SURF
+MUTATIONS += MUTATIONS_MER
 MUTATIONS += MUTATIONS_ACCUEIL_AUTO
 MUTATIONS += MUTATIONS_NVS_SECURITE
 MUTATIONS += MUTATIONS_GRANDEURS
