@@ -31,7 +31,11 @@ struct Bandeau {
     Niveau niveau = Niveau::Inconnu;    // couleur de la pastille (couleur_officielle du thème)
     std::uint8_t autres = 0;            // alertes en vigueur en plus de celle qui est montrée
     char texte[BANDEAU_TEXTE_CAP] = {}; // une ligne, UTF-8
-    std::uint32_t empreinte = 0;        // vigie::empreinte : change quand ce que la pastille ou la page montrent change
+    // Quand l'alerte commence et finit (instants UNIX UTC ; 0 : inconnu). Début : `debut` (onset), à défaut `effectif` ; fin : `fin` (ends), à
+    // défaut `expire` (fin de validité du message). L'accueil en tire « 14–22 h » quand les deux tombent le même jour local.
+    std::int64_t debut_s = 0;
+    std::int64_t fin_s = 0;
+    std::uint32_t empreinte = 0; // vigie::empreinte : change quand ce que la pastille ou la page montrent change
 };
 
 namespace detail {
@@ -70,6 +74,8 @@ constexpr Bandeau composer_bandeau(const Alertes &a, const Vue &v, i18n::Langue 
     b.present = true;
     b.niveau = x.niveau;
     b.autres = static_cast<std::uint8_t>(v.nombre - 1);
+    b.debut_s = x.debut ? *x.debut : (x.effectif ? *x.effectif : 0);
+    b.fin_s = x.fin ? *x.fin : (x.expire ? *x.expire : 0);
     const std::string_view code_langue = i18n::code(langue);
     const Titre titre = titre_de(x, code_langue);
     std::size_t n = 0;
@@ -86,6 +92,11 @@ constexpr Bandeau composer_bandeau(const Alertes &a, const Vue &v, i18n::Langue 
     for (std::size_t i = 0; b.texte[i] != '\0' && i < sizeof b.texte; ++i)
         octet(static_cast<unsigned char>(b.texte[i]));
     octet(0);
+    // la page ignore `effectif` (début de repli) : la pastille, elle, l'écrit
+    for (const std::int64_t t : {b.debut_s, b.fin_s}) {
+        for (int i = 0; i < 8; ++i)
+            octet(static_cast<std::uint32_t>(static_cast<std::uint64_t>(t) >> (8 * i)));
+    }
     b.empreinte = h;
     return b;
 }
