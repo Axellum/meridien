@@ -15,6 +15,13 @@
 > phrases are added to the seven-language table (German, Dutch, Spanish, Italian and Turkish are **written by the AI**, not
 > checked by a native speaker). All thresholds are still "Vigie's rule, to be validated by the owner", none official. Status:
 > **proposed**; seen on PC renders and compiled for both boards, **never flashed, never run on a board**.
+>
+> **Complement (stacked PR B): the « Profil » setting.** The pilot's `epingle` / `profil_epingle` inputs now come from a setting,
+> `profil` (`auto` by default, or `meteo`), set from the web page, the on-screen settings and a **« Profil ▸ » family in the
+> press-and-hold wheel** (second ring: Auto and Weather, the one in force marked). The device offers **only what it can draw**:
+> Auto and Weather. A stored value outside the table (a corrupt NVS byte) means **no pin**. Pinned: the pastille says
+> « Météo · épinglé » with « Auto en pause », the rain card is gone, an orange or red alert still gets its enlarged banner;
+> unpinning gives the hand back to the rules at once. See « Complément » below. Still **never flashed, never run on a board**.
 
 - **Statut** : **proposée**, écrite le 08/11/2026 ; à valider par Axel. Constaté (PC et compilation, aucune carte) : 1 694 tests du noyau avec AddressSanitizer et UBSan, 104 mutations toutes détectées,
   117 rendus LVGL regardés (13 états, 3 tailles, français, allemand et turc), compilations du Tab5 et de la 7B depuis un arbre propre
@@ -23,7 +30,7 @@
   (le goût, la lisibilité à un mètre, le toucher), la durée d'une vraie journée, les cinq langues écrites sans relecteur.
 - **Contexte** : le 08/11/2026 Axel a validé un plan en six lots pour un nouvel accueil (voir [ADR-0015](0015-accueil-mode-automatique.md)).
   Le lot 3 est le **branchement** du noyau de décision : il est livré en **deux PR empilées**. Celle-ci (A) branche `decider()` à
-  l'écran **sans réglage** ; la suivante (B) ajoute le réglage « Profil » et « Profil ▸ » dans la roue d'appui long. La consigne
+  l'écran **sans réglage** ; la suivante (B) ajoute le réglage « Profil » et « Profil ▸ » dans la roue d'appui long (voir « Complément »). La consigne
   cite deux esquisses, `auto-pluie` (la carte pluie) et `auto-alerte` (le bandeau agrandi) : **je ne les ai pas retrouvées** (ni dans
   le dépôt, ni dans les notes de la session qui m'a lancé). La composition suit leur description ; les nombres (bande de 92 px,
   tuile de 360 px, écart de 16 px) sont **choisis par l'auteur**, pas mesurés : à comparer aux esquisses par Axel.
@@ -120,7 +127,7 @@
   - que le lever et le coucher du soleil calculés sont ceux que la personne voit chez elle (comparaison à une source, non faite).
 - **Conséquences** :
   - La PR suivante (B) ajoute le réglage « Profil » (Auto / un profil épinglé) et « Profil ▸ » dans la roue ; le champ
-    `Mesures::epingle` / `profil_epingle` du pilote est déjà là, à `false` dans cette PR.
+    `Mesures::epingle` / `profil_epingle` du pilote est déjà là, à `false` dans cette PR (voir « Complément » : la PR B le branche).
   - Les lots 4 à 6 rendront Surf, Vent·Bateau et Côte disponibles (`PROFILS_DISPONIBLES`) et brancheront les entrées aujourd'hui
     « inconnues » ; le pilote n'a alors qu'à les lire.
   - Changer un seuil ou une phrase = changer l'en-tête, la table, les tests et `mutations_accueil_pilote.py` /
@@ -128,3 +135,62 @@
   - Ligne à l'index `docs/decisions/README.md` : `0023 — Accueil : le mode automatique branché à l'écran`.
   - À garder en tête : **l'écran montre des règles jamais jugées sur une carte ; aucun seuil ne vient d'une source officielle ;
     rien n'a été flashé.**
+
+## Complément (PR B, empilée sur la PR A) — le réglage « Profil » et « Profil ▸ » dans la roue d'appui long
+
+- **Statut** : **proposée**, écrite le 08/11/2026 ; à valider par Axel. Constaté (PC et compilation, aucune carte) : voir
+  [docs/mesures/accueil-profil.md](../mesures/accueil-profil.md). **Non constaté** : tout ce qui se juge sur l'écran réel (le toucher
+  de la roue, la lisibilité du choix marqué), la **persistance après un vrai redémarrage** (la NVS n'a été exercée que sur le PC).
+- **Décision** :
+  1. **Un réglage `profil`** (registre `affichage.profil`, section Affichage, `Choix`) : `auto` (défaut : les règles de l'ADR-0015
+     décident) ou `meteo` (l'écran reste sur la météo ; **une alerte officielle s'affiche quand même**). Il se règle de **trois
+     façons qui écrivent au même endroit** : la page web (`/api/display`, champs `profil` et `profils` — la liste de ce que l'appareil
+     offre), l'écran de réglages (une rangée de pastilles « Auto / Météo » dans « Affichage ») et la roue. Comme le thème : même
+     registre, même validation, même NVS ; l'API refuse une valeur inconnue (`422 profil_inconnu`) sans rien changer.
+  2. **NVS** : une clé `u8` « profil » dans l'espace « reglages », **à côté** du blob « affichage » (qui ne change pas : une carte
+     déjà en service le relit tel quel). Clé absente = « auto ». Un octet lu **hors table** (NVS abîmée) vaut « auto » : **jamais un
+     profil épinglé par accident**. À l'écriture, une valeur hors table est refusée et rien n'est écrit.
+  3. **L'appareil n'offre que ce qu'il dessine** : « Auto » et « Météo » (`accueil::profil_offert`, `PROFILS_DISPONIBLES` du pilote).
+     Surf, Vent·Bateau et Côte n'existent ni dans le registre, ni dans l'API, ni dans la roue : un profil de plus = une ligne dans
+     `PROFILS_ACCUEIL`, dans le registre, dans `PROFILS_DISPONIBLES`, et son glyphe. La famille « Profil ▸ » n'est posée que si au
+     moins deux choix sont offerts.
+  4. **La roue** : « Profil ▸ » est la **dernière entrée du premier anneau** (Réglages, Détails, Alertes quand une alerte est en
+     vigueur, puis Profil : jamais plus de quatre boutons sur six). Son second anneau : « Auto » et « Météo ». Le choix **en vigueur
+     est marqué** comme la famille dépliée du premier anneau (filet et icône à la couleur d'accent, `ChoixRoue::actif`) ; il reste
+     touchable, et le choisir de nouveau **n'écrit rien**. Toucher un choix **écrit le réglage puis déclenche tout de suite** le
+     passage de l'accueil (l'écran suit sans attendre les 500 ms). Les trois icônes sont des glyphes de la police de la roue (ADR-0021)
+     ajoutés au manifeste et régénérés : `monitor-dashboard` (Profil), `refresh-auto` (Auto), `weather-partly-cloudy` (Météo) ;
+     aucune n'est un rectangle vide (contrôlé par `generer_police_roue.py --verifier`). Le **mot du bouton de la famille dépliée n'est
+     plus redit** : le moyeu l'affiche déjà et le mot, posé vers l'extérieur dans l'axe du bouton, passait sous les disques du second
+     anneau (« Profil » y perdait son « l » sous « Météo ») ; c'est vrai aussi de la famille de démonstration d'ADR-0021, avant cette PR.
+  5. **Épinglé** : la pastille dit « Météo · épinglé » avec « Auto en pause » ; la carte pluie ne s'ouvre pas ; l'alerte orange ou
+     rouge garde son bandeau agrandi (une alerte officielle ne cède jamais sa place) ; la décision des règles est **suspendue, pas
+     perdue** : dépingler rend la main aux règles au passage suivant, qui est déclenché à l'instant.
+  6. **ADR-0017** : la famille « Profil » donne `Demande::choix` = 2 (les mots sont mesurés à l'ouverture comme pour toute famille) ;
+     la position du moyeu a été **remesurée** avec la nouvelle forme du premier anneau (jusqu'à quatre boutons dont une famille), aux
+     trois tailles : le journal du banc dit « tient » à chaque fois (voir la page de mesures).
+- **Alternatives écartées** :
+  - *Mettre « Profil » en premier anneau avant « Réglages »* : « Réglages » reste le premier bouton, celui que tout le monde atteint
+    (les essais du banc le touchent par son rang).
+  - *Un réglage par profil épinglable (« épingler Météo » oui / non)* : un seul réglage à N valeurs, « Auto » en est une ; c'est ce
+    que feront Surf, Vent·Bateau et Côte sans changer l'interface.
+  - *Mettre le profil dans le blob « affichage »* : il aurait fallu le migrer (taille, version) sans que rien ne l'exige.
+  - *Une durée d'épinglage (« jusqu'à demain »)* : non demandé ; l'épinglage dure jusqu'à ce qu'on le retire.
+- **À valider par Axel** (choix faits par l'auteur, pas par la consigne) :
+  10. « Profil ▸ » **en dernière place** du premier anneau ;
+  11. le **choix en vigueur marqué** par la couleur d'accent (filet + icône), la même marque que la famille dépliée : à juger à un mètre ;
+  12. le **mot de la famille dépliée n'est plus dessiné** au premier anneau (le moyeu le dit) ;
+  13. les **icônes** : un écran de tableau de bord (Profil), un « A » dans une flèche circulaire (Auto), un soleil derrière un nuage (Météo) ;
+  14. le **libellé** « Profil » et ses six traductions (rédigées par l'IA, non relues) ; la phrase d'aide du réglage ;
+  15. **épingler Météo laisse l'alerte officielle s'afficher** (la consigne dit que l'alerte gagne ; la pastille, elle, dit « épinglé »).
+- **À prouver (non vérifié)** :
+  - sur la carte : toucher « Profil », puis « Météo », voir l'accueil changer, **redémarrer**, retrouver Météo épinglé ; puis le
+    dépingler par la page web et revoir la marque dans la roue ;
+  - l'écriture NVS (un `nvs_set_u8` de plus avant le `commit` existant) : exercée sur le PC par les tests de l'API et de l'hôte, **pas
+    sur une NVS réelle** ;
+  - la **place de la rangée « Profil »** sur la page « Affichage » de l'écran de réglages à 1024×600 : vue sur les rendus, pas sur la carte.
+- **Limites** : le panneau « Pourquoi cet écran ? », l'état « nuit », Surf, Vent·Bateau et Côte ne sont **pas** faits ; l'indice d'appui
+  long (« une seule fois ») n'existe pas dans le dépôt et n'a **pas** été construit ; rien de ce qui touche à la mer n'est dans cette PR.
+- **Conflits possibles** avec les PR de la mer (empilées sur `claude/mer-noyau`) : elles ajoutent aussi un glyphe à la roue
+  (`roue_glyphes.json`, `mdi_roue.ttf`, `ui_roue_icones.inc`, `main/assets/README.md`) et une entrée à `composer_entrees` ; le fichier de
+  police est binaire : au second merge, **régénérer** `mdi_roue.ttf` avec `generer_police_roue.py --source …` depuis le manifeste fusionné.

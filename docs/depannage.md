@@ -644,6 +644,26 @@ endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy
 - **Status**: resolved on the PC renders; not seen on a screen.
 
 
+#### The word of the unfolded family disappears under the second ring
+
+**Symptom.** With « Profil ▸ » unfolded (two choices), the last letter of the word « Profil », drawn beside its button of the first ring, is covered by the disk of the neighbouring choice (« Météo »), on the PC renders at 1280×720 and 1024×600. The demonstration family of ADR-0021 does the same with « Affichage ».
+
+**Cause.** A first-ring word is placed on the axis of its button, outwards (`cote_du_mot` in `roue_geometrie.hpp`), which is exactly where the second ring of that family opens: with few choices the nearest disk sits on the word.
+
+**Solution.** `main/ui_roue.cpp` no longer draws the word of the unfolded family at the first ring: the hub already says it (« Profil »). A folded family keeps its word. The geometry is not changed (it keeps reserving the room).
+
+**Seen on** PC render (LVGL 9.5.0, no board), branch `claude/mode-auto-profil-1bf706`, 08/11/2026. **Evidence**: the PNG before (the « l » cut, zoomed) and after (no word, the hub says « Profil ») were looked at. **Status**: resolved on the render; not looked at on a board.
+
+#### « Hava durumu » is cut at the edge when the wheel opens in the bottom-right corner of a portrait screen
+
+**Symptom.** In Turkish, at 720×1280, with a finger at about 95 % × 93 % of the screen and the « Alertes » button present (four buttons), the second ring of « Profil ▸ » does not fit: the word « Hava durumu » (Weather) is cut by the right edge, and the bench journal says “NE TIENT PAS”. The other six languages and the sizes of the two boards (1280×720, 1024×600) fit in the same variant.
+
+**Cause.** The geometry reserves the width of the longest choice word (`mot_choix`), but at that corner no placement leaves enough room for that word. Read in the bench journal; the geometry was not explored further.
+
+**Solution.** None made. Options not done: a shorter Turkish word for the wheel, or letting the wheel put its hub further from the finger when a word does not fit. Portrait is not a use of the two boards today.
+
+**Seen on** PC render (LVGL 9.5.0, no board), branch `claude/mode-auto-profil-1bf706`, 08/11/2026. **Evidence**: variant `roue-profil-coin`, Turkish, 720×1280, in `docs/captures/ecran/`. **Status**: open, low priority.
+
 #### GCC 14.2 stops with "internal compiler error: in gimple_add_tmp_var" on `g.second = roue::Anneau{};`
 
 **Symptom.** `idf.py build` (ESP-IDF 5.5.5, GCC 14.2.0) fails on `main/ui_roue.cpp` with `internal compiler error: in gimple_add_tmp_var, at gimplify.cc:802`, the caret under the `{}` of `g.second = roue::Anneau{};`. clang (the PC bench and the tests) compiles the same line without a word.
@@ -1314,6 +1334,26 @@ endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une s
 - **Preuve** : les PNG `roue-centre-1280x720` avant (tache au-dessus du moyeu) et après (bande sous les boutons), regardés.
 - **Statut** : résolu sur les rendus du PC ; pas vu sur un écran.
 
+
+#### Le mot de la famille dépliée disparaît sous le second anneau
+
+**Symptôme.** Avec « Profil ▸ » déplié (deux choix), la dernière lettre du mot « Profil », posé à côté de son bouton du premier anneau, est couverte par le disque du choix voisin (« Météo »), sur les rendus du PC à 1280×720 et 1024×600. La famille de démonstration de l'ADR-0021 fait pareil avec « Affichage ».
+
+**Cause.** Le mot d'un bouton du premier anneau est posé dans l'axe de son bouton, vers l'extérieur (`cote_du_mot` dans `roue_geometrie.hpp`), c'est-à-dire exactement là où s'ouvre le second anneau de cette famille : avec peu de choix, le disque le plus proche tombe sur le mot.
+
+**Solution.** `main/ui_roue.cpp` ne dessine plus le mot de la famille dépliée au premier anneau : le moyeu le dit déjà (« Profil »). Une famille repliée garde son mot. La géométrie n'est pas modifiée (elle continue de réserver la place).
+
+**Vu sur** rendu PC (LVGL 9.5.0, aucune carte), branche `claude/mode-auto-profil-1bf706`, 08/11/2026. **Preuve** : le PNG avant (le « l » coupé, agrandi) et après (plus de mot, le moyeu dit « Profil ») ont été regardés. **Statut** : résolu sur le rendu ; pas regardé sur une carte.
+
+#### « Hava durumu » est coupé au bord quand la roue s'ouvre dans le coin bas droit d'un écran en portrait
+
+**Symptôme.** En turc, à 720×1280, avec un doigt vers 95 % × 93 % de l'écran et le bouton « Alertes » présent (quatre boutons), le second anneau de « Profil ▸ » ne tient pas : le mot « Hava durumu » (Météo) est coupé par le bord droit, et le journal du banc dit « NE TIENT PAS ». Les six autres langues et les tailles des deux cartes (1280×720, 1024×600) tiennent dans la même variante.
+
+**Cause.** La géométrie réserve la largeur du plus long mot des choix (`mot_choix`), mais dans ce coin aucune disposition ne laisse assez de place à ce mot. Lue dans le journal du banc ; la géométrie n'a pas été explorée davantage.
+
+**Solution.** Aucune. Pistes non faites : un mot turc plus court pour la roue, ou laisser la roue poser son moyeu plus loin du doigt quand un mot ne tient pas. Le portrait n'est pas un usage des deux cartes aujourd'hui.
+
+**Vu sur** rendu PC (LVGL 9.5.0, aucune carte), branche `claude/mode-auto-profil-1bf706`, 08/11/2026. **Preuve** : variante `roue-profil-coin`, turc, 720×1280, dans `docs/captures/ecran/`. **Statut** : ouvert, priorité basse.
 
 #### GCC 14.2 plante (« internal compiler error: in gimple_add_tmp_var ») sur `g.second = roue::Anneau{};`
 

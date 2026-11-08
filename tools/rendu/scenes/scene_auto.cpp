@@ -2,13 +2,17 @@
 // pastille « Auto · … » à côté du lieu, la carte pluie qui recouvre les cinq jours, le bandeau d'alerte agrandi (orange ou rouge) avec sa
 // tuile de pluie et les cinq jours réduits à une bande, le profil épinglé.
 //
+// Les variantes « roue-profil-* » ajoutent la roue d'appui long (main/ui_roue.cpp) avec sa famille « Profil ▸ » (main/ui_roue_profil.h,
+// le même fichier que l'appareil) : le second anneau offre « Auto » et « Météo », le profil en vigueur marqué ; la variante
+// « parcours-profil » rejoue le geste (appui long, Profil, Météo, puis Auto) et s'arrête en ECHEC si l'accueil ne suit pas.
+//
 // La décision n'est pas écrite à la main : chaque variante passe par le VRAI pilote (accueil_pilote.hpp), avec les mêmes mesures que le
 // branchement de l'appareil (main/ecran_principal.cpp), donc ce que ce banc montre est ce que le noyau décide pour ces entrées.
 //
 // À rendre avec -Instant 2026-11-08T07:45:00Z (dimanche 08 h 45 en France), l'heure de l'esquisse. Fixtures inventées, pas des mesures.
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp
+// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp
 // rendu-langues: fr en de nl es it tr
 // rendu-langues-defaut: fr de tr
 // rendu-tailles: 1280x720 1024x600 720x1280
@@ -16,15 +20,22 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 
 #include "banc.h"
+#include "ecran/accueil_epinglage.hpp"
 #include "ecran/accueil_pilote.hpp"
+#include "ecran/visuel_textes.hpp"
 #include "lvgl.h"
 #include "scenes/scene_principal_donnees.hpp"
 #include "ui_principal.h"
+#include "ui_roue.h"
+#include "ui_roue_profil.h"
 
 extern const uint8_t roboto_700_start[] asm("_binary_roboto_700_ttf_start");
 extern const uint8_t roboto_700_end[] asm("_binary_roboto_700_ttf_end");
+extern const uint8_t mdi_roue_start[] asm("_binary_mdi_roue_ttf_start");
+extern const uint8_t mdi_roue_end[] asm("_binary_mdi_roue_ttf_end");
 
 namespace {
 
@@ -62,7 +73,18 @@ ecran::vigie::Bandeau alerte(int64_t maintenant_s, Niveau niveau, const char *ti
     return b;
 }
 
-// Le pilote, avec les mêmes mesures que main/ecran_principal.cpp. `epingle` : un profil Météo épinglé (le réglage « Profil » de la suite).
+[[noreturn]] void echec(const char *quoi) {
+    std::fprintf(stderr, "ECHEC de la scène auto : %s\n", quoi);
+    std::exit(1);
+}
+
+void exiger(bool condition, const char *quoi) {
+    if (!condition) {
+        echec(quoi);
+    }
+}
+
+// Le pilote, avec les mêmes mesures que main/ecran_principal.cpp. `epingle` : un profil Météo épinglé (le réglage « Profil »).
 ecran::EntreesPrincipal decider(ecran::EntreesPrincipal e, bool epingle = false) {
     ecran::accueil::Pilote pilote;
     ecran::accueil::Mesures m;
@@ -181,6 +203,159 @@ void exemple(const banc::Contexte &c) {
     afficher(c, decider(entrees(c, 0, v)));
 }
 
+// ---- la roue d'appui long et sa famille « Profil » ----------------------------------------------------------------------------------
+
+using ecran::reglages::ProfilAccueil;
+
+// Le réglage du banc : ce que « Auto » et « Météo » écrivent ici (sur l'appareil : le réglage « Profil » en NVS).
+ProfilAccueil g_profil = ProfilAccueil::Auto;
+int g_choix_profil = 0;
+void choisir_auto() {
+    g_profil = ProfilAccueil::Auto;
+    ++g_choix_profil;
+}
+void choisir_meteo() {
+    g_profil = ProfilAccueil::Meteo;
+    ++g_choix_profil;
+}
+void rien() {}
+
+// Le premier anneau de l'appareil (main/ecran_principal.cpp, composer_entrees) : « Réglages », « Détails », « Alertes » quand une alerte est
+// en vigueur, puis la famille « Profil ». « Réglages », « Détails » et « Alertes » ne font rien ici : la scène juge le second anneau.
+int composer(ecran::EntreeRoue *sortie, bool alertes, ecran::ChoixRoue *choix) {
+    int n = 0;
+    sortie[n++] = {ecran::visuel::texte_c("Réglages"), ecran::ICONE_REGLAGES, rien, nullptr, 0};
+    sortie[n++] = {ecran::visuel::texte_c("Détails"), ecran::ICONE_DETAILS, rien, nullptr, 0};
+    if (alertes) {
+        sortie[n++] = {ecran::visuel::texte_c("Alertes"), ecran::ICONE_ALERTES, rien, nullptr, 0};
+    }
+    ecran::ActionsProfil actions;
+    actions.choisir[static_cast<std::size_t>(ProfilAccueil::Auto)] = choisir_auto;
+    actions.choisir[static_cast<std::size_t>(ProfilAccueil::Meteo)] = choisir_meteo;
+    return ecran::ajouter_famille_profil(sortie, n, g_profil, actions, choix);
+}
+
+// L'accueil que la décision du noyau donne pour le réglage `g_profil`, avec ou sans alerte orange.
+ecran::EntreesPrincipal accueil_du_profil(const banc::Contexte &c, bool alerte_orange) {
+    ecran::EntreesPrincipal e = entrees(c, 0, avec_pluie_dans(c.instant_utc_s, 12));
+    if (alerte_orange) {
+        e.bandeau = alerte(c.instant_utc_s, Niveau::Orange, "Vent violent");
+    }
+    return decider(e, ecran::accueil::epinglage_de(g_profil).epingle);
+}
+
+ecran::ContexteRoue contexte_roue(const banc::Contexte &c) {
+    ecran::ContexteRoue ctx;
+    ctx.couche = lv_display_get_layer_top(c.affichage);
+    ctx.ttf = roboto_700_start;
+    ctx.ttf_taille = static_cast<std::size_t>(roboto_700_end - roboto_700_start);
+    ctx.mdi = mdi_roue_start;
+    ctx.mdi_taille = static_cast<std::size_t>(mdi_roue_end - mdi_roue_start);
+    ctx.largeur = c.largeur;
+    ctx.hauteur = c.hauteur;
+    ctx.theme = &ecran::visuel::kThemeCiel;
+    return ctx;
+}
+
+void tourner() {
+    for (int i = 0; i < 3; ++i) {
+        for (lv_timer_t *t = lv_timer_get_next(nullptr); t != nullptr; t = lv_timer_get_next(t)) {
+            lv_timer_ready(t);
+        }
+        lv_timer_handler();
+    }
+}
+
+// Ouvre la roue au point (fx, fy) en millièmes de l'écran, puis, si `deplier`, touche « Profil » comme le doigt. Rend le nombre d'entrées.
+int ouvrir_roue(const banc::Contexte &c, int fx, int fy, bool alertes, bool deplier) {
+    ecran::EntreeRoue entrees_roue[ecran::ENTREES_ROUE_MAX] = {};
+    ecran::ChoixRoue choix[ecran::reglages::NOMBRE_PROFILS_ACCUEIL] = {};
+    const int n = composer(entrees_roue, alertes, choix);
+    const int32_t x = c.largeur * fx / 1000;
+    const int32_t y = c.hauteur * fy / 1000;
+    exiger(ecran::ui_roue_ouvrir(contexte_roue(c), entrees_roue, n, x, y), "la roue n'a pas pu s'ouvrir");
+    if (deplier) {
+        int32_t bx = 0;
+        int32_t by = 0;
+        exiger(ecran::ui_roue_centre_bouton(n - 1, &bx, &by), "le bouton « Profil » n'a pas de centre");
+        exiger(ecran::ui_roue_simuler_toucher(bx, by), "toucher « Profil » ferme la roue au lieu de la déplier");
+    }
+    ecran::PositionRoue position = {};
+    exiger(ecran::ui_roue_position(&position), "la roue ouverte n'a pas de position");
+    std::fprintf(stderr, "roue-profil %dx%d, doigt en (%d, %d), %d entrée(s), %s : %s\n", static_cast<int>(c.largeur),
+                 static_cast<int>(c.hauteur), static_cast<int>(x), static_cast<int>(y), n,
+                 deplier ? "dépliée" : "repliée", position.tient ? "tient" : "NE TIENT PAS");
+    return n;
+}
+
+void roue_profil(const banc::Contexte &c, ProfilAccueil profil, int fx, int fy, bool alertes, bool deplier) {
+    g_profil = profil;
+    afficher(c, accueil_du_profil(c, alertes));
+    ouvrir_roue(c, fx, fy, alertes, deplier);
+}
+
+// Le premier anneau : Réglages, Détails, Profil ▸ (aucune alerte). La famille est repliée.
+void roue_profil_replie(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Auto, 500, 500, false, false); }
+// Le second anneau : Auto (marqué) et Météo.
+void roue_profil_auto(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Auto, 500, 500, false, true); }
+// Météo épinglé : l'accueil dit « Météo · épinglé », sans carte pluie, et le second anneau marque Météo.
+void roue_profil_epingle(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Meteo, 500, 500, false, true); }
+// Avec une alerte orange : quatre boutons au premier anneau.
+void roue_profil_alerte(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Auto, 500, 500, true, true); }
+// Près d'un coin et d'un bord : le second anneau pivote pour tenir.
+void roue_profil_coin(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Meteo, 950, 930, true, true); }
+void roue_profil_bord(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Auto, 50, 500, false, true); }
+
+// Le geste de bout en bout : appui long (la roue), « Profil », « Météo » ferme la roue et épingle ; l'accueil que le noyau décide ne montre plus
+// la carte pluie ; la roue se rouvre avec Météo marqué ; « Auto » dépingle et la carte pluie revient tout de suite.
+void parcours_profil(const banc::Contexte &c) {
+    g_profil = ProfilAccueil::Auto;
+    g_choix_profil = 0;
+    ecran::EntreesPrincipal e = accueil_du_profil(c, false);
+    exiger(!e.mode_auto.epingle && e.mode_auto.carte_pluie, "Auto avec de la pluie proche doit montrer la carte pluie");
+    afficher(c, e);
+
+    int32_t x = 0;
+    int32_t y = 0;
+    ecran::EntreeRoue entrees_roue[ecran::ENTREES_ROUE_MAX] = {};
+    ecran::ChoixRoue choix[ecran::reglages::NOMBRE_PROFILS_ACCUEIL] = {};
+    int n = composer(entrees_roue, false, choix);
+    exiger(n == 3 && entrees_roue[n - 1].nb_choix == 2,
+           "le premier anneau n'a pas « Profil » avec deux choix à la suite");
+    exiger(choix[0].actif && !choix[1].actif, "« Auto » n'est pas marqué quand rien n'est épinglé");
+
+    ouvrir_roue(c, 500, 500, false, true);
+    exiger(ecran::ui_roue_centre_choix(1, &x, &y), "le second anneau n'a pas de second choix (Météo)");
+    exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Météo » laisse la roue ouverte");
+    tourner();
+    exiger(g_choix_profil == 1 && g_profil == ProfilAccueil::Meteo,
+           "toucher « Météo » n'écrit pas le profil exactement une fois");
+    exiger(ecran::ui_roue_cout().objets == 0, "la roue fermée garde un objet LVGL");
+    e = accueil_du_profil(c, false);
+    exiger(e.mode_auto.epingle && !e.mode_auto.carte_pluie,
+           "épinglé : l'accueil doit dire « épinglé » et ne plus montrer la carte pluie");
+    afficher(c, e);
+
+    n = composer(entrees_roue, false, choix);
+    exiger(!choix[0].actif && choix[1].actif, "« Météo » n'est pas marqué une fois épinglé");
+    ouvrir_roue(c, 500, 500, false, true);
+    exiger(ecran::ui_roue_centre_choix(0, &x, &y), "le second anneau n'a pas de premier choix (Auto)");
+    exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Auto » laisse la roue ouverte");
+    tourner();
+    exiger(g_choix_profil == 2 && g_profil == ProfilAccueil::Auto, "toucher « Auto » n'écrit pas le profil");
+    e = accueil_du_profil(c, false);
+    exiger(!e.mode_auto.epingle && e.mode_auto.carte_pluie,
+           "dépinglé : les règles reprennent tout de suite (carte pluie)");
+
+    // Une alerte orange reste affichée, épinglé ou non : l'alerte officielle ne cède jamais sa place.
+    g_profil = ProfilAccueil::Meteo;
+    e = accueil_du_profil(c, true);
+    exiger(e.mode_auto.epingle && e.mode_auto.bandeau_agrandi, "épinglé : le bandeau d'alerte agrandi doit rester");
+    afficher(c, e);
+    g_profil = ProfilAccueil::Auto;
+    (void)n;
+}
+
 } // namespace
 
 namespace banc {
@@ -199,6 +374,13 @@ const Scene kScenes[] = {
     {"epingle-et-alerte", "Épinglé + alerte orange", epingle_et_alerte},
     {"ville-longue", "Lieu très long et pastille", ville_longue},
     {"exemple", "Pastille et « Exemple »", exemple},
+    {"roue-profil", "Roue : Réglages, Détails, Profil ▸ (repliée)", roue_profil_replie},
+    {"roue-profil-auto", "Roue : second anneau de Profil, Auto marqué", roue_profil_auto},
+    {"roue-profil-epingle", "Roue : second anneau de Profil, Météo marqué, accueil épinglé", roue_profil_epingle},
+    {"roue-profil-alerte", "Roue : quatre boutons (alerte en vigueur), second anneau de Profil", roue_profil_alerte},
+    {"roue-profil-coin", "Roue : second anneau de Profil près du coin bas droit", roue_profil_coin},
+    {"roue-profil-bord", "Roue : second anneau de Profil près du bord gauche", roue_profil_bord},
+    {"parcours-profil", "Parcours : appui long, Profil, Météo (épinglé), Auto (dépinglé)", parcours_profil},
 };
 const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
 
