@@ -93,6 +93,8 @@ hash per zone), so the clock alone is redrawn each minute.
 > date 36 px, the day texts 32 and 28 px, the small text 24 px; the table above counts the old composition's 7). The Clock theme
 > is unchanged. The cost rows marked *board* above describe the old home screen: the new one has **not been measured on a board**.
 
+> **Update 2026-11-08 — no more Settings button** ([ADR-0021](../decisions/0021-roue-d-appui-long-sur-l-ecran-principal.md), numbers in [mesures/roue.md](../mesures/roue.md)). The round button at the right end of the place bar is gone, and so is its reserved space: the place now has the whole bar. **LVGL objects of the home screen: 9** (screen, six zones, alert chip, touch ring). A long press (400 ms) anywhere on the screen opens the wheel **at the finger**: « Settings » and, when the alerts page exists, « Alerts » (one more LVGL object while it is open, none otherwise). The diagnostic screen is reached through Settings > Device > Diagnostic. Seen on PC renders only; **not seen on a board**.
+
 **Seen on:** PC render (clang 23.1.5, LVGL 9.5.0), commits of branch `claude/ecran-visuel-ba722a`, 2026-11-07; the *board* rows:
 Tab5 with the ST7121 screen (MAC read on the chip, not copied here), ESP32-P4, commit `cd362eb` built with the memory settings of
 jalon 1b added in a separate build directory (never committed), 2026-11-07 from 01:57 to 02:02.
@@ -203,6 +205,8 @@ contenu a changé (une empreinte par zone), donc seule l'heure est redessinée c
 > (l'heure 168 px, la température 54 px, la date 36 px, les textes des jours 32 et 28 px, le petit texte 24 px ; le tableau ci-dessus
 > compte 7 polices pour l'ancienne composition). Le thème Horloge ne change pas. Les lignes *carte* du coût ci-dessus décrivent
 > l'ancien accueil : le nouveau n'a **pas été mesuré sur une carte**.
+
+> **Mise à jour du 08/11/2026 — plus de bouton Réglages** ([ADR-0021](../decisions/0021-roue-d-appui-long-sur-l-ecran-principal.md), chiffres dans [mesures/roue.md](../mesures/roue.md)). Le bouton rond au bout droit de la barre du lieu a disparu, et la place qu'il réservait aussi : le lieu a toute la barre. **Objets LVGL de l'accueil : 9** (écran, six zones, pastille d'alerte, anneau tactile). Un appui long (400 ms) n'importe où sur l'écran ouvre la roue **au doigt** : « Réglages » et, quand la page des alertes existe, « Alertes » (un objet LVGL de plus tant qu'elle est ouverte, aucun sinon). Le diagnostic s'atteint par Réglages > Appareil > Diagnostic. Vu sur des rendus du PC seulement ; **pas vu sur une carte**.
 
 **Vu sur :** rendu PC (clang 23.1.5, LVGL 9.5.0), commits de la branche `claude/ecran-visuel-ba722a`, 07/11/2026 ; les lignes
 *carte* : Tab5 avec l'écran ST7121 (MAC lue sur la puce, non recopiée ici), ESP32-P4, commit `cd362eb` compilé avec les réglages

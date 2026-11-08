@@ -43,6 +43,7 @@ CACHE = RACINE / ".cache" / "rendu"
 SORTIE_DEFAUT = RACINE / "docs" / "captures" / "ecran"
 POLICE = RACINE / "main" / "assets" / "roboto_700.ttf"
 ICONES = RACINE / "main" / "assets" / "icones_meteo.bin"
+ICONES_ROUE = RACINE / "main" / "assets" / "mdi_roue.ttf"  # sous-ensemble de Material Design Icons pour la roue (ADR-0021)
 FICHIERS_COMMUNS = ["tools/rendu/banc.cpp"]
 
 # Les sept langues de l'écran (ADR-0006) : code -> nom dans sa langue, dans l'ordre des indices du noyau pur.
@@ -339,6 +340,7 @@ def construire_scenes(scenes: list, lvgl: Path, archive: Path, jobs: int) -> dic
     # symboles, par un .s qui l'inclut.
     # Le binaire des icônes météo (main/assets/icones_meteo.bin, EMBED_FILES aussi) est posé de la même façon, dans le même .o :
     # sans lui, les scènes qui lient main/ui_meteo_icones.cpp n'ont pas de pixels à dessiner.
+    # Le sous-ensemble de police d'icônes de la roue (main/assets/mdi_roue.ttf, target_add_binary_data) : même principe.
     police_s = dossier / "police.s"
     police_s.write_text(
         '    .section .rdata,"dr"\n'
@@ -351,7 +353,12 @@ def construire_scenes(scenes: list, lvgl: Path, archive: Path, jobs: int) -> dic
         "    .global _binary_icones_meteo_bin_end\n"
         "_binary_icones_meteo_bin_start:\n"
         f'    .incbin "{ICONES.as_posix()}"\n'
-        "_binary_icones_meteo_bin_end:\n",
+        "_binary_icones_meteo_bin_end:\n"
+        "    .global _binary_mdi_roue_ttf_start\n"
+        "    .global _binary_mdi_roue_ttf_end\n"
+        "_binary_mdi_roue_ttf_start:\n"
+        f'    .incbin "{ICONES_ROUE.as_posix()}"\n'
+        "_binary_mdi_roue_ttf_end:\n",
         encoding="utf-8",
     )
     police_o = dossier / "police.o"

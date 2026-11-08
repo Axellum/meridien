@@ -33,16 +33,17 @@ struct Env {
     Polices f;
     int32_t largeur = 0; // taille LOGIQUE de l'écran (rotation comprise), jamais écrite en dur
     int32_t hauteur = 0;
-    float echelle = 1.0F;       // 1.0 = 720 px sur le petit côté
-    lv_obj_t *racine = nullptr; // conteneur plein écran qui porte les écrans empilés
-    void (*fermer)() = nullptr; // « Retour » sur le premier écran
+    float echelle = 1.0F;                  // 1.0 = 720 px sur le petit côté
+    lv_obj_t *racine = nullptr;            // conteneur plein écran qui porte les écrans empilés
+    void (*fermer)() = nullptr;            // « Retour » sur le premier écran
+    void (*ouvrir_diagnostic)() = nullptr; // ligne « Diagnostic » de la page Appareil ; nul : sans effet
     const uint8_t *ttf = nullptr;
     std::size_t ttf_taille = 0;
 };
 
 Env &env();
 void env_initialiser(lv_obj_t *racine, const uint8_t *ttf, std::size_t ttf_taille, int32_t largeur, int32_t hauteur,
-                     HoteReglages *hote, void (*fermer)());
+                     HoteReglages *hote, void (*fermer)(), void (*ouvrir_diagnostic)() = nullptr);
 void env_choisir_theme(); // relit « affichage.theme » auprès de l'hôte
 
 // Un nombre de pixels à l'échelle de l'écran (720 px de petit côté = 1.0).

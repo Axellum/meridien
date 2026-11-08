@@ -4,7 +4,7 @@
 
 A non-obvious decision gets one numbered page here (next number), with the context, the choice, the alternatives that were
 rejected and what would reopen it. Read the relevant page **before** "fixing" something that looks wrong. The pages are
-written in French; each of 0001 to 0005, 0008, 0009, 0010, 0012, 0013, 0014, 0015, 0016 and 0017 opens with a short English summary. A summary says no more than the French text
+written in French; each of 0001 to 0005, 0008, 0009, 0010, 0012, 0013, 0014, 0015, 0016, 0017 and 0021 opens with a short English summary. A summary says no more than the French text
 below it, including its "proposed" status.
 
 | No. | Decision | Status |
@@ -26,6 +26,7 @@ below it, including its "proposed" status.
 | [0016](0016-accueil-aere-pluie-et-alerte-en-bandeau.md) | Home screen redone: 12-hour curve, one banner for the rain to come and the official alert, five days; one LVGL object per zone, logic in the pure core | proposed, awaiting the owner's validation (seen on PC renders only, compiled for both boards, never run on a board) |
 | [0017](0017-roue-d-appui-long-geometrie-pure.md) | Press-and-hold wheel: the Tab5's geometry ported into the pure core (hub, rings, words, touch), the hub sliding away from the finger when the wheel does not fit | proposed, awaiting the owner's validation (seen on PC only, never on a board or a screen) |
 | [0020](0020-page-details-sept-grandeurs.md) | Page « Détails » : les sept grandeurs retirées de l'accueil sur une page plein écran, « — » pour une grandeur absente, les dernières valeurs grisées pour une météo périmée, texte jamais sous 24 pixels réels, noyau pur + dessin LVGL + colle séparés ; rien ne l'ouvre encore | proposée, à valider par Axel (vue sur des rendus du PC seulement, compilée pour les deux cartes, jamais lancée sur une carte) |
+| [0021](0021-roue-d-appui-long-sur-l-ecran-principal.md) | Press-and-hold wheel on the main screen: one LVGL object, opens at the finger, first ring "Settings", "Details" and "Alerts" only, the Settings button leaves the home screen, diagnostic moved to Settings, icon subset | proposed, awaiting the owner's validation (seen on PC renders only, never run on a board) |
 
 Status as of 2026-11-06. "Proposed" means written by the AI agent from the research notes and not yet settled by the owner;
 the code follows it in the meantime. The open questions (wake word, local STT/TTS, project name, repository, licence, ESP-IDF
@@ -36,7 +37,7 @@ summary at the top).
 
 ## Version française
 
-Une décision non évidente = une page numérotée ici (numéro suivant), avec le contexte, le choix, les alternatives écartées et ce qui la remettrait en cause. À lire **avant** de « corriger » quelque chose qui a l'air faux. Les pages sont en français ; chacune de 0001 à 0005, 0008, 0009, 0010, 0012, 0013, 0014, 0015, 0016 et 0017 commence par un court résumé en anglais, qui n'en dit pas plus que le texte français, statut « proposée » compris.
+Une décision non évidente = une page numérotée ici (numéro suivant), avec le contexte, le choix, les alternatives écartées et ce qui la remettrait en cause. À lire **avant** de « corriger » quelque chose qui a l'air faux. Les pages sont en français ; chacune de 0001 à 0005, 0008, 0009, 0010, 0012, 0013, 0014, 0015, 0016, 0017 et 0021 commence par un court résumé en anglais, qui n'en dit pas plus que le texte français, statut « proposée » compris.
 
 | N° | Décision | Statut |
 |---|---|---|
@@ -56,5 +57,6 @@ Une décision non évidente = une page numérotée ici (numéro suivant), avec l
 | [0015](0015-accueil-mode-automatique.md) | Accueil : le mode automatique choisit le profil (Météo, Surf, Vent·Bateau, Côte) et dit pourquoi ; bandeau d'alerte agrandi et carte pluie en ajouts ; garde-fous (un changement par 30 min, jamais pendant un toucher, donnée périmée, épinglage) ; seul le noyau pur existe, pas encore d'écran | proposée, à valider par Axel (vue sur le PC seulement, jamais sur une carte) |
 | [0016](0016-accueil-aere-pluie-et-alerte-en-bandeau.md) | Accueil refait : courbe des 12 heures, un bandeau pour la pluie à venir et l'alerte officielle, cinq jours ; un objet LVGL par zone, la logique dans le noyau pur | proposée, à valider par Axel (vu sur des rendus du PC seulement, compilé pour les deux cartes, jamais lancé sur une carte) |
 | [0017](0017-roue-d-appui-long-geometrie-pure.md) | Roue d'appui long : la géométrie du Tab5 portée dans le noyau pur (moyeu, anneaux, mots, toucher), le moyeu qui s'écarte du doigt quand la roue ne tient pas | proposée, à valider par Axel (vue sur le PC seulement, jamais sur une carte ni sur un écran) |
+| [0021](0021-roue-d-appui-long-sur-l-ecran-principal.md) | Roue d'appui long sur l'écran principal : un objet LVGL, ouverte au doigt, premier anneau « Réglages », « Détails » et « Alertes » seulement, le bouton Réglages quitte l'accueil, le diagnostic passe dans les réglages, sous-ensemble d'icônes | proposée, à valider par Axel (vue sur des rendus PC seulement, jamais lancée sur une carte) |
 
 Statut au 06/11/2026. « Proposée » = écrite par l'agent d'après les recherches, pas encore tranchée par Axel ; le code s'y conforme en attendant. Les questions ouvertes (mot d'activation, STT/TTS locaux, nom du projet, dépôt, licence, version d'ESP-IDF, fraîcheur du calendrier) sont listées dans [le plan](../plan.md#décisions-à-prendre-par-axel).

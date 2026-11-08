@@ -1,0 +1,41 @@
+{
+  "_lisez_moi": "Les glyphes de la roue d'appui long (ADR-0021). Ajouter une entree a la roue = ajouter une ligne ici, puis `python tools/icones/generer_police_roue.py --source <materialdesignicons-webfont.ttf>`. Le nom est celui de la police source (Material Design Icons) ; l'id nomme la constante C++ ICONE_<ID> du fichier genere main/ui_roue_icones.inc. Jamais d'icone de marque (categorie « Brand / Logos », hors licence).",
+  "source": {
+    "fichier": "materialdesignicons-webfont.ttf",
+    "origine": "copie du dépôt Tab5 (Tab5/fonts/materialdesignicons-webfont.ttf, dépôt Axellum/M5-Tab5-ESPHome-LVGL)",
+    "taille": 1307660,
+    "sha256": "61e8aba5a4e981fe22cf7c8e8bcdbea00476e75c62c37f01bf7ee33361d68428",
+    "table_de_noms": "Material Design Icons, Version 1.0 (le numéro de version du paquet MDI n'est pas dans le fichier)"
+  },
+  "glyphes": [
+    {
+      "id": "reglages",
+      "mdi": "cog-outline",
+      "point": "F08BB",
+      "ou": "bouton « Réglages » du premier anneau"
+    },
+    {
+      "id": "alertes",
+      "mdi": "bell-outline",
+      "point": "F009C",
+      "ou": "bouton « Alertes » du premier anneau"
+    },
+    {
+      "id": "details",
+      "mdi": "view-grid-outline",
+      "point": "F11D9",
+      "ou": "bouton « Détails » du premier anneau (les sept tuiles de grandeurs, ADR-0020)"
+    },
+    {
+      "id": "moyeu",
+      "mdi": "compass-rose",
+      "point": "F1382",
+      "ou": "centre de la roue, « Aller à »"
+    }
+  ],
+  "sortie": {
+    "fichier": "main/assets/mdi_roue.ttf",
+    "sha256": "2265e9fca6b10aa53792a53046d45b454a557b88eb91627dbd4417f267d4dc85",
+    "taille": 1380
+  }
+}

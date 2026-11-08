@@ -13,6 +13,7 @@
 #include "parcours_outils.h"
 
 #include "ecran/texte_modele.hpp"
+#include "ecran/visuel_textes.hpp"
 #include "ui_reglages_interne.h"
 
 namespace {
@@ -106,6 +107,22 @@ void wifi_retour_arriere(const banc::Contexte &ctx) {
            "l'ancien réseau reste en place");
     exiger(affiche_modele("« {ssid} » ne répond pas.", "ssid", "Freebox-A1B2C3"), "la phrase d'échec nomme le réseau");
     exiger(existe("L’ancien réseau est conservé."), "l'écran dit que l'ancien réseau est conservé");
+}
+
+// Le diagnostic n'a plus de bouton ni de geste sur l'écran principal (ADR-0021) : il s'ouvre par Réglages > Appareil > Diagnostic.
+// Ce parcours vérifie que la ligne est là, qu'elle se touche et qu'elle demande l'écran de diagnostic.
+void diagnostic_depuis_les_reglages(const banc::Contexte &ctx) {
+    preparer(ctx, "diagnostic-depuis-les-reglages", Interface::Reglages);
+    g_diagnostics = 0;
+    ecran::ui_aller("section:5");
+    tourner();
+    const char *diagnostic = ecran::visuel::texte_c("Diagnostic");
+    exiger(affiche(diagnostic), "la page Appareil montre la ligne « Diagnostic »");
+    exiger(g_diagnostics == 0, "rien ne s'ouvre avant le toucher");
+    exiger(toucher_texte(diagnostic), "toucher « Diagnostic »");
+    exiger(g_diagnostics == 1, "« Diagnostic » demande l'écran de diagnostic, une fois");
+    exiger(existe("Redémarrer") && existe("Réinitialiser l’appareil"),
+           "le reste de la page Appareil est resté en place");
 }
 
 // Réinitialiser demande deux gestes, et le premier retombe tout seul.
@@ -425,6 +442,7 @@ const Scene kScenes[] = {
     {"installation-complete", "Parcours : installation de bout en bout", installation_complete},
     {"reprise-apres-redemarrage", "Parcours : reprise de l'installation à l'étape 3", reprise_apres_redemarrage},
     {"wifi-retour-arriere", "Parcours : Wi-Fi qui ne répond pas, ancien réseau gardé", wifi_retour_arriere},
+    {"diagnostic-depuis-les-reglages", "Parcours : Réglages > Appareil > Diagnostic", diagnostic_depuis_les_reglages},
     {"reinitialisation-deux-gestes", "Parcours : réinitialiser demande deux gestes", reinitialisation_deux_gestes},
     {"refaire-puis-quitter", "Parcours : refaire l'installation puis la quitter", refaire_puis_quitter},
     {"preset-service-local", "Parcours : préréglage d'un service du PC", preset_service_local},

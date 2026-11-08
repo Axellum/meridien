@@ -22,6 +22,9 @@ struct ContexteReglages {
     int32_t hauteur = 0;
     HoteReglages *hote = nullptr;
     void (*fermer)() = nullptr; // rend la main à l'écran principal ; peut être nul (rendu PC)
+    // Réglages > Appareil > « Diagnostic » : charge l'écran de diagnostic existant (ecran_principal_ouvrir_diagnostic). Nul : la ligne est
+    // dessinée mais ne fait rien (rendu PC, installation guidée).
+    void (*ouvrir_diagnostic)() = nullptr;
 };
 
 // La liste des réglages (six sections). Efface ce que l'interface avait dessiné avant.
@@ -54,7 +57,7 @@ void ui_reglages_liberer();
 
 } // namespace ecran
 
-// Appelé par l'écran principal (bouton « Réglages ») : ouvre la liste des réglages sur un écran à part, l'écran principal reste
+// Appelé par la roue d'appui long de l'écran principal (entrée « Réglages », ADR-0021) : ouvre la liste des réglages sur un écran à part, l'écran principal reste
 // dessous, intact. Défini dans ui_reglages_ouvrir.cpp (colle du firmware : afficheur de la carte, hôte, police), jamais compilé
 // par le rendu PC. À appeler dans la tâche LVGL, verrou pris.
 void ui_reglages_ouvrir();
