@@ -7,7 +7,7 @@
 // la NVS, le Wi-Fi du C6 ni le toucher réels (main/hote_appareil_esp.cpp, à constater sur la carte).
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
+// rendu-sources: main/ui_installation.cpp main/ui_reglages.cpp main/ui_reglages_mer.cpp main/ui_clavier.cpp main/ui_commun.cpp main/hote_memoire.cpp
 // rendu-langues: toutes
 // rendu-langues-defaut: fr
 // rendu-tailles: 1280x720 720x1280

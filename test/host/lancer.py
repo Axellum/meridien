@@ -188,6 +188,8 @@ from mutations_mer_textes import MUTATIONS_MER_TEXTES  # noqa: E402  (mots de la
 from mutations_mer_page import MUTATIONS_MER_PAGE  # noqa: E402  (page mer composée : verdicts montrés, barres, courbe de marée, bandeau)
 from mutations_mer_geometrie import MUTATIONS_MER_GEOMETRIE  # noqa: E402  (mise en page de la page mer : zones, échelle, cartes, détail)
 from mutations_mer_api import MUTATIONS_MER_API  # noqa: E402  (écriture du registre des spots par la page de réglages : liste, choix, plage de vent, routes)
+from mutations_mer_liste import MUTATIONS_MER_LISTE  # noqa: E402  (liste des spots de Vigie lue par l'appareil : lecture, repli des accents, recherche, ajout)
+from mutations_mer_reglage import MUTATIONS_MER_REGLAGE  # noqa: E402  (boutons de la plage de vent de la page La mer de l'écran)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
@@ -220,6 +222,8 @@ MUTATIONS += MUTATIONS_MER_TEXTES
 MUTATIONS += MUTATIONS_MER_PAGE
 MUTATIONS += MUTATIONS_MER_GEOMETRIE
 MUTATIONS += MUTATIONS_MER_API
+MUTATIONS += MUTATIONS_MER_LISTE
+MUTATIONS += MUTATIONS_MER_REGLAGE
 MUTATIONS += MUTATIONS_ACCUEIL_AUTO
 MUTATIONS += MUTATIONS_NVS_SECURITE
 MUTATIONS += MUTATIONS_GRANDEURS

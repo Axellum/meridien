@@ -24,10 +24,12 @@
 
 #include "appairage.h"
 #include "ecran/hote_appareil.hpp"
+#include "mer_liste_client.h"
 #include "meteo_etat.h"
 #include "meteo_interne.h"
 #include "reglages.h"
 #include "reglages_alertes.h"
+#include "reglages_mer.h"
 #include "reseau.h"
 #include "reseau_wifi.h"
 
@@ -399,6 +401,14 @@ class PortsEsp final : public PortsAppareil {
     EtatTelechargement telecharger_etat() override { return dl_.etat(); }
     std::string_view telecharger_corps() override { return dl_.corps(); }
     void telecharger_liberer() override { dl_.liberer(); }
+
+    // La mer (ADR-0026) : le registre des spots est celui de la page web (main/reglages_mer.*, qui valide, écrit en NVS et réveille le
+    // client réseau) ; la liste de Vigie est lue par une tâche à part (main/mer_liste_client.cpp).
+    bool mer_registre(mer::Registre &sortie) override { return reglages_mer(sortie); }
+    bool mer_enregistrer(const mer::Registre &nouveau) override { return reglages_mer_enregistrer(nouveau); }
+    void mer_liste_lancer() override { mer_liste_lecture_lancer(); }
+    ListeMer mer_liste_etat() override { return mer_liste_lecture_etat(); }
+    bool mer_liste_copier(mer::liste::Liste &sortie) override { return mer_liste_lecture_copier(sortie); }
 
     void version(char *sortie, std::size_t capacite) override {
         const esp_app_desc_t *app = esp_app_get_description();

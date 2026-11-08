@@ -54,6 +54,8 @@ lv_obj_t *construire_selon_le_type(Entree &e) {
         return construire_recherche_ville(e);
     case TypeEcran::ListeSource:
         return construire_liste_source(e);
+    case TypeEcran::RechercheSpot:
+        return construire_recherche_spot(e);
     case TypeEcran::Etape:
         return construire_etape(e);
     }
@@ -115,6 +117,11 @@ void depiler() {
 } // namespace
 
 lv_obj_t *champ_actuel() { return g_champ_actuel; }
+
+void champ_actuel_definir(lv_obj_t *champ) {
+    g_champ_actuel = champ;
+    lv_obj_add_event_cb(champ, sur_suppression_champ, LV_EVENT_DELETE, nullptr);
+}
 
 // ---- pile d'écrans ----------------------------------------------------------------------------------------------------------
 
@@ -278,8 +285,6 @@ void ajouter_timer(lv_obj_t *ecran, void (*cb)(lv_timer_t *), uint32_t periode_m
     lv_obj_add_event_cb(ecran, sur_suppression_minuteur, LV_EVENT_DELETE, t);
 }
 
-namespace {
-
 // Vrai si le minuteur appartient à l'écran du dessus (un minuteur d'un écran en cours de suppression ne fait rien).
 bool est_le_dessus(lv_timer_t *t) {
     const Entree *haut = nav_haut();
@@ -339,6 +344,8 @@ lv_obj_t *creer_carte(lv_obj_t *parent) {
     lv_obj_remove_flag(c, LV_OBJ_FLAG_SCROLLABLE);
     return c;
 }
+
+namespace {
 
 int index_reglage(const registre::Reglage &r) { return static_cast<int>(&r - registre::REGISTRE); }
 
@@ -859,6 +866,12 @@ void rangee_action_ou_info(lv_obj_t *parent, std::string_view id) {
             lv_obj_t *a = creer_bouton(c, T("Annuler"), StyleBouton::Discret, sur_annuler_reinitialisation, nullptr);
             lv_obj_set_width(a, LV_PCT(100));
         }
+    } else if (id == "info.mer_spots") {
+        rangee_mer_spots(parent);
+    } else if (id == "action.mer_ajouter") {
+        rangee_mer_ajouter(parent);
+    } else if (id == "info.mer_vent") {
+        rangee_mer_vent(parent);
     }
 }
 
@@ -1630,6 +1643,10 @@ void pousser_sous_ecran(const char *sous) {
     } else if (std::strcmp(sous, "source") == 0) {
         Entree s;
         s.type = TypeEcran::ListeSource;
+        nav_pousser(s);
+    } else if (std::strcmp(sous, "spot") == 0) {
+        Entree s;
+        s.type = TypeEcran::RechercheSpot;
         nav_pousser(s);
     } else if (commence_par(sous, "editeur:")) {
         Entree e;
