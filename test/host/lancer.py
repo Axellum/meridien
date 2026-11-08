@@ -182,6 +182,7 @@ from mutations_roue_geometrie import MUTATIONS_ROUE_GEOMETRIE  # noqa: E402  (ro
 from mutations_roue_commande import MUTATIONS_ROUE_COMMANDE  # noqa: E402  (roue d'appui long : écran, demande, dépliement, décision du toucher)
 from mutations_surf import MUTATIONS_SURF  # noqa: E402  (noyau surf : spot, requêtes, lecture, vent, marée, note, créneau)
 from mutations_mer import MUTATIONS_MER  # noqa: E402  (noyau mer : CRC, trame SEA/ACT/CRIT, noms du contrat, fraîcheur, courbe de marée)
+from mutations_mer_client import MUTATIONS_MER_CLIENT  # noqa: E402  (client de la mer : requête, rythme, registre des spots, réparation de la NVS)
 from racine_idf import outil_croise  # noqa: E402  (compilateur croisé d'ESP-IDF, dossier propre à chaque PC)
 
 MUTATIONS += MUTATIONS_METEO_HEURE
@@ -208,6 +209,7 @@ MUTATIONS += MUTATIONS_GZIP
 MUTATIONS += MUTATIONS_FUSEAUX
 MUTATIONS += MUTATIONS_SURF
 MUTATIONS += MUTATIONS_MER
+MUTATIONS += MUTATIONS_MER_CLIENT
 MUTATIONS += MUTATIONS_ACCUEIL_AUTO
 MUTATIONS += MUTATIONS_NVS_SECURITE
 MUTATIONS += MUTATIONS_GRANDEURS
