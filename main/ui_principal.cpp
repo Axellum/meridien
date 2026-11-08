@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include <string_view>
 
+#include "ecran/accueil.hpp"
 #include "ecran/heure_lieu.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_wmo.hpp"
@@ -18,23 +19,26 @@
 #include "ui_meteo_dessin.h"
 #include "ui_meteo_icones.h"
 
-// Écran principal. Chaque ZONE est un seul objet LVGL qui dessine tout son contenu dans l'événement LV_EVENT_DRAW_MAIN : sept
-// objets en tout (quatre autres pour le fond, le bouton Réglages, l'anneau tactile), au lieu d'une centaine d'étiquettes. Un
-// objet LVGL coûte de la RAM interne (le point étroit de cette carte), une tâche de dessin non.
+// Écran principal. Chaque ZONE est un seul objet LVGL qui dessine tout son contenu dans l'événement LV_EVENT_DRAW_MAIN : six zones, le
+// bouton Réglages, la pastille de l'alerte officielle et l'anneau tactile, au lieu d'une centaine d'étiquettes. Un objet LVGL coûte de
+// la RAM interne (le point étroit de cette carte), une tâche de dessin non.
 //
-//   paysage (1280 x 720)                      portrait (720 x 1280)
-//   +-- barre : ville · alerte · état · ⚙ -+  +-- barre --------------+
-//   | horloge + date  |  maintenant        |  | horloge + date        |
-//   +-----------------+--------------------+  | maintenant            |
-//   | vent · pluie · humidité · pression · UV · soleil · lune           | grandeurs en grille
-//   | heures : icône, température, pluie, selon la largeur              | heures
-//   | semaine : 7 jours, barre min-max sur une échelle commune          | semaine en lignes
+//   accueil (thèmes « ciel », « tableau sombre », « clair »), paysage 1280 x 720
+//   +-- lieu ----------- ⚙ --+--------------------------+
+//   | heure                  |  courbe des 12 prochaines |
+//   | date                   |  heures : icônes, pluie,  |
+//   | météo du moment        |  maximum et minimum       |
+//   +-- bandeau : la pluie ---+--- l'alerte -------------+
+//   | cinq jours : nom et icône, 14° / 8°, ruban des températures, vent, pluie |
 //
-// Une zone n'est redessinée que si ses données ont changé (empreinte par zone) : l'horloge change à la minute, le reste à la
-// mise à jour de la météo. Ce qui est inconnu est caché ou remplacé par « — », jamais inventé.
+// Le thème « horloge » garde sa composition d'avant (l'heure géante, la météo du moment, les sept jours).
 //
-// Couleurs, opacités, dispositions : visuel_themes.hpp (aucune couleur écrite ici). Textes : visuel_textes.hpp (sept langues).
-// Tout ce qui se calcule sans LVGL est dans le noyau pur (visuel_*.hpp, testé sur le PC).
+// Une zone n'est redessinée que si ses données ont changé (empreinte par zone) : l'horloge change à la minute, le reste à la mise à
+// jour de la météo. Ce qui est inconnu est caché ou remplacé par « — », jamais inventé. Une météo périmée est dessinée avec le thème
+// grisé (ecran/accueil.hpp).
+//
+// Couleurs, opacités, dispositions : visuel_themes.hpp et accueil.hpp (aucune couleur écrite ici). Textes : visuel_textes.hpp (sept
+// langues). Tout ce qui se calcule sans LVGL est dans le noyau pur (visuel_*.hpp, accueil.hpp, testé sur le PC).
 
 namespace ecran {
 
@@ -44,7 +48,7 @@ using namespace visuel;
 namespace dz = dessin;
 using dz::Police;
 
-enum Zone { Z_BARRE, Z_HORLOGE, Z_MAINTENANT, Z_METRIQUES, Z_HEURES, Z_SEMAINE, Z_NOMBRE };
+enum Zone { Z_BARRE, Z_HORLOGE, Z_MAINTENANT, Z_HEURES, Z_BANDEAU, Z_SEMAINE, Z_NOMBRE };
 
 struct Rect {
     int x = 0, y = 0, w = 0, h = 0;
@@ -67,7 +71,7 @@ struct Vue {
     int largeur = 0, hauteur = 0;
     bool portrait = false;
     float echelle = 1.0F;
-    Police heure, temperature, titre, corps, petit, mini, nano;
+    Police heure, temperature, titre, corps, petit, mini;
     lv_obj_t *ecran = nullptr;
     lv_obj_t *zone[Z_NOMBRE] = {};
     lv_obj_t *bouton = nullptr;
@@ -82,7 +86,10 @@ struct Vue {
     std::uint32_t empreinte[Z_NOMBRE] = {};
     std::uint32_t empreinte_ciel = 0;
     lv_draw_buf_t *ciel_image = nullptr; // le ciel tramé (voir appliquer_ciel)
-    bool a_heures = false;
+    bool est_accueil = false;            // la composition de l'accueil ; faux : celle de l'horloge en vedette
+    int extra_h = 0; // hauteur de référence gagnée au-delà de 720 (la 7B) : elle va à la carte des jours
+    ThemePrincipal theme_gris = kThemeCiel; // le thème de la météo périmée (accueil::theme_grise)
+    accueil::EpisodePluie pluie;            // la pluie à annoncer dans le bandeau (recalculée à chaque mise à jour)
     int diametre_anneau = 88;
     int objets = 0;
     void (*appui_long)() = nullptr;
@@ -353,11 +360,10 @@ int premier_jour() {
 
 // ---- mise en page -------------------------------------------------------------------------------------------------------
 //
-// Hauteurs de référence en paysage (720 px) : barre 48, haut 196, grandeurs 126, heure par heure 134, sept jours le reste (≈ 160).
-// Sans prévision heure par heure, la place libérée va au haut et aux grandeurs ; les jours centrent leur contenu dans leur carte.
-
-constexpr int H_TUILE = 126; // hauteur d'une tuile de grandeur, en pixels de référence
-constexpr int H_HAUT = 196;  // horloge et météo du moment, en paysage
+// Deux compositions. L'ACCUEIL (thèmes « ciel », « tableau sombre », « clair ») : les zones sont calculées par le noyau pur
+// (accueil::disposer, testé sur le PC) en pixels de référence, puis mises à l'échelle de l'écran ; la hauteur gagnée sur 720 (la 7B)
+// va à la carte des jours. L'HORLOGE en vedette garde sa composition d'avant : l'heure géante au centre, la météo du moment dessous,
+// les sept jours en bas, ni courbe d'heures ni bandeau.
 
 struct Cotes {
     int marge, ecart, barre_h;
@@ -365,55 +371,46 @@ struct Cotes {
 
 Cotes cotes() { return {px(g.portrait ? 28 : 36), px(10), px(48)}; }
 
+// Un rectangle en pixels de référence -> pixels de l'écran, par ses BORDS (deux zones qui se touchent en référence se touchent encore).
+Rect en_pixels(const accueil::Rect &r) {
+    const int x0 = px(r.x);
+    const int y0 = px(r.y);
+    return {x0, y0, px(r.x + r.w) - x0, px(r.y + r.h) - y0};
+}
+
 void calculer_disposition() {
+    if (g.est_accueil) {
+        const int ref_l = std::max(1, static_cast<int>(std::lround(static_cast<float>(g.largeur) / g.echelle)));
+        const int ref_h = std::max(1, static_cast<int>(std::lround(static_cast<float>(g.hauteur) / g.echelle)));
+        const accueil::Zones z = accueil::disposer(ref_l, ref_h, g.portrait);
+        g.extra_h = z.extra_h;
+        g.rect[Z_BARRE] = en_pixels(z.barre);
+        g.rect[Z_HORLOGE] = en_pixels(z.horloge);
+        g.rect[Z_MAINTENANT] = en_pixels(z.maintenant);
+        g.rect[Z_HEURES] = en_pixels(z.heures);
+        g.rect[Z_BANDEAU] = en_pixels(z.bandeau);
+        g.rect[Z_SEMAINE] = en_pixels(z.jours);
+        return;
+    }
+    // Composition calme : l'heure géante au centre, la météo du moment dessous, les sept jours en bas ; ni courbe d'heures ni bandeau
+    // (leurs zones restent vides, donc cachées).
+    // En paysage : 262 px pour l'heure + la date, 196 pour la carte du moment (sans quoi « Ressenti » est coupé), et les
+    // 168 qui restent suffisent à la carte des sept jours.
     const Cotes c = cotes();
     const int utile = g.largeur - 2 * c.marge;
     const int y0 = px(10);
     g.rect[Z_BARRE] = {c.marge, y0, utile - px(64), c.barre_h}; // le bouton Réglages occupe la droite
     int y = y0 + c.barre_h + px(4);
     const int bas = g.hauteur - px(12);
-    if (g.theme->disposition == Disposition::HORLOGE) {
-        // Composition calme : l'heure géante au centre, la météo du moment dessous, les sept jours en bas ; ni grandeurs ni
-        // heure par heure (leurs zones restent vides, donc cachées).
-        // En paysage : 262 px pour l'heure + la date, 196 pour la carte du moment (sans quoi « Ressenti » est coupé), et les
-        // 168 qui restent suffisent à la carte des sept jours (celle de la composition complète en fait 160).
-        const int h_horloge = g.portrait ? px(330) : px(262);
-        g.rect[Z_HORLOGE] = {c.marge, y, utile, h_horloge};
-        y += h_horloge + c.ecart;
-        const int h_maintenant = g.portrait ? px(230) : px(196);
-        const int w_maintenant = g.portrait ? utile : std::min(utile, px(600));
-        g.rect[Z_MAINTENANT] = {(g.largeur - w_maintenant) / 2, y, w_maintenant, h_maintenant};
-        y += h_maintenant + c.ecart;
-        g.rect[Z_METRIQUES] = {};
-        g.rect[Z_HEURES] = {};
-        g.rect[Z_SEMAINE] = {c.marge, y, utile, bas - y};
-        return;
-    }
-    const int h_heures = g.a_heures ? px(134) : 0;
-    if (!g.portrait) {
-        const int h_metriques = px(H_TUILE) + (g.a_heures ? 0 : px(20));
-        const int h_haut = px(H_HAUT) + (g.a_heures ? 0 : px(36));
-        const int w_horloge = utile * 47 / 100;
-        g.rect[Z_HORLOGE] = {c.marge, y, w_horloge, h_haut};
-        g.rect[Z_MAINTENANT] = {c.marge + w_horloge + c.ecart, y, utile - w_horloge - c.ecart, h_haut};
-        y += h_haut + c.ecart;
-        g.rect[Z_METRIQUES] = {c.marge, y, utile, h_metriques};
-        y += h_metriques + c.ecart;
-    } else {
-        const int h_horloge = px(200);
-        const int h_maintenant = px(230);
-        const int h_metriques = 2 * px(H_TUILE) + c.ecart;
-        g.rect[Z_HORLOGE] = {c.marge, y, utile, h_horloge};
-        y += h_horloge + c.ecart;
-        g.rect[Z_MAINTENANT] = {c.marge, y, utile, h_maintenant};
-        y += h_maintenant + c.ecart;
-        g.rect[Z_METRIQUES] = {c.marge, y, utile, h_metriques};
-        y += h_metriques + c.ecart;
-    }
-    g.rect[Z_HEURES] = {c.marge, y, utile, h_heures};
-    if (g.a_heures) {
-        y += h_heures + c.ecart;
-    }
+    const int h_horloge = g.portrait ? px(330) : px(262);
+    g.rect[Z_HORLOGE] = {c.marge, y, utile, h_horloge};
+    y += h_horloge + c.ecart;
+    const int h_maintenant = g.portrait ? px(230) : px(196);
+    const int w_maintenant = g.portrait ? utile : std::min(utile, px(600));
+    g.rect[Z_MAINTENANT] = {(g.largeur - w_maintenant) / 2, y, w_maintenant, h_maintenant};
+    y += h_maintenant + c.ecart;
+    g.rect[Z_HEURES] = {};
+    g.rect[Z_BANDEAU] = {};
     g.rect[Z_SEMAINE] = {c.marge, y, utile, bas - y};
 }
 
@@ -435,12 +432,18 @@ void appliquer_disposition() {
             lv_obj_set_size(g.zone[z], r.w, r.h);
         }
     }
-    const Cotes c = cotes();
     const int cote = px(48);
     lv_obj_set_size(g.bouton, cote, cote);
-    lv_obj_set_pos(g.bouton, g.largeur - c.marge - cote, px(10));
-    positionner_pastille_officielle(); // la barre a pu changer de taille
+    if (g.est_accueil) { // au bout droit de la zone du lieu, à droite de l'heure
+        const Rect &b = g.rect[Z_BARRE];
+        lv_obj_set_pos(g.bouton, b.x + b.w - cote, b.y + (b.h - cote) / 2);
+    } else {
+        lv_obj_set_pos(g.bouton, g.largeur - cotes().marge - cote, px(10));
+    }
+    positionner_pastille_officielle(); // la barre ou le bandeau a pu changer de taille
 }
+
+PlaceOfficielle placer_puce_officielle(); // plus bas, avec le dessin du bandeau
 
 // ---- zones : briques communes --------------------------------------------------------------------------------------------
 
@@ -545,7 +548,7 @@ PlaceOfficielle placer_pastille_officielle() {
 // Met l'objet de la pastille à sa place (ou le cache). À appeler quand l'alerte, la langue, les indications d'état ou la disposition
 // changent : la zone de la barre est redessinée au même moment (empreinte).
 void positionner_pastille_officielle() {
-    g.officielle = placer_pastille_officielle();
+    g.officielle = g.est_accueil ? placer_puce_officielle() : placer_pastille_officielle();
     if (g.pastille == nullptr) {
         return;
     }
@@ -711,403 +714,708 @@ void dessiner_maintenant(const Ctx &c) {
     }
 }
 
-// ---- zone : grandeurs (vent, pluie, humidité, pression, UV, soleil, lune) ------------------------------------------------------
+// ---- l'accueil (thèmes « ciel », « tableau sombre », « clair ») -------------------------------------------------------------
 //
-// Une tuile = l'icône de la grandeur (en couleur), sa valeur en gros, une ligne de détail. Pas de libellé : l'icône dit de quoi on
-// parle dans toutes les langues, et un mot de plus ne tiendrait pas dans « Luftfeuchtigkeit » ou « Basınç ».
+// La composition de l'esquisse retenue : à gauche le lieu, l'heure, la date et la météo du moment ; à droite la courbe des 12 prochaines
+// heures ; au milieu le bandeau (la pluie à gauche, l'alerte à droite) ; en bas les cinq jours avec leur vent et leur pluie. Les
+// positions sont celles de l'esquisse, en pixels de RÉFÉRENCE (1280 x 720) : `px()` les met à l'échelle de l'écran. Rien n'est animé.
+// Une valeur de la météo périmée est dessinée avec le thème grisé (theme_meteo) ; l'heure, la date et le lieu ne le sont pas.
 
-struct Tuile {
-    Rect r;
-    Metrique grandeur;
+constexpr int COLONNES_HEURES = 12;
+constexpr int COLONNES_JOURS = 5;
+constexpr const char *POINT_MEDIAN = " \xC2\xB7 "; // « · » entre deux morceaux d'une phrase
+
+// Le thème des valeurs de la météo : grisé quand elle est périmée (une valeur périmée n'est plus une mesure).
+const ThemePrincipal &theme_meteo() { return g.e.meteo.perimee ? g.theme_gris : *g.theme; }
+
+bool en_francais() { return i18n::langue_courante() == i18n::Langue::Fr; }
+
+// Texte posé par sa LIGNE DE BASE, comme dans l'esquisse (les polices n'ont pas toutes le même vide sous la ligne de base).
+void texte_base(const dz::Pinceau &pc, const Police &p, const char *s, int x, int base, int w, lv_text_align_t align,
+                std::uint32_t rgb) {
+    dz::texte(pc, p, s, x, base - (dz::hauteur_ligne(p) - p.f->base_line), w, align, rgb);
+}
+
+// Le verre d'une carte : la teinte du thème et un filet clair à peine visible.
+void carte_de_verre(const Ctx &c, int rayon) {
+    const ThemePrincipal &t = *g.theme;
+    if (t.carte_opa > 0) {
+        dz::rect_bord(c.pc, c.x, c.y, c.w, c.h, rayon, t.carte, t.carte_opa, t.texte, 20, px(2));
+    }
+}
+
+// Un point de la courbe : un halo de la teinte de la carte, puis un point de la couleur du texte.
+void point_de_courbe(const dz::Pinceau &pc, const ThemePrincipal &t, int x, int y, int rayon_halo, int rayon) {
+    dz::disque(pc, x, y, rayon_halo, t.carte);
+    dz::disque(pc, x, y, rayon, t.texte);
+}
+
+// Le tracé d'une courbe monotone en petits traits arrondis, chacun de la couleur de la température qu'il traverse (mélange entre les
+// teintes de ses deux points).
+void tracer_courbe(const dz::Pinceau &pc, const accueil::CourbeMonotone &courbe, const std::uint32_t *teintes,
+                   int epaisseur, int pas) {
+    for (int i = 0; i + 1 < courbe.n; ++i) {
+        const int x0 = courbe.p[i].x;
+        const int x1 = courbe.p[i + 1].x;
+        const Rgb a = depuis_hex(teintes[i]);
+        const Rgb b = depuis_hex(teintes[i + 1]);
+        for (int xa = x0; xa < x1;) {
+            const int xb = std::min(x1, xa + pas);
+            const int milieu_pm = x1 > x0 ? ((xa + xb) / 2 - x0) * 1000 / (x1 - x0) : 0;
+            dz::trait(pc, xa, courbe.y_en(xa), xb, courbe.y_en(xb), epaisseur, en_hex(melanger(a, b, milieu_pm)));
+            xa = xb;
+        }
+    }
+}
+
+// Un dégradé vertical GLOBAL : couleur et opacité (0 à 255) valent `c0`, `a0` à l'ordonnée `y0` et `c1`, `a1` à `y1`, linéairement.
+struct DegradeGlobal {
+    std::uint32_t c0, c1;
+    int a0, a1;
+    int y0, y1;
+    void en(int y, std::uint32_t *rgb, std::uint8_t *opa) const {
+        int pm = y1 != y0 ? (y - y0) * 1000 / (y1 - y0) : 0;
+        pm = std::max(0, std::min(1000, pm));
+        *rgb = en_hex(melanger(depuis_hex(c0), depuis_hex(c1), pm));
+        *opa = static_cast<std::uint8_t>(a0 + (a1 - a0) * pm / 1000);
+    }
 };
 
-// Les sept tuiles : une rangée en paysage (largeurs en poids), une grille de 4 colonnes en portrait (le soleil en occupe deux).
-int placer_tuiles(const Ctx &c, Tuile *t) {
-    static constexpr Metrique ORDRE[7] = {Metrique::VENT, Metrique::PLUIE,  Metrique::HUMIDITE, Metrique::PRESSION,
-                                          Metrique::UV,   Metrique::SOLEIL, Metrique::LUNE};
-    const int ecart = px(10);
-    if (!g.portrait) {
-        static constexpr int POIDS[7] = {140, 130, 130, 160, 135, 235, 206}; // en pixels de référence (somme 1136)
-        int total = 0;
-        for (int p : POIDS) {
-            total += p;
+// Le voile entre deux courbes (`haut` au-dessus de `bas`), de `x_debut` à `x_fin`, en bandes de `pas` pixels dont chaque bout reprend le
+// dégradé global : le même résultat qu'un seul dégradé sous toute la courbe, sans polygone.
+void voile_entre(const dz::Pinceau &pc, const accueil::CourbeMonotone &haut, const accueil::CourbeMonotone &bas,
+                 int x_debut, int x_fin, int pas, const DegradeGlobal &d) {
+    for (int x = x_debut; x < x_fin; x += pas) {
+        const int w = std::min(pas, x_fin - x);
+        const int xm = x + w / 2;
+        const int y_haut = haut.y_en(xm);
+        const int y_bas = bas.y_en(xm);
+        if (y_bas <= y_haut) {
+            continue;
         }
-        const int net = c.w - 6 * ecart;
-        int x = c.x;
-        for (int i = 0; i < 7; ++i) {
-            const int w = (i == 6) ? (c.x + c.w - x) : net * POIDS[i] / total;
-            t[i] = {{x, c.y, w, c.h}, ORDRE[i]};
-            x += w + ecart;
-        }
-        return 7;
+        std::uint32_t c_haut, c_bas;
+        std::uint8_t a_haut, a_bas;
+        d.en(y_haut, &c_haut, &a_haut);
+        d.en(y_bas, &c_bas, &a_bas);
+        dz::rect_degrade_v(pc, x, y_haut, w, y_bas - y_haut, c_haut, a_haut, c_bas, a_bas);
     }
-    const int col = (c.w - 3 * ecart) / 4;
-    const int ligne = (c.h - ecart) / 2;
-    const auto cellule = [&](int cx, int cy, int span) {
-        return Rect{c.x + cx * (col + ecart), c.y + cy * (ligne + ecart), span * col + (span - 1) * ecart, ligne};
-    };
-    t[0] = {cellule(0, 0, 1), Metrique::VENT};
-    t[1] = {cellule(1, 0, 1), Metrique::PLUIE};
-    t[2] = {cellule(2, 0, 1), Metrique::HUMIDITE};
-    t[3] = {cellule(3, 0, 1), Metrique::PRESSION};
-    t[4] = {cellule(0, 1, 1), Metrique::UV};
-    t[5] = {cellule(1, 1, 2), Metrique::SOLEIL};
-    t[6] = {cellule(3, 1, 1), Metrique::LUNE};
-    return 7;
 }
 
-int pad_tuile() { return px(10); }
-int icone_tuile_px() { return px(38); }
+// ---- zone : lieu ----
 
-// L'icône de la grandeur en haut à gauche ; rend l'ordonnée de la ligne de valeur.
-int icone_tuile(const Ctx &c, const Rect &r, Piece piece, Metrique grandeur) {
-    icones::piece(c.pc.couche, piece, icone_tuile_px(), r.x + pad_tuile(), r.y + pad_tuile(),
-                  couleur_metrique(*g.theme, grandeur));
-    return r.y + pad_tuile() + icone_tuile_px();
-}
-
-// La valeur en gros, suivie de son unité (ou d'un mot) en petit, posée sur la même ligne de base.
-void valeur_tuile(const Ctx &c, const Rect &r, int y, const char *valeur, const char *unite, std::uint32_t rgb) {
+void dessiner_barre_accueil(const Ctx &c) {
     const ThemePrincipal &t = *g.theme;
-    const int w = r.w - 2 * pad_tuile();
-    const int w_valeur = dz::largeur_texte(g.corps, valeur);
-    dz::texte(c.pc, g.corps, valeur, r.x + pad_tuile(), y, w, LV_TEXT_ALIGN_LEFT, rgb);
-    if (unite == nullptr || unite[0] == '\0') {
+    const VueMeteo &m = g.e.meteo;
+    const int centre = c.y + c.h / 2;
+    // Le bouton Réglages occupe le bout droit de la zone ; « Exemple » se pose après le lieu.
+    int bord = c.x + c.w - px(48) - px(16);
+    const int w_exemple = m.exemple ? largeur_etat_exemple() : 0;
+    if (m.exemple) {
+        bord -= w_exemple + px(16);
+    }
+    int x_fin = c.x + px(6);
+    if (m.ville[0] != '\0') {
+        const int icone = px(28);
+        icones::piece(c.pc.couche, Piece::epingle, icone, c.x + px(6), centre - icone / 2, t.texte_2);
+        const int x_texte = c.x + px(44);
+        const Ajuste a = ajuster({&g.petit, &g.mini}, m.ville, std::max(px(40), bord - x_texte));
+        const int w = std::min(bord - x_texte, dz::largeur_texte(*a.police, a.texte));
+        dz::texte(c.pc, *a.police, a.texte, x_texte, centre - dz::hauteur_ligne(*a.police) / 2,
+                  std::max(px(40), w) + px(4), LV_TEXT_ALIGN_LEFT, t.texte_2);
+        x_fin = x_texte + w;
+    }
+    if (m.exemple) {
+        const int x = x_fin + px(16);
+        dz::rect(c.pc, x, centre - px(18), w_exemple, px(36), px(18), t.avertissement);
+        dz::texte(c.pc, g.petit, texte_principal::t(texte_principal::kExemple), x,
+                  centre - dz::hauteur_ligne(g.petit) / 2, w_exemple, LV_TEXT_ALIGN_CENTER, t.texte_sur_couleur);
+    }
+}
+
+// ---- zone : l'heure et la date ----
+
+void dessiner_horloge_accueil(const Ctx &c) {
+    const ThemePrincipal &t = *g.theme;
+    const char *heure = g.e.heure_connue ? g.e.heure : texte_principal::kHeureAbsente;
+    const lv_text_align_t align = g.portrait ? LV_TEXT_ALIGN_CENTER : LV_TEXT_ALIGN_LEFT;
+    const int retrait = g.portrait ? 0 : px(4);
+    dz::texte_par_les_chiffres(c.pc, g.heure, heure, c.x + retrait, c.y + px(11), c.w - retrait, align, t.texte);
+    const char *date = g.e.heure_connue && g.e.date != nullptr && g.e.date[0] != '\0'
+                           ? g.e.date
+                           : (g.e.date_attente != nullptr && g.e.date_attente[0] != '\0'
+                                  ? g.e.date_attente
+                                  : texte_principal::t(texte_principal::kDateAttente));
+    const int retrait_date = g.portrait ? 0 : px(10);
+    const Ajuste a = ajuster({&g.titre, &g.corps, &g.petit}, date, c.w - retrait_date);
+    // La ligne de base de la date est à 178 px de référence sous le haut de la zone.
+    dz::texte_par_les_chiffres(c.pc, *a.police, a.texte, c.x + retrait_date,
+                               c.y + px(178) - dz::hauteur_chiffres(*a.police), c.w - retrait_date, align, t.texte_2);
+}
+
+// ---- zone : la météo du moment ----
+
+void dessiner_maintenant_accueil(const Ctx &c) {
+    const ThemePrincipal &t = theme_meteo();
+    const VueMeteo &m = g.e.meteo;
+    const int icone = px(56);
+    const int x_icone = c.x + px(12);
+    const int y_icone = c.y + px(2);
+    if (!m.connue) {
+        icones::meteo(c.pc.couche, IdIcone::inconnue, icone, x_icone, y_icone, t, 110);
+        const int x = x_icone + icone + px(24);
+        texte_ajuste(c.pc, {&g.corps, &g.petit, &g.mini}, texte_principal::t(texte_principal::kMeteoIndisponible), x,
+                     c.y + c.h / 2, c.x + c.w - x, LV_TEXT_ALIGN_LEFT, t.texte_2);
         return;
     }
-    const Police *u = &g.mini;
-    if (w_valeur + px(5) + dz::largeur_texte(*u, unite) > w) {
-        u = &g.nano; // l'unité garde sa place : on la réduit avant de la couper
+    icones::meteo(c.pc.couche, icone_pour_code(m.code, m.jour), icone, x_icone, y_icone, t);
+    char temp[24];
+    fmt_temp(temp, sizeof temp, m.temp_dix);
+    const int x_temp = c.x + px(80);
+    dz::texte_par_les_chiffres(c.pc, g.temperature, temp, x_temp, c.y + px(8), c.x + c.w - x_temp, LV_TEXT_ALIGN_LEFT,
+                               connu(m.temp_dix) ? couleur_temperature(m.temp_dix, t.rampe) : t.texte);
+    // « Éclaircies · ressenti 9° » : le ressenti saute quand la place manque, le libellé est alors coupé s'il le faut.
+    const int x_texte = x_temp + dz::largeur_texte(g.temperature, temp) + px(20);
+    const int w = c.x + c.w - x_texte;
+    if (w < px(40)) {
+        return;
     }
-    const int ligne_de_base = y + dz::hauteur_ligne(g.corps) - g.corps.f->base_line;
-    const int y_unite = ligne_de_base - (dz::hauteur_ligne(*u) - u->f->base_line);
-    dz::texte(c.pc, *u, unite, r.x + pad_tuile() + w_valeur + px(5), y_unite, std::max(0, w - w_valeur - px(5)),
-              LV_TEXT_ALIGN_LEFT, t.texte_3);
-}
-
-int y_detail(int y_valeur) { return y_valeur + dz::hauteur_ligne(g.corps); }
-
-void detail_tuile(const Ctx &c, const Rect &r, int y_valeur, const char *texte, std::uint32_t rgb) {
-    texte_ajuste(c.pc, {&g.mini, &g.nano}, texte, r.x + pad_tuile(), y_detail(y_valeur) + dz::hauteur_ligne(g.mini) / 2,
-                 r.w - 2 * pad_tuile(), LV_TEXT_ALIGN_LEFT, rgb);
-}
-
-void tuile_vent(const Ctx &c, const Rect &r) {
-    const ThemePrincipal &t = *g.theme;
-    const VueMeteo &m = g.e.meteo;
-    const int y = icone_tuile(c, r, Piece::vent, Metrique::VENT);
-    char v[16];
-    if (connu(m.vent_dix_kmh)) {
-        std::snprintf(v, sizeof v, "%d", arrondi_dix(m.vent_dix_kmh));
-    } else {
-        std::snprintf(v, sizeof v, "%s", TIRET);
-    }
-    valeur_tuile(c, r, y, v, connu(m.vent_dix_kmh) ? "km/h" : "", t.texte);
-    // Flèche de direction (vers où le vent souffle), dans un cercle, en haut à droite.
-    if (m.direction_deg >= 0) {
-        const int rayon = px(16);
-        const int cx = r.x + r.w - pad_tuile() - rayon - px(2);
-        const int cy = r.y + pad_tuile() + icone_tuile_px() / 2;
-        dz::anneau(c.pc, cx, cy, rayon + px(3), px(2), t.filet);
-        const double a = angle_fleche_vent(m.direction_deg) * 3.14159265358979 / 180.0;
-        const auto point = [&](double angle, int rayon_point) {
-            return lv_point_t{cx + static_cast<int>(std::lround(std::sin(angle) * rayon_point)),
-                              cy + static_cast<int>(std::lround(-std::cos(angle) * rayon_point))};
-        };
-        const lv_point_t pointe = point(a, rayon);
-        const lv_point_t g1 = point(a + 2.5, rayon * 7 / 10);
-        const lv_point_t g2 = point(a - 2.5, rayon * 7 / 10);
-        dz::triangle(c.pc, pointe.x, pointe.y, g1.x, g1.y, g2.x, g2.y, couleur_metrique(t, Metrique::VENT));
-    }
-    char d[48];
-    if (connu(m.rafales_dix_kmh) && connu(m.vent_dix_kmh) && m.rafales_dix_kmh > m.vent_dix_kmh + 50) {
-        std::snprintf(d, sizeof d, "%s %d", texte_principal::t("Rafales"), arrondi_dix(m.rafales_dix_kmh));
-    } else if (m.direction_deg >= 0) {
-        static constexpr const char *SECTEURS[8] = {"N", "NE", "E", "SE", "S", "SO", "O", "NO"};
-        std::snprintf(d, sizeof d, "%s", texte_principal::t(SECTEURS[secteur_vent(m.direction_deg)]));
-    } else {
-        d[0] = '\0';
-    }
-    detail_tuile(c, r, y, d, t.texte_2);
-}
-
-void tuile_pluie(const Ctx &c, const Rect &r) {
-    const ThemePrincipal &t = *g.theme;
-    const VueMeteo &m = g.e.meteo;
-    const int y = icone_tuile(c, r, Piece::parapluie, Metrique::PLUIE);
-    char v[16];
-    if (m.proba_pluie_pct >= 0) {
-        std::snprintf(v, sizeof v, "%d", m.proba_pluie_pct);
-    } else {
-        std::snprintf(v, sizeof v, "%s", TIRET);
-    }
-    valeur_tuile(c, r, y, v, m.proba_pluie_pct >= 0 ? "%" : "", t.texte);
-    char d[48] = "";
-    switch (pluie_proche(m.pluie_dans_min)) {
-    case PluieProche::EN_COURS:
-        std::snprintf(d, sizeof d, "%s", texte_principal::t("Il pleut"));
-        break;
-    case PluieProche::BIENTOT:
-        std::snprintf(d, sizeof d, texte_principal::t("dans %d min"), m.pluie_dans_min);
-        break;
-    case PluieProche::AUCUNE:
-        std::snprintf(d, sizeof d, "%s", texte_principal::t("Sec 2 h"));
-        break;
-    case PluieProche::INCONNUE:
-        if (connu(m.pluie_dix_mm)) {
-            char mm[16];
-            fmt_dixieme(mm, sizeof mm, m.pluie_dix_mm);
-            std::snprintf(d, sizeof d, "%s mm", mm);
-        }
-        break;
-    }
-    detail_tuile(c, r, y, d, t.texte_2);
-}
-
-void tuile_humidite(const Ctx &c, const Rect &r) {
-    const ThemePrincipal &t = *g.theme;
-    const VueMeteo &m = g.e.meteo;
-    const int y = icone_tuile(c, r, Piece::humidite, Metrique::HUMIDITE);
-    char v[16];
-    if (m.humidite_pct >= 0) {
-        std::snprintf(v, sizeof v, "%d", m.humidite_pct);
-    } else {
-        std::snprintf(v, sizeof v, "%s", TIRET);
-    }
-    valeur_tuile(c, r, y, v, m.humidite_pct >= 0 ? "%" : "", t.texte);
-    // Jauge fine : un rail et son remplissage, sur la ligne de détail.
-    const int h = px(8);
-    const int w = r.w - 2 * pad_tuile();
-    const int yb = y_detail(y) + dz::hauteur_ligne(g.mini) / 2 - h / 2;
-    dz::rect(c.pc, r.x + pad_tuile(), yb, w, h, h / 2, t.filet);
-    if (m.humidite_pct >= 0) {
-        dz::rect(c.pc, r.x + pad_tuile(), yb, std::max(h, w * m.humidite_pct / 100), h, h / 2,
-                 couleur_metrique(t, Metrique::HUMIDITE));
-    }
-}
-
-void tuile_pression(const Ctx &c, const Rect &r) {
-    const ThemePrincipal &t = *g.theme;
-    const VueMeteo &m = g.e.meteo;
-    const int y = icone_tuile(c, r, Piece::pression, Metrique::PRESSION);
-    char v[16];
-    if (connu(m.pression_dix_hpa)) {
-        std::snprintf(v, sizeof v, "%d", arrondi_dix(m.pression_dix_hpa));
-    } else {
-        std::snprintf(v, sizeof v, "%s", TIRET);
-    }
-    valeur_tuile(c, r, y, v, connu(m.pression_dix_hpa) ? "hPa" : "", t.texte);
-    // Tendance sur trois heures : un triangle en haut à droite, et trois mots sous la valeur.
-    const TendancePression tend = tendance_pression(m.tendance_dix_hpa_3h);
-    if (tend != TendancePression::INCONNUE) {
-        const int cx = r.x + r.w - pad_tuile() - px(14);
-        const int cy = r.y + pad_tuile() + icone_tuile_px() / 2;
-        const std::uint32_t rgb = couleur_metrique(t, Metrique::PRESSION);
-        if (tend == TendancePression::HAUSSE) {
-            triangle_haut_bas(c.pc, cx, cy, px(11), true, rgb);
-        } else if (tend == TendancePression::BAISSE) {
-            triangle_haut_bas(c.pc, cx, cy, px(11), false, rgb);
-        } else {
-            dz::trait(c.pc, cx - px(11), cy, cx + px(11), cy, px(4), rgb);
-        }
-        const char *mot = tend == TendancePression::HAUSSE
-                              ? "En hausse"
-                              : (tend == TendancePression::BAISSE ? "En baisse" : "Stable");
-        detail_tuile(c, r, y, texte_principal::t(mot), t.texte_2);
-    }
-}
-
-const char *texte_uv(CategorieUv cat) {
-    switch (cat) {
-    case CategorieUv::FAIBLE:
-        return texte_principal::t("Faible");
-    case CategorieUv::MODERE:
-        return texte_principal::t("Modéré");
-    case CategorieUv::ELEVE:
-        return texte_principal::t("Élevé");
-    case CategorieUv::TRES_ELEVE:
-        return texte_principal::t("Très élevé");
-    case CategorieUv::EXTREME:
-        return texte_principal::t("Extrême");
-    case CategorieUv::INCONNU:
-        break;
-    }
-    return "";
-}
-
-void tuile_uv(const Ctx &c, const Rect &r) {
-    const ThemePrincipal &t = *g.theme;
-    const VueMeteo &m = g.e.meteo;
-    const int y = icone_tuile(c, r, Piece::uv, Metrique::UV);
-    const CategorieUv cat = categorie_uv(m.uv_dix);
-    char v[16];
-    if (cat != CategorieUv::INCONNU) {
-        std::snprintf(v, sizeof v, "%d", arrondi_dix(m.uv_dix));
-    } else {
-        std::snprintf(v, sizeof v, "%s", TIRET);
-    }
-    valeur_tuile(c, r, y, v, texte_uv(cat), cat != CategorieUv::INCONNU ? couleur_uv(t, cat) : t.texte);
-    // Cinq segments qui se remplissent jusqu'au niveau.
-    const int h = px(8);
-    const int ecart = px(4);
-    const int w = r.w - 2 * pad_tuile();
-    const int seg = (w - 4 * ecart) / 5;
-    const int yb = y_detail(y) + dz::hauteur_ligne(g.mini) / 2 - h / 2;
-    const int niveau = cat == CategorieUv::INCONNU ? 0 : static_cast<int>(cat);
-    for (int i = 0; i < 5; ++i) {
-        dz::rect(c.pc, r.x + pad_tuile() + i * (seg + ecart), yb, seg, h, h / 2, i < niveau ? t.niveau_uv[i] : t.filet);
-    }
-}
-
-// Soleil : les deux icônes lever et coucher aux coins, l'arc du jour entre elles avec le soleil à sa position, les deux heures dessous.
-void tuile_soleil(const Ctx &c, const Rect &r) {
-    const ThemePrincipal &t = *g.theme;
-    const VueMeteo &m = g.e.meteo;
-    const int pad = pad_tuile();
-    const int ico = icone_tuile_px();
-    const bool connu_soleil = m.lever_s > 0 && m.coucher_s > m.lever_s;
-    icones::piece(c.pc.couche, Piece::lever, ico, r.x + pad, r.y + pad, couleur_metrique(t, Metrique::SOLEIL));
-    icones::piece(c.pc.couche, Piece::coucher, ico, r.x + r.w - pad - ico, r.y + pad,
-                  couleur_metrique(t, Metrique::SOLEIL));
-    // L'arc : demi-cercle entre les deux icônes.
-    const int h_heure = dz::hauteur_ligne(g.corps);
-    const int rayon = std::min(px(48), (r.w - 2 * pad - 2 * ico) / 2 - px(6));
-    const int cx = r.x + r.w / 2;
-    const int cy = r.y + r.h - pad - h_heure - px(8);
-    dz::arc(c.pc, cx, cy, rayon, px(4), 180, 360, t.filet, LV_OPA_COVER, true);
-    dz::trait(c.pc, cx - rayon - px(8), cy, cx + rayon + px(8), cy, px(2), t.filet, LV_OPA_COVER, false);
-    if (connu_soleil) {
-        const ArcSoleil a = arc_soleil(g.e.maintenant_s, m.lever_s, m.coucher_s, m.jour);
-        if (a.position_pm >= 0) {
-            const int fin = 180 + a.position_pm * 180 / 1000;
-            if (fin > 182) {
-                dz::arc(c.pc, cx, cy, rayon, px(4), 180, fin, couleur_metrique(t, Metrique::SOLEIL));
-            }
-            const double ang = fin * 3.14159265358979 / 180.0;
-            const int sx = cx + static_cast<int>(std::lround(std::cos(ang) * rayon));
-            const int sy = cy + static_cast<int>(std::lround(std::sin(ang) * rayon));
-            dz::disque(c.pc, sx, sy, px(11), couleur_metrique(t, Metrique::SOLEIL), 90);
-            dz::disque(c.pc, sx, sy, px(7), couleur_metrique(t, Metrique::SOLEIL));
+    char libelle[64];
+    libelle_meteo(libelle, sizeof libelle, m.code, m.jour);
+    char phrase[128];
+    std::snprintf(phrase, sizeof phrase, "%s", libelle);
+    if (connu(m.ressenti_dix)) {
+        char ressenti[24], mention[48], complet[128];
+        fmt_temp(ressenti, sizeof ressenti, m.ressenti_dix);
+        std::snprintf(mention, sizeof mention, texte_principal::t("ressenti %s"), ressenti);
+        std::snprintf(complet, sizeof complet, "%s%s%s", libelle, POINT_MEDIAN, mention);
+        if (dz::largeur_texte(g.mini, complet) <= w) {
+            std::snprintf(phrase, sizeof phrase, "%s", complet);
         }
     }
-    char lever[16], coucher[16];
-    fmt_hhmm(lever, sizeof lever, connu_soleil ? m.lever_s : 0);
-    fmt_hhmm(coucher, sizeof coucher, connu_soleil ? m.coucher_s : 0);
-    const int y = r.y + r.h - pad - h_heure;
-    const int moitie = (r.w - 2 * pad) / 2;
-    dz::texte(c.pc, g.corps, lever, r.x + pad, y, moitie, LV_TEXT_ALIGN_LEFT, t.texte);
-    dz::texte(c.pc, g.corps, coucher, r.x + r.w - pad - moitie, y, moitie, LV_TEXT_ALIGN_RIGHT, t.texte);
+    const Ajuste a = ajuster({&g.mini}, phrase, w);
+    // La ligne de base du texte est à 43 px de référence sous le haut de la zone.
+    dz::texte_par_les_chiffres(c.pc, *a.police, a.texte, x_texte, c.y + px(43) - dz::hauteur_chiffres(*a.police), w,
+                               LV_TEXT_ALIGN_LEFT, t.texte_2);
 }
 
-// Lune : la phase du jour dessinée (calcul local), son éclairement en gros et son nom dessous (sur deux lignes si besoin).
-void tuile_lune(const Ctx &c, const Rect &r) {
-    const ThemePrincipal &t = *g.theme;
-    const int pad = pad_tuile();
-    const PhaseLune p = phase_lune(g.e.maintenant_s);
-    const int cote = px(64);
-    icones::lune(c.pc.couche, p.indice, cote, r.x + pad, r.y + pad, couleur_metrique(t, Metrique::LUNE));
-    char pct[16];
-    std::snprintf(pct, sizeof pct, "%d", p.eclairement_pct);
-    const int x = r.x + pad + cote + px(8);
-    const int w_val = dz::largeur_texte(g.corps, pct);
-    const int y = r.y + pad + (cote - dz::hauteur_ligne(g.corps)) / 2;
-    dz::texte(c.pc, g.corps, pct, x, y, r.x + r.w - pad - x, LV_TEXT_ALIGN_LEFT, t.texte);
-    const int ligne_de_base = y + dz::hauteur_ligne(g.corps) - g.corps.f->base_line;
-    dz::texte(c.pc, g.mini, "%", x + w_val + px(4), ligne_de_base - (dz::hauteur_ligne(g.mini) - g.mini.f->base_line),
-              px(30), LV_TEXT_ALIGN_LEFT, t.texte_3);
-    static constexpr const char *NOMS[8] = {"Nouvelle lune",       "Premier croissant", "Premier quartier",
-                                            "Gibbeuse croissante", "Pleine lune",       "Gibbeuse décroissante",
-                                            "Dernier quartier",    "Dernier croissant"};
-    const char *nom = texte_principal::t(NOMS[p.indice]);
-    const int w = r.w - 2 * pad;
-    const Police &police =
-        dz::largeur_texte(g.mini, nom) <= w ? g.mini : g.nano; // sinon LVGL passe à la ligne dans `w`
-    const int y_nom = r.y + pad + cote + px(2);
-    dz::texte(c.pc, police, nom, r.x + pad, y_nom, w, LV_TEXT_ALIGN_LEFT, t.texte_2, LV_OPA_COVER, 2);
-}
+// ---- zone : la courbe des heures ----
 
-void dessiner_metriques(const Ctx &c) {
-    Tuile tuiles[7];
-    const int n = placer_tuiles(c, tuiles);
-    for (int i = 0; i < n; ++i) {
-        const Rect &r = tuiles[i].r;
-        fond_de_carte(c, r.x, r.y, r.w, r.h, px(20));
-        switch (tuiles[i].grandeur) {
-        case Metrique::VENT:
-            tuile_vent(c, r);
-            break;
-        case Metrique::PLUIE:
-            tuile_pluie(c, r);
-            break;
-        case Metrique::HUMIDITE:
-            tuile_humidite(c, r);
-            break;
-        case Metrique::PRESSION:
-            tuile_pression(c, r);
-            break;
-        case Metrique::UV:
-            tuile_uv(c, r);
-            break;
-        case Metrique::SOLEIL:
-            tuile_soleil(c, r);
-            break;
-        case Metrique::LUNE:
-            tuile_lune(c, r);
-            break;
-        case Metrique::NOMBRE:
-            break;
-        }
-    }
-}
-
-// ---- zone : heure par heure ------------------------------------------------------------------------------------------------
-
-void dessiner_heures(const Ctx &c) {
-    const ThemePrincipal &t = *g.theme;
+void dessiner_heures_accueil(const Ctx &c) {
+    const ThemePrincipal &t = theme_meteo();
     const VueMeteo &m = g.e.meteo;
-    fond_de_carte(c, c.x, c.y, c.w, c.h, px(24));
+    carte_de_verre(c, px(28));
     const int debut = premiere_heure();
-    const int disponibles = m.nb_heures - debut;
-    if (disponibles <= 0) {
+    const int n = std::min(COLONNES_HEURES, m.nb_heures - debut);
+    if (!m.connue || n <= 0) { // pas de prévision heure par heure : la carte le dit par un tiret
+        texte_ajuste(c.pc, {&g.titre}, TIRET, c.x, c.y + c.h / 2, c.w, LV_TEXT_ALIGN_CENTER, t.texte_3);
         return;
     }
-    const int pad = px(8);
-    const int largeur_mini = px(g.portrait ? 84 : 88);
-    const int colonnes = std::max(1, std::min(disponibles, (c.w - 2 * pad) / largeur_mini));
-    const int col_w = (c.w - 2 * pad) / colonnes;
-    const int x0 = c.x + pad + ((c.w - 2 * pad) - col_w * colonnes) / 2;
-    const int h_barre = px(5);
-    const int h_texte = dz::hauteur_ligne(g.mini) + dz::hauteur_ligne(g.petit) + px(8) + h_barre;
-    const int h_icone = std::max(px(28), std::min(px(42), c.h - 2 * pad - h_texte));
-    const int bloc = h_texte + h_icone;
-    const int y_haut = c.y + std::max(pad, (c.h - bloc) / 2);
-    const bool francais = i18n::langue_courante() == i18n::Langue::Fr;
-    for (int i = 0; i < colonnes; ++i) {
-        const HeurePrevue &h = m.heures[debut + i];
-        const int x = x0 + i * col_w;
-        if (i > 0) { // un filet léger entre deux colonnes
-            dz::rect(c.pc, x, c.y + pad + px(6), px(1), c.h - 2 * pad - px(12), 0, t.filet, 120);
+    const HeurePrevue *h = m.heures + debut;
+    const int pad_x = px(20);
+    const int largeur = c.w - 2 * pad_x;
+    const int pas = largeur / n;
+    const auto x_col = [&](int i) { return c.x + pad_x + largeur * (2 * i + 1) / (2 * n); };
+
+    int temps[COLONNES_HEURES];
+    int pluie_max_dix = 0;
+    for (int i = 0; i < n; ++i) {
+        temps[i] = h[i].temp_dix;
+        if (connu(h[i].pluie_dix_mm) && h[i].pluie_dix_mm > pluie_max_dix) {
+            pluie_max_dix = h[i].pluie_dix_mm;
         }
-        // L'heure locale de CETTE colonne, au décalage en vigueur à son instant (une fenêtre peut contenir un changement d'heure) ;
-        // « 7h » / « 7:00 » à l'heure pile, « 05:30 » sinon (fuseaux à demi-heure ou trois quarts d'heure).
+    }
+    const bool a_pluie = pluie_max_dix > 0;
+    const int y_icones = c.y + px(33); // centre des icônes
+    const int y_haut = c.y + px(96);   // ordonnée du maximum
+    const int y_pied = c.y + px(256);  // pied des barres de pluie et du voile
+    // Ordonnée du minimum : sous le point, son chiffre (36 px) doit rester au-dessus des étiquettes d'heures (286), pluie ou non.
+    const int y_bas = c.y + (a_pluie ? px(202) : px(208));
+    const int y_etiquette = c.y + px(286); // ligne de base des heures
+
+    // La colonne de l'heure en cours, teintée d'accent.
+    dz::rect(c.pc, c.x + pad_x + px(1), c.y + px(14), pas - px(2), px(276), px(14), t.accent, 31);
+
+    // Les points de la courbe : les heures dont la température est connue.
+    accueil::Pt pts[COLONNES_HEURES];
+    std::uint32_t teintes[COLONNES_HEURES];
+    int k = 0;
+    int bas_dix = 0, haut_dix = 0;
+    for (int i = 0; i < n; ++i) {
+        if (!connu(temps[i])) {
+            continue;
+        }
+        if (k == 0 || temps[i] < bas_dix) {
+            bas_dix = temps[i];
+        }
+        if (k == 0 || temps[i] > haut_dix) {
+            haut_dix = temps[i];
+        }
+        pts[k] = {x_col(i), 0};
+        teintes[k] = couleur_temperature(temps[i], t.rampe);
+        ++k;
+    }
+    for (int i = 0, j = 0; i < n; ++i) {
+        if (connu(temps[i])) {
+            pts[j++].y = accueil::ordonnee_de(temps[i], bas_dix, haut_dix, y_haut, y_bas);
+        }
+    }
+    const accueil::CourbeMonotone courbe = accueil::courbe_monotone(pts, k);
+
+    // Le voile sous la courbe : de la teinte moyenne, opaque à 34 % en haut, nul au pied.
+    if (k >= 2) {
+        int somme = 0;
+        for (int i = 0; i < n; ++i) {
+            if (connu(temps[i])) {
+                somme += temps[i];
+            }
+        }
+        const std::uint32_t moyenne = couleur_temperature(somme / k, t.rampe);
+        int y_min = y_pied;
+        for (int j = 0; j < k; ++j) {
+            y_min = std::min(y_min, pts[j].y);
+        }
+        const DegradeGlobal d = {moyenne, moyenne, 87, 0, y_min, y_pied};
+        // Le « bas » du voile est une droite au pied : une courbe à deux points à la même ordonnée.
+        const accueil::Pt droite[2] = {{pts[0].x, y_pied}, {pts[k - 1].x, y_pied}};
+        voile_entre(c.pc, courbe, accueil::courbe_monotone(droite, 2), pts[0].x, pts[k - 1].x, std::max(3, px(8)), d);
+    }
+
+    // Les barres de pluie : arrondies, de hauteur en racine carrée de la pluie, teintées selon l'intensité.
+    int hauteur_barre[COLONNES_HEURES] = {};
+    if (a_pluie) {
+        const int largeur_barre = std::min(px(20), pas / 2);
+        for (int i = 0; i < n; ++i) {
+            if (!connu(h[i].pluie_dix_mm) || h[i].pluie_dix_mm <= 0) {
+                continue;
+            }
+            // `gelule_du_jour` donne ici la HAUTEUR (de 8 à 44 px de référence) : la même racine carrée que la largeur des gélules des jours.
+            const accueil::Gelule b = accueil::gelule_du_jour(
+                h[i].pluie_dix_mm, accueil::echelle_pluie(pluie_max_dix, accueil::PLANCHER_ECHELLE_HEURE_DIX), px(8),
+                px(44), 0, 0, 0);
+            hauteur_barre[i] = b.largeur;
+            dz::rect(c.pc, x_col(i) - largeur_barre / 2, y_pied - b.largeur, largeur_barre, b.largeur,
+                     largeur_barre / 2, accueil::couleur_niveau_pluie(t, b.niveau));
+        }
+    }
+
+    if (k >= 2) {
+        tracer_courbe(c.pc, courbe, teintes, std::max(2, px(5)), std::max(3, px(6)));
+    }
+
+    // Les icônes du temps de chaque heure.
+    const int cote_icone = px(38);
+    for (int i = 0; i < n; ++i) {
+        icones::meteo(c.pc.couche, icone_pour_code(h[i].code, h[i].jour), cote_icone, x_col(i) - cote_icone / 2,
+                      y_icones - cote_icone / 2, t);
+    }
+
+    // Le maximum (au-dessus de son point) et le minimum (en dessous, sauf si la barre de pluie de sa colonne y monte : au-dessus).
+    const accueil::Extremes ex = accueil::extremes_de(temps, n);
+    const auto etiquette = [&](int i, bool en_haut) {
+        const int x = x_col(i);
+        const int y = accueil::ordonnee_de(temps[i], bas_dix, haut_dix, y_haut, y_bas);
+        point_de_courbe(c.pc, t, x, y, px(10), px(6));
+        char s[24];
+        fmt_temp(s, sizeof s, temps[i]);
+        if (!en_haut && hauteur_barre[i] > 0 && y_pied - hauteur_barre[i] < y + px(36) + px(4)) {
+            en_haut = true; // sinon le chiffre s'écrirait sur la barre
+        }
+        const int base = en_haut ? y - px(18) : y + px(36);
+        texte_base(c.pc, g.mini, s, x - px(40), base, px(80), LV_TEXT_ALIGN_CENTER,
+                   couleur_temperature(temps[i], t.rampe));
+    };
+    if (ex.i_max >= 0) {
+        etiquette(ex.i_max, true);
+    }
+    if (ex.i_min >= 0) {
+        etiquette(ex.i_min, false);
+    }
+
+    // Une heure sur quatre porte son étiquette, la première en accent.
+    const bool francais = en_francais();
+    for (int i = 0; i < n; ++i) {
+        if (!accueil::est_repere_heure(i, n)) {
+            continue;
+        }
         char libelle[16];
-        ecran::heure::formater_etiquette_heure(heure_du(h.instant_s), francais, libelle, sizeof libelle);
-        int y = y_haut;
-        dz::texte(c.pc, g.mini, libelle, x, y, col_w, LV_TEXT_ALIGN_CENTER, i == 0 ? t.accent : t.texte_2);
-        y += dz::hauteur_ligne(g.mini) + px(2);
-        icones::meteo(c.pc.couche, icone_pour_code(h.code, h.jour), h_icone, x + (col_w - h_icone) / 2, y, t);
-        y += h_icone + px(2);
-        char temp[24];
-        fmt_temp(temp, sizeof temp, h.temp_dix);
-        dz::texte(c.pc, g.petit, temp, x, y, col_w, LV_TEXT_ALIGN_CENTER,
-                  connu(h.temp_dix) ? couleur_temperature(h.temp_dix, t.rampe) : t.texte_3);
-        y += dz::hauteur_ligne(g.petit) + px(4);
-        // Barre de pluie : proportionnelle à la probabilité, au moins 2 px dès qu'elle n'est pas nulle.
-        if (h.proba_pct >= 0) {
-            const int bw = col_w * 6 / 10;
-            const int bx = x + (col_w - bw) / 2;
-            dz::rect(c.pc, bx, y, bw, h_barre, h_barre / 2, t.filet);
-            dz::rect(c.pc, bx, y, hauteur_barre_pct(h.proba_pct, bw), h_barre, h_barre / 2, t.pluie);
+        ecran::heure::formater_etiquette_heure(heure_du(h[i].instant_s), francais, libelle, sizeof libelle);
+        texte_base(c.pc, g.mini, libelle, x_col(i) - px(40), y_etiquette, px(80), LV_TEXT_ALIGN_CENTER,
+                   i == 0 ? t.accent : t.texte_3);
+    }
+}
+
+// ---- zone : le bandeau (la pluie, l'alerte) ----
+
+// Le bandeau est fait de deux moitiés qui gardent chacune leur place : la pluie (ou la mention des données périmées) à gauche,
+// l'alerte à droite.
+Rect moitie_du_bandeau(bool droite) {
+    const Rect &r = g.rect[Z_BANDEAU];
+    const int ecart = px(16);
+    const int w = (r.w - ecart) / 2;
+    return droite ? Rect{r.x + w + ecart, r.y, r.w - w - ecart, r.h} : Rect{r.x, r.y, w, r.h};
+}
+
+// Verre teinté d'une puce : le fond à 20 %, le contour à 65 % de sa couleur (`opa_*` en 0 à 255).
+void fond_de_puce(const dz::Pinceau &pc, int x, int y, int w, int h, std::uint32_t rgb, std::uint8_t opa_fond,
+                  std::uint8_t opa_bord) {
+    dz::rect_bord(pc, x, y, w, h, h / 2, rgb, opa_fond, rgb, opa_bord, std::max(1, px(2)));
+}
+
+// L'icône d'une puce : 30 px de référence, centrée dans le carré de gauche de la puce.
+void icone_de_puce(const dz::Pinceau &pc, Piece piece, int x, int y, int h, std::uint32_t rgb) {
+    const int cote = px(30);
+    icones::piece(pc.couche, piece, cote, x + h / 2 - cote / 2, y + h / 2 - cote / 2, rgb);
+}
+
+// Une coche dans un rond (« rien à signaler ») : la police n'a pas ce signe, on le trace.
+void coche_dans_rond(const dz::Pinceau &pc, int cx, int cy, int rayon, std::uint32_t rgb) {
+    const int e = std::max(2, px(2));
+    dz::anneau(pc, cx, cy, rayon, e, rgb);
+    dz::trait(pc, cx - rayon * 45 / 100, cy + rayon * 5 / 100, cx - rayon * 10 / 100, cy + rayon * 40 / 100, e, rgb);
+    dz::trait(pc, cx - rayon * 10 / 100, cy + rayon * 40 / 100, cx + rayon * 50 / 100, cy - rayon * 35 / 100, e, rgb);
+}
+
+// Une puce complète : verre teinté, icône, texte (coupé par « … » s'il le faut).
+void puce(const dz::Pinceau &pc, const ThemePrincipal &t, const Rect &r, std::uint32_t rgb, std::uint8_t opa_fond,
+          std::uint8_t opa_bord, Piece icone, const char *texte) {
+    fond_de_puce(pc, r.x, r.y, r.w, r.h, rgb, opa_fond, opa_bord);
+    icone_de_puce(pc, icone, r.x, r.y, r.h, rgb);
+    const int x_texte = r.x + r.h + px(4);
+    texte_ajuste(pc, {&g.petit, &g.mini}, texte, x_texte, r.y + r.h / 2, r.x + r.w - px(24) - x_texte,
+                 LV_TEXT_ALIGN_LEFT, t.texte);
+}
+
+// « Pluie dès 13 h · 6,5 mm », « Pluie dans 25 min · 2,1 mm », « Pluie en cours · 3,2 mm » (le cumul s'il est connu et demandé).
+void texte_de_pluie(char *sortie, std::size_t n, bool avec_cumul) {
+    const accueil::EpisodePluie &e = g.pluie;
+    char base[64] = {};
+    switch (e.genre) {
+    case accueil::GenrePluie::EN_COURS:
+        std::snprintf(base, sizeof base, "%s", texte_principal::t("Pluie en cours"));
+        break;
+    case accueil::GenrePluie::BIENTOT:
+        std::snprintf(base, sizeof base, texte_principal::t("Pluie dans %d min"), e.dans_min);
+        break;
+    case accueil::GenrePluie::PLUS_TARD: {
+        char heure[16] = {};
+        accueil::formater_heure_phrase(heure_du(e.debut_s), en_francais(), heure, sizeof heure);
+        std::snprintf(base, sizeof base, texte_principal::t("Pluie dès %s"), heure);
+        break;
+    }
+    default:
+        break;
+    }
+    if (avec_cumul && connu(e.cumul_dix_mm) && e.cumul_dix_mm > 0) {
+        char mm[16];
+        fmt_dixieme(mm, sizeof mm, e.cumul_dix_mm);
+        std::snprintf(sortie, n, "%s%s%s mm", base, POINT_MEDIAN, mm);
+    } else {
+        std::snprintf(sortie, n, "%s", base);
+    }
+}
+
+void dessiner_bandeau(const Ctx &c) {
+    const ThemePrincipal &t = theme_meteo();
+    const ThemePrincipal &normal = *g.theme;
+    const VueMeteo &m = g.e.meteo;
+    const Alerte al = alerte_du_jour();
+    const accueil::ContenuBandeau cb =
+        accueil::composer_bandeau(m.connue, m.perimee, g.pluie.genre, g.e.bandeau.present, al != Alerte::AUCUNE);
+    const Rect gauche = moitie_du_bandeau(false);
+    switch (cb.gauche) {
+    case accueil::Puce::PLUIE: {
+        char s[96];
+        texte_de_pluie(s, sizeof s, true);
+        if (dz::largeur_texte(g.mini, s) > gauche.w - gauche.h - px(4) - px(24)) {
+            texte_de_pluie(s, sizeof s,
+                           false); // le cumul est le détail : il part avant que la phrase soit coupée par « … »
+        }
+        puce(c.pc, t, gauche, t.pluie, 51, 166, Piece::parapluie, s);
+        break;
+    }
+    case accueil::Puce::PERIMEE: {
+        char hhmm[16], s[96];
+        fmt_hhmm(hhmm, sizeof hhmm, m.instant_s);
+        std::snprintf(s, sizeof s, texte_principal::t("Données de %s · périmées"), hhmm);
+        puce(c.pc, normal, gauche, normal.avertissement, 51, 166, Piece::hors_ligne, s);
+        break;
+    }
+    case accueil::Puce::CALME: {
+        // Centrée sur toute la largeur : il n'y a rien d'autre à dire.
+        const Rect r = {c.x + (c.w - gauche.w) / 2, gauche.y, gauche.w, gauche.h};
+        fond_de_puce(c.pc, r.x, r.y, r.w, r.h, normal.texte_3, 26, 64);
+        coche_dans_rond(c.pc, r.x + r.h / 2, r.y + r.h / 2, px(13), normal.texte_3);
+        const int x_texte = r.x + r.h + px(4);
+        texte_ajuste(c.pc, {&g.petit, &g.mini}, texte_principal::t("Rien à signaler dans les prochaines heures"),
+                     x_texte, r.y + r.h / 2, r.x + r.w - px(24) - x_texte, LV_TEXT_ALIGN_LEFT, normal.texte);
+        break;
+    }
+    default:
+        break;
+    }
+    if (cb.droite == accueil::Puce::ALERTE_METEO) {
+        // L'alerte déduite de la météo du jour : pas d'appui (seule l'alerte officielle ouvre la page des alertes).
+        puce(c.pc, t, moitie_du_bandeau(true), couleur_alerte(t, al), 51, 166, piece_alerte(al), texte_alerte(al));
+    }
+    // L'alerte officielle est dessinée par l'objet g.pastille, posé sur cette moitié (il reçoit l'appui).
+}
+
+// ---- l'alerte officielle (objet g.pastille, posé sur la moitié droite du bandeau) ----
+
+// Le texte de la puce : le titre de l'émetteur, suivi de la fenêtre « 14–22 h » quand l'alerte tient dans un seul jour. Trop long, le
+// titre est coupé par « … » et la fenêtre reste (c'est elle qui dit QUAND) ; sans place pour les deux, le titre seul.
+void texte_officielle(const vigie::Bandeau &b, int largeur, char *sortie, std::size_t n, const Police **police) {
+    char fenetre[24] = {};
+    if (b.debut_s > 0 && b.fin_s > 0) {
+        accueil::formater_fenetre(heure_du(b.debut_s), heure_du(b.fin_s), en_francais(), fenetre, sizeof fenetre);
+    }
+    const char *liaison = fenetre[0] != '\0' ? POINT_MEDIAN : "";
+    for (const Police *p : {&g.petit, &g.mini}) {
+        std::snprintf(sortie, n, "%s%s%s", b.texte, liaison, fenetre);
+        *police = p;
+        if (dz::largeur_texte(*p, sortie) <= largeur) {
+            return;
+        }
+    }
+    const Police &p = g.mini;
+    const int w_fenetre = fenetre[0] != '\0' ? dz::largeur_texte(p, liaison) + dz::largeur_texte(p, fenetre) : 0;
+    if (largeur - w_fenetre < px(80)) {
+        const Ajuste a = ajuster({&p}, b.texte, largeur);
+        std::snprintf(sortie, n, "%s", a.texte);
+        return;
+    }
+    const Ajuste a = ajuster({&p}, b.texte, largeur - w_fenetre);
+    std::snprintf(sortie, n, "%s%s%s", a.texte, liaison, fenetre);
+}
+
+PlaceOfficielle placer_puce_officielle() {
+    PlaceOfficielle p;
+    const vigie::Bandeau &b = g.e.bandeau;
+    const Rect &zone = g.rect[Z_BANDEAU];
+    if (!b.present || zone.w <= 0 || zone.h <= 0) {
+        return p;
+    }
+    const Rect r = moitie_du_bandeau(true);
+    p.x = r.x;
+    p.y = r.y;
+    p.w = r.w;
+    p.h = r.h;
+    int d_autres = 0;
+    if (b.autres > 0) {
+        std::snprintf(p.autres, sizeof p.autres, "+%u", static_cast<unsigned>(b.autres));
+        d_autres = std::max(px(30), dz::largeur_texte(g.mini, p.autres) + px(14));
+        p.d_autres = d_autres;
+        p.x_autres = p.w - px(18) - d_autres;
+    }
+    const int x_texte = p.h + px(4);
+    const int bord = d_autres > 0 ? p.x_autres - px(10) : p.w - px(24);
+    const int w_dispo = bord - x_texte;
+    if (w_dispo >= px(60) && b.texte[0] != '\0') {
+        const Police *police = nullptr;
+        texte_officielle(b, w_dispo, p.texte, sizeof p.texte, &police);
+        p.police = police;
+        p.w_texte = std::min(w_dispo, dz::largeur_texte(*police, p.texte));
+        p.x_texte = x_texte;
+    }
+    p.ok = true;
+    return p;
+}
+
+// ---- zone : les cinq jours ----
+
+// Une flèche de vent à deux triangles (l'esquisse : pointe, deux ailes, un creux) qui pointe VERS où le vent souffle.
+void fleche_vent(const dz::Pinceau &pc, int cx, int cy, int taille, int angle_deg, std::uint32_t rgb) {
+    const double a = angle_deg * 3.14159265358979 / 180.0;
+    const double s = std::sin(a);
+    const double co = std::cos(a);
+    const double k = taille / 2.0;
+    const auto pt = [&](double x, double y) {
+        return lv_point_t{cx + static_cast<int>(std::lround((x * co - y * s) * k)),
+                          cy + static_cast<int>(std::lround((x * s + y * co) * k))};
+    };
+    const lv_point_t pointe = pt(0.0, -1.0);
+    const lv_point_t aile_d = pt(0.62, 0.85);
+    const lv_point_t creux = pt(0.0, 0.42);
+    const lv_point_t aile_g = pt(-0.62, 0.85);
+    dz::triangle(pc, pointe.x, pointe.y, aile_d.x, aile_d.y, creux.x, creux.y, rgb);
+    dz::triangle(pc, pointe.x, pointe.y, creux.x, creux.y, aile_g.x, aile_g.y, rgb);
+}
+
+void dessiner_jours(const Ctx &c) {
+    const ThemePrincipal &t = theme_meteo();
+    const VueMeteo &m = g.e.meteo;
+    carte_de_verre(c, px(28));
+    const int debut = premier_jour();
+    const int n = std::min(COLONNES_JOURS, m.nb_jours - debut);
+    if (n <= 0) {
+        return;
+    }
+    const JourPrevu *jours = m.jours + debut;
+    const std::int64_t numero_aujourdhui = ecran::heure::numero_jour_local(g.e.maintenant_s, fuseau());
+
+    // Les rangées : leurs ordonnées de référence (sous le haut de la carte) croissent avec la hauteur gagnée sur 720 (la 7B : 30 px),
+    // et le surplus au-delà de 90 px (portrait) est réparti en haut et en bas.
+    const int gagne = std::min(g.extra_h, 90);
+    const int marge_haut = g.extra_h > 90 ? (g.extra_h - 90) / 2 : 0;
+    const auto rang = [&](int base, int par_30) { return c.y + px(base + par_30 * gagne / 30 + marge_haut); };
+    const int y_icone = rang(36, 2);       // centre de la rangée « nom + icône »
+    const int y_temps = rang(97, 6);       // ligne de base de « 14° / 8° »
+    const int y_ruban_haut = rang(113, 8); // le ruban : les maximales...
+    const int y_ruban_bas = rang(170, 20); // ... et les minimales
+    const int y_vent = rang(200, 24);      // centre de la rangée du vent
+    const int y_pluie = rang(236, 30);     // centre de la rangée de la pluie
+
+    const int x0 = c.x + px(24);
+    const int largeur = c.w - 2 * px(24);
+    const int pas = largeur / n;
+    const auto x_col = [&](int i) { return x0 + largeur * (2 * i + 1) / (2 * n); };
+
+    // Aujourd'hui : la colonne teintée d'accent, comme l'heure en cours de la courbe d'heures.
+    if (numero_du_jour_prevu(jours[0]) == numero_aujourdhui) {
+        dz::rect(c.pc, x_col(0) - pas / 2 + px(4), c.y + px(8), pas - px(8), c.h - px(16), px(20), t.accent, 26);
+    }
+
+    // Le ruban entre les maximales (courbe du haut) et les minimales (courbe du bas), sur une échelle commune.
+    accueil::Pt p_haut[COLONNES_JOURS], p_bas[COLONNES_JOURS];
+    std::uint32_t t_haut[COLONNES_JOURS], t_bas[COLONNES_JOURS];
+    int nb = 0;
+    int plus_bas_dix = 0, plus_haut_dix = 0;
+    int somme_haut = 0, somme_bas = 0;
+    for (int i = 0; i < n; ++i) {
+        if (!connu(jours[i].max_dix) || !connu(jours[i].min_dix)) {
+            continue;
+        }
+        if (nb == 0 || jours[i].min_dix < plus_bas_dix) {
+            plus_bas_dix = jours[i].min_dix;
+        }
+        if (nb == 0 || jours[i].max_dix > plus_haut_dix) {
+            plus_haut_dix = jours[i].max_dix;
+        }
+        somme_haut += jours[i].max_dix;
+        somme_bas += jours[i].min_dix;
+        p_haut[nb] = {x_col(i), 0};
+        p_bas[nb] = {x_col(i), 0};
+        t_haut[nb] = couleur_temperature(jours[i].max_dix, t.rampe);
+        t_bas[nb] = couleur_temperature(jours[i].min_dix, t.rampe);
+        ++nb;
+    }
+    for (int i = 0, j = 0; i < n; ++i) {
+        if (connu(jours[i].max_dix) && connu(jours[i].min_dix)) {
+            p_haut[j].y =
+                accueil::ordonnee_de(jours[i].max_dix, plus_bas_dix, plus_haut_dix, y_ruban_haut, y_ruban_bas);
+            p_bas[j].y = accueil::ordonnee_de(jours[i].min_dix, plus_bas_dix, plus_haut_dix, y_ruban_haut, y_ruban_bas);
+            ++j;
+        }
+    }
+    if (nb >= 2) {
+        const accueil::CourbeMonotone c_haut = accueil::courbe_monotone(p_haut, nb);
+        const accueil::CourbeMonotone c_bas = accueil::courbe_monotone(p_bas, nb);
+        const DegradeGlobal d = {couleur_temperature(somme_haut / nb, t.rampe),
+                                 couleur_temperature(somme_bas / nb, t.rampe),
+                                 87,
+                                 31,
+                                 y_ruban_haut,
+                                 y_ruban_bas};
+        voile_entre(c.pc, c_haut, c_bas, p_haut[0].x, p_haut[nb - 1].x, std::max(3, px(8)), d);
+        tracer_courbe(c.pc, c_haut, t_haut, std::max(2, px(5)), std::max(3, px(8)));
+        tracer_courbe(c.pc, c_bas, t_bas, std::max(2, px(5)), std::max(3, px(8)));
+    }
+    for (int j = 0; j < nb; ++j) {
+        point_de_courbe(c.pc, t, p_haut[j].x, p_haut[j].y, px(9), px(5));
+        point_de_courbe(c.pc, t, p_bas[j].x, p_bas[j].y, px(9), px(5));
+    }
+
+    int pluie_max_dix = 0;
+    for (int i = 0; i < n; ++i) {
+        if (connu(jours[i].pluie_dix_mm) && jours[i].pluie_dix_mm > pluie_max_dix) {
+            pluie_max_dix = jours[i].pluie_dix_mm;
+        }
+    }
+
+    for (int i = 0; i < n; ++i) {
+        const JourPrevu &j = jours[i];
+        const int cx = x_col(i);
+        const bool aujourdhui = numero_du_jour_prevu(j) == numero_aujourdhui;
+
+        // Le nom à gauche, l'icône à droite, le tout centré sur la colonne.
+        char nom[24];
+        jour_court(i18n::langue_courante(), ecran::heure::jour_semaine_du_jour(j.date_s, fuseau()), nom, sizeof nom);
+        if (nom[0] >= 'a' && nom[0] <= 'z') {
+            nom[0] = static_cast<char>(nom[0] - 'a' +
+                                       'A'); // « Dim », comme « Fre » et « Cum » (la table donne « dim » en français)
+        }
+        const int cote = px(52);
+        const int w_nom = std::min(dz::largeur_texte(g.petit, nom), std::max(px(20), pas - cote - px(22)));
+        const int xg = cx - (w_nom + px(14) + cote) / 2;
+        texte_base(c.pc, g.petit, nom, xg, y_icone + px(10), w_nom + px(4), LV_TEXT_ALIGN_LEFT,
+                   aujourdhui ? t.accent : t.texte_2);
+        icones::meteo(c.pc.couche, icone_pour_code(j.code, true), cote, xg + w_nom + px(14), y_icone - cote / 2, t);
+
+        // « 14° / 8° » : la maximale grande, la minimale petite, chacune de la couleur de sa température.
+        char haut[24], bas[24];
+        fmt_temp(haut, sizeof haut, j.max_dix);
+        fmt_temp(bas, sizeof bas, j.min_dix);
+        const Police *p_grand = &g.corps;
+        const Police *p_petit = &g.petit;
+        const int sep = px(10);
+        int w_total = dz::largeur_texte(*p_grand, haut) + 2 * sep + dz::largeur_texte(*p_petit, "/") +
+                      dz::largeur_texte(*p_petit, bas);
+        if (w_total > pas - px(8)) { // colonne étroite : une taille de moins
+            p_grand = &g.petit;
+            p_petit = &g.mini;
+            w_total = dz::largeur_texte(*p_grand, haut) + 2 * sep + dz::largeur_texte(*p_petit, "/") +
+                      dz::largeur_texte(*p_petit, bas);
+        }
+        int x = cx - w_total / 2;
+        texte_base(c.pc, *p_grand, haut, x, y_temps, dz::largeur_texte(*p_grand, haut) + px(4), LV_TEXT_ALIGN_LEFT,
+                   connu(j.max_dix) ? couleur_temperature(j.max_dix, t.rampe) : t.texte_3);
+        x += dz::largeur_texte(*p_grand, haut) + sep;
+        texte_base(c.pc, *p_petit, "/", x, y_temps, dz::largeur_texte(*p_petit, "/") + px(4), LV_TEXT_ALIGN_LEFT,
+                   t.filet);
+        x += dz::largeur_texte(*p_petit, "/") + sep;
+        texte_base(c.pc, *p_petit, bas, x, y_temps, dz::largeur_texte(*p_petit, bas) + px(4), LV_TEXT_ALIGN_LEFT,
+                   connu(j.min_dix) ? couleur_temperature(j.min_dix, t.rampe) : t.texte_3);
+
+        // Le vent : la flèche (vers où il souffle) et sa force.
+        if (connu(j.vent_dix_kmh)) {
+            char vitesse[24];
+            std::snprintf(vitesse, sizeof vitesse, "%d km/h", arrondi_dix(j.vent_dix_kmh));
+            const int fleche = px(30);
+            const bool avec_fleche = j.direction_deg >= 0;
+            const int w_fleche = avec_fleche ? fleche + px(10) : 0;
+            if (w_fleche + dz::largeur_texte(g.mini, vitesse) > pas - px(8)) {
+                std::snprintf(vitesse, sizeof vitesse, "%d",
+                              arrondi_dix(j.vent_dix_kmh)); // colonne étroite (portrait) : sans l'unité
+            }
+            const int w_vitesse = dz::largeur_texte(g.mini, vitesse);
+            const int w_tout = w_fleche + w_vitesse;
+            int xv = cx - w_tout / 2;
+            if (avec_fleche) {
+                fleche_vent(c.pc, xv + fleche / 2, y_vent, fleche, angle_fleche_vent(j.direction_deg),
+                            couleur_metrique(t, Metrique::VENT));
+                xv += fleche + px(10);
+            }
+            texte_base(c.pc, g.mini, vitesse, xv, y_vent + px(8), w_vitesse + px(4), LV_TEXT_ALIGN_LEFT, t.texte_2);
+        }
+
+        // La pluie du jour : une gélule (largeur en racine carrée de la pluie) ; le chiffre dedans seulement s'il y tient ; un petit
+        // trait pour un jour sec ; rien quand la pluie est inconnue.
+        if (connu(j.pluie_dix_mm) && j.pluie_dix_mm > 0) {
+            char mm[24];
+            fmt_dixieme(mm, sizeof mm, j.pluie_dix_mm);
+            std::snprintf(mm + std::strlen(mm), sizeof mm - std::strlen(mm), " mm");
+            const accueil::Gelule gl = accueil::gelule_du_jour(
+                j.pluie_dix_mm, accueil::echelle_pluie(pluie_max_dix, accueil::PLANCHER_ECHELLE_JOUR_DIX), px(26),
+                std::min(px(138), pas - px(8)), dz::largeur_texte(g.mini, mm), px(16), pas - px(8));
+            const int h_gelule = px(30);
+            dz::rect(c.pc, cx - gl.largeur / 2, y_pluie - h_gelule / 2, gl.largeur, h_gelule, h_gelule / 2,
+                     accueil::couleur_niveau_pluie(t, gl.niveau));
+            if (gl.avec_texte) {
+                texte_base(c.pc, g.mini, mm, cx - gl.largeur / 2, y_pluie + px(9), gl.largeur, LV_TEXT_ALIGN_CENTER,
+                           t.texte_sur_couleur);
+            }
+        } else if (connu(j.pluie_dix_mm)) {
+            dz::rect(c.pc, cx - px(13), y_pluie - px(4), px(26), px(8), px(4), t.texte, 36);
         }
     }
 }
@@ -1237,22 +1545,38 @@ void sur_dessin(lv_event_t *evenement) {
     const Ctx c = {{couche, g.theme}, a.x1, a.y1, lv_area_get_width(&a), lv_area_get_height(&a)};
     switch (zone) {
     case Z_BARRE:
-        dessiner_barre(c);
+        if (g.est_accueil) {
+            dessiner_barre_accueil(c);
+        } else {
+            dessiner_barre(c);
+        }
         break;
     case Z_HORLOGE:
-        dessiner_horloge(c);
+        if (g.est_accueil) {
+            dessiner_horloge_accueil(c);
+        } else {
+            dessiner_horloge(c);
+        }
         break;
     case Z_MAINTENANT:
-        dessiner_maintenant(c);
-        break;
-    case Z_METRIQUES:
-        dessiner_metriques(c);
+        if (g.est_accueil) {
+            dessiner_maintenant_accueil(c);
+        } else {
+            dessiner_maintenant(c);
+        }
         break;
     case Z_HEURES:
-        dessiner_heures(c);
+        dessiner_heures_accueil(c);
+        break;
+    case Z_BANDEAU:
+        dessiner_bandeau(c);
         break;
     case Z_SEMAINE:
-        dessiner_semaine(c);
+        if (g.est_accueil) {
+            dessiner_jours(c);
+        } else {
+            dessiner_semaine(c);
+        }
         break;
     default:
         break;
@@ -1290,6 +1614,25 @@ void sur_dessin_pastille(lv_event_t *evenement) {
     const dz::Pinceau pc = {couche, g.theme};
     const ThemePrincipal &t = *g.theme;
     const int centre = a.y1 + p.h / 2;
+    if (g.est_accueil) {
+        // Dans le bandeau : la même puce que les autres (verre teinté du niveau), jamais grisée : un avis en vigueur reste un avis.
+        const std::uint32_t rgb = couleur_officielle(t, static_cast<int>(g.e.bandeau.niveau));
+        fond_de_puce(pc, a.x1, a.y1, p.w, p.h, rgb, 51, 166);
+        if (lv_obj_has_state(objet, LV_STATE_PRESSED)) {
+            dz::rect(pc, a.x1, a.y1, p.w, p.h, p.h / 2, t.texte, 40);
+        }
+        icone_de_puce(pc, Piece::alerte, a.x1, a.y1, p.h, rgb);
+        if (p.w_texte > 0 && p.police != nullptr) {
+            dz::texte(pc, *p.police, p.texte, a.x1 + p.x_texte, centre - dz::hauteur_ligne(*p.police) / 2,
+                      p.w_texte + px(4), LV_TEXT_ALIGN_LEFT, t.texte);
+        }
+        if (p.d_autres > 0) {
+            dz::disque(pc, a.x1 + p.x_autres + p.d_autres / 2, centre, p.d_autres / 2, rgb);
+            dz::texte(pc, g.mini, p.autres, a.x1 + p.x_autres, centre - dz::hauteur_ligne(g.mini) / 2, p.d_autres,
+                      LV_TEXT_ALIGN_CENTER, t.texte_sur_couleur);
+        }
+        return;
+    }
     const int icone = px(30);
     const std::uint32_t fond = couleur_officielle(t, static_cast<int>(g.e.bandeau.niveau));
     dz::rect(pc, a.x1, a.y1, p.w, p.h, p.h / 2, fond);
@@ -1484,18 +1827,27 @@ bool ui_principal_creer(lv_obj_t *ecran, const RessourcesPrincipal &ressources, 
     g.diametre_anneau = px(88);
     g.ecran = ecran;
 
-    // Tailles de référence : l'heure et la température se lisent de loin, le reste est dimensionné pour la carte de 5 pouces.
-    // L'heure : 190 px dans la composition complète, 270 px (250 en portrait, 664 px de large) quand elle est la vedette.
-    const bool vedette = theme.disposition == Disposition::HORLOGE;
-    g.heure = creer_police(ressources.ttf, ressources.ttf_taille, vedette ? (g.portrait ? 250 : 270) : 190);
-    g.temperature = creer_police(ressources.ttf, ressources.ttf_taille, g.portrait ? 128 : 124);
-    g.titre = creer_police(ressources.ttf, ressources.ttf_taille, 42);
-    g.corps = creer_police(ressources.ttf, ressources.ttf_taille, 34);
-    g.petit = creer_police(ressources.ttf, ressources.ttf_taille, 28);
-    g.mini = creer_police(ressources.ttf, ressources.ttf_taille, 23);
-    g.nano = creer_police(ressources.ttf, ressources.ttf_taille, 19); // unités et détails de dernier rang
+    // Tailles de référence. L'accueil : l'heure 168, la température du moment 54, la date 36, le texte des jours 32 et 28, le plus petit
+    // texte 24 (19 px réels sur la 7B). L'horloge en vedette : l'heure 270 px (250 en portrait, 664 px de large) et la température 124.
+    g.est_accueil = theme.disposition != Disposition::HORLOGE;
+    g.theme_gris = accueil::theme_grise(theme);
+    if (g.est_accueil) {
+        g.heure = creer_police(ressources.ttf, ressources.ttf_taille, 168);
+        g.temperature = creer_police(ressources.ttf, ressources.ttf_taille, 54);
+        g.titre = creer_police(ressources.ttf, ressources.ttf_taille, 36);
+        g.corps = creer_police(ressources.ttf, ressources.ttf_taille, 32);
+        g.petit = creer_police(ressources.ttf, ressources.ttf_taille, 28);
+        g.mini = creer_police(ressources.ttf, ressources.ttf_taille, 24);
+    } else {
+        g.heure = creer_police(ressources.ttf, ressources.ttf_taille, g.portrait ? 250 : 270);
+        g.temperature = creer_police(ressources.ttf, ressources.ttf_taille, g.portrait ? 128 : 124);
+        g.titre = creer_police(ressources.ttf, ressources.ttf_taille, 42);
+        g.corps = creer_police(ressources.ttf, ressources.ttf_taille, 34);
+        g.petit = creer_police(ressources.ttf, ressources.ttf_taille, 28);
+        g.mini = creer_police(ressources.ttf, ressources.ttf_taille, 23);
+    }
     if (g.heure.f == nullptr || g.temperature.f == nullptr || g.titre.f == nullptr || g.corps.f == nullptr ||
-        g.petit.f == nullptr || g.mini.f == nullptr || g.nano.f == nullptr) {
+        g.petit.f == nullptr || g.mini.f == nullptr) {
         return false;
     }
 
@@ -1557,19 +1909,17 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     g.e.date = g.date;
     g.e.date_attente = g.date_attente;
 
-    const bool heures = g.e.meteo.connue && g.e.meteo.nb_heures - premiere_heure() > 0;
-    bool tout = false;
-    if (heures != g.a_heures) {
-        g.a_heures = heures;
-        appliquer_disposition();
-        tout = true;
-    }
-
     const VueMeteo &m = g.e.meteo;
+    // La pluie à annoncer : les cumuls horaires, recalés sur la pluie proche au quart d'heure, bornés aux 12 prochaines heures.
+    g.pluie = accueil::dans_l_horizon(
+        accueil::episode_de_pluie(m.heures, m.nb_heures, g.e.maintenant_s, m.pluie_dans_min), g.e.maintenant_s);
+
+    bool tout = false;
     const int langue = i18n::indice(i18n::langue_courante());
     const auto base = [&](Empreinte &e) {
         e.u(static_cast<std::uint32_t>(langue));
         e.u(m.connue);
+        e.u(m.perimee); // une météo périmée est dessinée grisée
     };
     // Le lieu change de fuseau (autre ville choisie sur l'écran ou sur la page web) : les heures, les jours et le soleil se redessinent.
     const std::uint32_t cle_fuseau = ecran::heure::cle_du_fuseau(fuseau());
@@ -1578,11 +1928,12 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
         Empreinte e;
         base(e);
         e.s(m.ville);
-        e.u(m.perimee);
         e.u(m.exemple);
-        e.u(static_cast<std::uint32_t>(alerte_du_jour()));
-        e.u(g.e.bandeau.present);
-        e.u(g.e.bandeau.empreinte); // texte, niveau et nombre d'autres alertes (noyau : vigie::composer_bandeau)
+        if (!g.est_accueil) { // la composition de l'horloge dit encore l'alerte et la fraîcheur dans sa barre
+            e.u(static_cast<std::uint32_t>(alerte_du_jour()));
+            e.u(g.e.bandeau.present);
+            e.u(g.e.bandeau.empreinte); // texte, niveau et nombre d'autres alertes (noyau : vigie::composer_bandeau)
+        }
         neuf[Z_BARRE] = e.h;
     }
     {
@@ -1608,26 +1959,6 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     {
         Empreinte e;
         base(e);
-        e.u(m.vent_dix_kmh);
-        e.u(m.rafales_dix_kmh);
-        e.u(m.direction_deg);
-        e.u(m.humidite_pct);
-        e.u(m.pression_dix_hpa);
-        e.u(m.tendance_dix_hpa_3h);
-        e.u(m.uv_dix);
-        e.u(m.proba_pluie_pct);
-        e.u(m.pluie_dix_mm);
-        e.u(m.pluie_dans_min);
-        e.i(m.lever_s);
-        e.i(m.coucher_s);
-        e.u(cle_fuseau); // le lever et le coucher s'écrivent en heure du lieu
-        // la position du soleil et la phase de la lune changent avec l'heure : on les range par minute et par jour
-        e.i(g.e.maintenant_s / 60);
-        neuf[Z_METRIQUES] = e.h;
-    }
-    {
-        Empreinte e;
-        base(e);
         e.u(cle_fuseau); // l'étiquette de chaque colonne est l'heure locale de son instant
         e.u(premiere_heure());
         for (int i = 0; i < m.nb_heures; ++i) {
@@ -1635,9 +1966,25 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
             e.u(m.heures[i].temp_dix);
             e.u(m.heures[i].code);
             e.u(m.heures[i].jour);
-            e.u(m.heures[i].proba_pct);
+            e.u(m.heures[i].pluie_dix_mm);
         }
         neuf[Z_HEURES] = e.h;
+    }
+    {
+        // Le bandeau : ce que dit la pluie (genre, minutes, heure de début, cumul), l'heure du relevé périmé, l'alerte déduite, l'alerte
+        // officielle (dessinée par la pastille, que le changement de ce bandeau repositionne).
+        Empreinte e;
+        base(e);
+        e.u(cle_fuseau);
+        e.u(static_cast<std::uint32_t>(g.pluie.genre));
+        e.u(g.pluie.genre == accueil::GenrePluie::BIENTOT ? g.pluie.dans_min : 0); // « dans N min » change à la minute
+        e.i(g.pluie.genre == accueil::GenrePluie::PLUS_TARD ? g.pluie.debut_s / 60 : 0);
+        e.u(g.pluie.cumul_dix_mm);
+        e.i(m.perimee ? m.instant_s / 60 : 0); // « Données de 07:52 »
+        e.u(static_cast<std::uint32_t>(alerte_du_jour()));
+        e.u(g.e.bandeau.present);
+        e.u(g.e.bandeau.empreinte);
+        neuf[Z_BANDEAU] = e.h;
     }
     {
         Empreinte e;
@@ -1652,6 +1999,9 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
             e.u(m.jours[i].min_dix);
             e.u(m.jours[i].max_dix);
             e.u(m.jours[i].proba_pct);
+            e.u(m.jours[i].pluie_dix_mm);
+            e.u(m.jours[i].vent_dix_kmh);
+            e.u(m.jours[i].direction_deg);
         }
         neuf[Z_SEMAINE] = e.h;
     }
@@ -1669,7 +2019,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
             if (g.zone[z] != nullptr) {
                 lv_obj_invalidate(g.zone[z]);
             }
-            if (z == Z_BARRE) {
+            if (z == (g.est_accueil ? Z_BANDEAU : Z_BARRE)) {
                 positionner_pastille_officielle(); // l'alerte, la langue ou une indication d'état a changé
             }
         }
@@ -1686,11 +2036,12 @@ bool ui_principal_changer_theme(const ThemePrincipal &theme) {
     if (&theme == g.theme) {
         return true;
     }
-    // L'horloge en vedette a sa propre police et sa propre disposition (créées à la construction) : pas de bascule à chaud.
+    // L'horloge en vedette a ses propres polices et sa propre disposition (créées à la construction) : pas de bascule à chaud.
     if ((theme.disposition == Disposition::HORLOGE) != (g.theme->disposition == Disposition::HORLOGE)) {
         return false;
     }
     g.theme = &theme;
+    g.theme_gris = accueil::theme_grise(theme);
     lv_obj_set_style_border_color(g.anneau, dz::couleur(theme.accent), 0);
     appliquer_ciel();
     for (int z = 0; z < Z_NOMBRE; ++z) {
@@ -1708,6 +2059,6 @@ void ui_principal_sur_reglages(void (*rappel)()) { g.ouvrir_reglages = rappel; }
 
 void ui_principal_sur_alertes(void (*rappel)()) { g.ouvrir_alertes = rappel; }
 
-CoutEcran ui_principal_cout() { return {g.objets, 7}; }
+CoutEcran ui_principal_cout() { return {g.objets, 6}; }
 
 } // namespace ecran

@@ -99,12 +99,41 @@ inline constexpr Texte TEXTES[] = {
 
 inline constexpr std::size_t NOMBRE_TEXTES = sizeof(TEXTES) / sizeof(TEXTES[0]);
 
+// Les phrases de l'ACCUEIL (ecran/accueil.hpp, main/ui_principal.cpp) : plus longues que les étiquettes ci-dessus (des phrases posées
+// dans le bandeau, pas sur de petites cartes), d'où leur table à part et leur propre limite de longueur dans le test. `%s` : une heure
+// (« 13 h », « 13:00 ») ou une température déjà écrite (« 9° »), mise en forme par l'appelant.
+inline constexpr Texte PHRASES[] = {
+    {"Pluie dès %s",
+     {"Rain from %s", "Regen ab %s", "Regen vanaf %s", "Lluvia desde %s", "Pioggia dalle %s", "%s sonrası yağmur"}},
+    {"Pluie dans %d min",
+     {"Rain in %d min", "Regen in %d Min.", "Regen over %d min", "Lluvia en %d min", "Pioggia tra %d min",
+      "%d dk sonra yağmur"}},
+    {"Pluie en cours",
+     {"Raining now", "Es regnet", "Het regent", "Está lloviendo", "Sta piovendo", "Şu an yağmur yağıyor"}},
+    {"ressenti %s", {"feels like %s", "gefühlt %s", "voelt als %s", "sensación %s", "percepita %s", "hissedilen %s"}},
+    {"Données de %s · périmées",
+     {"Data from %s · outdated", "Daten von %s · veraltet", "Gegevens van %s · verouderd", "Datos de %s · antiguos",
+      "Dati delle %s · vecchi", "%s verileri · eski"}},
+    {"Rien à signaler dans les prochaines heures",
+     {"Nothing to report in the next hours", "Nichts zu melden in den nächsten Stunden",
+      "Niets te melden de komende uren", "Nada que señalar en las próximas horas",
+      "Niente da segnalare nelle prossime ore", "Önümüzdeki saatlerde bildirilecek bir şey yok"}},
+};
+
+inline constexpr std::size_t NOMBRE_PHRASES = sizeof(PHRASES) / sizeof(PHRASES[0]);
+
 // Texte dans la langue : cette table, sinon la table commune (repli : anglais, puis français). Le résultat est terminé par un zéro
 // quand `francais` est un littéral (cas normal).
 constexpr std::string_view texte(std::string_view francais, i18n::Langue langue) noexcept {
     if (langue == i18n::Langue::Fr)
         return francais;
     for (const Texte &x : TEXTES) {
+        if (x.fr == francais) {
+            const std::string_view propre = x.t[i18n::indice(langue) - 1];
+            return propre.empty() ? x.t[0] : propre;
+        }
+    }
+    for (const Texte &x : PHRASES) {
         if (x.fr == francais) {
             const std::string_view propre = x.t[i18n::indice(langue) - 1];
             return propre.empty() ? x.t[0] : propre;

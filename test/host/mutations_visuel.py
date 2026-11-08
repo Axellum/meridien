@@ -47,6 +47,9 @@ MUTATIONS_VISUEL = [
      ASTRES, "la_position_sur_l_arc_va_de_0_a_1000", "le soleil n'atteint que le dixième de l'arc"),
     ("visuel_astres.hpp", "if (lever_s <= 0 || coucher_s <= lever_s) {", "if (lever_s <= 0) {", ASTRES,
      "sans_lever_ni_coucher_on_se_fie_a_is_day", "nuit polaire (lever = coucher) prise pour un jour normal"),
+    # --- visuel_textes.hpp : les phrases de l'accueil ---
+    ("visuel_textes.hpp", "for (const Texte &x : PHRASES) {\n        if (x.fr == francais) {", "for (const Texte &x : TEXTES) {\n        if (x.fr == francais) {", TEXTES,
+     "les_phrases_de_l_accueil_se_traduisent_par_texte", "les phrases de l'accueil ne sont plus cherchées : l'écran les dit en français partout"),
     # --- visuel_echelles.hpp ---
     ("visuel_echelles.hpp",
      "    case meteo::Icone::Orage:\n    case meteo::Icone::OrageGrele:\n        return Ambiance::ORAGE;",

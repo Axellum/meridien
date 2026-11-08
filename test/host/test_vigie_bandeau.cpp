@@ -270,6 +270,52 @@ int la_copie_d_une_ligne_garde_la_place_du_zero_final() {
     return 0;
 }
 
+int la_fenetre_de_l_alerte_vient_de_son_debut_et_de_sa_fin_ou_de_leurs_reperes() {
+    // `alerte()` pose début 1000 et fin 100000 : ce sont eux que la pastille reprend
+    a_la_main({alerte(Niveau::Jaune, Phenomene::Vent, "Vent violent")});
+    Bandeau b = bandeau_de(Langue::Fr);
+    VERIFIER(b.present && b.debut_s == 1000 && b.fin_s == 100000);
+    // sans `debut` ni `fin`, l'instant d'effet (effective) et la fin de validité (expires) les remplacent
+    Alerte x = alerte(Niveau::Jaune, Phenomene::Vent, "Vent violent");
+    x.debut.reset();
+    x.fin.reset();
+    x.effectif = 1200;
+    x.expire = 90000;
+    a_la_main({x});
+    b = bandeau_de(Langue::Fr);
+    VERIFIER(b.present && b.debut_s == 1200 && b.fin_s == 90000);
+    // `debut` l'emporte sur `effectif`, `fin` sur `expire`
+    x.debut = 1100;
+    x.fin = 80000;
+    a_la_main({x});
+    b = bandeau_de(Langue::Fr);
+    VERIFIER(b.debut_s == 1100 && b.fin_s == 80000);
+    // aucun repère : inconnus (0)
+    Alerte y = alerte(Niveau::Jaune, Phenomene::Vent, "Vent violent");
+    y.debut = 1000; // l'alerte doit être en vigueur pour avoir une pastille ; la fin, elle, est inconnue
+    y.fin.reset();
+    y.expire.reset();
+    a_la_main({y});
+    b = bandeau_de(Langue::Fr);
+    VERIFIER(b.present && b.debut_s == 1000 && b.fin_s == 0);
+    return 0;
+}
+
+int l_empreinte_de_la_pastille_suit_la_fenetre_meme_quand_la_page_ne_la_voit_pas() {
+    // deux alertes qui ne diffèrent que par `effectif` (début de repli) : la page n'en voit pas la différence, la pastille si
+    Alerte x = alerte(Niveau::Jaune, Phenomene::Vent, "Vent violent");
+    x.debut.reset();
+    x.effectif = 1200;
+    a_la_main({x});
+    const Bandeau a = bandeau_de(Langue::Fr);
+    x.effectif = 1300;
+    a_la_main({x});
+    const Bandeau b = bandeau_de(Langue::Fr);
+    VERIFIER(a.present && b.present && a.debut_s == 1200 && b.debut_s == 1300);
+    VERIFIER(a.empreinte != b.empreinte);
+    return 0;
+}
+
 int la_pastille_ne_depasse_jamais_son_tampon() {
     char long_titre[BANDEAU_TEXTE_CAP + 40];
     for (std::size_t i = 0; i + 1 < sizeof long_titre; ++i)
@@ -299,6 +345,8 @@ int la_pastille_ne_depasse_jamais_son_tampon() {
     X(une_alerte_pas_encore_commencee_ou_deja_finie_ne_fait_pas_de_pastille)                                           \
     X(l_empreinte_change_avec_la_langue_le_niveau_et_le_texte)                                                         \
     X(la_copie_d_une_ligne_garde_la_place_du_zero_final)                                                               \
+    X(la_fenetre_de_l_alerte_vient_de_son_debut_et_de_sa_fin_ou_de_leurs_reperes)                                      \
+    X(l_empreinte_de_la_pastille_suit_la_fenetre_meme_quand_la_page_ne_la_voit_pas)                                    \
     X(la_pastille_ne_depasse_jamais_son_tampon)
 
 int main() {

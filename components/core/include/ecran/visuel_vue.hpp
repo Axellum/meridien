@@ -37,7 +37,10 @@ struct JourPrevu {
     int max_dix = INCONNU_DIX;
     int proba_pct = INCONNU;
     int pluie_dix_mm = INCONNU_DIX;
-    int uv_dix = INCONNU_DIX; // indice UV maximal du jour
+    int uv_dix = INCONNU_DIX;       // indice UV maximal du jour
+    int vent_dix_kmh = INCONNU_DIX; // vent maximal du jour, dixièmes de km/h (MET Norway et NWS : la force seule)
+    int direction_deg =
+        INCONNU; // d'où vient le vent dominant du jour ; INCONNU quand le fournisseur ne la donne pas (flèche cachée)
 };
 
 struct VueMeteo {
