@@ -575,6 +575,13 @@ function carteEcran() {
       seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(b === seg.querySelector(`[data-t="${th}"]`))));
       enregistrer({ theme: th });
     }, 'data-t': th })));
+  /* Le profil de l'accueil (ADR-0023) : Auto, ou un profil épinglé. La liste vient de l'appareil (seulement ce qu'il sait dessiner). */
+  const PROFILS = ['auto', 'meteo'];
+  const segProfil = h('div', { class: 'seg', id: 'profil', role: 'radiogroup', 'aria-label': t('ecran.profil'), 'aria-describedby': 'profil-aide' }, (d.profils || PROFILS).map((pr) =>
+    h('button', { type: 'button', role: 'radio', 'aria-checked': String(pr === d.profil), text: t('profil.' + pr), onclick: () => {
+      segProfil.querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(b === segProfil.querySelector(`[data-p="${pr}"]`))));
+      enregistrer({ profil: pr });
+    }, 'data-p': pr })));
   const valeur = h('span', { class: 'valeur', text: pourcent(d.luminosite) });
   const lum = h('input', { id: 'luminosite', type: 'range', min: '5', max: '100', step: '1', value: String(d.luminosite), 'aria-valuetext': pourcent(d.luminosite) });
   lum.addEventListener('input', () => { valeur.textContent = pourcent(lum.value); lum.setAttribute('aria-valuetext', pourcent(lum.value)); });
@@ -584,7 +591,9 @@ function carteEcran() {
     h('div', { class: 'f' }, h('label', { class: 'lab', for: 'langue-assistant', text: t('ecran.langue_assistant') }), h('div', { class: 'champ' }, langueAssistant, ico('chevd')),
       h('p', { class: 'aide', id: 'langue-assistant-aide', text: t('ecran.langue_assistant_aide') })),
     h('div', { class: 'f' }, h('span', { class: 'lab', text: t('ecran.theme') }), seg),
-    h('div', { class: 'f' }, h('label', { class: 'lab', for: 'luminosite' }, t('ecran.luminosite'), valeur), lum));
+    h('div', { class: 'f' }, h('label', { class: 'lab', for: 'luminosite' }, t('ecran.luminosite'), valeur), lum),
+    h('div', { class: 'f' }, h('span', { class: 'lab', text: t('ecran.profil') }), segProfil,
+      h('p', { class: 'aide', id: 'profil-aide', text: t('ecran.profil_aide') })));
 }
 
 /* ---------- Wi-Fi ---------- */

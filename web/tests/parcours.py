@@ -517,7 +517,7 @@ def main():
 
             def t_ecran():
                 if REEL:
-                    depart_affichage.update({k: v for k, v in api(page, "GET", "/api/display")[1].items() if k in ("langue_ecran", "langue_assistant", "theme", "luminosite")})
+                    depart_affichage.update({k: v for k, v in api(page, "GET", "/api/display")[1].items() if k in ("langue_ecran", "langue_assistant", "theme", "luminosite", "profil")})
                 else:
                     ouvrir(page, "Réfléchir")  # referme
                 page.get_by_role("radio", name="Sombre").click()
@@ -528,11 +528,24 @@ def main():
                 expect(page.locator("#toast")).to_contain_text("Enregistré")
                 _, d = api(page, "GET", "/api/display")
                 verifier("luminosité 55 % enregistrée", d["luminosite"] == 55, str(d["luminosite"]))
+                # Le profil de l'accueil (ADR-0023) : « Auto » au départ, seulement les profils que l'appareil dessine, « Météo » l'épingle.
+                verifier("profil de l'accueil : Auto au départ, deux profils offerts", d["profil"] in ("auto", "meteo") and d["profils"] == ["auto", "meteo"], str(d))
+                profil = page.locator("#profil")
+                verifier("profil de l'accueil : la page ne montre que les profils de l'appareil", profil.get_by_role("radio").count() == 2)
+                profil.get_by_role("radio", name="Météo", exact=True).click()
+                expect(page.locator("#toast")).to_contain_text("Enregistré")
+                _, d = api(page, "GET", "/api/display")
+                verifier("profil de l'accueil : Météo enregistré (épinglé) sur l'appareil", d["profil"] == "meteo", d["profil"])
+                expect(profil.get_by_role("radio", name="Météo", exact=True)).to_have_attribute("aria-checked", "true")
+                profil.get_by_role("radio", name="Auto", exact=True).click()
+                expect(page.locator("#toast")).to_contain_text("Enregistré")
+                _, d = api(page, "GET", "/api/display")
+                verifier("profil de l'accueil : Auto rendu (plus rien d'épinglé) sur l'appareil", d["profil"] == "auto", d["profil"])
                 page.locator("#ecran").scroll_into_view_if_needed()
                 page.screenshot(path=str(CAPTURES / "10-ecran.png"))
                 if REEL:  # remettre l'écran de l'appareil comme avant le parcours
-                    api(page, "PUT", "/api/display", {k: depart_affichage[k] for k in ("theme", "luminosite") if k in depart_affichage})
-            etape("Écran : thème et luminosité", t_ecran, page)
+                    api(page, "PUT", "/api/display", {k: depart_affichage[k] for k in ("theme", "luminosite", "profil") if k in depart_affichage})
+            etape("Écran : thème, luminosité et profil de l'accueil", t_ecran, page)
 
             def t_alertes():
                 carte = page.locator("#alertes")
@@ -731,7 +744,8 @@ def main():
                         verifier(f"{code} : aucun identifiant brut (« ville.titre ») affiché", not bruts, str(bruts[:4]))
                         if code != "fr":
                             propres_au_francais = [v for k, v in fr.items() if "{" not in v and len(v) >= 6 and v != cat.get(k)]
-                            restes = sorted({v for v in propres_au_francais if v in texte})
+                            # Mot entier : « Profil » (fr) ne doit pas être vu dans « Profile » (en) ni « Profilo » (it), traduits.
+                            restes = sorted({v for v in propres_au_francais if re.search(r"(?<!\w)" + re.escape(v) + r"(?!\w)", texte)})
                             verifier(f"{code} : aucun texte français visible dans la page", not restes, str(restes[:4]))
                         verifier_attribution(p4, code, code)
                         expect(p4.locator(".hero .temp b")).to_have_text(re.compile(r"-?\d+\s°C"), timeout=20000)
