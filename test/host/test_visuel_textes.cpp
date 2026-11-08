@@ -135,6 +135,20 @@ constexpr int les_phrases_de_l_accueil_se_traduisent_par_texte() {
     return 0;
 }
 
+constexpr int les_textes_du_mode_automatique_se_traduisent() {
+    VERIFIER(texte("Auto · Météo", Langue::En) == "Auto · Weather");
+    VERIFIER(texte("Auto · alerte orange", Langue::De) == "Auto · Warnung Orange");
+    VERIFIER(texte("Auto en pause", Langue::De) == "Auto pausiert");
+    VERIFIER(texte("Alerte rouge", Langue::Tr) == "Kırmızı uyarı");
+    VERIFIER(texte("Pluie modérée", Langue::Es) == "Lluvia moderada");
+    VERIFIER(texte("puis plus forte vers %s", Langue::Es) == "luego más fuerte hacia las %s");
+    VERIFIER(texte("environ %d h", Langue::It) == "circa %d h");
+    VERIFIER(compter_marques(texte("puis plus forte vers %s", Langue::Tr)) == 1);
+    VERIFIER(compter_marques(texte("%s mm en tout", Langue::Tr)) == 1);
+    VERIFIER(compter_marques(texte("environ %d h", Langue::Nl)) == 1);
+    return 0;
+}
+
 } // namespace
 
 #define LISTE(X)                                                                                                       \
@@ -147,7 +161,8 @@ constexpr int les_phrases_de_l_accueil_se_traduisent_par_texte() {
     X(les_huit_phases_de_lune_et_les_huit_directions_sont_la)                                                          \
     X(les_phrases_de_l_accueil_ont_six_traductions_les_memes_marques_et_une_longueur_bornee)                           \
     X(aucune_phrase_n_a_la_cle_d_une_etiquette)                                                                        \
-    X(les_phrases_de_l_accueil_se_traduisent_par_texte)
+    X(les_phrases_de_l_accueil_se_traduisent_par_texte)                                                                \
+    X(les_textes_du_mode_automatique_se_traduisent)
 
 TESTS_A_LA_COMPILATION(LISTE)
 

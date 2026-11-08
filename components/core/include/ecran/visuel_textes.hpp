@@ -64,6 +64,44 @@ inline constexpr Texte TEXTES[] = {
     {"Détails", {"Details", "Details", "Details", "Detalles", "Dettagli", "Ayrıntılar"}},
     // Réglages > Appareil : la ligne qui ouvre l'écran de diagnostic (qui n'a plus de bouton sur l'écran principal).
     {"Diagnostic", {"Diagnostics", "Diagnose", "Diagnose", "Diagnóstico", "Diagnostica", "Tanılama"}},
+    // --- le mode automatique de l'accueil (ADR-0023) : la pastille posée à côté du lieu, une phrase par raison (accueil_pilote.hpp,
+    // `phrase_pastille`) ; « Auto en pause » l'accompagne quand un profil est épinglé. Les phrases de Surf, Vent·Bateau et Côte attendent
+    // les profils de mer (aucune règle ne les choisit encore) mais sont déjà traduites. Écrites par l'IA, jamais relues par un locuteur natif.
+    {"Auto · Météo", {"Auto · Weather", "Auto · Wetter", "Auto · Weer", "Auto · Tiempo", "Auto · Meteo", "Oto · Hava"}},
+    {"Auto · alerte orange",
+     {"Auto · orange alert", "Auto · Warnung Orange", "Auto · oranje alert", "Auto · alerta naranja",
+      "Auto · allerta arancione", "Oto · turuncu uyarı"}},
+    {"Auto · alerte rouge",
+     {"Auto · red alert", "Auto · Warnung Rot", "Auto · rode alert", "Auto · alerta roja", "Auto · allerta rossa",
+      "Oto · kırmızı uyarı"}},
+    {"Auto · pluie proche",
+     {"Auto · rain soon", "Auto · Regen bald", "Auto · regen nabij", "Auto · lluvia cerca", "Auto · pioggia vicina",
+      "Oto · yağmur yakın"}},
+    {"Auto · Surf", {"Auto · Surf", "Auto · Surfen", "Auto · Surfen", "Auto · Surf", "Auto · Surf", "Oto · Sörf"}},
+    {"Auto · Vent·Bateau",
+     {"Auto · Wind·Boat", "Auto · Wind·Boot", "Auto · Wind·Boot", "Auto · Viento·Barco", "Auto · Vento·Barca",
+      "Oto · Rüzgâr·Tekne"}},
+    {"Auto · Côte", {"Auto · Coast", "Auto · Küste", "Auto · Kust", "Auto · Costa", "Auto · Costa", "Oto · Kıyı"}},
+    {"Auto · données périmées",
+     {"Auto · outdated data", "Auto · Daten veraltet", "Auto · verouderd", "Auto · datos antiguos",
+      "Auto · dati vecchi", "Oto · eski veri"}},
+    {"Météo · épinglé",
+     {"Weather · pinned", "Wetter · fixiert", "Weer · vastgezet", "Tiempo · fijado", "Meteo · fissato",
+      "Hava · sabit"}},
+    {"Épinglé", {"Pinned", "Fixiert", "Vastgezet", "Fijado", "Fissato", "Sabitlendi"}},
+    {"Auto · changement différé",
+     {"Auto · change delayed", "Auto · Wechsel später", "Auto · wissel later", "Auto · cambio diferido",
+      "Auto · cambio rinviato", "Oto · değişim ertelendi"}},
+    {"Auto en pause",
+     {"Auto paused", "Auto pausiert", "Auto gepauzeerd", "Auto en pausa", "Auto in pausa", "Oto duraklatıldı"}},
+    // La carte pluie (pluie dans moins de 60 min) et la grande carte d'alerte (orange ou rouge). La force reprend « Pluie forte » (alertes).
+    {"Pluie faible",
+     {"Light rain", "Leichter Regen", "Lichte regen", "Lluvia débil", "Pioggia debole", "Hafif yağmur"}},
+    {"Pluie modérée",
+     {"Moderate rain", "Mäßiger Regen", "Matige regen", "Lluvia moderada", "Pioggia moderata", "Orta şiddetli yağmur"}},
+    {"Alerte orange",
+     {"Orange alert", "Warnung Orange", "Oranje alert", "Alerta naranja", "Allerta arancione", "Turuncu uyarı"}},
+    {"Alerte rouge", {"Red alert", "Warnung Rot", "Rode alert", "Alerta roja", "Allerta rossa", "Kırmızı uyarı"}},
     // --- indice UV ---
     {"Faible", {"Low", "Niedrig", "Laag", "Bajo", "Basso", "Düşük"}},
     {"Modéré", {"Moderate", "Mäßig", "Matig", "Moderado", "Moderato", "Orta"}},
@@ -124,6 +162,13 @@ inline constexpr Texte PHRASES[] = {
      {"Nothing to report in the next hours", "Nichts zu melden in den nächsten Stunden",
       "Niets te melden de komende uren", "Nada que señalar en las próximas horas",
       "Niente da segnalare nelle prossime ore", "Önümüzdeki saatlerde bildirilecek bir şey yok"}},
+    // La carte pluie (ADR-0023) : `%s` est une heure (« 15 h », « 15:00 ») ou une quantité (« 6,5 »), mise en forme par l'appelant.
+    {"puis plus forte vers %s",
+     {"then heavier around %s", "dann stärker gegen %s", "daarna zwaarder rond %s", "luego más fuerte hacia las %s",
+      "poi più forte verso le %s", "sonra %s'de şiddetlenir"}},
+    {"environ %d h", {"about %d h", "ca. %d Std.", "ongeveer %d u", "unas %d h", "circa %d h", "yaklaşık %d sa"}},
+    {"%s mm en tout",
+     {"%s mm in total", "%s mm gesamt", "%s mm in totaal", "%s mm en total", "%s mm in tutto", "toplam %s mm"}},
 };
 
 inline constexpr std::size_t NOMBRE_PHRASES = sizeof(PHRASES) / sizeof(PHRASES[0]);
