@@ -21,6 +21,12 @@
       "ou": "bouton « Alertes » du premier anneau"
     },
     {
+      "id": "details",
+      "mdi": "view-grid-outline",
+      "point": "F11D9",
+      "ou": "bouton « Détails » du premier anneau (les sept tuiles de grandeurs, ADR-0020)"
+    },
+    {
       "id": "moyeu",
       "mdi": "compass-rose",
       "point": "F1382",
@@ -29,7 +35,7 @@
   ],
   "sortie": {
     "fichier": "main/assets/mdi_roue.ttf",
-    "sha256": "97a24aea295e0db3117d525a6265f06bab30153a16afae061c4e03349cdfde93",
-    "taille": 1260
+    "sha256": "2265e9fca6b10aa53792a53046d45b454a557b88eb91627dbd4417f267d4dc85",
+    "taille": 1380
   }
 }
