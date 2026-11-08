@@ -1,12 +1,12 @@
 // Scène « roue » : la roue d'appui long (main/ui_roue.cpp, ADR-0021) ouverte par-dessus l'écran principal (main/ui_principal.cpp), tous
-// deux compilés tels quels. Le premier anneau porte « Réglages » et « Alertes » comme sur l'appareil ; les variantes « famille-* »
+// deux compilés tels quels. Le premier anneau porte « Réglages », « Détails » et « Alertes » comme sur l'appareil ; les variantes « famille-* »
 // ajoutent une entrée de DÉMONSTRATION qui déplie un second anneau (choix inventés, glyphes d'emprunt : le firmware n'a pas encore de
 // famille). La roue s'ouvre à un point de l'écran, exprimé en millièmes de la largeur et de la hauteur : le centre, près d'un coin,
 // près d'un bord. Les variantes « parcours-* » rejouent des gestes et s'arrêtent en ECHEC (code de sortie non nul) si l'effet n'est
 // pas celui attendu : c'est ainsi que « les réglages sont toujours atteignables » est vérifié sur le PC (pas sur la carte).
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp
+// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp main/ui_details.cpp
 // rendu-langues: fr en de nl es it tr
 // rendu-langues-defaut: fr
 // rendu-tailles: 1280x720 1024x600
@@ -20,9 +20,12 @@
 #include <cstdlib>
 
 #include "banc.h"
+#include "ecran/grandeurs.hpp"
+#include "ecran/heure_lieu.hpp"
 #include "ecran/visuel_textes.hpp"
 #include "lvgl.h"
 #include "scenes/scene_principal_donnees.hpp"
+#include "ui_details.h"
 #include "ui_principal.h"
 #include "ui_roue.h"
 
@@ -64,6 +67,7 @@ void tourner() {
 int g_reglages = 0;
 int g_alertes = 0;
 int g_choix = 0;
+int g_details = 0;
 void compter_reglages() { ++g_reglages; }
 void compter_alertes() { ++g_alertes; }
 void compter_choix() { ++g_choix; }
@@ -72,15 +76,62 @@ void compter_choix() { ++g_choix; }
 // place et le rendu d'un second anneau plein (huit choix). Textes en français seulement : le rendu juge la forme, pas la traduction.
 const ChoixRoue FAMILLE_HUIT[8] = {
     {"Profil", ecran::ICONE_MOYEU, compter_choix},        {"Affichage", ecran::ICONE_REGLAGES, compter_choix},
-    {"Assistant", ecran::ICONE_ALERTES, compter_choix},   {"Détails", ecran::ICONE_MOYEU, compter_choix},
+    {"Assistant", ecran::ICONE_ALERTES, compter_choix},   {"Écran", ecran::ICONE_MOYEU, compter_choix},
     {"Luminosité", ecran::ICONE_REGLAGES, compter_choix}, {"Langue", ecran::ICONE_ALERTES, compter_choix},
     {"Réseau", ecran::ICONE_MOYEU, compter_choix},        {"À propos", ecran::ICONE_REGLAGES, compter_choix},
 };
+
+lv_obj_t *g_principal = nullptr;
+const banc::Contexte *g_contexte = nullptr;
+
+// « Détails » : ce que fait ui_details_ouvrir() (main/ui_details_ouvrir.cpp, la colle de l'appareil, qui ne tourne PAS sur le PC) : la
+// page est construite sur un écran neuf, l'écran actif est gardé comme « précédent », la page est chargée d'un coup ; « Fermer » recharge
+// le précédent et supprime la page plus tard (lv_obj_delete_async). La page elle-même (main/ui_details.cpp) est celle de l'appareil.
+lv_obj_t *g_page_details = nullptr;
+lv_obj_t *g_avant_details = nullptr;
+
+void fermer_details() {
+    if (g_page_details == nullptr) {
+        return;
+    }
+    lv_screen_load(g_avant_details);
+    lv_obj_delete_async(g_page_details);
+    g_page_details = nullptr;
+    g_avant_details = nullptr;
+}
+
+void ouvrir_details() {
+    ++g_details;
+    if (g_page_details != nullptr || g_contexte == nullptr) {
+        return; // déjà ouverte : un second appel ne fait rien (comme ui_details_ouvrir)
+    }
+    const banc::Contexte &c = *g_contexte;
+    ecran::heure::Fuseau fuseau{};
+    ecran::horloge_fuseau(fuseau); // la zone posée par le banc (Lyon, Europe/Paris)
+    const ecran::grandeurs::Page page =
+        ecran::grandeurs::composer(vue_esquisse(c.instant_utc_s), c.instant_utc_s, fuseau, c.langue);
+    lv_obj_t *racine = lv_obj_create(nullptr);
+    ecran::ContexteDetails ctx;
+    ctx.racine = racine;
+    ctx.ttf = roboto_700_start;
+    ctx.ttf_taille = static_cast<std::size_t>(roboto_700_end - roboto_700_start);
+    ctx.largeur = c.largeur;
+    ctx.hauteur = c.hauteur;
+    ctx.theme = &ecran::visuel::kThemeCiel;
+    ctx.fermer = fermer_details;
+    if (!ecran::ui_details_creer(ctx, page)) {
+        echec("la page Détails n'a pas pu être créée (police)");
+    }
+    g_page_details = racine;
+    g_avant_details = lv_screen_active();
+    lv_screen_load(racine);
+}
 
 // La table du premier anneau de l'appareil (ecran_principal.cpp, composer_entrees) puis, si demandé, la famille de démonstration.
 int composer(EntreeRoue *sortie, bool alertes, int choix_demo) {
     int n = 0;
     sortie[n++] = {ecran::visuel::texte_c("Réglages"), ecran::ICONE_REGLAGES, compter_reglages, nullptr, 0};
+    sortie[n++] = {ecran::visuel::texte_c("Détails"), ecran::ICONE_DETAILS, ouvrir_details, nullptr, 0};
     if (alertes) {
         sortie[n++] = {ecran::visuel::texte_c("Alertes"), ecran::ICONE_ALERTES, compter_alertes, nullptr, 0};
     }
@@ -89,9 +140,6 @@ int composer(EntreeRoue *sortie, bool alertes, int choix_demo) {
     }
     return n;
 }
-
-lv_obj_t *g_principal = nullptr;
-const banc::Contexte *g_contexte = nullptr;
 
 void afficher_principal(const banc::Contexte &c) {
     g_contexte = &c;
@@ -198,13 +246,14 @@ void parcours_reglages(const banc::Contexte &c) {
     exiger(ecran::ui_roue_centre_bouton(0, &x, &y), "pas de premier bouton");
     exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Réglages » laisse la roue ouverte");
     tourner();
-    exiger(g_reglages == 1 && g_alertes == 0, "toucher « Réglages » n'ouvre pas les réglages exactement une fois");
+    exiger(g_reglages == 1 && g_alertes == 0 && g_details == 0,
+           "toucher « Réglages » n'ouvre pas les réglages exactement une fois");
     exiger(ecran::ui_roue_cout().objets == 0, "la roue fermée garde un objet LVGL");
 
-    // 2. Appui long -> roue -> Alertes.
+    // 2. Appui long -> roue -> Alertes (le troisième bouton : Réglages, Détails, Alertes).
     lv_obj_send_event(g_principal, LV_EVENT_LONG_PRESSED, nullptr);
     exiger(ecran::ui_roue_ouverte(), "la roue ne se rouvre pas au second appui long");
-    exiger(ecran::ui_roue_centre_bouton(1, &x, &y), "pas de second bouton (Alertes)");
+    exiger(ecran::ui_roue_centre_bouton(2, &x, &y), "pas de troisième bouton (Alertes)");
     exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Alertes » laisse la roue ouverte");
     tourner();
     exiger(g_alertes == 1 && g_reglages == 1, "toucher « Alertes » n'ouvre pas les alertes exactement une fois");
@@ -223,6 +272,54 @@ void parcours_reglages(const banc::Contexte &c) {
     ecran::ui_roue_fermer();
     tourner();
     exiger(!ecran::ui_roue_ouverte() && ecran::ui_roue_cout().objets == 0, "fermer la roue laisse un objet LVGL");
+}
+
+// « Détails » : appui long -> roue -> toucher « Détails » ouvre la page exactement une fois (et la roue est fermée), « Fermer » ramène à
+// l'accueil et supprime la page, puis la roue se rouvre et « Réglages » reste atteignable.
+void parcours_details(const banc::Contexte &c) {
+    g_variante = "parcours-details";
+    g_reglages = g_alertes = g_details = g_appuis_longs = 0;
+    afficher_principal(c);
+    ecran::ui_principal_sur_appui_long(sur_appui_long);
+
+    lv_obj_send_event(g_principal, LV_EVENT_LONG_PRESSED, nullptr);
+    exiger(ecran::ui_roue_ouverte(), "un appui long n'ouvre pas la roue");
+    int32_t x = 0;
+    int32_t y = 0;
+    exiger(ecran::ui_roue_centre_bouton(1, &x, &y), "pas de second bouton (Détails)");
+    exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Détails » laisse la roue ouverte");
+    tourner();
+    exiger(g_details == 1 && g_reglages == 0 && g_alertes == 0,
+           "toucher « Détails » n'ouvre pas la page exactement une fois");
+    exiger(ecran::ui_roue_cout().objets == 0, "la roue fermée garde un objet LVGL");
+    exiger(g_page_details != nullptr && lv_screen_active() == g_page_details,
+           "la page Détails n'est pas l'écran actif après le toucher");
+    exiger(g_avant_details == g_principal, "la page Détails ne garde pas l'accueil comme écran précédent");
+
+    // « Fermer » est le seul objet cliquable de la page (ui_details.cpp).
+    lv_obj_t *page = g_page_details;
+    lv_obj_t *fermer = nullptr;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(page); ++i) {
+        lv_obj_t *o = lv_obj_get_child(page, static_cast<int32_t>(i));
+        if (lv_obj_has_flag(o, LV_OBJ_FLAG_CLICKABLE)) {
+            exiger(fermer == nullptr, "la page Détails a plusieurs objets cliquables");
+            fermer = o;
+        }
+    }
+    exiger(fermer != nullptr, "la page Détails n'a pas de bouton « Fermer »");
+    lv_obj_send_event(fermer, LV_EVENT_CLICKED, nullptr);
+    tourner();
+    exiger(lv_screen_active() == g_principal, "« Fermer » ne ramène pas à l'accueil");
+    exiger(g_page_details == nullptr && !lv_obj_is_valid(page), "« Fermer » laisse la page Détails en mémoire");
+
+    // Les réglages restent atteignables par la roue après la visite de la page.
+    lv_obj_send_event(g_principal, LV_EVENT_LONG_PRESSED, nullptr);
+    exiger(ecran::ui_roue_ouverte() && g_appuis_longs == 2, "la roue ne se rouvre pas après « Fermer »");
+    exiger(ecran::ui_roue_centre_bouton(0, &x, &y), "pas de premier bouton (Réglages)");
+    exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Réglages » laisse la roue ouverte");
+    tourner();
+    exiger(g_reglages == 1 && g_details == 1, "« Réglages » n'est plus atteignable après la page Détails");
+    exiger(lv_screen_active() == g_principal, "toucher « Réglages » a changé d'écran dans le banc");
 }
 
 // Une famille : toucher son bouton déplie le second anneau, toucher un choix ferme la roue et lance l'action du choix ; avec la famille
@@ -264,8 +361,8 @@ void parcours_famille(const banc::Contexte &c) {
 namespace banc {
 
 const Scene kScenes[] = {
-    {"centre", "Au centre, Réglages et Alertes", centre},
-    {"centre-sans-alertes", "Au centre, Réglages seul (aucune alerte)", centre_sans_alertes},
+    {"centre", "Au centre, Réglages, Détails et Alertes", centre},
+    {"centre-sans-alertes", "Au centre, Réglages et Détails (aucune alerte)", centre_sans_alertes},
     {"coin-haut-gauche", "Près du coin haut gauche", coin_haut_gauche},
     {"coin-bas-droit", "Près du coin bas droit", coin_bas_droit},
     {"bord-droit", "Près du bord droit", bord_droit},
@@ -277,6 +374,7 @@ const Scene kScenes[] = {
     {"famille-bord-droit", "Famille de démonstration, 8 choix, près du bord droit", famille_bord_droit},
     {"famille-bord-bas", "Famille de démonstration, 6 choix, près du bord bas", famille_bord_bas},
     {"parcours-reglages", "Parcours : appui long, Réglages, Alertes, toucher dans le vide", parcours_reglages},
+    {"parcours-details", "Parcours : appui long, Détails, Fermer, Réglages encore atteignable", parcours_details},
     {"parcours-famille", "Parcours : famille dépliée, Réglages encore atteignable", parcours_famille},
 };
 const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
