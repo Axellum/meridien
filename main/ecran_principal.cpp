@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "lvgl.h"
 
+#include "ecran/accueil_pilote.hpp"
 #include "ecran/horloge_materielle.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_synthese.hpp"
@@ -55,6 +56,21 @@ lv_obj_t *g_diag_retour = nullptr; // l'écran d'où le diagnostic a été ouver
 int g_compteur = 0;
 bool g_heure_journalisee = false;
 char g_ville[sizeof(ZoneMeteo::nom)] = {};
+
+// Le mode automatique de l'accueil (ADR-0023) : le pilote garde l'état de la décision d'un passage au suivant (le dernier changement de
+// profil, le gel pendant un toucher). Un seul, lu et écrit par la tâche LVGL.
+accueil::Pilote g_pilote;
+
+// Un doigt est-il posé sur l'écran à cet instant ? Lu sur le périphérique tactile lui-même : peu importe quel objet reçoit l'appui
+// (l'écran, la pastille de l'alerte), et la roue ouverte par-dessus n'en est pas un.
+bool doigt_pose() {
+    for (lv_indev_t *p = lv_indev_get_next(nullptr); p != nullptr; p = lv_indev_get_next(p)) {
+        if (lv_indev_get_type(p) == LV_INDEV_TYPE_POINTER && lv_indev_get_state(p) == LV_INDEV_STATE_PRESSED) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void vers_principal() {
     if (g_ecran_principal != nullptr) {
@@ -257,6 +273,24 @@ void rafraichir(lv_timer_t *) {
             entrees.bandeau = vigie::composer_bandeau(lecture.alertes(), vue, i18n::langue_courante());
         }
     }
+
+    // Le mode automatique : les mesures de cet instant, et la décision du noyau pur. Aucun réglage n'épingle un profil pour l'instant
+    // (aucune mesure ne l'épingle) : le mode est toujours « Auto ». Les données de mer, les spots et le seuil de vent n'existent pas
+    // encore sur l'appareil : le noyau ne peut donc choisir que Météo, et ne bascule jamais sur une entrée qu'il ne connaît pas.
+    accueil::Mesures mesures;
+    mesures.maintenant_s = entrees.maintenant_s;
+    mesures.fuseau = entrees.fuseau;
+    mesures.fuseau_connu = entrees.fuseau_connu;
+    mesures.position_connue = entrees.position_connue;
+    mesures.latitude_deg = entrees.latitude_deg;
+    mesures.longitude_deg = entrees.longitude_deg;
+    mesures.lieu = zone_connue ? accueil::cle_du_lieu(zone.nom, zone.latitude, zone.longitude) : 0U;
+    mesures.meteo_connue = entrees.meteo.connue;
+    mesures.meteo_perimee = entrees.meteo.perimee;
+    mesures.pluie_dans_min = entrees.meteo.pluie_dans_min;
+    mesures.niveau_alerte = entrees.bandeau.present ? entrees.bandeau.niveau : vigie::Niveau::Inconnu;
+    mesures.toucher = doigt_pose();
+    entrees.mode_auto = g_pilote.avancer(mesures);
 
     ui_principal_mettre_a_jour(entrees);
 
