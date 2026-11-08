@@ -152,6 +152,21 @@ Prouvé sur le PC (détail et nombres exacts : [ADR-0014](../decisions/0014-met-
 
 - **Tout ce qui se passe sur une carte** : les vraies requêtes TLS vers `api.met.no` et `api.weather.gov` depuis l'appareil, la décompression de 240 Ko en PSRAM, **la marge de pile de la tâche météo (12 Ko) pendant l'analyse de la grille du NWS** et **la durée de cette analyse**, la consommation de RAM interne pendant la prise de contact TLS, le repli vers Open-Meteo sur une vraie panne, le redémarrage en cours de requête.
 - Les autres lieux : huit lieux pour MET Norway et six pour le NWS, un jour (jours courts de l'hémisphère nord), une mesure par lieu. Pas d'été, pas de tempête, pas de neige forte.
-- Le texte exact des pages officielles (lues par résumeur) et les textes intégraux des licences CC BY 4.0 et NLOD 2.0.
+- ~~Le texte exact des pages officielles (lues par résumeur) et les textes intégraux des licences CC BY 4.0 et NLOD 2.0.~~ **Relus mot pour mot le 08/11/2026** (dernière section) ; la FAQ de MET Norway n'a pas été rouverte.
 - Les seuils de `skyCover` du NWS et la correspondance « sleet » / « hail » ; l'UV de MET Norway (en zone nordique, une valeur plus utile que l'UV « ciel dégagé » existe peut-être ailleurs dans la documentation : non lu).
 - Ce que le NWS ou MET Norway font quand le contact du `User-Agent` est injoignable (le dépôt est public depuis le 08/11/2026, le contact est donc joignable) : aucun essai.
+
+## 7. Relecture mot pour mot du 08/11/2026
+
+**Vu sur** : pages ouvertes dans le navigateur intégré d'une session Claude Code le 08/11/2026 (pas par un résumeur) : conditions d'utilisation de MET Norway (dernière révision le 05/11/2026 d'après la page), licence, page « Licensing and crediting » de met.no, documentation de Locationforecast, textes intégraux de CC BY 4.0 et de NLOD 2.0 ; pour le NWS, la mise en garde, la page de l'API et la FAQ générale. **Non rouverte : la FAQ de MET Norway.** Les tableaux du §2 viennent de la lecture du 07/11/2026 ; rien n'y est contredit, sauf ce qui suit.
+
+| Constat | Suite |
+|---|---|
+| MET : intervalle entre deux requêtes identiques = 30 min pour la région nordique, 3 h pour le reste du monde ; la page ne définit pas « région nordique » ; l'appareil attend 30 min pour `NO FI IS SJ` | Islande **non tranchée** (la retirer de la liste MET ou la garder) : décision d'Axel |
+| MET : `If-Modified-Since` fait partie des règles par défaut | Non fait (ADR-0014, point 9) ; décision d'Axel |
+| MET : les conditions se disent un accord contraignant à lire et accepter par un humain responsable ; le développeur répond de la confidentialité des utilisateurs ; navigateurs et applications mobiles : mandataire à cache | README (« Ce qui sort de l'appareil ») |
+| CC BY 4.0 : texte de la licence ou lien (§3(a)(1), « de toute façon raisonnable » §3(a)(2)) ; NLOD 2.0 §5 : référence à la licence, lien vers la licence et la source si possible | La page de réglages lie le texte de chaque licence (parcours de navigateur sur le PC, 213 vérifications sur 213) ; l'écran nomme les licences sans lien |
+| NWS : la page de l'API dit « données ouvertes, libres pour tout usage » ; « domaine public » est la formule de la mise en garde, pour les pages web | L'écran et la page disent « données ouvertes » |
+| NWS : en cas d'indisponibilité, ne pas réessayer plus d'une fois par minute | Respecté : après un échec, le service direct est mis en pause pour son plancher complet (`main/meteo_client.cpp`, `g_natif_pas_avant_s`). Un écart « réessais à 15 s » annoncé le 08/11 avait été **écrit à tort** (lecture de commentaire, pas du code) et a été retiré |
+
+Respecté, vérifié au texte : forme du `User-Agent`, coordonnées tronquées à 4 décimales, `Expires` respecté, pas d'appel à l'heure ronde, gzip et redirections, HTTPS seul, aucun logo ni nom Yr, NRK ou NWS, pause de 10 min après un HTTP 429, mention de la source avec « données adaptées ».

@@ -153,7 +153,7 @@ seconde entre deux appels, un seul appel par adresse) : les attendus sont alors 
 **Limites.** Huit lieux pour MET Norway, six pour le NWS : une seule mesure par lieu, un seul jour (07/11/2026, jours courts en
 hémisphère nord) ; ni Guam, ni les îles Vierges, ni les Mariannes du Nord (le NWS y répond, constaté en direct, mais sans fixture :
 l'appareil ne les propose pas encore), et les Samoa américaines n'ont pas de grille (`gridId` nul, refus propre). Des cartes réelles : aucune.
-Données MET Norway : CC BY 4.0 et NLOD 2.0 (https://api.met.no/license_data.html) ; données NWS : domaine public (https://www.weather.gov/).
+Données MET Norway : CC BY 4.0 et NLOD 2.0 (https://api.met.no/doc/License) ; données NWS : « données ouvertes » d'après la page de l'API (https://www.weather.gov/documentation/services-web-api).
 
 Résultat consigné (07/11/2026, PC d'Axel, clang++ 23.1.5 avec AddressSanitizer + UBSan, mode « complet (compilé + exécuté) », branche
 `claude/meteo-fournisseurs-e3cd8b`) : `test_meteo_metno.cpp` 32 tests, `test_meteo_nws.cpp` 45, `test_requete_fournisseurs.cpp` 11,
