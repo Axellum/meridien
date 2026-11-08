@@ -141,13 +141,19 @@ FOURNISSEURS = {
 }
 
 
+# Les noms de licence de la phrase sont des liens vers le texte de la licence (CC BY 4.0 : texte ou lien de la licence ; NLOD 2.0 : lien).
+LICENCES = {"CC BY 4.0": "https://creativecommons.org/licenses/by/4.0/", "NLOD 2.0": "https://data.norge.no/nlod/en/2.0"}
+LICENCES_DU = {"open-meteo": ["CC BY 4.0"], "met-norway": ["CC BY 4.0", "NLOD 2.0"], "nws": []}
+
+
 def verifier_attribution(page, code, quand, fournisseur="open-meteo"):
     """L'attribution du service qui a donné la météo : visible, traduite, son nom est un lien vers son site.
-    Open-Meteo : CC BY 4.0. MET Norway : CC BY 4.0 et NLOD 2.0. NWS : domaine public, et la phrase « ni approuvé ni parrainé »."""
+    Open-Meteo : CC BY 4.0. MET Norway : CC BY 4.0 et NLOD 2.0. NWS : données ouvertes, et la phrase « ni approuvé ni parrainé ».
+    Chaque nom de licence est un lien vers son texte, et il n'y a pas d'autre lien."""
     cle, nom, adresse = FOURNISSEURS[fournisseur]
     cat = catalogue(code)
     zone = page.locator("#attribution")
-    lien = zone.locator("a")
+    lien = zone.locator(f'a[href="{adresse}"]')
     expect(lien).to_have_text(nom)  # la page change d'attribution quand la réponse météo arrive : on attend le bon service avant de comparer
     attendu = norm(cat[cle].replace("{lien}", nom))
     if fournisseur == "nws":
@@ -160,6 +166,13 @@ def verifier_attribution(page, code, quand, fournisseur="open-meteo"):
         verifier(f"attribution ({quand}) : la seconde licence (NLOD 2.0) est nommée", "NLOD 2.0" in texte, texte)
     verifier(f"attribution ({quand}) : « {nom} » est un lien vers {adresse}",
              lien.count() == 1 and lien.inner_text() == nom and lien.get_attribute("href") == adresse, str(lien.count()))
+    for licence in LICENCES_DU[fournisseur]:
+        texte_licence = zone.locator(f'a[href="{LICENCES[licence]}"]')
+        verifier(f"attribution ({quand}) : « {licence} » est un lien vers le texte de la licence",
+                 texte_licence.count() == 1 and texte_licence.inner_text() == licence and texte_licence.get_attribute("target") == "_blank"
+                 and "noopener" in (texte_licence.get_attribute("rel") or ""), str(texte_licence.count()))
+    verifier(f"attribution ({quand}) : aucun autre lien que le service et ses licences",
+             zone.locator("a").count() == 1 + len(LICENCES_DU[fournisseur]), str(zone.locator("a").count()))
 
 
 def sans_null(page, quand):
@@ -372,7 +385,7 @@ def main():
                          page.locator("#source-repli").is_hidden() and page.locator("#attribution-modele").inner_text() == "")
                 page.locator("#attribution").scroll_into_view_if_needed()
                 page.screenshot(path=str(CAPTURES / "04f-source-metno.png"))
-                # 3. la phrase du NWS (domaine public, sans parrainage) : la page n'a qu'à suivre ce que l'appareil annonce
+                # 3. la phrase du NWS (données ouvertes, sans parrainage) : la page n'a qu'à suivre ce que l'appareil annonce
                 page.unroute("**/api/weather")
                 page.route("**/api/weather", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(reponse(nws))))
                 page.locator("#source-meteo").select_option("noaa")

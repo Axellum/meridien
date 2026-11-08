@@ -164,7 +164,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Source remise sur « Automatique » : l’ancienne ne couvre pas ce pays.": "Quelle auf „Automatisch“ zurückgesetzt: die bisherige deckt dieses Land nicht ab."
 "Modèle : {modele}": "Modell: {modele}"
 "Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)": "Wetterdaten: {lien} (Lizenzen CC BY 4.0 und NLOD 2.0, Daten angepasst)"
-"Données météo : {lien} (domaine public)": "Wetterdaten: {lien} (gemeinfrei)"
+"Données météo : {lien} (données ouvertes)": "Wetterdaten: {lien} (offene Daten)"
 "{service} est indisponible : la météo vient d’Open-Meteo en attendant.": "{service} ist nicht verfügbar: Das Wetter kommt vorerst von Open-Meteo."
 
 # --- Page de réglages : source de la météo (07/11/2026) ---
