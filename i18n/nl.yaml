@@ -451,3 +451,12 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Maximum, en nœuds": "Maximum, in knopen"
 "Pour le verdict du kite. Par défaut 12 à 25 nœuds.": "Voor het kite-oordeel. Standaard 12 tot 25 knopen."
 "Chaque champ doit contenir un nombre entier de nœuds.": "Elk veld moet een geheel aantal knopen bevatten."
+
+# --- Écran : La mer, réglages sur l’écran (08/11/2026) ---
+"Pas de connexion : la liste des spots demande Internet.": "Geen verbinding: voor de lijst met spots is internet nodig."
+"Vigie ne propose aucun spot pour le moment.": "Vigie biedt op dit moment geen spots aan."
+"Déjà ajouté": "Al toegevoegd"
+"Mémoire insuffisante pour afficher la liste.": "Te weinig geheugen om de lijst te tonen."
+"La liste est longue : seuls les premiers spots sont montrés.": "De lijst is lang: alleen de eerste spots worden getoond."
+"Les spots ne sont pas lisibles pour le moment.": "De spots zijn nu niet leesbaar."
+"Enregistrement impossible : réessayez.": "Opslaan lukt niet: probeer het opnieuw."

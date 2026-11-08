@@ -451,3 +451,12 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Maximum, en nœuds": "Maximum, in knots"
 "Pour le verdict du kite. Par défaut 12 à 25 nœuds.": "For the kite verdict. 12 to 25 knots by default."
 "Chaque champ doit contenir un nombre entier de nœuds.": "Each field must contain a whole number of knots."
+
+# --- Écran : La mer, réglages sur l’écran (08/11/2026) ---
+"Pas de connexion : la liste des spots demande Internet.": "No connection: the list of spots needs the Internet."
+"Vigie ne propose aucun spot pour le moment.": "Vigie has no spots to offer right now."
+"Déjà ajouté": "Already added"
+"Mémoire insuffisante pour afficher la liste.": "Not enough memory to show the list."
+"La liste est longue : seuls les premiers spots sont montrés.": "The list is long: only the first spots are shown."
+"Les spots ne sont pas lisibles pour le moment.": "The spots can’t be read right now."
+"Enregistrement impossible : réessayez.": "Couldn’t save: try again."

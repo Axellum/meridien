@@ -139,6 +139,13 @@ class PortsAppareil {
     virtual std::string_view telecharger_corps() = 0;
     virtual void telecharger_liberer() = 0;
 
+    // ---- la mer (ADR-0026) : le registre des spots (main/reglages_mer.*) et la lecture de la liste de Vigie (main/mer_liste_client.*)
+    virtual bool mer_registre(mer::Registre &sortie) = 0;
+    virtual bool mer_enregistrer(const mer::Registre &nouveau) = 0;
+    virtual void mer_liste_lancer() = 0;
+    virtual ListeMer mer_liste_etat() = 0;
+    virtual bool mer_liste_copier(mer::liste::Liste &sortie) = 0;
+
     // ---- appareil
     virtual void version(char *sortie, std::size_t capacite) = 0;
     virtual void code_appairage(char *sortie, std::size_t capacite) = 0; // vide tant que la page n'est pas servie
@@ -495,6 +502,16 @@ class HoteAppareil final : public HoteReglages {
         reglages::copier_texte(i18n::tr(meteo::decrire(m.code_wmo, m.jour).libelle), a.libelle, sizeof a.libelle);
         return a;
     }
+
+    // ---- la mer -----------------------------------------------------------------------------------------------------------
+    // Tout est transmis tel quel : les règles (identifiants, noms, doublons, plage de vent) sont dans le noyau mer_spots.hpp, que le
+    // port applique avant d'écrire ; la lecture de la liste de Vigie est faite par une tâche à part (main/mer_liste_client.cpp).
+
+    bool mer_registre(mer::Registre &sortie) override { return p_.mer_registre(sortie); }
+    bool mer_enregistrer(const mer::Registre &nouveau) override { return p_.mer_enregistrer(nouveau); }
+    void mer_liste_demander() override { p_.mer_liste_lancer(); }
+    ListeMer mer_liste_etat() override { return p_.mer_liste_etat(); }
+    bool mer_liste_copier(mer::liste::Liste &sortie) override { return p_.mer_liste_copier(sortie); }
 
     // ---- appareil ---------------------------------------------------------------------------------------------------------
 

@@ -126,6 +126,15 @@ class PortsFaux final : public PortsAppareil {
     std::string derniere_adresse;
     int telechargements = 0;
     int liberations = 0;
+    // la mer
+    mer::Registre registre_mer;
+    bool registre_mer_lisible = true;
+    int enregistrements_mer = 0;
+    bool ecriture_mer_ok = true;
+    ListeMer liste_mer_etat = ListeMer::Inactive;
+    mer::liste::Liste liste_mer;
+    int demandes_liste_mer = 0;
+    int copies_liste_mer = 0;
     // appareil
     std::string version_texte = "0.6.0";
     std::string code = "482913";
@@ -236,6 +245,35 @@ class PortsFaux final : public PortsAppareil {
     EtatTelechargement telecharger_etat() override { return dl; }
     std::string_view telecharger_corps() override { return corps; }
     void telecharger_liberer() override { ++liberations; }
+
+    bool mer_registre(mer::Registre &sortie) override {
+        if (!registre_mer_lisible) {
+            return false;
+        }
+        sortie = registre_mer;
+        return true;
+    }
+    bool mer_enregistrer(const mer::Registre &nouveau) override {
+        if (!ecriture_mer_ok || !mer::registre_valide(nouveau)) { // comme main/reglages_mer.cpp
+            return false;
+        }
+        ++enregistrements_mer;
+        registre_mer = nouveau;
+        return true;
+    }
+    void mer_liste_lancer() override {
+        ++demandes_liste_mer;
+        liste_mer_etat = ListeMer::EnCours;
+    }
+    ListeMer mer_liste_etat() override { return liste_mer_etat; }
+    bool mer_liste_copier(mer::liste::Liste &sortie) override {
+        ++copies_liste_mer;
+        if (liste_mer_etat != ListeMer::Terminee) {
+            return false;
+        }
+        sortie = liste_mer;
+        return true;
+    }
 
     void version(char *sortie, std::size_t capacite) override {
         reglages::copier_texte(version_texte, sortie, capacite);
