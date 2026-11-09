@@ -6,6 +6,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "src/display/lv_display_private.h" // le drapeau `flushing` (voir attendre_fin_du_dernier_transfert)
 
 #include "boot_info.h"
 #include "commande_serie.h"
@@ -22,6 +23,23 @@ static const char *TAG = "ecran";
 // Rétroéclairage : la luminosité réglée par la page (reglages.h) ; 75 % tant qu'elle n'a jamais été réglée, comme le firmware
 // ESPHome du Tab5 (moins de courant et de chaleur que 100 % ; un brownout a été vu à 100 % sur une alimentation juste, audit du
 // 16/10/2026).
+
+// lv_refr_now() rend la main avant la fin du transfert DMA2D de la dernière bande vers le tampon d'image : esp_lvgl_port ne
+// signale « terminé » (lv_display_flush_ready, qui baisse `flushing`) que dans le rappel de fin de transfert. LVGL n'offre pas de
+// lecture publique de ce drapeau, d'où l'en-tête privé (déjà utilisé par main/ui_details_ouvrir.cpp pour les tampons). Avant, une
+// attente fixe de 100 ms couvrait ce transfert. Ici : on attend la fin réelle (au plus 100 ms, l'ancienne attente, si le rappel ne
+// vient jamais), puis une période de balayage de la dalle (60 Hz, ~17 ms) pour que l'image entière ait été envoyée au moins une
+// fois quand la lumière s'allume. Renvoie la durée attendue, en ms, pour le journal.
+static int attendre_fin_du_dernier_transfert() {
+    constexpr int64_t kAttenteMaxUs = 100 * 1000;
+    const int64_t debut_us = esp_timer_get_time();
+    lv_display_t *const ecran = board_get_display();
+    while (ecran->flushing && (esp_timer_get_time() - debut_us) < kAttenteMaxUs) {
+        vTaskDelay(1);
+    }
+    vTaskDelay(pdMS_TO_TICKS(20)); // une période de balayage à 60 Hz
+    return static_cast<int>((esp_timer_get_time() - debut_us) / 1000);
+}
 
 extern "C" void app_main(void) {
     ESP_LOGI(TAG, "écran autonome, phase 1b ; ESP-IDF %s ; application démarrée à %d ms", esp_get_idf_version(),
@@ -40,6 +58,10 @@ extern "C" void app_main(void) {
     }
     ecran::memoire_jalon("après board_init (écran, tactile, LVGL, tampons)");
 
+    // La météo du cache NVS est relue AVANT l'écran principal : sa première image la montre au lieu de « météo indisponible »
+    // jusqu'au passage suivant du minuteur. Sans Wi-Fi ni heure, comme le reste de la relecture du cache.
+    ecran::meteo_client_relire_cache();
+
     if (board_display_lock(0)) {
         // Écran principal (heure, date, météo) chargé ; l'écran « Bonjour » des phases 1a/1b devient l'écran de diagnostic
         // (appui long sur le fond pour passer de l'un à l'autre).
@@ -48,18 +70,18 @@ extern "C" void app_main(void) {
         board_display_unlock();
     }
     ecran::memoire_jalon("après l'écran principal (objets, police, première image)");
-    vTaskDelay(pdMS_TO_TICKS(100)); // laisser finir le transfert DMA de la dernière bande
+    const int attente_ms = attendre_fin_du_dernier_transfert();
     const int luminosite = ecran::reglages_affichage().luminosite;
     board_set_backlight_percent(luminosite);
-    ESP_LOGI(TAG, "rétroéclairage allumé à %d %% à %d ms ; première image affichée", luminosite,
-             static_cast<int>(esp_timer_get_time() / 1000));
+    ESP_LOGI(TAG, "rétroéclairage allumé à %d %% à %d ms ; première image affichée (dernier transfert attendu %d ms)",
+             luminosite, static_cast<int>(esp_timer_get_time() / 1000), attente_ms);
 
     // Le réseau démarre après la première image : l'écran garde le temps de démarrage mesuré en 1a (docs/mesures/1b.md dit
     // si le Wi-Fi l'a changé).
     ecran::reseau_demarrer(boot);
     ecran::memoire_jalon("après le lancement de la tâche réseau (pile 8 Ko)");
     ecran::
-        meteo_client_demarrer(); // météo Open-Meteo : cache NVS lu tout de suite, requêtes dès que le Wi-Fi et l'heure sont là
+        meteo_client_demarrer(); // météo Open-Meteo : cache NVS déjà relu avant la première image, requêtes dès le Wi-Fi et l'heure
     ecran::memoire_jalon("après le lancement de la tâche météo (pile 12 Ko, cache NVS)");
     ecran::
         vigie_client_demarrer(); // alertes officielles de Vigie : premier essai 60 à 120 s après que le réseau et l'heure soient prêts

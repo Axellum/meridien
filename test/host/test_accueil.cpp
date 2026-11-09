@@ -665,6 +665,54 @@ constexpr int griser_garde_la_luminance_a_60_pour_cent() {
     return 0;
 }
 
+// =========================================================================================== icônes et colonnes des heures
+
+constexpr int une_icone_a_la_premiere_heure_puis_a_chaque_changement_de_temps() {
+    using ecran::visuel::IdIcone;
+    // Même temps toute la journée : une seule icône, à la première heure.
+    const IdIcone calme[6] = {IdIcone::pluie, IdIcone::pluie, IdIcone::pluie,
+                              IdIcone::pluie, IdIcone::pluie, IdIcone::pluie};
+    for (int i = 0; i < 6; ++i)
+        VERIFIER(a_une_icone_heure(calme, 6, i) == (i == 0));
+    // Un temps qui change : une nouvelle icône à l'heure du changement, rien quand il dure, et le retour au premier temps en est un.
+    const IdIcone change[7] = {IdIcone::soleil_jour, IdIcone::soleil_jour, IdIcone::nuageux_jour, IdIcone::nuageux_jour,
+                               IdIcone::pluie,       IdIcone::pluie,       IdIcone::soleil_jour};
+    const bool attendu[7] = {true, false, true, false, true, false, true};
+    for (int i = 0; i < 7; ++i)
+        VERIFIER(a_une_icone_heure(change, 7, i) == attendu[i]);
+    // Le jour qui passe à la nuit change l'icône (la lune remplace le soleil) : c'est un changement.
+    const IdIcone nuit[3] = {IdIcone::soleil_jour, IdIcone::lune_nuit, IdIcone::lune_nuit};
+    VERIFIER(a_une_icone_heure(nuit, 3, 1) && !a_une_icone_heure(nuit, 3, 2));
+    // Hors plage ou sans tableau : jamais d'icône.
+    VERIFIER(!a_une_icone_heure(change, 7, -1) && !a_une_icone_heure(change, 7, 7) &&
+             !a_une_icone_heure(nullptr, 7, 0));
+    VERIFIER(!a_une_icone_heure(change, 0, 0));
+    return 0;
+}
+
+constexpr int deux_colonnes_voisines_n_ont_jamais_la_meme_couleur_dans_aucun_theme() {
+    for (const ThemePrincipal *t : ecran::visuel::THEMES) {
+        // la première colonne (l'heure en cours) est en accent
+        VERIFIER(couleur_de_colonne(*t, 0) == t->accent);
+        // les suivantes : cyan (vent), vert (humidité), violet (pression), dans cet ordre, et la quatrième colonne reprend la couleur
+        // de la deuxième
+        using ecran::visuel::Metrique;
+        VERIFIER(couleur_de_colonne(*t, 1) == t->metrique[static_cast<int>(Metrique::VENT)]);
+        VERIFIER(couleur_de_colonne(*t, 2) == t->metrique[static_cast<int>(Metrique::HUMIDITE)]);
+        VERIFIER(couleur_de_colonne(*t, 3) == t->metrique[static_cast<int>(Metrique::PRESSION)]);
+        VERIFIER(couleur_de_colonne(*t, 1) == couleur_de_colonne(*t, 1 + NB_COULEURS_COLONNES));
+        for (int i = 0; i < 11; ++i)
+            VERIFIER(couleur_de_colonne(*t, i) != couleur_de_colonne(*t, i + 1));
+        // et les trois couleurs sont différentes entre elles, comme de l'accent
+        VERIFIER(couleur_de_colonne(*t, 1) != couleur_de_colonne(*t, 2) &&
+                 couleur_de_colonne(*t, 2) != couleur_de_colonne(*t, 3) &&
+                 couleur_de_colonne(*t, 1) != couleur_de_colonne(*t, 3));
+    }
+    // un numéro négatif (colonne inconnue) retombe sur l'accent, sans sortir d'un tableau
+    VERIFIER(couleur_de_colonne(ecran::visuel::kThemeCiel, -3) == ecran::visuel::kThemeCiel.accent);
+    return 0;
+}
+
 } // namespace
 
 #define LISTE(X)                                                                                                       \
@@ -696,7 +744,9 @@ constexpr int griser_garde_la_luminance_a_60_pour_cent() {
     X(les_zones_tiennent_dans_l_ecran_sans_se_marcher_dessus)                                                          \
     X(la_hauteur_gagnee_sur_720_va_a_la_carte_des_jours)                                                               \
     X(un_theme_grise_n_a_plus_de_couleur_mais_reste_lisible)                                                           \
-    X(griser_garde_la_luminance_a_60_pour_cent)
+    X(griser_garde_la_luminance_a_60_pour_cent)                                                                        \
+    X(une_icone_a_la_premiere_heure_puis_a_chaque_changement_de_temps)                                                 \
+    X(deux_colonnes_voisines_n_ont_jamais_la_meme_couleur_dans_aucun_theme)
 
 TESTS_A_LA_COMPILATION(LISTE)
 
