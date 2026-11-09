@@ -92,7 +92,13 @@ struct Vue {
     std::uint32_t empreinte[Z_NOMBRE] = {};
     std::uint32_t empreinte_ciel = 0;
     lv_draw_buf_t *ciel_image = nullptr; // le ciel tramé (voir appliquer_ciel)
-    bool est_accueil = false;            // la composition de l'accueil ; faux : celle de l'horloge en vedette
+    // Le verre des grandes cartes (heures, cinq jours ou pluie) est cuit dans l'image du ciel (voir cuire_verre) : ces rectangles
+    // sont ceux déjà peints, que carte_de_verre ne redessine plus. `nb_verre` 0 : rien de cuit, le verre se dessine comme avant.
+    Rect verre[2];
+    int nb_verre = 0;
+    std::uint32_t cle_verre = 0;
+    std::uint32_t ciel_haut = 0, ciel_bas = 0; // les couleurs avec lesquelles l'image du ciel a été remplie
+    bool est_accueil = false;                  // la composition de l'accueil ; faux : celle de l'horloge en vedette
     int extra_h = 0; // hauteur de référence gagnée au-delà de 720 (la 7B) : elle va à la carte des jours
     ThemePrincipal theme_gris = kThemeCiel; // le thème de la météo périmée (accueil::theme_grise)
     accueil::EpisodePluie pluie;            // la pluie à annoncer dans le bandeau (recalculée à chaque mise à jour)
@@ -448,6 +454,7 @@ void calculer_disposition() {
 }
 
 void positionner_pastille_officielle(); // plus bas, avec le dessin de la barre
+void cuire_verre();                     // plus bas, avec le fond
 
 void appliquer_disposition() {
     calculer_disposition();
@@ -466,6 +473,7 @@ void appliquer_disposition() {
         }
     }
     positionner_pastille_officielle(); // la barre ou le bandeau a pu changer de taille
+    cuire_verre();                     // les cartes de verre ont pu changer de place
 }
 
 PlaceOfficielle placer_puce_officielle(); // plus bas, avec le dessin du bandeau
@@ -764,6 +772,12 @@ void texte_base(const dz::Pinceau &pc, const Police &p, const char *s, int x, in
 // Le verre d'une carte : la teinte du thème et un filet clair à peine visible.
 void carte_de_verre(const Ctx &c, int rayon) {
     const ThemePrincipal &t = *g.theme;
+    for (int i = 0; i < g.nb_verre; ++i) { // déjà dans l'image du ciel, au pixel près
+        const Rect &v = g.verre[i];
+        if (v.x == c.x && v.y == c.y && v.w == c.w && v.h == c.h && rayon == px(28)) {
+            return;
+        }
+    }
     if (t.carte_opa > 0) {
         dz::rect_bord(c.pc, c.x, c.y, c.w, c.h, rayon, t.carte, t.carte_opa, t.texte, 20, px(2));
     }
@@ -2298,6 +2312,81 @@ void remplir_ciel_trame(lv_draw_buf_t *buf, std::uint32_t haut, std::uint32_t ba
     }
 }
 
+// Cuit le verre des cartes des heures et des cinq jours (ou de la pluie) DANS l'image du ciel : chaque bande repeinte n'a plus qu'à
+// recopier des pixels au lieu de fondre un rectangle arrondi translucide (un tiers de l'écran). On les dessine avec le MÊME code que
+// le dessin direct (carte_de_verre) et le MÊME LVGL, sur l'image en RGB565 comme la dalle : le résultat est le même pixel pour pixel.
+// Refait quand une carte change de place, de taille ou de teinte (disposition, thème) ; l'image est alors remplie à neuf d'abord, le
+// verre ne s'empile jamais. Si l'image manque, rien n'est cuit et le dessin direct reste en service.
+void cuire_verre() {
+    Rect voulu[2];
+    int n = 0;
+    const ThemePrincipal &t = *g.theme;
+    if (g.ciel_image != nullptr && g.est_accueil && t.ciel_dynamique && t.carte_opa > 0) {
+        for (const int z : {static_cast<int>(Z_HEURES), static_cast<int>(Z_SEMAINE)}) {
+            if (g.rect[z].w > 0 && g.rect[z].h > 0) {
+                voulu[n++] = g.rect[z];
+            }
+        }
+    }
+    Empreinte e;
+    e.u(static_cast<std::uint32_t>(n));
+    for (int i = 0; i < n; ++i) {
+        e.u(static_cast<std::uint32_t>(voulu[i].x));
+        e.u(static_cast<std::uint32_t>(voulu[i].y));
+        e.u(static_cast<std::uint32_t>(voulu[i].w));
+        e.u(static_cast<std::uint32_t>(voulu[i].h));
+    }
+    e.u(t.carte);
+    e.u(t.carte_opa);
+    e.u(t.texte);
+    e.u(g.ciel_haut);
+    e.u(g.ciel_bas);
+    e.u(reinterpret_cast<std::uintptr_t>(g.ciel_image));
+    e.u(static_cast<std::uint32_t>(px(28)));
+    e.u(static_cast<std::uint32_t>(px(2)));
+    if (e.h == g.cle_verre) {
+        return;
+    }
+    g.cle_verre = e.h;
+    if (g.nb_verre > 0 && g.ciel_image != nullptr) { // du verre déjà cuit : repartir du ciel nu
+        remplir_ciel_trame(g.ciel_image, g.ciel_haut, g.ciel_bas);
+    }
+    g.nb_verre = 0;
+    if (n > 0) {
+        lv_layer_t couche;
+        lv_layer_init(&couche);
+        const lv_area_t tout = {0, 0, static_cast<int32_t>(g.ciel_image->header.w) - 1,
+                                static_cast<int32_t>(g.ciel_image->header.h) - 1};
+        couche.draw_buf = g.ciel_image;
+        couche.color_format = static_cast<lv_color_format_t>(g.ciel_image->header.cf);
+        couche.buf_area = tout;
+        couche._clip_area = tout;
+        couche.phy_clip_area = tout;
+        lv_draw_unit_send_event(nullptr, LV_EVENT_CHILD_CREATED, &couche);
+        for (int i = 0; i < n; ++i) {
+            const Ctx c = {{&couche, g.theme}, voulu[i].x, voulu[i].y, voulu[i].w, voulu[i].h};
+            carte_de_verre(c, px(28)); // g.nb_verre est 0 : dessine vraiment
+        }
+        couche.all_tasks_added = true;
+        while (couche.draw_task_head != nullptr) {
+            lv_draw_dispatch_wait_for_request();
+            if (!lv_draw_dispatch_layer(lv_obj_get_display(g.ecran), &couche)) {
+                lv_draw_wait_for_finish();
+                lv_draw_dispatch_request();
+            }
+        }
+        lv_draw_unit_send_event(nullptr, LV_EVENT_SCREEN_LOAD_START, &couche);
+        lv_draw_unit_send_event(nullptr, LV_EVENT_CHILD_DELETED, &couche);
+        for (int i = 0; i < n; ++i) {
+            g.verre[i] = voulu[i];
+        }
+        g.nb_verre = n;
+    }
+    if (g.ecran != nullptr) {
+        lv_obj_invalidate(g.ecran);
+    }
+}
+
 void appliquer_ciel() {
     const ThemePrincipal &t = *g.theme;
     if (!t.ciel_dynamique) {
@@ -2309,6 +2398,8 @@ void appliquer_ciel() {
             lv_draw_buf_destroy(g.ciel_image);
             g.ciel_image = nullptr;
         }
+        g.nb_verre = 0;
+        cuire_verre();
         return;
     }
     const Degrade d = ciel(moment_du_jour(), ambiance_du_moment());
@@ -2323,12 +2414,17 @@ void appliquer_ciel() {
         return;
     }
     remplir_ciel_trame(neuf, d.haut, d.bas);
+    g.ciel_haut = d.haut;
+    g.ciel_bas = d.bas;
     lv_obj_set_style_bg_image_src(g.ecran, neuf, 0);
     lv_obj_set_style_bg_image_opa(g.ecran, LV_OPA_COVER, 0);
     if (g.ciel_image != nullptr) { // l'ancienne image n'est plus référencée par le style : on peut la rendre
         lv_draw_buf_destroy(g.ciel_image);
     }
     g.ciel_image = neuf;
+    g.nb_verre = 0; // l'image est neuve : sans verre
+    g.cle_verre = 0;
+    cuire_verre();
 }
 
 Police creer_police(const std::uint8_t *ttf, std::size_t taille, int reference) {
