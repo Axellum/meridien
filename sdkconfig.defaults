@@ -37,3 +37,10 @@ CONFIG_HTTPD_MAX_URI_LEN=1024
 # Outil de mesure PROVISOIRE (commande serie " piles ", jalon 1b) : liste des taches avec la base et la marge de leur pile.
 # A retirer avec la commande avant la phase 2.
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+
+# Code compile pour la vitesse (-O2). Le defaut d'IDF est -Og (« debug ») : il laisse le calcul de l'interface deux fois plus lent.
+# Essai du 08/11/2026 sur le Tab5 ST7121 de developpement (commit 1324550, 5 demarrages par binaire) : boucle de rotation du
+# processeur 649 -> 307 µs, premiere image 379 -> 340 ms au maximum, PPA inchange. Les assertions RESTENT activees
+# (CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE) : spi_flash/cache_utils.c fait assert sur la pile (docs/mesures/memoire-interne.md).
+# Apres un changement de ces defaults : supprimer sdkconfig (les defaults ne sont relus que sur un sdkconfig neuf).
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
