@@ -1,17 +1,21 @@
 ### Changed
 
 - **Code built for speed (`-O2`) instead of ESP-IDF's default `-Og`** (`CONFIG_COMPILER_OPTIMIZATION_PERF=y` in `sdkconfig.defaults`,
-  both boards). Assertions stay on. A previous session measured it on the Tab5 ST7121 development board (commit `1324550`,
-  08/11/2026, 5 start-ups per binary): the CPU rotation loop went from 649 to 307 µs, the first image from 379 to 340 ms at the
-  maximum, the PPA path unchanged. **Those figures were not measured again here.** Cost: the Tab5 binary grows by 164 800 bytes
-  (3 093 184 → 3 257 984, 22 % of the 4 MB partition still free). Tested on: compiled for `tab5-st7121` and `waveshare-7b`
-  with no warning; **not flashed and not measured on any board**.
+  both boards). Assertions stay on. Measured before/after on the Tab5 ST7121 development board (6 soft restarts per binary,
+  09/11/2026, commits `c3fd97b` → `dca5e93`, Wi-Fi not configured in either build, details in `docs/mesures/optimisation-o2.md`):
+  first image 2236 → 2116 ms on average (minimum 2209 → 2115 ms), CPU rotation loop 649–651 → 303–306 µs, PPA path unchanged,
+  worst render time of an image 394 → 355 ms, free internal RAM +5.1 kB. **Cost to watch**: the minimum free stack of
+  `taskLVGL` fell from 1768 to 716 bytes (stack of 7168 bytes), measured only on the start-up sequence and the main screen.
+  The Tab5 binary grows by 164 848 bytes (3 093 184 → 3 258 032, 22 % of the 4 MB partition still free). Tested on:
+  `tab5-st7121` on 09/11/2026 as above; the Waveshare 7B is compiled with no warning but **not flashed and not measured**.
 - **The touch is read every 10 ms instead of every 33 ms** (LVGL's default read period), on both boards. **Not measured**: the
   gain, if any, in the delay between a touch and its effect is unknown, and the extra I2C reads are not measured either. Tested
-  on: compiled for both boards; not flashed. Separate commit, so that it can be reverted alone.
+  on: compiled for both boards; the Tab5 ran this code in the `-O2` measurement above but no touch was made. Separate commit,
+  so that it can be reverted alone.
 
 ### Fixed
 
 - **Three truncation warnings that `-Og` hid and `-O2` turns into build errors** (`strncpy` in the weather zone copy,
   `snprintf` of the official-alert chip text, `snprintf` of the hardware clock text). The text produced is unchanged; the cut,
-  where there was one, is the same and is now written in the code. Tested on: compiled; not flashed.
+  where there was one, is the same and is now written in the code. Tested on: compiled for both boards; the Tab5 started and
+  displayed the main screen with this code on 09/11/2026 (the three code paths themselves were not exercised on purpose).
