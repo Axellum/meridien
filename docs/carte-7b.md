@@ -71,6 +71,20 @@ The panel is natively landscape. Build option `WS7B_ROTATION`, **0 or 180** only
 
 The rotation is done by software (LVGL + the P4 PPA accelerator, like the Tab5); the panel's own scan-direction register exists in the component but was **never tried** on this board (ESPHome disables it). 90°/270° are not supported. **The default of 0 is a decision taken in the author's place** and is to be confirmed on the unit: if the clock appears upside down, build with `"-DWS7B_ROTATION=180"`.
 
+### Drawing: what differs from the Tab5 (read in the code unless marked measured)
+
+| Point | Tab5 | Waveshare 7B | Source |
+|---|---|---|---|
+| Panel (native) | 720 × 1280, portrait | 1024 × 600, landscape | `tab5_internal.h:61-62`, `ws7b_pur.h:85-86` |
+| Interface (logical) | 1280 × 720 (LVGL turns the image by 90°) | 1024 × 600, rotation 0 on the author's unit | `tab5_internal.h:67-69`, `ws7b_internal.h:26` |
+| Rotation | software, by the PPA (`sw_rotate = true`) | **none** at rotation 0 (`sw_rotate` only if the rotation is not 0); the PPA is used only for the 180° build | `tab5_board.c`, `ws7b_board.c:87-88` |
+| Draw buffer | 720 × 50 px × 2 B × 2 buffers = 144 KiB internal, DMA | 1024 × 25 px × 2 B × 2 buffers = 100 KiB internal, DMA | `tab5_board.c:25`, `ws7b_board.c:76-85`, `WS7B_DRAW_BUFFER_LINES_DEFAULT` |
+| Draw band | 28 lines of the 1280-px logical width (36 000 px buffer) → about 26 bands for 720 lines | 25 lines of 1024 px (25 600 px buffer) → 24 bands for 600 lines | `tab5_orientation.c:106-109` (comment of the bench); the band counts are **computed here, not observed on a board** |
+| Minimum free stack of `taskLVGL`, `-O2`, 7168 B stack | **716 B** (measured 09/11/2026) | **584 B** (measured 09/11/2026) | [optimisation-o2.md](mesures/optimisation-o2.md) |
+| Same, 8192 B stack (both boards now) | **1608 B** at the end of start-up | **1608 B** | [optimisation-o2.md](mesures/optimisation-o2.md) |
+
+Why a gain measured on one board does not carry over to the other: the work per image is not the same (the Tab5 rotates every band by the PPA and copies it, the 7B at rotation 0 only copies it), the bands are not the same size (28 lines of 1280 px against 25 lines of 1024 px), the free internal RAM is not the same (the 7B has more: 253 vs 359 kB after the main screen, measured) and the stack margins differ by 130 B at the same stack size. The PPA benchmark at start-up (355 µs per band by the PPA, 305 µs by the CPU in `-O2`, measured on the Tab5) has **no equivalent on the 7B**. A result is therefore tied to the board, the screen revision, the commit and the date of its "Vu sur" line, and must be measured again on the other board before it is claimed there. Example: two LVGL draw units (trial of 09/11/2026, Tab5 ST7121, commit `1069571`, 6 starts per binary, see [dessin-2-unites.md](mesures/dessin-2-unites.md)): first image +365 ms, −21 kB free internal RAM, worst frame render 737 ms against 386 ms; **not measured on the 7B**.
+
 ### Audio
 
 ES8311 on I2S0, mono, 16 kHz, 16 bits, through `esp_codec_dev`; ES7210 for the microphones (MIC1 + MIC2). **Volume is capped**: the ES8311 register 0x32 has 0.5 dB steps, 0xBF = 0 dB, 0xFF = +32 dB, and the speaker **saturates** above 0 dB (author's trial by ear, 17/10/2026: 100 % saturates, 80 % a little, 75 % clean, `[D][M]`). The layer writes the register itself, never above 0xBF (= 75 % of the register scale), and a non-zero volume never goes under 0x66 (−44.5 dB) because below it “nothing is heard” (author, 18/10/2026, `[M]`); volume 0 mutes. The curve `ws7b_volume_reg()` is tested on the PC (never above 0xBF, monotonic, 0 mutes). A build with `WS7B_ESSAI_AUDIO=1` plays a 440 Hz tone of 300 ms at 60 % (register 0x9B, about −18 dB) and then reports the microphone level. **Not verified on the board.** Note: `board.h` has no audio API yet — the audio code is ready inside the layer and waits for milestone 1c; if the interface has to grow, the proposal goes to the Tab5 board-layer owner first.
@@ -207,6 +221,20 @@ La dalle est en paysage natif. Option de compilation `WS7B_ROTATION`, **0 ou 180
 | 180 | montage « normal » : le sens des démos Waveshare et le défaut public d'ESPHome | `[B]` (`ESP_LV_ADAPTER_ROTATE_180`), `[H]` (`carte_rotation: 180`) |
 
 La rotation est logicielle (LVGL + accélérateur PPA du P4, comme le Tab5) ; le registre de sens de balayage de la dalle existe dans le composant mais n'a **jamais été essayé** sur cette carte (ESPHome le désactive). 90°/270° ne sont pas pris en charge. **Le défaut 0 est une décision prise à la place de l'auteur** et reste à confirmer sur l'exemplaire : si l'heure s'affiche à l'envers, compiler avec `"-DWS7B_ROTATION=180"`.
+
+### Dessin : ce qui change par rapport au Tab5 (lu dans le code, sauf mention « mesuré »)
+
+| Point | Tab5 | Waveshare 7B | Source |
+|---|---|---|---|
+| Dalle (native) | 720 × 1280, portrait | 1024 × 600, paysage | `tab5_internal.h:61-62`, `ws7b_pur.h:85-86` |
+| Interface (logique) | 1280 × 720 (LVGL tourne l'image de 90°) | 1024 × 600, rotation 0 sur l'exemplaire de l'auteur | `tab5_internal.h:67-69`, `ws7b_internal.h:26` |
+| Rotation | logicielle, par le PPA (`sw_rotate = true`) | **aucune** en rotation 0 (`sw_rotate` seulement si la rotation n'est pas 0) ; le PPA ne sert que pour la version à 180° | `tab5_board.c`, `ws7b_board.c:87-88` |
+| Tampon de dessin | 720 × 50 px × 2 o × 2 tampons = 144 Kio internes, DMA | 1024 × 25 px × 2 o × 2 tampons = 100 Kio internes, DMA | `tab5_board.c:25`, `ws7b_board.c:76-85`, `WS7B_DRAW_BUFFER_LINES_DEFAULT` |
+| Bande de dessin | 28 lignes de la largeur logique de 1280 px (tampon de 36 000 px) → environ 26 bandes pour 720 lignes | 25 lignes de 1024 px (tampon de 25 600 px) → 24 bandes pour 600 lignes | `tab5_orientation.c:106-109` (commentaire du banc) ; les nombres de bandes sont **calculés ici, pas observés sur une carte** |
+| Marge minimale de la pile de `taskLVGL`, `-O2`, pile de 7168 o | **716 o** (mesuré le 09/11/2026) | **584 o** (mesuré le 09/11/2026) | [optimisation-o2.md](mesures/optimisation-o2.md) |
+| Idem, pile de 8192 o (les deux cartes maintenant) | **1608 o** en fin de démarrage | **1608 o** | [optimisation-o2.md](mesures/optimisation-o2.md) |
+
+Pourquoi un gain mesuré sur une carte ne vaut pas pour l'autre : le travail par image n'est pas le même (le Tab5 tourne chaque bande par le PPA puis la copie, la 7B en rotation 0 ne fait que la copier), les bandes n'ont pas la même taille (28 lignes de 1280 px contre 25 lignes de 1024 px), la mémoire interne libre n'est pas la même (la 7B en a plus : 253 contre 359 ko après l'écran principal, mesuré) et les marges de pile diffèrent de 130 o à pile égale. Le banc du PPA au démarrage (355 µs la bande par le PPA, 305 µs par le processeur en `-O2`, mesuré sur le Tab5) **n'a pas d'équivalent sur la 7B**. Un résultat est donc lié à la carte, à la révision d'écran, au commit et à la date de sa ligne « Vu sur », et se mesure de nouveau sur l'autre carte avant d'être affirmé là. Exemple : deux unités de dessin LVGL (essai du 09/11/2026, Tab5 ST7121, commit `1069571`, 6 démarrages par binaire, voir [dessin-2-unites.md](mesures/dessin-2-unites.md)) : première image +365 ms, −21 ko de mémoire interne libre, pire rendu d'une image 737 ms contre 386 ms ; **non mesuré sur la 7B**.
 
 ### Audio
 
