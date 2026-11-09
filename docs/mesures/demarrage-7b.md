@@ -1,6 +1,6 @@
 # Démarrage de la 7B : test mémoire de la PSRAM coupé et attente fixe retirée (09/11/2026)
 
-> **Summary (EN)** — Six software restarts of the Waveshare 7B before and after the change, read on the serial log with the chip's own timestamps. The light now comes on **1030 ms after the start of the bootloader instead of 1996.5 ms (−966 ms, −48 %)**. Two causes, each seen separately in the log: the PSRAM memory test (`CONFIG_SPIRAM_MEMTEST=n`) took 885 ms, and the fixed 100 ms wait before the backlight became 19 ms (the last display transfer was already finished when it was checked), i.e. −80 ms between "board ready" and the light. **Not verified**: the image on the panel at the moment the light comes on (nobody looked at it), a cold start (power cut), the "sky" theme, the Tab5 (not measured, only compiled by the CI).
+> **Summary (EN)** — Six software restarts of the Waveshare 7B before and after the change, read on the serial log with the chip's own timestamps. The light now comes on **1030 ms after the start of the bootloader instead of 1996.5 ms (−966 ms, −48 %)**. Two causes, each seen separately in the log: the PSRAM memory test (`CONFIG_SPIRAM_MEMTEST=n`) took 885 ms, and the fixed 100 ms wait before the backlight became 19 ms (the last display transfer was already finished when it was checked), i.e. −80 ms between "board ready" and the light. **Seen by the author**: after the flash and the two series of restarts, he looked at the panel and found the image clean ("Image propre", 2026-11-09; the number of restarts watched was not counted). **Not verified**: a cold start (power cut), the "sky" theme, the Tab5 (not measured, only compiled by the CI).
 
 **Vu sur** : Waveshare 7B (écran EK79007, GT911), puce ESP32-P4 révision v3.2, ESP-IDF 5.5.5 ; avant : commit `c3fd97b` (binaire `meridien-lot-f-c3fd97b-7b`, empreinte ELF `514da6b60…`) ; après : commit `86d5352` (compilé le 09/11/2026 à 08:43:36, lu sur l'appareil) ; 6 redémarrages logiciels de chaque, thème sombre, luminosité 63 %, le 09/11/2026 entre 08 h 30 et 09 h 00. La carte est retrouvée par sa MAC lue sur la puce (jamais écrite dans le dépôt). Journaux bruts conservés hors dépôt.
 
@@ -39,7 +39,7 @@ La ligne « rétroéclairage allumé » indique maintenant le temps passé à at
 
 ## 5. Non vérifié
 
-- **L'image sur la dalle** à l'instant où la lumière s'allume (déchirure, bande manquante) : personne ne l'a regardée, la mesure est celle du journal. À regarder à l'œil sur quelques redémarrages.
+- **L'image sur la dalle** à l'instant où la lumière s'allume (déchirure, bande manquante) : la mesure est celle du journal, mais **Axel a regardé l'écran de la 7B après le flash et les deux séries de redémarrages et a jugé l'image propre** (« Image propre », 09/11/2026). Le nombre de redémarrages regardés n'a pas été compté, et l'œil ne voit pas une déchirure d'une seule période de balayage sur un seul démarrage : constat à l'œil, pas une mesure.
 - Un démarrage à froid (coupure de courant) : la 7B n'a pas d'horloge matérielle, l'heure vient du réseau ; non mesuré.
 - Le thème « ciel » sur la 7B, et le Tab5 (compilé par la CI seulement, jamais flashé avec ce lot).
 - La part de chaque cause sur la sensation d'allumage : la mesure donne des millisecondes, pas ce que l'œil perçoit (cf. barre de progression d'ESPHome, rapport du 09/11).
