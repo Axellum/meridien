@@ -271,7 +271,7 @@ jobs:
       - name: Installer gitleaks (archive vérifiée par SHA-256)
         run: |
           # Relances : le 09/11/2026 l'archive a échoué trois fois sur un 504 de GitHub, et un job ne se relance qu'une fois
-          # TOUT le run terminé (donc après les vingt minutes de tests-noyau).
+          # TOUT le run terminé (donc après la fin des tests du noyau, quand ils étaient lancés un fichier après l'autre).
           curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 --retry-max-time 120 \
             --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
