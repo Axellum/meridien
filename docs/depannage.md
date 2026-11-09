@@ -314,6 +314,16 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 *Known elsewhere (the author's backups of this board on 20/10/2026, esptool 5.3.1).* On the ESP32-P4 the stub `read-flash` fails at fixed sectors: read in 2 MB pieces (about 21 s each), split by 8 on failure, 4 KB sectors with `--no-stub` as a last resort, use `--before default-reset` after a dropped stub, and prove the copy with `verify-flash` (MD5 computed in the chip). The real flash is **32 MB** (the first plan assumed 16 MB). The otadata (0x9000 and 0xa000) must be decoded before choosing what to keep: sequence number, CRC `crc32_le(0xFFFFFFFF, seq)`, slot `(seq − 1) % 2`. `tools/essai_7b.py` does all of this; its decoder was checked against the real otadata of the backup of 20/10/2026 (sequences 5 and 4, both CRC valid, slot 0 chosen). The part of the script that talks to the board has **not been run**. **Status**: worked around; script written, board part not run.
 
+#### Waveshare 7B: `essai_7b.py flasher` refuses every limited-scope flash (« partition ota_1 du build … depasse la fin de l'emplacement sauvegarde »)
+
+**Symptom.** After `essai_7b.py sauvegarde --reference <application file>` (limited-scope backup), `essai_7b.py flasher --build <build>` stops with `[REFUS] partition ota_1 du build (0x410000-0x810000) depasse la fin de l'emplacement sauvegarde (0x410000) : aucune ecriture`. Nothing is written (exit code 2).
+
+**Cause (read in the code; not proven by a fix).** `verifier_portee` compares, besides the regions that will be written, **every partition declared in the build's table** to the end of the saved slot (`0x410000`). With the 7B table (`boards/waveshare-7b/partitions.csv`) `ota_1` and `nvs` always end beyond it, so the check cannot pass, although only the bootloader, table, otadata and application (up to `0x2ff000`) would be written.
+
+**Workaround used.** Once `sauvegarde` has confirmed, write **only the application** (`esptool write-flash 0x10000 meridien.bin`, inside the saved slot `ota_0`) and prove it with `verify-flash` (MD5 computed by the chip); the board's bootloader, table and otadata stay untouched. `essai_7b.py restaurer` is not affected and puts the saved image back (verified by the chip). **Not fixed**: the guard protects a board in service; how it should treat partitions that are declared but not written is a decision for the author of the script.
+
+**Seen on** Waveshare 7B (the house display), 09/11/2026, tree of commit `db823e0`, esptool 5.3.1. **Evidence**: the refusal printed before any write; then two application writes and one restoration, each verified by the chip, and the version read on the board after the restoration. **Status**: open (workaround in use), `tools/essai_7b.py` not changed.
+
 ---
 
 ### Memory and watchdog
@@ -984,6 +994,16 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 #### Waveshare 7B : sauvegarder la flash de 32 Mo
 
 *Connu ailleurs (les sauvegardes de l'auteur sur cette carte le 20/10/2026, esptool 5.3.1).* Sur l'ESP32-P4, `read-flash` avec le stub échoue à des secteurs fixes : lire par morceaux de 2 Mo (environ 21 s chacun), couper en 8 en cas d'échec, secteurs de 4 Ko en `--no-stub` en dernier recours, `--before default-reset` après un stub coupé, et prouver la copie par `verify-flash` (MD5 calculé dans la puce). La flash réelle fait **32 Mo** (le premier plan en supposait 16). L'otadata (0x9000 et 0xa000) se décode avant de choisir ce qu'on garde : numéro de séquence, CRC `crc32_le(0xFFFFFFFF, seq)`, emplacement `(seq − 1) % 2`. `tools/essai_7b.py` fait tout cela ; son décodeur a été confronté à l'otadata réelle de la sauvegarde du 20/10/2026 (séquences 5 et 4, CRC valides toutes les deux, emplacement 0 choisi). La partie du script qui parle à la carte **n'a pas été exécutée**. **Statut** : contourné ; script écrit, partie carte non exécutée.
+
+#### Waveshare 7B : `essai_7b.py flasher` refuse tout flash à portée limitée (« partition ota_1 du build … depasse la fin de l'emplacement sauvegarde »)
+
+**Symptôme.** Après `essai_7b.py sauvegarde --reference <fichier de l'application>` (sauvegarde à portée limitée), `essai_7b.py flasher --build <build>` s'arrête sur `[REFUS] partition ota_1 du build (0x410000-0x810000) depasse la fin de l'emplacement sauvegarde (0x410000) : aucune ecriture`. Rien n'est écrit (code de sortie 2).
+
+**Cause (lue dans le code ; non prouvée par un correctif).** `verifier_portee` compare, en plus des régions qui seront écrites, **toutes les partitions déclarées par la table du build** à la fin de l'emplacement sauvegardé (`0x410000`). Avec la table de la 7B (`boards/waveshare-7b/partitions.csv`), `ota_1` et `nvs` finissent toujours au-delà : le contrôle ne peut pas passer, alors qu'on n'écrirait que le bootloader, la table, l'otadata et l'application (jusqu'à `0x2ff000`).
+
+**Contournement utilisé.** Une fois `sauvegarde` confirmée, n'écrire que **l'application** (`esptool write-flash 0x10000 meridien.bin`, dans l'emplacement `ota_0` sauvegardé) et la prouver par `verify-flash` (MD5 calculé par la puce) ; le bootloader, la table et l'otadata de la carte ne sont pas touchés. `essai_7b.py restaurer` n'est pas concerné et remet l'image sauvegardée (vérifiée par la puce). **Non corrigé** : ce garde-fou protège une carte en service ; la façon de traiter les partitions déclarées mais non écrites est une décision de l'auteur du script.
+
+**Vu sur** Waveshare 7B (l'écran de la maison), 09/11/2026, arbre du commit `db823e0`, esptool 5.3.1. **Preuve** : le refus affiché avant toute écriture ; puis deux écritures de l'application et une restauration, chacune vérifiée par la puce, et la version relue sur la carte après la restauration. **Statut** : ouvert (contournement en usage), `tools/essai_7b.py` non modifié.
 
 ---
 
