@@ -23,6 +23,8 @@
 > « Météo · épinglé » with « Auto en pause », the rain card is gone, an orange or red alert still gets its enlarged banner;
 > unpinning gives the hand back to the rules at once. See « Complément » below. Still **never flashed, never run on a board**.
 
+> **Mise à jour du 09/11/2026 (ADR-0027).** La grande carte « Pluie en cours / Pluie dans N min » qui recouvrait les cinq jours **n'est plus choisie** : la composition `CartePluie` retombe sur `Normale`, et la pluie est dite par la **bande de la ligne centrale** (une barre par quart d'heure, moitié gauche du bandeau). Le bandeau d'alerte agrandi et sa petite tuile de pluie ne changent pas. Le code de la carte est encore dans l'arbre.
+
 - **Statut** : **proposée**, écrite le 08/11/2026 ; à valider par Axel. Constaté (PC et compilation, aucune carte) : 1 694 tests du noyau avec AddressSanitizer et UBSan, 104 mutations toutes détectées,
   117 rendus LVGL regardés (13 états, 3 tailles, français, allemand et turc), compilations du Tab5 et de la 7B depuis un arbre propre
   (+17,6 Ko d'image, +512 octets de RAM statique, le code lié aux deux binaires)
