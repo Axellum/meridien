@@ -4,9 +4,11 @@
 > itself (a full-screen image: 27 ms alone, with LVGL's gradient under it) but what it does to everything else: the zones alone take
 > 143 ms on a flat background, so zones plus sky should take about 164 ms; with the 1.2 MB image in PSRAM they take 235 ms. The sky is a vertical gradient dithered with an 8-column pattern, so
 > it only needs a 64-column tile that LVGL repeats (`bg_image_tiled`): same pixels, 77 KB instead of 1.2 MB, and LVGL's own
-> gradient is no longer drawn under it. Return to the main screen: **235 → 178 ms (−57 ms, −24 %)** with equivalent test binaries.
-> Pixel-for-pixel identical on the PC bench (575 of 575 renders at 50, 28 and 25 lines). The binary of this very commit has not
-> been flashed yet. The mechanism (the image sweeping the 128 KB L2 cache) is a hypothesis, not a finding.
+> gradient is no longer drawn under it. Return to the main screen: **235 → 178 ms (−57 ms, −24 %)** with equivalent test binaries, then
+> **239.0 → 183.3 ms (−55.7 ms, −23 %)** with this commit's code plus a temporary timer, measured on the board the same afternoon, with
+> 1.17 to 1.19 MB more free PSRAM. Pixel-for-pixel identical on the PC bench (575 of 575 renders at 50, 28 and 25 lines). The exact
+> binary of this commit has booted on the board, but nobody has looked at the sky on the panel (the 7B is set to the Dark theme, which
+> has no sky). The mechanism (the image sweeping the 128 KB L2 cache) is a hypothesis, not a finding.
 
 Branche `claude/ciel-en-mosaique-6ac1a8` (tirée de `main` au commit `1069571`). Règle de lecture : tout ce qui n'est pas sous « Vu sur » avec une carte est **non constaté sur carte**.
 
@@ -40,7 +42,23 @@ Méthode : un chronomètre **temporaire, jamais commité** note, par les événe
 
 Les zones seules s'additionnent (≈ 143 ms) et le ciel seul coûte 27 ms (plancher compris) : la somme attendue est d'environ 164 ms, le mesuré 235 ms. C'est l'image pleine taille derrière les zones qui coûte les ≈ 71 ms de trop. Ce qui reste à dessiner avec la mosaïque (on retire une classe d'éléments à la fois, gain en ms sur l'image d'aujourd'hui / sur la mosaïque) : rectangles, disques et anneaux (cartes de verre, colonnes, gélules) −55 / −50 ; voiles (rectangles à dégradé) −33 / −29 ; traits des courbes −26 / −21 ; textes −27 / −20 ; icônes −7 / −2 ; arcs et triangles −3 / −1.
 
-**Vu sur** : Waveshare 7B (1024 × 600), MAC lue sur la puce et non écrite ici, 09/11/2026 entre 13 h 55 et 14 h 20. Base `main` `1069571` plus le chronomètre, flashés application seule (0x10000) et vérifiés par la puce ; la 7B a été remise ensuite sur le binaire d'origine (`roue-sans-voile-1069571`, SHA-256 `35680da5…`, lu : version `354-g10695`, compilé à 13:04:01). Binaires d'essai non commités (SHA-256) : `aa40de58…` (zones, 3 278 544 o), `883c4cb7…` (mosaïques, 3 278 848 o), `981db2fb…` (classes d'éléments, 3 281 248 o). **Le binaire de cette PR n'a pas encore été flashé** : les valeurs de la ligne en gras viennent du binaire de mosaïque, qui pose la même tuile de 64 px et coupe le même dégradé.
+**Vu sur** : Waveshare 7B (1024 × 600), MAC lue sur la puce et non écrite ici, 09/11/2026 entre 13 h 55 et 14 h 20. Base `main` `1069571` plus le chronomètre, flashés application seule (0x10000) et vérifiés par la puce ; la 7B a été remise ensuite sur le binaire d'origine (`roue-sans-voile-1069571`, SHA-256 `35680da5…`, lu : version `354-g10695`, compilé à 13:04:01). Binaires d'essai non commités (SHA-256) : `aa40de58…` (zones, 3 278 544 o), `883c4cb7…` (mosaïques, 3 278 848 o), `981db2fb…` (classes d'éléments, 3 281 248 o). Les valeurs de la ligne en gras viennent du binaire de mosaïque, qui pose la même tuile de 64 px et coupe le même dégradé que le commit : voir la reprise ci-dessous, faite avec le code du commit lui-même.
+
+### Reprise avec le code du commit `44f61a5` (même jour, après l'ouverture de la PR)
+
+Même méthode (chronomètre temporaire non commité, thème Ciel forcé, retour du diagnostic vers l'accueil, accueil et diagnostic alternés toutes les 3 s), mais sur le **code du commit** auquel on ajoute seulement le chronomètre, comparé à `main` (`1069571`) avec le même chronomètre. Deux démarrages par binaire, 8 retours par démarrage, le premier de chaque démarrage écarté : 14 retours chacun.
+
+| | Retour → accueil (ms) | Min – max | PSRAM libre à ≈ 65 s (octets) |
+| --- | --- | --- | --- |
+| `main` + chronomètre | **239,0 ± 1,3** | 236,6 – 241,9 | 30 709 968 / 30 726 348 |
+| PR (`44f61a5`) + chronomètre | **183,3 ± 1,1** | 182,2 – 185,4 | 31 904 264 / 31 894 148 |
+| Écart | **−55,7 ms (−23 %)** | | **+1 194 296 / +1 167 800** |
+
+- La PSRAM gagnée (1,17 à 1,19 Mo) est proche de celle attendue (1 228 800 − 76 800 = 1 152 000 octets) ; l'excédent, 16 à 42 Ko, n'est pas expliqué (la valeur varie d'environ 16 Ko d'un démarrage à l'autre).
+- `main` mesure 239,0 ms ici contre 235,2 ms le matin : la carte, le Wi-Fi et la météo ne sont pas dans le même état. Seul l'écart entre deux binaires mesurés l'un après l'autre compte.
+- **Le binaire exact du commit** (sans chronomètre, SHA-256 `6d0917e0…`, 3 276 512 octets) a été écrit, comparé à la flash par la puce (identique), puis a démarré : version `jalon-1a-tab5-st7121-355-g44f61`, écran principal 1024 × 600 chargé, SNTP lancé, aucune panique ni redémarrage dans les 60 s de journal. Comme la NVS de la 7B dit « thème sombre », **il n'affiche pas de ciel** : ce démarrage prouve qu'il tourne, pas le dessin du ciel ni le temps de retour. Remarque : la version et l'heure de compilation lues sur la puce (`14:40:25`) sont les mêmes que celles de la variante chronométrée (compilation incrémentale), elles ne distinguent pas les deux binaires ; c'est la comparaison par la puce avec le fichier qui le fait.
+
+**Vu sur** : Waveshare 7B (1024 × 600), MAC lue sur la puce et non écrite ici, 09/11/2026 de 14 h 55 à 15 h 17, commit `44f61a5`. Binaires (SHA-256) : `main` + chronomètre `8faeb15f…` (3 276 896 octets), PR + chronomètre `be35f0e9…` (3 276 944 octets), commit exact `6d0917e0…`. La 7B a ensuite été remise sur le firmware d'origine (`roue-sans-voile-1069571`, SHA-256 `35680da5…`, relu par la puce : version `354-g10695`, compilé à 13:04:01, écran principal chargé, SNTP lancé). Sauvegarde de la flash faite avant d'écrire (début de flash, NVS, application en service).
 
 ## 3. L'image est la même : rendu du banc du PC, pixel pour pixel
 
@@ -57,7 +75,7 @@ Les zones seules s'additionnent (≈ 143 ms) et le ciel seul coûte 27 ms (planc
 
 ## 4. Ce qui n'est pas prouvé
 
-- **Le binaire de cette PR sur une carte.** Les −57 ms viennent de binaires d'essai équivalents ; ni le commit de la PR ni son effet sur la mémoire (PSRAM libre attendue : +1,75 Mo au Tab5, +1,15 Mo à la 7B) n'ont été relevés sur carte.
+- **Le binaire exact du commit, avec un ciel à l'écran.** Il a démarré sur la 7B, mais en thème sombre (celui de la NVS) donc sans ciel ; le temps de retour et la PSRAM sont mesurés sur le code du commit **plus** un chronomètre temporaire et le thème Ciel forcé, pas sur le binaire exact. La PSRAM libérée sur le Tab5 (+1,75 Mo attendus) n'est pas relevée.
 - **L'image sur la dalle**, regardée à l'œil : seule la preuve du banc PC existe.
 - **La cause.** Mesuré : l'image pleine taille fait perdre ≈ 71 ms au dessin du reste. Non prouvé : pourquoi. L'hypothèse est qu'elle balaie le cache L2 de 128 Ko (`CONFIG_CACHE_L2_CACHE_128KB`), où vivent aussi le code, venu de la flash, et tout ce que LVGL alloue en PSRAM (`main/lvgl_memoire.cpp`) ; la mosaïque, qui ne relit que 3 Ko par bande, la corrobore. Un cache L2 de 256 Ko n'a pas été essayé (il coûterait 128 Ko de mémoire interne).
 - **Le Tab5** (1280 × 720) n'a pas été mesuré pour ce changement. Le profil du 08/11 (385 ms de repeinte, voir [accueil-zone-de-dessin.md](accueil-zone-de-dessin.md)) a la même forme, mais rien ne dit que le gain y soit le même.

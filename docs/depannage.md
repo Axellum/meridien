@@ -303,6 +303,8 @@ The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if
 
 **Solution.** Read the useful partitions at the offsets read from the **board's partition table** (here ESPHome's NVS is at `0xf90000`), twice, and compare the SHA-256; fall back to `--no-stub` if the stub fails; `verify-flash` (MD5 sum computed by the chip) to prove that a stored file is identical to the flash. **Seen on** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Status**: resolved (partial backup made, wanted by the author: the code is in git, the NVS is not).
 
+*Seen again on the Waveshare 7B on 09/11/2026* (stub, 460 800 baud): the application read stops at `0x310000`, **inside** the image; a 4 KB read there fails (“Packet content transfer stopped”), the same sector reads fine in 1 KB blocks with the stub (4 × `0x400`) and in one 4 KB block without the stub (about 3 s at 9.8 kbit/s, too slow for the whole image). A reading script that halves the block down to 512 bytes got through (two identical readings, 7 min 17 s). **Status**: worked around; the cause (content-dependent, stub or USB link) is unknown.
+
 #### The COM port is not the one you think
 
 **Cause.** The number changes with the USB socket; on 06/11/2026 the Tab5 was on COM11, and COM14 was an **ESP32-S3 from another project**.
@@ -1013,6 +1015,8 @@ Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement,
 **Cause.** Lecture de toute la flash avec le stub d'esptool sur une zone qui ne répond pas ; ici aussi, une erreur d'offset (la NVS n'est pas au début de la flash).
 
 **Solution.** Lire les partitions utiles aux offsets lus dans la **table de partitions de la carte** (ici la NVS d'ESPHome est en `0xf90000`), deux fois, comparer les SHA-256 ; repli `--no-stub` si le stub échoue ; `verify-flash` (somme MD5 calculée par la puce) pour prouver qu'un fichier rangé est identique à la flash. **Vu sur** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Statut** : résolu (sauvegarde partielle faite, voulue par l'auteur : le code est dans git, pas la NVS).
+
+*Revu sur la Waveshare 7B le 09/11/2026* (stub, 460 800 bauds) : la lecture de l'application bute en `0x310000`, **à l'intérieur** de l'image ; une lecture de 4 Ko y échoue (« Packet content transfer stopped »), le même secteur se lit bien en blocs de 1 Ko avec le stub (4 × `0x400`) et en un bloc de 4 Ko sans le stub (3 s environ à 9,8 kbit/s, trop lent pour toute l'image). Un script de lecture qui coupe le bloc en deux jusqu'à 512 octets est passé (deux lectures identiques, 7 min 17 s). **Statut** : contourné ; la cause (selon le contenu, stub ou lien USB) est inconnue.
 
 #### Le port COM n'est pas celui qu'on croit
 
