@@ -1,0 +1,3 @@
+### Changed
+
+- **Faster start-up, first light earlier**: the PSRAM memory test at boot is turned off (`CONFIG_SPIRAM_MEMTEST=n`; it took 886 ms of the ~2.0 s before the first light of the Waveshare 7B, measured on 2026-11-09 on commit `c3fd97b`), and the fixed 100 ms wait before the backlight is replaced by the real end of the last display transfer plus one panel scan period (20 ms). The boot log line "rétroéclairage allumé" now also gives the time spent waiting. The memory is no longer swept at every start. *Démarrage plus rapide : test de la PSRAM coupé et attente fixe de 100 ms remplacée par la fin réelle du dernier transfert.* Tested on: not tested on board (build only; the gain is to be measured over several boots after the flash).
