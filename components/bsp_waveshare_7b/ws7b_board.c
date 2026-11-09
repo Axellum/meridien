@@ -59,7 +59,10 @@ static lv_display_rotation_t lvgl_rotation(void) {
 }
 
 static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_handle_t io, esp_lcd_touch_handle_t touch) {
-    const lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    // Pile de la tache LVGL : 8192 octets au lieu des 7168 par defaut d'esp_lvgl_port. En -O2 la marge minimale mesuree au demarrage
+    // tombait a 716 o (Tab5) et 584 o (7B) ; +1 Ko de memoire interne (docs/mesures/optimisation-o2.md).
+    port_cfg.task_stack = 8192;
     ESP_RETURN_ON_ERROR(lvgl_port_init(&port_cfg), TAG, "lvgl_port_init");
 
     // Taille LOGIQUE attendue apres la rotation (0 et 180 la laissent en 1024 x 600) : controlee ci-dessous.
@@ -114,6 +117,9 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
     // INT n'est pas relie au P4 : on interroge la puce a chaque periode de LVGL.
     lvgl_port_lock(0);
     lv_indev_set_mode(indev, LV_INDEV_MODE_TIMER);
+    // Lecture toutes les 10 ms au lieu des 33 ms de LVGL (LV_DEF_REFR_PERIOD) : un appui est vu plus tot. Effet NON mesure sur la
+    // carte. LVGL 9.5 n'a pas de lv_indev_set_read_period : on regle la minuterie de lecture de l'indev.
+    lv_timer_set_period(lv_indev_get_read_timer(indev), 10);
     ws7b_touch_trace(indev);
     lvgl_port_unlock();
     return ESP_OK;
