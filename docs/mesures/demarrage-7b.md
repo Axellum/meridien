@@ -62,4 +62,6 @@ Le cache NVS de la météo est relu juste avant la création de l'écran princip
 
 **Estimé, non mesuré** : sans P5, la météo n'apparaît qu'au premier passage du minuteur, soit ~500 ms après la création de l'écran, plus ~200 ms de rendu : image complète vers 1,5 à 1,7 s au lieu de 1,22 s. Autrement dit, P5 avance l'image **complète** d'environ 0,3 à 0,5 s et recule la **première lumière** de 0,19 s. La cause des 195 ms (dessin de l'icône, génération des glyphes TinyTTF à froid) n'est pas isolée ; la mesure ne distingue pas ces deux parts.
 
-**Non vérifié** : l'image à l'œil avec P5 (à juger par Axel : météo présente dès l'allumage, ou lumière trop tardive), un démarrage à froid, le thème « ciel ».
+**Décision d'Axel (09/11/2026) : « Garder P5 »**, après avoir lu ces chiffres (lumière +191,5 ms contre une première image complète). Le firmware P5 reste sur la 7B.
+
+**Non vérifié** : un jugement à l'œil de l'image avec P5 dont l'auteur aurait dit le résultat (la décision est prise sur les chiffres), un démarrage à froid, le thème « ciel ».
