@@ -5,6 +5,11 @@ CONFIG_IDF_TARGET="esp32p4"
 # La tache principale construit l'interface (TinyTTF, formats) : la pile par defaut (3584 octets) est trop juste.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
+# Test de la PSRAM coupe au demarrage : il prenait 886 ms sur les ~2,0 s qui precedent la premiere lumiere de la 7B (mesure du
+# 09/11/2026, commit c3fd97b), soit le meme test que le firmware ESPHome a coupe (CONFIG_SPIRAM_MEMTEST "n"). Contrepartie : la
+# memoire n'est plus balayee a chaque demarrage. Apres ce changement : supprimer sdkconfig.
+CONFIG_SPIRAM_MEMTEST=n
+
 # LVGL 9 configure par Kconfig (pas de lv_conf.h). Chaines et formats : ceux de la libc d'IDF, comme le BSP d'Espressif
 # (m5stack_tab5/examples). Allocation : celle de main/lvgl_memoire.cpp (PSRAM d'abord) et non le malloc du systeme, qui range tout
 # bloc de moins de 256 octets en memoire interne, la seule ou le Wi-Fi et le TLS peuvent vivre (plantage du scan Wi-Fi, 07/11/2026).
