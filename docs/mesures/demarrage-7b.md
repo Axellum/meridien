@@ -43,3 +43,23 @@ La ligne « rétroéclairage allumé » indique maintenant le temps passé à at
 - Un démarrage à froid (coupure de courant) : la 7B n'a pas d'horloge matérielle, l'heure vient du réseau ; non mesuré.
 - Le thème « ciel » sur la 7B, et le Tab5 (compilé par la CI seulement, jamais flashé avec ce lot).
 - La part de chaque cause sur la sensation d'allumage : la mesure donne des millisecondes, pas ce que l'œil perçoit (cf. barre de progression d'ESPHome, rapport du 09/11).
+
+## 6. Lot P5 : la météo du cache avant la première image (mesuré le 09/11/2026)
+
+**Vu sur** : Waveshare 7B, commit `560186f` (compilé le 09/11/2026 à 09:17:00, lu sur l'appareil), application seule écrite à `0x10000` (MD5 de la puce identique), 6 redémarrages logiciels vers 09 h 25, thème sombre, luminosité 63 %. Comparé à la seconde série du lot 1 (même carte, `86d5352`).
+
+Le cache NVS de la météo est relu juste avant la création de l'écran principal (`meteo_client_relire_cache()`) : la première image montre la météo au lieu de « météo indisponible » jusqu'au passage suivant du minuteur (500 ms).
+
+| Étape (moyenne de 6 démarrages) | Lot 1 (`86d5352`) | P5 (`560186f`) | Écart |
+|---|---:|---:|---:|
+| « Carte prête » | 944,7 ms | 943,3 ms | −1,4 |
+| Relecture du cache (jusqu'à la ligne « cache relu ») | n'avait pas lieu ici | 5,0 ms | +5,0 |
+| Carte prête → écran principal créé | 19,0 ms | 17,0 ms | −2,0 |
+| **Écran créé → fin du premier rendu** | **43,2 ms** | **238,2 ms** | **+195,0** |
+| **Rétroéclairage allumé** | **1 029,2 ms** | **1 220,7 ms** (1 219-1 222) | **+191,5** |
+
+**Ce que ça dit** (mesuré) : la relecture du cache est quasi gratuite (5 ms) ; la météo est bien relue avant l'écran (ligne « cache relu » à 948 ms, écran créé à 960 ms) et le contrat `meteo_etat_lire` annonce `valide=1` ; mais le **premier rendu coûte 195 ms de plus** parce qu'il dessine maintenant la météo (icône, textes, tailles de police nouvelles). Ce coût existait déjà : il était payé après la lumière, par le minuteur de 500 ms. **La première lumière recule donc de 191,5 ms** (1,03 s → 1,22 s) pour que la première image soit complète. Aucune panique, mêmes deux lignes d'erreur qu'avant (6 fois chacune), `coupures=0`, « dernier transfert attendu » 19 ms.
+
+**Estimé, non mesuré** : sans P5, la météo n'apparaît qu'au premier passage du minuteur, soit ~500 ms après la création de l'écran, plus ~200 ms de rendu : image complète vers 1,5 à 1,7 s au lieu de 1,22 s. Autrement dit, P5 avance l'image **complète** d'environ 0,3 à 0,5 s et recule la **première lumière** de 0,19 s. La cause des 195 ms (dessin de l'icône, génération des glyphes TinyTTF à froid) n'est pas isolée ; la mesure ne distingue pas ces deux parts.
+
+**Non vérifié** : l'image à l'œil avec P5 (à juger par Axel : météo présente dès l'allumage, ou lumière trop tardive), un démarrage à froid, le thème « ciel ».
