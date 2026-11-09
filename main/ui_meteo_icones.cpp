@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include "ui_meteo_dessin.h"
+
 // Le binaire des pixels (main/assets/icones_meteo.bin), embarqué comme la police (EMBED_FILES de main/CMakeLists.txt) ; sur le
 // banc de rendu, tools/rendu/rendre.py pose les mêmes symboles.
 extern const std::uint8_t icones_meteo_octets[] asm("_binary_icones_meteo_bin_start");
@@ -98,6 +100,10 @@ void piece(lv_layer_t *couche, visuel::Piece p, int cote, int x, int y, std::uin
     d.opa = opa;
     const lv_area_t zone = {px, py, px + static_cast<int>(e->dsc.header.w) - 1,
                             py + static_cast<int>(e->dsc.header.h) - 1};
+    // Même test de zone que les autres éléments de l'accueil (ui_meteo_dessin.h) : hors de la bande repeinte, pas de tâche de dessin.
+    if (dessin::hors_zone(couche, zone.x1, zone.y1, zone.x2, zone.y2)) {
+        return;
+    }
     lv_draw_image(couche, &d, &zone);
 }
 

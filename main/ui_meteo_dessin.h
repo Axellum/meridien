@@ -30,6 +30,19 @@ inline lv_color_t couleur(std::uint32_t rgb) { return lv_color_hex(rgb); }
 
 inline int hauteur_ligne(const Police &p) { return lv_font_get_line_height(p.f); }
 
+// Vrai si le rectangle [x1..x2] x [y1..y2], agrandi de `marge` pixels, ne touche pas la zone que LVGL repeint en ce moment (la
+// bande de dessin, coupée à l'objet). LVGL rejoue le rappel de dessin de l'objet à chaque bande : sans ce test, chaque élément
+// devient une tâche de dessin dans toutes les bandes (≈ 26 pour l'accueil), puis LVGL l'écarte après coup. Mesuré le 09/11/2026
+// sur le Tab5 ST7121 (4 essais chacun) : retour des Réglages vers l'accueil 429 → 390 ms (docs/mesures/accueil-zone-de-dessin.md).
+inline bool hors_zone(const lv_layer_t *couche, int x1, int y1, int x2, int y2, int marge = 4) {
+    const lv_area_t &c = couche->_clip_area;
+    return x2 + marge < c.x1 || x1 - marge > c.x2 || y2 + marge < c.y1 || y1 - marge > c.y2;
+}
+
+inline bool hors_zone(const Pinceau &pc, int x1, int y1, int x2, int y2, int marge = 4) {
+    return hors_zone(pc.couche, x1, y1, x2, y2, marge);
+}
+
 // Distance du haut de la ligne au haut des chiffres (capitales de Roboto : 0,711 em au-dessus de la ligne de base).
 inline int vide_au_dessus_des_chiffres(const Police &p) {
     const int ascent = lv_font_get_line_height(p.f) - p.f->base_line;
@@ -64,6 +77,9 @@ inline void texte(const Pinceau &pc, const Police &p, const char *s, int x, int 
     d.opa = opa;
     d.align = align;
     const lv_area_t zone = {x, y, x + w - 1, y + hauteur_ligne(p) * (lignes < 1 ? 1 : lignes) - 1};
+    if (hors_zone(pc, zone.x1, zone.y1, zone.x2, zone.y2, hauteur_ligne(p))) {
+        return;
+    }
     lv_draw_label(pc.couche, &d, &zone);
 }
 
@@ -84,6 +100,9 @@ inline void rect(const Pinceau &pc, int x, int y, int w, int h, int rayon, std::
     d.bg_opa = opa;
     d.radius = rayon;
     const lv_area_t zone = {x, y, x + w - 1, y + h - 1};
+    if (hors_zone(pc, zone.x1, zone.y1, zone.x2, zone.y2)) {
+        return;
+    }
     lv_draw_rect(pc.couche, &d, &zone);
 }
 
@@ -102,6 +121,9 @@ inline void rect_degrade_h(const Pinceau &pc, int x, int y, int w, int h, int ra
     d.bg_grad.stops[0] = {couleur(gauche), LV_OPA_COVER, 0};
     d.bg_grad.stops[1] = {couleur(droite), LV_OPA_COVER, 255};
     const lv_area_t zone = {x, y, x + w - 1, y + h - 1};
+    if (hors_zone(pc, zone.x1, zone.y1, zone.x2, zone.y2)) {
+        return;
+    }
     lv_draw_rect(pc.couche, &d, &zone);
 }
 
@@ -121,6 +143,9 @@ inline void rect_bord(const Pinceau &pc, int x, int y, int w, int h, int rayon, 
     d.border_opa = bord_opa;
     d.border_width = epaisseur;
     const lv_area_t zone = {x, y, x + w - 1, y + h - 1};
+    if (hors_zone(pc, zone.x1, zone.y1, zone.x2, zone.y2)) {
+        return;
+    }
     lv_draw_rect(pc.couche, &d, &zone);
 }
 
@@ -140,6 +165,9 @@ inline void rect_degrade_v(const Pinceau &pc, int x, int y, int w, int h, std::u
     d.bg_grad.stops[0] = {couleur(haut), haut_opa, 0};
     d.bg_grad.stops[1] = {couleur(bas), bas_opa, 255};
     const lv_area_t zone = {x, y, x + w - 1, y + h - 1};
+    if (hors_zone(pc, zone.x1, zone.y1, zone.x2, zone.y2)) {
+        return;
+    }
     lv_draw_rect(pc.couche, &d, &zone);
 }
 
@@ -157,6 +185,9 @@ inline void anneau(const Pinceau &pc, int cx, int cy, int rayon, int epaisseur, 
     d.border_opa = opa;
     d.border_width = epaisseur;
     const lv_area_t zone = {cx - rayon, cy - rayon, cx + rayon - 1, cy + rayon - 1};
+    if (hors_zone(pc, zone.x1, zone.y1, zone.x2, zone.y2)) {
+        return;
+    }
     lv_draw_rect(pc.couche, &d, &zone);
 }
 
@@ -171,6 +202,11 @@ inline void trait(const Pinceau &pc, int x1, int y1, int x2, int y2, int epaisse
     d.opa = opa;
     d.round_start = arrondi;
     d.round_end = arrondi;
+    const int demi = epaisseur / 2 + 1;
+    if (hors_zone(pc, (x1 < x2 ? x1 : x2) - demi, (y1 < y2 ? y1 : y2) - demi, (x1 < x2 ? x2 : x1) + demi,
+                  (y1 < y2 ? y2 : y1) + demi)) {
+        return;
+    }
     lv_draw_line(pc.couche, &d);
 }
 
@@ -183,6 +219,13 @@ inline void triangle(const Pinceau &pc, int x1, int y1, int x2, int y2, int x3, 
     d.p[2] = {static_cast<lv_value_precise_t>(x3), static_cast<lv_value_precise_t>(y3)};
     d.color = couleur(rgb);
     d.opa = opa;
+    const int tx1 = x1 < x2 ? (x1 < x3 ? x1 : x3) : (x2 < x3 ? x2 : x3);
+    const int tx2 = x1 > x2 ? (x1 > x3 ? x1 : x3) : (x2 > x3 ? x2 : x3);
+    const int ty1 = y1 < y2 ? (y1 < y3 ? y1 : y3) : (y2 < y3 ? y2 : y3);
+    const int ty2 = y1 > y2 ? (y1 > y3 ? y1 : y3) : (y2 > y3 ? y2 : y3);
+    if (hors_zone(pc, tx1, ty1, tx2, ty2)) {
+        return;
+    }
     lv_draw_triangle(pc.couche, &d);
 }
 
@@ -199,6 +242,9 @@ inline void arc(const Pinceau &pc, int cx, int cy, int rayon, int epaisseur, int
     d.color = couleur(rgb);
     d.opa = opa;
     d.rounded = arrondi;
+    if (hors_zone(pc, cx - rayon, cy - rayon, cx + rayon, cy + rayon)) {
+        return;
+    }
     lv_draw_arc(pc.couche, &d);
 }
 
