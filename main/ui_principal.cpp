@@ -2259,9 +2259,14 @@ lv_obj_t *creer_zone(lv_obj_t *parent) {
 // Le dégradé du ciel est vertical et sombre : en RGB565 (5 bits de rouge et de bleu, 6 de vert) un dégradé que LVGL calcule tel
 // quel montre des bandes horizontales, une marche de 4 à 8 niveaux sur 8 bits tous les quelques dizaines de lignes. On le dessine
 // donc une fois dans une image RGB565 TRAMÉE (matrice de Bayer 8x8 : chaque marche devient un mélange fin des deux teintes voisines,
-// que l'oeil prend pour la teinte intermédiaire). L'image fait la taille de l'écran (1,8 Mo à 1280 x 720 : la PSRAM, jamais la RAM
-// interne) et n'est refaite que quand le ciel change (matin, soir, nuit, temps) : quelques dizaines de millisecondes. Si
-// l'allocation échoue, on retombe sur le dégradé de LVGL (avec ses bandes) plutôt que sur un écran sans fond.
+// que l'oeil prend pour la teinte intermédiaire). La trame se répète toutes les 8 colonnes : l'image n'est qu'une TUILE de
+// kLargeurTuileCiel colonnes sur toute la hauteur de l'écran (92 Ko à 1280 x 720 au lieu de 1,8 Mo : la PSRAM, jamais la RAM
+// interne), répétée par LVGL (`bg_image_tiled`). Les pixels sont les mêmes que ceux d'une image de la taille de l'écran. Pourquoi :
+// avec une image pleine taille relue de la PSRAM à chaque bande repeinte, la repeinte de l'accueil durait ≈ 70 ms de plus que la
+// somme de ses morceaux (mesuré, la cause probable est le cache : docs/mesures/accueil-ciel-en-mosaique.md). L'image n'est refaite
+// que quand le ciel change (matin, soir, nuit, temps) : quelques millisecondes. Si l'allocation échoue, on retombe sur le dégradé
+// de LVGL (avec ses bandes) plutôt que sur un écran sans fond.
+constexpr int kLargeurTuileCiel = 64; // multiple de 8 : la trame de Bayer ne se raccorde qu'à ce prix
 constexpr std::uint8_t BAYER_8[8][8] = {{0, 32, 8, 40, 2, 34, 10, 42},  {48, 16, 56, 24, 50, 18, 58, 26},
                                         {12, 44, 4, 36, 14, 46, 6, 38}, {60, 28, 52, 20, 62, 30, 54, 22},
                                         {3, 35, 11, 43, 1, 33, 9, 41},  {51, 19, 59, 27, 49, 17, 57, 25},
@@ -2304,27 +2309,29 @@ void appliquer_ciel() {
         lv_obj_set_style_bg_image_src(g.ecran, nullptr, 0);
         lv_obj_set_style_bg_color(g.ecran, dz::couleur(t.fond), 0);
         lv_obj_set_style_bg_grad_dir(g.ecran, LV_GRAD_DIR_NONE, 0);
-        if (g.ciel_image !=
-            nullptr) { // venu d'un thème à ciel : le style ne le référence plus, on rend ses 1,8 Mo de PSRAM
+        if (g.ciel_image != nullptr) { // venu d'un thème à ciel : le style ne le référence plus, on rend sa PSRAM
             lv_draw_buf_destroy(g.ciel_image);
             g.ciel_image = nullptr;
         }
         return;
     }
     const Degrade d = ciel(moment_du_jour(), ambiance_du_moment());
-    // Le dégradé de LVGL reste réglé : c'est le repli si l'image tramée ne peut pas être créée.
+    // Le dégradé de LVGL reste réglé (couleurs) : c'est le repli si l'image tramée ne peut pas être créée. Tant que l'image couvre
+    // l'écran il est coupé (voir plus bas) : LVGL le dessinait sous l'image, à chaque bande, pour rien.
     lv_obj_set_style_bg_color(g.ecran, dz::couleur(d.haut), 0);
     lv_obj_set_style_bg_grad_color(g.ecran, dz::couleur(d.bas), 0);
-    lv_obj_set_style_bg_grad_dir(g.ecran, LV_GRAD_DIR_VER, 0);
     lv_draw_buf_t *neuf =
-        lv_draw_buf_create(static_cast<std::uint32_t>(g.largeur), static_cast<std::uint32_t>(g.hauteur),
+        lv_draw_buf_create(static_cast<std::uint32_t>(kLargeurTuileCiel), static_cast<std::uint32_t>(g.hauteur),
                            LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO);
     if (neuf == nullptr) {
+        lv_obj_set_style_bg_grad_dir(g.ecran, LV_GRAD_DIR_VER, 0);
         return;
     }
     remplir_ciel_trame(neuf, d.haut, d.bas);
     lv_obj_set_style_bg_image_src(g.ecran, neuf, 0);
+    lv_obj_set_style_bg_image_tiled(g.ecran, true, 0);
     lv_obj_set_style_bg_image_opa(g.ecran, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_grad_dir(g.ecran, LV_GRAD_DIR_NONE, 0);
     if (g.ciel_image != nullptr) { // l'ancienne image n'est plus référencée par le style : on peut la rendre
         lv_draw_buf_destroy(g.ciel_image);
     }
