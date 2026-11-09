@@ -33,16 +33,18 @@ env:
 
 jobs:
   # Le noyau pur (components/core) compilé ET exécuté sous Linux, avec les détecteurs d'erreurs mémoire (AddressSanitizer)
-  # et de comportements indéfinis (UBSan), par deux compilateurs de l'image du runner :
-  #   - clang++-18 avec ASan + UBSan complets (mêmes options que clang++-san.cmd sur le PC d'Axel) ;
-  #   - g++-14 avec ASan seul. Essai du 06/11/2026 : g++ 14.2 avec -fsanitize=undefined ne sait plus évaluer les
+  # et de comportements indéfinis (UBSan), par deux compilateurs de l'image du runner, dans DEUX jobs qui partent en même
+  # temps (chacun sur son runner de 4 cœurs, quatre fichiers de test à la fois : lancer.py --jobs 4) :
+  #   - noyau-clang : clang++-18 avec ASan + UBSan complets (mêmes options que clang++-san.cmd sur le PC d'Axel) ;
+  #   - noyau-gpp : g++-14 avec ASan seul. Essai du 06/11/2026 : g++ 14.2 avec -fsanitize=undefined ne sait plus évaluer les
   #     static_assert des tests (« is not a constant expression », fuseaux.hpp:49), tant que null, bounds, pointer-overflow,
   #     nonnull-attribute, returns-nonnull-attribute et vptr sont actifs ; en retirer un seul ne suffit pas. Sans UBSan, g++
   #     compile et exécute tous les tests. Le détecteur de fuites est coupé, comme sur le PC (non pris en charge sous Windows).
-  tests-noyau:
-    name: tests-noyau
+  # Mesuré le 09/11/2026 : un fichier après l'autre, clang 13 à 25 min et g++ 3 à 5 min, l'un derrière l'autre (voir docs/outils.md).
+  noyau-clang:
+    name: noyau-clang
     runs-on: ubuntu-24.04
-    timeout-minutes: 45 # 30 jusqu'au 09/11/2026 : #18 et #21 ont été annulés à la limite (clang 25 min puis g++ 5 min)
+    timeout-minutes: 30
     env:
       ASAN_OPTIONS: detect_leaks=0
     steps:
@@ -52,30 +54,75 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Compilateurs avec détecteurs
+      - name: Compilateur avec détecteurs
         run: |
+          echo "cœurs : $(nproc), mémoire : $(free -m | awk '/^Mem:/ {print $2}') Mo"
           clang++-18 --version | head -n 1
-          g++-14 --version | head -n 1
-          sudo tee /usr/local/bin/clang++-san > /dev/null <<'EOF'
+          sudo tee /usr/local/bin/clang++-san > /dev/null <<'EOT'
           #!/bin/sh
           exec clang++-18 -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer "$@"
-          EOF
-          sudo tee /usr/local/bin/g++-san > /dev/null <<'EOF'
-          #!/bin/sh
-          exec g++-14 -fsanitize=address -fno-omit-frame-pointer "$@"
-          EOF
-          sudo chmod +x /usr/local/bin/clang++-san /usr/local/bin/g++-san
+          EOT
+          sudo chmod +x /usr/local/bin/clang++-san
       - name: Tests du noyau, clang++-18 avec ASan et UBSan
         run: |
           set -o pipefail
-          python test/host/lancer.py --cxx /usr/local/bin/clang++-san | tee noyau-clang.log
+          python test/host/lancer.py --cxx /usr/local/bin/clang++-san --jobs 4 --durees | tee noyau-clang.log
           # Le lanceur retombe en « syntaxe » (rien d'exécuté) sans bon compilateur : on exige le mode complet.
           grep -q 'mode        : complet' noyau-clang.log
+          # Chaque fichier de test écrit « N test(s), M echec(s) » : la somme prouve que tout a été exécuté.
+          total=$(grep -oE '^[0-9]+ test\(s\)' noyau-clang.log | awk '{s += $1} END {print s + 0}')
+          echo "tests exécutés (clang++-18) : ${total} dans $(grep -c '^test_.*\.cpp :$' noyau-clang.log) fichiers"
+          test "${total}" -gt 0
+
+  noyau-gpp:
+    name: noyau-gpp
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Compilateur avec détecteur
+        run: |
+          echo "cœurs : $(nproc), mémoire : $(free -m | awk '/^Mem:/ {print $2}') Mo"
+          g++-14 --version | head -n 1
+          sudo tee /usr/local/bin/g++-san > /dev/null <<'EOT'
+          #!/bin/sh
+          exec g++-14 -fsanitize=address -fno-omit-frame-pointer "$@"
+          EOT
+          sudo chmod +x /usr/local/bin/g++-san
       - name: Tests du noyau, g++-14 avec ASan
         run: |
           set -o pipefail
-          python test/host/lancer.py --cxx /usr/local/bin/g++-san | tee noyau-gpp.log
+          python test/host/lancer.py --cxx /usr/local/bin/g++-san --jobs 4 --durees | tee noyau-gpp.log
           grep -q 'mode        : complet' noyau-gpp.log
+          total=$(grep -oE '^[0-9]+ test\(s\)' noyau-gpp.log | awk '{s += $1} END {print s + 0}')
+          echo "tests exécutés (g++-14) : ${total} dans $(grep -c '^test_.*\.cpp :$' noyau-gpp.log) fichiers"
+          test "${total}" -gt 0
+
+  # Le contrôle REQUIS de la protection de `main` : son nom ne change pas, il rend le verdict des deux jobs ci-dessus.
+  # `!cancelled()` plutôt que `success()` : il doit s'exécuter, et ÉCHOUER, quand un des deux a échoué ; un job « skipped »
+  # compte pour réussi aux yeux de GitHub, donc seul « success » est accepté ici.
+  tests-noyau:
+    name: tests-noyau
+    needs: [noyau-clang, noyau-gpp]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verdict des deux compilateurs
+        env:
+          CLANG: ${{ needs.noyau-clang.result }}
+          GPP: ${{ needs.noyau-gpp.result }}
+        run: |
+          echo "noyau-clang : ${CLANG}"
+          echo "noyau-gpp   : ${GPP}"
+          test "${CLANG}" = success && test "${GPP}" = success
 
   # Chaque mutation du noyau doit faire échouer le test qui la vise. Compilation seule : pas besoin des détecteurs.
   # clang++-18 comme sur le PC d'Axel, où toutes les mutations sont détectées. Attention : la liste en compte 1 530
