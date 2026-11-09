@@ -64,7 +64,7 @@ def trouver_compilateur(force=None):
 
 
 def options_inclusion(include_noyau):
-    """Les « -I » de la compilation d'un test."""
+    """Les « -I » communs à la compilation et à la liste des dépendances (dependances_des_tests)."""
     options = ["-I", str(include_noyau), "-I", str(RACINE / "test" / "host")]
     for dossier in INCLUDES_CARTES:
         options += ["-I", str(dossier)]
@@ -140,9 +140,15 @@ def controles_croises():
     return echecs
 
 
-def lancer(cxx, mode, jobs=1, durees=False):
-    print(f"compilateur : {cxx}\nmode        : {mode}" + (
-        "  (compilé + exécuté)" if mode == "complet" else "  (static_assert évalués à la compilation ; main() NON exécuté)"))
+def lancer(cxx, mode, jobs=1, durees=False, controles_seuls=False):
+    if controles_seuls:
+        # Aucun test C++ : la CI n'en demande pas quand rien de ce que les tests lisent n'a changé (voir --concerne).
+        # Cette ligne ne contient volontairement pas « mode        : complet », que la CI exige quand elle compile.
+        print("mode        : contrôles seuls  (aucun test C++ compilé ni exécuté)")
+        TESTS[:] = []
+    else:
+        print(f"compilateur : {cxx}\nmode        : {mode}" + (
+            "  (compilé + exécuté)" if mode == "complet" else "  (static_assert évalués à la compilation ; main() NON exécuté)"))
     echecs = 0
     mesures = []
     drapeaux_constexpr(cxx)  # lu une fois ici, avant de lancer les fils
@@ -161,10 +167,56 @@ def lancer(cxx, mode, jobs=1, durees=False):
     debut = time.perf_counter()
     echecs += controles_croises()
     if durees:
-        afficher_durees(mesures, max(1, jobs), reel_tests)
+        if mesures:
+            afficher_durees(mesures, max(1, jobs), reel_tests)
         print(f"  contrôles croisés (Python, sans compilation) : {time.perf_counter() - debut:.1f} s", file=sys.stderr)
     print("\nRÉSULTAT :", "tout passe" if echecs == 0 else f"{echecs} fichier(s) en échec")
     return 1 if echecs else 0
+
+
+def dependances_des_tests(cxx, jobs=1):
+    """(dossiers, fichiers) dont le contenu peut changer le résultat de la compilation d'un test, en chemins relatifs à la
+    racine avec « / ». Les fichiers : chaque test et, par le préprocesseur du compilateur (-MM), tous les en-têtes qu'il
+    inclut, directement ou non, y compris ceux de main/ (test_horloge inclut ../../main/horloge.cpp). Les dossiers : tous
+    ceux des « -I », en entier, parce qu'un fichier AJOUTÉ dans l'un d'eux peut masquer un en-tête trouvé plus loin. Calculé
+    à chaque fois : aucune liste écrite à la main qui pourrait rester en arrière quand un test inclut un nouveau fichier."""
+    dossiers = {Path(INCLUDE_NOYAU).resolve(), (RACINE / "test" / "host").resolve(), *(d.resolve() for d in INCLUDES_CARTES)}
+
+    def un_test(t):
+        cmd = [cxx, "-std=c++17", "-MM", "-MT", "cible", *options_inclusion(INCLUDE_NOYAU), str(t)]
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode != 0:
+            raise RuntimeError(f"{t.name} : le préprocesseur a échoué\n{r.stderr}")
+        fichiers = set()
+        for mot in r.stdout.replace("\\\n", " ").replace("\\\r\n", " ").split()[1:]:  # le premier mot est « cible: »
+            chemin = Path(mot)
+            if not chemin.is_file():
+                raise RuntimeError(f"{t.name} : « {mot} » n'est pas un fichier (chemin à espaces ?)")
+            try:
+                fichiers.add(chemin.resolve().relative_to(RACINE).as_posix())
+            except ValueError:
+                pass  # hors du dépôt : en-tête du système, sans lien avec une modification du dépôt
+        return fichiers
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        tous = set().union(*pool.map(un_test, TESTS)) if TESTS else set()
+    return sorted(d.relative_to(RACINE).as_posix() + "/" for d in dossiers), sorted(tous)
+
+
+def concerne(cxx, modifies, jobs=1):
+    """Premier fichier modifié que lisent les tests C++ (avec sa raison), ou None. Le message dit toujours ce qui a été regardé."""
+    dossiers, fichiers = dependances_des_tests(cxx, jobs)
+    exacts = set(fichiers)
+    for brut in modifies:
+        p = brut.strip().replace("\\", "/")
+        if not p:
+            continue
+        if p in exacts:
+            return f"oui : {p} est inclus par un test ({len(fichiers)} fichiers suivis)"
+        for d in dossiers:
+            if p.startswith(d):
+                return f"oui : {p} est dans {d}, dossier d'inclusion des tests"
+    return None
 
 
 # (fichier du noyau, texte exact à remplacer, remplacement, test qui doit le détecter ; None = « n'importe lequel »)
@@ -348,6 +400,11 @@ def main():
                     "(1 par défaut ; sans effet avec --mutations)")
     ap.add_argument("--durees", action="store_true", help="écrit sur la sortie d'erreur le temps cumulé, le temps réel, les "
                     "fichiers les plus longs et la mémoire du plus gros fils")
+    ap.add_argument("--controles-seuls", action="store_true", help="ne compile aucun test C++ : seulement les contrôles Python "
+                    "qui recoupent le noyau avec main/, web/, boards/ et docs/ (la CI s'en contente quand --concerne répond non)")
+    ap.add_argument("--concerne", metavar="FICHIER", help="lit la liste des fichiers modifiés (un chemin par ligne, « - » pour "
+                    "l'entrée standard) et répond « oui : … » si l'un d'eux peut changer le résultat d'un test C++ (test, "
+                    "en-tête inclus, dossier d'inclusion), sinon « non : … » ; tout doute répond oui")
     ap.add_argument("--seulement", help="fichiers de test à traiter, séparés par des virgules (un morceau du nom suffit) : "
                     "ne compile et ne mute que ceux-là (pour travailler sur un sujet sans relancer les 30 minutes de tout)")
     a = ap.parse_args()
@@ -360,6 +417,15 @@ def main():
     if not cxx:
         print("Aucun compilateur C++ trouvé (ni g++, ni clang++, ni le g++ croisé d'ESP-IDF).", file=sys.stderr)
         return 2
+    if a.concerne:
+        # Tout doute répond « oui » (on compile) : une erreur de lecture, de préprocesseur ou de chemin ne doit jamais sauter les tests.
+        try:
+            modifies = (sys.stdin.read() if a.concerne == "-" else Path(a.concerne).read_text(encoding="utf-8")).splitlines()
+            verdict = concerne(cxx, modifies, a.jobs)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as e:
+            verdict = f"oui : calcul impossible ({str(e).splitlines()[0] if str(e) else type(e).__name__})"
+        print(verdict or "non : aucun fichier modifié n'est lu par un test C++ (ni test, ni en-tête inclus, ni dossier d'inclusion)")
+        return 0
     if a.mutations:
         resultat = mutations(cxx, mode)
         if any(t.name == "test_carte_7b.cpp" for t in TESTS):  # mutations de la couche carte 7B (leur propre dossier include/)
@@ -367,7 +433,7 @@ def main():
 
             resultat |= mutations_carte_7b(cxx, mode, RACINE, [*DRAPEAUX, *drapeaux_constexpr(cxx)], INCLUDE_NOYAU)
         return resultat
-    return lancer(cxx, mode, a.jobs, a.durees)
+    return lancer(cxx, mode, a.jobs, a.durees, a.controles_seuls)
 
 
 if __name__ == "__main__":
