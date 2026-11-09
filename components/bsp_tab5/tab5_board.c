@@ -97,6 +97,9 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
     // "evenement seul" un relachement dont l'interruption serait perdue laisserait le doigt "appuye" indefiniment.
     lvgl_port_lock(0);
     lv_indev_set_mode(indev, LV_INDEV_MODE_TIMER);
+    // Lecture toutes les 10 ms au lieu des 33 ms de LVGL (LV_DEF_REFR_PERIOD) : un appui est vu plus tot. Effet NON mesure sur la
+    // carte. LVGL 9.5 n'a pas de lv_indev_set_read_period : on regle la minuterie de lecture de l'indev.
+    lv_timer_set_period(lv_indev_get_read_timer(indev), 10);
     tab5_orientation_trace_tactile(indev);
     lvgl_port_unlock();
     return ESP_OK;
