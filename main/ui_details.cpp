@@ -18,7 +18,7 @@
 // l'accueil, visuel_themes.hpp), aucun texte écrit ici (la page composée les porte, en sept langues), aucune animation.
 //
 // Les polices sont créées à la première ouverture et gardées (TinyTTF se libère mal : même choix que les réglages et les alertes). L'état
-// de la page (la page composée, le thème grisé, le ciel tramé de 1,8 Mo) est alloué par LVGL, donc en PSRAM, pour la durée de
+// de la page (la page composée, le thème grisé, la tuile du ciel tramé) est alloué par LVGL, donc en PSRAM, pour la durée de
 // l'ouverture : il est rendu quand l'écran de la page est supprimé (LV_EVENT_DELETE).
 
 namespace ecran {
@@ -115,6 +115,12 @@ void texte_centre(const dz::Pinceau &pc, const Police &p, const char *s, int x, 
 // Même tramage que l'accueil (main/ui_principal.cpp) : un dégradé vertical sombre calculé tel quel par LVGL montre des bandes en RGB565 ;
 // une matrice de Bayer 8 x 8 mélange finement les deux teintes voisines de chaque marche. Copié et non partagé pour ne pas toucher
 // l'accueil (une autre session le modifie) ; à factoriser quand elle aura fini (voir l'ADR de la page).
+//
+// La trame se répète toutes les 8 colonnes : l'image n'est qu'une TUILE de kLargeurTuileCiel colonnes sur toute la hauteur (92 Ko à
+// 1280 x 720 au lieu de 1,8 Mo), que LVGL répète (`bg_image_tiled`). Les pixels sont les mêmes que ceux d'une image de la taille de
+// l'écran. Pourquoi : relue de la PSRAM à chaque bande repeinte, l'image pleine taille a rendu la repeinte de l'accueil nettement plus
+// lente (239 -> 183 ms mesurés sur la 7B avec la tuile). Mesuré sur cette page (7B) : ouverture 187 -> 102 ms, docs/mesures/details-ciel-en-mosaique.md.
+constexpr int kLargeurTuileCiel = 64; // multiple de 8 : la trame de Bayer ne se raccorde qu'à ce prix
 constexpr std::uint8_t BAYER_8[8][8] = {{0, 32, 8, 40, 2, 34, 10, 42},  {48, 16, 56, 24, 50, 18, 58, 26},
                                         {12, 44, 4, 36, 14, 46, 6, 38}, {60, 28, 52, 20, 62, 30, 54, 22},
                                         {3, 35, 11, 43, 1, 33, 9, 41},  {51, 19, 59, 27, 49, 17, 57, 25},
@@ -159,20 +165,23 @@ void appliquer_ciel(Etat &E) {
         return;
     }
     const Degrade d = ciel(E.page.ciel.moment, E.page.ciel.ambiance);
-    // Le dégradé de LVGL reste réglé : c'est le repli si l'image tramée ne peut pas être créée (pas de PSRAM libre).
+    // Le dégradé de LVGL reste réglé (couleurs) : c'est le repli si l'image tramée ne peut pas être créée (pas de PSRAM libre). Tant que
+    // l'image couvre l'écran il est coupé (voir plus bas) : LVGL le dessinait sous l'image, à chaque bande, pour rien.
     lv_obj_set_style_bg_color(racine, dz::couleur(d.haut), 0);
     lv_obj_set_style_bg_grad_color(racine, dz::couleur(d.bas), 0);
-    lv_obj_set_style_bg_grad_dir(racine, LV_GRAD_DIR_VER, 0);
     lv_obj_set_style_bg_opa(racine, LV_OPA_COVER, 0);
     lv_draw_buf_t *neuf =
-        lv_draw_buf_create(static_cast<std::uint32_t>(E.ctx.largeur), static_cast<std::uint32_t>(E.ctx.hauteur),
+        lv_draw_buf_create(static_cast<std::uint32_t>(kLargeurTuileCiel), static_cast<std::uint32_t>(E.ctx.hauteur),
                            LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO);
     if (neuf == nullptr) {
+        lv_obj_set_style_bg_grad_dir(racine, LV_GRAD_DIR_VER, 0);
         return;
     }
     remplir_ciel_trame(neuf, d.haut, d.bas);
     lv_obj_set_style_bg_image_src(racine, neuf, 0);
+    lv_obj_set_style_bg_image_tiled(racine, true, 0);
     lv_obj_set_style_bg_image_opa(racine, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_grad_dir(racine, LV_GRAD_DIR_NONE, 0);
     if (E.ciel_image != nullptr) { // l'ancienne image n'est plus référencée par le style : on peut la rendre
         lv_draw_buf_destroy(E.ciel_image);
     }
