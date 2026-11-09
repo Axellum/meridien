@@ -52,13 +52,15 @@ Les chiffres « avant » viennent d'une compilation de `origin/main` (`5d5f3ad`)
 
 ### 3 bis. Ce qui a été exécuté en local, et ce qui ne l'a pas été
 
-- **Exécuté** : tous les tests du noyau (2 025, 0 échec) ; les 25 mutations des deux fichiers de test touchés (22 de la bande, 3 des textes : 0 problème) ;
+- **Exécuté** : tous les tests du noyau (2 025, 0 échec) ; **347 mutations** des 13 fichiers de test `test_accueil*` et `test_visuel*` (dont les 22 de la bande et les 3 des textes : **0 problème**, 342 s) ;
   `clang-format` sur les fichiers C++ modifiés (le crochet de commit le rejoue sur les fichiers indexés) ; `gitleaks` à chaque commit ;
   `tools/controle_publication.py --historique` (0 trouvaille bloquante ; les valeurs « à juger » sont de l'historique ancien) ;
   `tools/controle_liens.py` (aucune des 10 erreurs ne vient des fichiers de ce travail : elles sont dans cinq autres pages, venues d'autres PR).
-- **Non exécuté jusqu'au bout** : `toolserifier.ps1` en entier. Sa passe de **toutes les mutations du dépôt** dure plusieurs heures sur ce PC partagé
-  (un premier passage a relevé l'unique échec de ce travail, la mutation 17 de la bande, corrigée depuis) ; je l'ai arrêtée au second passage et je n'ai pas
-  rejoué les mutations des autres sujets (accueil, cartes, pilote…), dont le code n'est **pas modifié** par ce travail. **La CI ne les rejoue pas non plus** (job `mutations-noyau` à lancement manuel seulement, environ 1 530 mutations) : elles restent **non rejouées** ici ; la CI de la PR rejoue les tests du noyau (clang++-18 et g++-14, avec ASan), `ruff`, `clang-format`, `gitleaks` et la compilation du Tab5.
+- **Non exécuté jusqu'au bout** : `tools\verifier.ps1` en entier. Sa passe de **toutes les mutations du dépôt** dure plusieurs heures sur ce PC partagé
+  (un premier passage a relevé l'unique échec de ce travail, la mutation 17 de la bande, corrigée depuis) ; je l'ai arrêtée au second passage. Les mutations des **autres
+  sujets** (hors `accueil` et `visuel`, le reste de la liste d'environ 1 530 d'après `ci.yml`) ne sont **pas rejouées** : leur code n'est **pas modifié** par ce travail. **La CI ne les
+  rejoue pas non plus** (job `mutations-noyau` à lancement manuel seulement) ; la CI de la PR rejoue les tests du noyau (clang++-18 et g++-14, avec ASan), `ruff`,
+  `clang-format`, `gitleaks` et la compilation du Tab5.
 
 ## 4. Ce que les rendus montrent
 
