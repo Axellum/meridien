@@ -5,7 +5,7 @@
 # installés par pip ou téléchargés le sont à la version exacte utilisée sur le PC d'Axel.
 #
 # Dépôt public depuis le 08/11/2026 (privé avant : minutes facturables). Les jobs lourds ne tournent que quand il le faut :
-#   - pull_request : tests-noyau, ruff, clang-format, gitleaks, firmware-tab5 ;
+#   - pull_request : tests-noyau (verdict de changements + noyau-clang + noyau-gpp), ruff, clang-format, gitleaks, firmware-tab5 ;
 #   - push sur main et lancement manuel : en plus parcours-web (réseau) ;
 #   - lancement manuel seulement : mutations-noyau (très longue, voir plus bas).
 name: CI
@@ -32,15 +32,63 @@ env:
   GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb" # gitleaks_8.30.1_linux_x64.tar.gz
 
 jobs:
+  # Faut-il compiler les tests C++ du noyau ? Non quand la pull request ne touche rien de ce que ces tests lisent : ni un test,
+  # ni un en-tête qu'un test inclut (directement ou non, y compris dans main/), ni un dossier d'inclusion. La liste est calculée
+  # par le préprocesseur (test/host/lancer.py --concerne), jamais écrite à la main, donc elle suit les nouveaux #include.
+  # Les contrôles Python qui recoupent le noyau avec main/, web/, boards/ et docs/ (traduction, contrat de l'API, cartes, mer)
+  # tournent TOUJOURS, tests C++ sautés ou non. Tout doute répond « oui » : push sur main, lancement manuel, ci.yml modifié,
+  # fusion illisible, lanceur en erreur.
+  changements:
+    name: changements
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      cpp: ${{ steps.verdict.outputs.cpp }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2 # la fusion de la pull request et ses deux parents : HEAD^1 = main, HEAD^2 = la branche
+          persist-credentials: false
+      - name: Les tests C++ du noyau sont-ils concernés ?
+        id: verdict
+        run: |
+          cpp=true
+          if [ "${GITHUB_EVENT_NAME}" != pull_request ]; then
+            raison="événement ${GITHUB_EVENT_NAME} : tout tourne"
+          elif ! git rev-parse --verify --quiet 'HEAD^2' > /dev/null; then
+            raison="HEAD n'est pas la fusion de la pull request : par prudence tout tourne"
+          elif ! git diff --name-only --no-renames 'HEAD^1' HEAD > modifies.txt; then
+            raison="liste des fichiers modifiés illisible : par prudence tout tourne"
+          elif grep -qx '.github/workflows/ci.yml' modifies.txt; then
+            raison="ci.yml modifié : tout tourne"
+          else
+            echo "$(wc -l < modifies.txt) fichier(s) modifié(s) par la pull request :"
+            cat modifies.txt
+            verdict=$(python3 test/host/lancer.py --concerne modifies.txt --cxx "$(command -v g++)") || verdict="oui : le lanceur a échoué"
+            raison="${verdict}"
+            case "${verdict}" in non*) cpp=false ;; esac
+          fi
+          echo "cpp=${cpp} : ${raison}"
+          echo "cpp=${cpp}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "### Tests C++ du noyau : $([ "${cpp}" = true ] && echo lancés || echo sautés)"
+            echo
+            echo "${raison}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
   # Le noyau pur (components/core) compilé ET exécuté sous Linux, avec les détecteurs d'erreurs mémoire (AddressSanitizer)
-  # et de comportements indéfinis (UBSan), par deux compilateurs de l'image du runner :
-  #   - clang++-18 avec ASan + UBSan complets (mêmes options que clang++-san.cmd sur le PC d'Axel) ;
-  #   - g++-14 avec ASan seul. Essai du 06/11/2026 : g++ 14.2 avec -fsanitize=undefined ne sait plus évaluer les
+  # et de comportements indéfinis (UBSan), par deux compilateurs de l'image du runner, dans DEUX jobs qui partent en même
+  # temps (chacun sur son runner de 4 cœurs, quatre fichiers de test à la fois : lancer.py --jobs 4) :
+  #   - noyau-clang : clang++-18 avec ASan + UBSan complets (mêmes options que clang++-san.cmd sur le PC d'Axel) ;
+  #   - noyau-gpp : g++-14 avec ASan seul. Essai du 06/11/2026 : g++ 14.2 avec -fsanitize=undefined ne sait plus évaluer les
   #     static_assert des tests (« is not a constant expression », fuseaux.hpp:49), tant que null, bounds, pointer-overflow,
   #     nonnull-attribute, returns-nonnull-attribute et vptr sont actifs ; en retirer un seul ne suffit pas. Sans UBSan, g++
   #     compile et exécute tous les tests. Le détecteur de fuites est coupé, comme sur le PC (non pris en charge sous Windows).
-  tests-noyau:
-    name: tests-noyau
+  # Mesuré le 09/11/2026 : un fichier après l'autre, clang 13 à 25 min et g++ 3 à 5 min, l'un derrière l'autre (voir docs/outils.md).
+  noyau-clang:
+    name: noyau-clang
+    needs: changements
+    if: needs.changements.outputs.cpp == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -52,30 +100,105 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Compilateurs avec détecteurs
+      - name: Compilateur avec détecteurs
         run: |
+          echo "cœurs : $(nproc), mémoire : $(free -m | awk '/^Mem:/ {print $2}') Mo"
           clang++-18 --version | head -n 1
-          g++-14 --version | head -n 1
-          sudo tee /usr/local/bin/clang++-san > /dev/null <<'EOF'
+          sudo tee /usr/local/bin/clang++-san > /dev/null <<'EOT'
           #!/bin/sh
           exec clang++-18 -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer "$@"
-          EOF
-          sudo tee /usr/local/bin/g++-san > /dev/null <<'EOF'
-          #!/bin/sh
-          exec g++-14 -fsanitize=address -fno-omit-frame-pointer "$@"
-          EOF
-          sudo chmod +x /usr/local/bin/clang++-san /usr/local/bin/g++-san
+          EOT
+          sudo chmod +x /usr/local/bin/clang++-san
       - name: Tests du noyau, clang++-18 avec ASan et UBSan
         run: |
           set -o pipefail
-          python test/host/lancer.py --cxx /usr/local/bin/clang++-san | tee noyau-clang.log
+          python test/host/lancer.py --cxx /usr/local/bin/clang++-san --jobs 4 --durees | tee noyau-clang.log
           # Le lanceur retombe en « syntaxe » (rien d'exécuté) sans bon compilateur : on exige le mode complet.
           grep -q 'mode        : complet' noyau-clang.log
+          # Chaque fichier de test écrit « N test(s), M echec(s) » : la somme prouve que tout a été exécuté.
+          total=$(grep -oE '^[0-9]+ test\(s\)' noyau-clang.log | awk '{s += $1} END {print s + 0}')
+          echo "tests exécutés (clang++-18) : ${total} dans $(grep -c '^test_.*\.cpp :$' noyau-clang.log) fichiers"
+          test "${total}" -gt 0
+
+  noyau-gpp:
+    name: noyau-gpp
+    needs: changements
+    if: needs.changements.outputs.cpp == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Compilateur avec détecteur
+        run: |
+          echo "cœurs : $(nproc), mémoire : $(free -m | awk '/^Mem:/ {print $2}') Mo"
+          g++-14 --version | head -n 1
+          sudo tee /usr/local/bin/g++-san > /dev/null <<'EOT'
+          #!/bin/sh
+          exec g++-14 -fsanitize=address -fno-omit-frame-pointer "$@"
+          EOT
+          sudo chmod +x /usr/local/bin/g++-san
       - name: Tests du noyau, g++-14 avec ASan
         run: |
           set -o pipefail
-          python test/host/lancer.py --cxx /usr/local/bin/g++-san | tee noyau-gpp.log
+          python test/host/lancer.py --cxx /usr/local/bin/g++-san --jobs 4 --durees | tee noyau-gpp.log
           grep -q 'mode        : complet' noyau-gpp.log
+          total=$(grep -oE '^[0-9]+ test\(s\)' noyau-gpp.log | awk '{s += $1} END {print s + 0}')
+          echo "tests exécutés (g++-14) : ${total} dans $(grep -c '^test_.*\.cpp :$' noyau-gpp.log) fichiers"
+          test "${total}" -gt 0
+
+  # Le contrôle REQUIS de la protection de `main` : son nom ne change pas, il tourne TOUJOURS (il n'est jamais « skipped »)
+  # et rend le verdict de ce qui devait tourner. `!cancelled()` plutôt que `success()` : il doit s'exécuter, et ÉCHOUER,
+  # quand `changements` ou un des deux compilateurs a échoué. Un job « skipped » compte pour réussi aux yeux de GitHub : ici
+  # « skipped » n'est accepté que pour les deux compilateurs, et seulement quand `changements` a répondu « false ».
+  tests-noyau:
+    name: tests-noyau
+    needs: [changements, noyau-clang, noyau-gpp]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.changements.outputs.cpp == 'false'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: needs.changements.outputs.cpp == 'false'
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Contrôles croisés seuls (aucun test C++ concerné)
+        if: needs.changements.outputs.cpp == 'false'
+        run: |
+          set -o pipefail
+          python test/host/lancer.py --controles-seuls --durees | tee controles.log
+          grep -q 'mode        : contrôles seuls' controles.log
+          grep -q 'RÉSULTAT : tout passe' controles.log
+      - name: Verdict
+        if: ${{ !cancelled() }}
+        env:
+          CHANGEMENTS: ${{ needs.changements.result }}
+          CPP: ${{ needs.changements.outputs.cpp }}
+          CLANG: ${{ needs.noyau-clang.result }}
+          GPP: ${{ needs.noyau-gpp.result }}
+        run: |
+          echo "changements : ${CHANGEMENTS} (cpp=${CPP})"
+          echo "noyau-clang : ${CLANG}"
+          echo "noyau-gpp   : ${GPP}"
+          test "${CHANGEMENTS}" = success
+          if [ "${CPP}" = true ]; then
+            test "${CLANG}" = success && test "${GPP}" = success
+          elif [ "${CPP}" = false ]; then
+            test "${CLANG}" = skipped && test "${GPP}" = skipped
+          else
+            echo "changements n'a rien répondu de clair : échec par prudence"
+            exit 1
+          fi
 
   # Chaque mutation du noyau doit faire échouer le test qui la vise. Compilation seule : pas besoin des détecteurs.
   # clang++-18 comme sur le PC d'Axel, où toutes les mutations sont détectées. Attention : la liste en compte 1 530
@@ -147,7 +270,10 @@ jobs:
           persist-credentials: false
       - name: Installer gitleaks (archive vérifiée par SHA-256)
         run: |
-          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
+          # Relances : le 09/11/2026 l'archive a échoué trois fois sur un 504 de GitHub, et un job ne se relance qu'une fois
+          # TOUT le run terminé (donc après la fin des tests du noyau, quand ils étaient lancés un fichier après l'autre).
+          curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 --retry-max-time 120 \
+            --output "${RUNNER_TEMP}/gitleaks.tar.gz" \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/gitleaks.tar.gz" | sha256sum --check -
           mkdir "${RUNNER_TEMP}/gitleaks"

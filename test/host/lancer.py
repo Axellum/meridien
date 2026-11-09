@@ -5,6 +5,10 @@
     python test/host/lancer.py --mutations   # prouve que chaque test échoue sans le code qu'il vérifie
     python test/host/lancer.py --cxx CHEMIN  # force un compilateur
     python test/host/lancer.py --seulement test_api,test_appairage [--mutations]   # un sujet à la fois
+    python test/host/lancer.py --jobs 4 [--durees]   # quatre fichiers à la fois (même sortie, même code de retour) ; temps mesurés
+
+--jobs vaut 1 par défaut (le PC d'Axel a déjà planté à six compilations en parallèle) ; la CI en prend quatre, autant que de
+cœurs du runner. Il ne change que la vitesse : la sortie reste dans l'ordre alphabétique des fichiers. Sans effet avec --mutations.
 
 Compilateur : --cxx, sinon la variable CXX, sinon g++ / clang++ / c++ du PATH (mode « complet » : compile,
 lie, EXÉCUTE). À défaut, le g++ croisé RISC-V d'ESP-IDF (dossier donné par tools/local.ps1 ou MERIDIEN_IDF_RACINE,
@@ -14,12 +18,14 @@ régression fait échouer la compilation. Le mode utilisé est affiché ; aucun 
 quand il ne l'est pas.
 """
 import argparse
+import concurrent.futures
 import functools
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[2]
@@ -57,10 +63,16 @@ def trouver_compilateur(force=None):
     return None, None
 
 
-def compiler(cxx, mode, source, include_noyau, sortie_exe=None):
-    cmd = [cxx, *DRAPEAUX, *drapeaux_constexpr(cxx), "-I", str(include_noyau), "-I", str(RACINE / "test" / "host")]
+def options_inclusion(include_noyau):
+    """Les « -I » communs à la compilation et à la liste des dépendances (dependances_des_tests)."""
+    options = ["-I", str(include_noyau), "-I", str(RACINE / "test" / "host")]
     for dossier in INCLUDES_CARTES:
-        cmd += ["-I", str(dossier)]
+        options += ["-I", str(dossier)]
+    return options
+
+
+def compiler(cxx, mode, source, include_noyau, sortie_exe=None):
+    cmd = [cxx, *DRAPEAUX, *drapeaux_constexpr(cxx), *options_inclusion(include_noyau)]
     if mode == "syntaxe":
         cmd += ["-fsyntax-only", str(source)]
     else:
@@ -68,29 +80,49 @@ def compiler(cxx, mode, source, include_noyau, sortie_exe=None):
     return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
-def lancer(cxx, mode):
-    print(f"compilateur : {cxx}\nmode        : {mode}" + (
-        "  (compilé + exécuté)" if mode == "complet" else "  (static_assert évalués à la compilation ; main() NON exécuté)"))
-    echecs = 0
-    with tempfile.TemporaryDirectory() as tmp:
-        for t in TESTS:
-            exe = Path(tmp) / (t.stem + (".exe" if os.name == "nt" else ""))
-            r = compiler(cxx, mode, t, INCLUDE_NOYAU, exe)
-            if r.returncode != 0:
-                print(f"\n{t.name} : ÉCHEC de compilation\n{r.stdout}{r.stderr}")
-                echecs += 1
-                continue
-            if mode == "complet":
-                p = subprocess.run([str(exe)], capture_output=True, text=True, encoding="utf-8", errors="replace")
-                print(f"\n{t.name} :\n{p.stdout}", end="")
-                echecs += p.returncode != 0
-            elif executee_seulement(t.name):
-                print(f"\n{t.name} : compilation OK, MAIS NON EXÉCUTÉ (aucun static_assert : lancer en mode complet)")
-            else:
-                print(f"\n{t.name} : compilation OK (tests évalués par static_assert)")
+def traiter_un_test(cxx, mode, t, tmp):
+    """Compile puis, en mode complet, exécute UN fichier de test. Retourne (texte à afficher tel quel, nombre d'échecs,
+    secondes de compilation, secondes d'exécution). Aucun état partagé : l'exécutable porte le nom du test dans le
+    dossier temporaire, donc plusieurs fichiers peuvent être traités en même temps (aucun test ne lit ni n'écrit un
+    fichier, un port ou une variable d'environnement)."""
+    exe = tmp / (t.stem + (".exe" if os.name == "nt" else ""))
+    debut = time.perf_counter()
+    r = compiler(cxx, mode, t, INCLUDE_NOYAU, exe)
+    compil = time.perf_counter() - debut
+    if r.returncode != 0:
+        return f"\n{t.name} : ÉCHEC de compilation\n{r.stdout}{r.stderr}\n", 1, compil, 0.0
+    if mode == "complet":
+        debut = time.perf_counter()
+        p = subprocess.run([str(exe)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        return f"\n{t.name} :\n{p.stdout}", int(p.returncode != 0), compil, time.perf_counter() - debut
+    if executee_seulement(t.name):
+        return f"\n{t.name} : compilation OK, MAIS NON EXÉCUTÉ (aucun static_assert : lancer en mode complet)\n", 0, compil, 0.0
+    return f"\n{t.name} : compilation OK (tests évalués par static_assert)\n", 0, compil, 0.0
+
+
+def afficher_durees(mesures, jobs, reel):
+    """Sur la sortie d'erreur (la sortie standard reste identique) : temps cumulé, temps réel, fichiers les plus longs et
+    mémoire du plus gros processus fils, pour savoir si l'on peut encore paralléliser."""
+    compil = sum(m[1] for m in mesures)
+    execution = sum(m[2] for m in mesures)
+    print(f"\ndurées : {len(mesures)} fichier(s), compilation {compil:.0f} s + exécution {execution:.0f} s cumulées, "
+          f"{reel:.0f} s réelles avec {jobs} processus (gain x{(compil + execution) / max(reel, 0.001):.1f})", file=sys.stderr)
+    for nom, c, x in sorted(mesures, key=lambda m: m[1] + m[2], reverse=True)[:8]:
+        print(f"  {nom:40} compilation {c:6.1f} s  exécution {x:5.1f} s", file=sys.stderr)
+    try:
+        import resource  # noqa: PLC0415  (Linux et macOS seulement)
+
+        print(f"  mémoire du plus gros processus fils : {resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024:.0f} Mo",
+              file=sys.stderr)
+    except ImportError:
+        pass
+
+
+def controles_croises():
+    """Les contrôles Python (sans compilation) qui recoupent le noyau avec main/, web/, boards/ et docs/ : retourne le nombre d'échecs."""
     from controle_i18n import controle_i18n  # noqa: PLC0415  (contrôles croisés de la traduction, sans compilation)
 
-    echecs += controle_i18n()
+    echecs = controle_i18n()
     from controle_reglages import controle_reglages  # noqa: PLC0415  (contrat de l'API, pages et clavier contre leurs sources)
 
     echecs += controle_reglages()
@@ -105,8 +137,86 @@ def lancer(cxx, mode):
     from controle_python_mer import controle_mer  # noqa: PLC0415  (mer : trames enregistrées relues par un lecteur Python indépendant)
 
     echecs += controle_mer()
+    return echecs
+
+
+def lancer(cxx, mode, jobs=1, durees=False, controles_seuls=False):
+    if controles_seuls:
+        # Aucun test C++ : la CI n'en demande pas quand rien de ce que les tests lisent n'a changé (voir --concerne).
+        # Cette ligne ne contient volontairement pas « mode        : complet », que la CI exige quand elle compile.
+        print("mode        : contrôles seuls  (aucun test C++ compilé ni exécuté)")
+        TESTS[:] = []
+    else:
+        print(f"compilateur : {cxx}\nmode        : {mode}" + (
+            "  (compilé + exécuté)" if mode == "complet" else "  (static_assert évalués à la compilation ; main() NON exécuté)"))
+    echecs = 0
+    mesures = []
+    drapeaux_constexpr(cxx)  # lu une fois ici, avant de lancer les fils
+    debut = time.perf_counter()
+    with tempfile.TemporaryDirectory() as tmp, concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        # Les plus gros fichiers partent en premier (ils sont les plus longs à compiler : la file se vide plus régulièrement) ;
+        # l'AFFICHAGE, lui, reste dans l'ordre alphabétique, comme avec un seul processus.
+        futurs = {t: pool.submit(traiter_un_test, cxx, mode, t, Path(tmp))
+                  for t in sorted(TESTS, key=lambda f: f.stat().st_size, reverse=True)}
+        for t in TESTS:
+            texte, echec, compil, execution = futurs[t].result()
+            print(texte, end="")
+            echecs += echec
+            mesures.append((t.name, compil, execution))
+    reel_tests = time.perf_counter() - debut
+    debut = time.perf_counter()
+    echecs += controles_croises()
+    if durees:
+        if mesures:
+            afficher_durees(mesures, max(1, jobs), reel_tests)
+        print(f"  contrôles croisés (Python, sans compilation) : {time.perf_counter() - debut:.1f} s", file=sys.stderr)
     print("\nRÉSULTAT :", "tout passe" if echecs == 0 else f"{echecs} fichier(s) en échec")
     return 1 if echecs else 0
+
+
+def dependances_des_tests(cxx, jobs=1):
+    """(dossiers, fichiers) dont le contenu peut changer le résultat de la compilation d'un test, en chemins relatifs à la
+    racine avec « / ». Les fichiers : chaque test et, par le préprocesseur du compilateur (-MM), tous les en-têtes qu'il
+    inclut, directement ou non, y compris ceux de main/ (test_horloge inclut ../../main/horloge.cpp). Les dossiers : tous
+    ceux des « -I », en entier, parce qu'un fichier AJOUTÉ dans l'un d'eux peut masquer un en-tête trouvé plus loin. Calculé
+    à chaque fois : aucune liste écrite à la main qui pourrait rester en arrière quand un test inclut un nouveau fichier."""
+    dossiers = {Path(INCLUDE_NOYAU).resolve(), (RACINE / "test" / "host").resolve(), *(d.resolve() for d in INCLUDES_CARTES)}
+
+    def un_test(t):
+        cmd = [cxx, "-std=c++17", "-MM", "-MT", "cible", *options_inclusion(INCLUDE_NOYAU), str(t)]
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode != 0:
+            raise RuntimeError(f"{t.name} : le préprocesseur a échoué\n{r.stderr}")
+        fichiers = set()
+        for mot in r.stdout.replace("\\\n", " ").replace("\\\r\n", " ").split()[1:]:  # le premier mot est « cible: »
+            chemin = Path(mot)
+            if not chemin.is_file():
+                raise RuntimeError(f"{t.name} : « {mot} » n'est pas un fichier (chemin à espaces ?)")
+            try:
+                fichiers.add(chemin.resolve().relative_to(RACINE).as_posix())
+            except ValueError:
+                pass  # hors du dépôt : en-tête du système, sans lien avec une modification du dépôt
+        return fichiers
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        tous = set().union(*pool.map(un_test, TESTS)) if TESTS else set()
+    return sorted(d.relative_to(RACINE).as_posix() + "/" for d in dossiers), sorted(tous)
+
+
+def concerne(cxx, modifies, jobs=1):
+    """Premier fichier modifié que lisent les tests C++ (avec sa raison), ou None. Le message dit toujours ce qui a été regardé."""
+    dossiers, fichiers = dependances_des_tests(cxx, jobs)
+    exacts = set(fichiers)
+    for brut in modifies:
+        p = brut.strip().replace("\\", "/")
+        if not p:
+            continue
+        if p in exacts:
+            return f"oui : {p} est inclus par un test ({len(fichiers)} fichiers suivis)"
+        for d in dossiers:
+            if p.startswith(d):
+                return f"oui : {p} est dans {d}, dossier d'inclusion des tests"
+    return None
 
 
 # (fichier du noyau, texte exact à remplacer, remplacement, test qui doit le détecter ; None = « n'importe lequel »)
@@ -286,6 +396,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--mutations", action="store_true", help="prouve que les tests échouent sans le code")
     ap.add_argument("--cxx", help="compilateur à utiliser")
+    ap.add_argument("--jobs", "-j", type=int, default=1, help="nombre de fichiers de test compilés et exécutés en même temps "
+                    "(1 par défaut ; sans effet avec --mutations)")
+    ap.add_argument("--durees", action="store_true", help="écrit sur la sortie d'erreur le temps cumulé, le temps réel, les "
+                    "fichiers les plus longs et la mémoire du plus gros fils")
+    ap.add_argument("--controles-seuls", action="store_true", help="ne compile aucun test C++ : seulement les contrôles Python "
+                    "qui recoupent le noyau avec main/, web/, boards/ et docs/ (la CI s'en contente quand --concerne répond non)")
+    ap.add_argument("--concerne", metavar="FICHIER", help="lit la liste des fichiers modifiés (un chemin par ligne, « - » pour "
+                    "l'entrée standard) et répond « oui : … » si l'un d'eux peut changer le résultat d'un test C++ (test, "
+                    "en-tête inclus, dossier d'inclusion), sinon « non : … » ; tout doute répond oui")
     ap.add_argument("--seulement", help="fichiers de test à traiter, séparés par des virgules (un morceau du nom suffit) : "
                     "ne compile et ne mute que ceux-là (pour travailler sur un sujet sans relancer les 30 minutes de tout)")
     a = ap.parse_args()
@@ -298,6 +417,15 @@ def main():
     if not cxx:
         print("Aucun compilateur C++ trouvé (ni g++, ni clang++, ni le g++ croisé d'ESP-IDF).", file=sys.stderr)
         return 2
+    if a.concerne:
+        # Tout doute répond « oui » (on compile) : une erreur de lecture, de préprocesseur ou de chemin ne doit jamais sauter les tests.
+        try:
+            modifies = (sys.stdin.read() if a.concerne == "-" else Path(a.concerne).read_text(encoding="utf-8")).splitlines()
+            verdict = concerne(cxx, modifies, a.jobs)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as e:
+            verdict = f"oui : calcul impossible ({str(e).splitlines()[0] if str(e) else type(e).__name__})"
+        print(verdict or "non : aucun fichier modifié n'est lu par un test C++ (ni test, ni en-tête inclus, ni dossier d'inclusion)")
+        return 0
     if a.mutations:
         resultat = mutations(cxx, mode)
         if any(t.name == "test_carte_7b.cpp" for t in TESTS):  # mutations de la couche carte 7B (leur propre dossier include/)
@@ -305,7 +433,7 @@ def main():
 
             resultat |= mutations_carte_7b(cxx, mode, RACINE, [*DRAPEAUX, *drapeaux_constexpr(cxx)], INCLUDE_NOYAU)
         return resultat
-    return lancer(cxx, mode)
+    return lancer(cxx, mode, a.jobs, a.durees, a.controles_seuls)
 
 
 if __name__ == "__main__":
