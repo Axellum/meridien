@@ -8,6 +8,7 @@
 // mémoire après un changement de zone, un nom inconnu qui retombe sur Paris, une zone illisible qui donne quand même une heure.
 #include <cstddef>
 #include <cstring>
+#include <string>
 #include <string_view>
 
 #include "../../main/horloge.cpp"
@@ -54,6 +55,31 @@ void poser_zone(sv fuseau_iana) {
 
 sv texte(const char *s) { return sv(s); }
 
+// La date de l'écran principal attendue, déduite de la date longue française du tableau (« vendredi 6 novembre 2026 ») : sans l'année,
+// avec une majuscule au jour et au mois (« Vendredi 6 Novembre »). Écrite mot par mot, à part de visuel_dates.hpp : elle ne partage
+// aucune ligne avec ce qu'elle contrôle.
+std::string date_ecran(sv longue) {
+    std::string sortie;
+    int mot = 0;
+    std::size_t debut = 0;
+    while (debut <= longue.size()) {
+        std::size_t fin = longue.find(' ', debut);
+        if (fin == sv::npos) {
+            fin = longue.size();
+        }
+        if (mot < 3) { // jour, numéro, mois : le quatrième mot est l'année
+            std::string m(longue.substr(debut, fin - debut));
+            if ((mot == 0 || mot == 2) && !m.empty() && m[0] >= 'a' && m[0] <= 'z') {
+                m[0] = static_cast<char>(m[0] - 'a' + 'A');
+            }
+            sortie += (mot > 0 ? " " : "") + m;
+        }
+        ++mot;
+        debut = fin + 1;
+    }
+    return sortie;
+}
+
 } // namespace
 
 // meteo_zone.h : sur l'appareil, la zone vient de la NVS ; ici, celle que le test a posée.
@@ -94,7 +120,7 @@ int heure_date_et_decalage_sont_ceux_du_lieu_selon_zoneinfo() {
 
         char date[48] = {};
         VERIFIER(horloge_date_localisee(l.instant, i18n::Langue::Fr, date, sizeof date));
-        VERIFIER(texte(date) == l.date);
+        VERIFIER(std::string(texte(date)) == date_ecran(l.date)); // l'écran : sans l'année, « Vendredi 6 Novembre »
 
         VERIFIER(horloge_decalage_s(l.instant) == l.decalage);
 
@@ -137,11 +163,11 @@ int un_changement_de_zone_change_l_heure_et_le_jour_a_l_appel_suivant() {
     poser_zone("Europe/Paris");
     VERIFIER(horloge_hhmm(instant, hhmm, sizeof hhmm) && texte(hhmm) == "21:30");
     VERIFIER(horloge_date_localisee(instant, i18n::Langue::Fr, date, sizeof date) &&
-             texte(date) == "vendredi 6 novembre 2026");
+             texte(date) == "Vendredi 6 Novembre");
     poser_zone("Asia/Tokyo");
     VERIFIER(horloge_hhmm(instant, hhmm, sizeof hhmm) && texte(hhmm) == "05:30");
     VERIFIER(horloge_date_localisee(instant, i18n::Langue::Fr, date, sizeof date) &&
-             texte(date) == "samedi 7 novembre 2026");
+             texte(date) == "Samedi 7 Novembre");
     poser_zone("Europe/Paris");
     VERIFIER(horloge_hhmm(instant, hhmm, sizeof hhmm) && texte(hhmm) == "21:30");
     return 0;
