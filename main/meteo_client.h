@@ -6,8 +6,15 @@
 
 namespace ecran {
 
-// Relit le cache de la NVS (la météo est lisible tout de suite, avant même le Wi-Fi) puis lance la tâche. À appeler une fois,
-// après reseau_demarrer() (le NVS est déjà initialisé par boot_info_load()). Rend la main tout de suite.
+// Relit le cache de la NVS et le publie par meteo_etat_lire() : la météo est lisible tout de suite, avant même le Wi-Fi. À
+// appeler AVANT la création de l'écran principal pour que sa première image porte déjà la météo (sinon elle n'arrive qu'au
+// passage suivant du minuteur, ≤ 0,5 s plus tard). Ne demande ni le Wi-Fi ni l'heure ; le NVS doit être initialisé
+// (boot_info_load()) et les réglages relus (reglages_demarrer(), pour le lieu). Sans effet au deuxième appel. Depuis la tâche
+// principale seulement (c'est elle qui appelle aussi meteo_client_demarrer()).
+void meteo_client_relire_cache();
+
+// Lance la tâche (relit d'abord le cache s'il ne l'a pas été par meteo_client_relire_cache()). À appeler une fois, après
+// reseau_demarrer(). Rend la main tout de suite.
 void meteo_client_demarrer();
 
 } // namespace ecran

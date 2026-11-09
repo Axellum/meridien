@@ -61,6 +61,7 @@ constexpr uint32_t kPileOctets = 12288;         // la prise de contact TLS deman
 constexpr UBaseType_t kPrioriteMeteo = tskIDLE_PRIORITY;
 
 TaskHandle_t g_tache = nullptr;
+bool g_cache_relu = false; // le cache NVS a déjà été relu (tâche principale seulement, voir meteo_client_relire_cache)
 
 // ---- mémoire -------------------------------------------------------------------------------------------------------
 
@@ -879,6 +880,14 @@ void meteo_client_source_changee() {
     meteo_client_zone_changee();
 }
 
+void meteo_client_relire_cache() {
+    if (g_cache_relu) {
+        return;
+    }
+    g_cache_relu = true; // même si la relecture ne trouve rien : une seule tentative par démarrage
+    relire_cache();
+}
+
 void meteo_client_demarrer() {
     // Les tailles réelles sur le RISC-V (le PC en annonce d'autres : alignement des entiers 64 bits).
     ESP_LOGI(
@@ -888,7 +897,7 @@ void meteo_client_demarrer() {
         static_cast<unsigned>(sizeof(meteo::Meteo)), static_cast<unsigned>(sizeof(MeteoDetail)),
         static_cast<unsigned>(meteo::TAILLE_CACHE_RICHE_MAX), static_cast<unsigned>(client_http::kTailleTampon),
         static_cast<unsigned>(sizeof(Natif)));
-    relire_cache();
+    meteo_client_relire_cache(); // déjà fait avant la première image par main.cpp ; sinon (autre appelant) fait ici
     journaliser_contrat("au démarrage, depuis le cache");
     journaliser_detail("au démarrage, depuis le cache");
     if (xTaskCreate(tache_meteo, "meteo", kPileOctets, nullptr, kPrioriteMeteo, &g_tache) != pdPASS) {
