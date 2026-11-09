@@ -1589,6 +1589,10 @@ void dessiner_bande_jours(const Ctx &c) {
 
 // ---- la bande de pluie (ADR-0027) : la ligne centrale, une barre par quart d'heure ----
 
+// Largeur de référence en dessous de laquelle la moitié gauche du bandeau ne tient ni la phrase ni huit barres (au rendu : environ 600
+// en paysage, environ 320 en portrait 720 x 1280).
+constexpr int LARGEUR_MIN_MOITIE_BANDE = 450;
+
 // La phrase de la bande, sur UNE ligne (la zone du bandeau n'a la place que d'une ligne). Il pleut : « Pluie modérée · fin dans 42 min »
 // (la fin seulement si les quarts la donnent et si `avec_fin`) ; sinon « Pluie dans 25 min » ou « Pluie dès 15 h ».
 void texte_de_bande(char *sortie, std::size_t n, bool avec_fin) {
@@ -1709,10 +1713,15 @@ void dessiner_bandeau(const Ctx &c) {
     const accueil::ContenuBandeau cb =
         accueil::composer_bandeau(m.connue, m.perimee, g.pluie.genre, g.e.bandeau.present, al != Alerte::AUCUNE);
     const Rect gauche = moitie_du_bandeau(false);
-    if (g.bande.presente && cb.gauche != accueil::Puce::PERIMEE) {
-        // Il pleut ou il va pleuvoir dans les deux heures : la bande de pluie prend la place de la puce, TOUJOURS sur la moitié gauche
-        // (les deux moitiés du bandeau gardent leur place : la pluie à gauche, l'alerte à droite ; Axel, 09/11/2026).
-        dessiner_bande_pluie(c, gauche);
+    // Il pleut ou il va pleuvoir dans les deux heures : la bande de pluie prend la place de la puce, TOUJOURS sur la moitié gauche
+    // (les deux moitiés du bandeau gardent leur place : la pluie à gauche, l'alerte à droite ; Axel, 09/11/2026). Seule exception :
+    // une moitié trop étroite pour les barres (le portrait : environ 320 px de référence). Elle prend alors toute la largeur si
+    // l'alerte ne la réclame pas, sinon la puce d'avant reste (la phrase seule).
+    const bool moitie_trop_etroite = gauche.w < px(LARGEUR_MIN_MOITIE_BANDE);
+    const bool bande = g.bande.presente && cb.gauche != accueil::Puce::PERIMEE &&
+                       (!moitie_trop_etroite || cb.droite == accueil::Puce::AUCUNE);
+    if (bande) {
+        dessiner_bande_pluie(c, moitie_trop_etroite ? g.rect[Z_BANDEAU] : gauche);
     } else {
         switch (g.composition == accueil::Composition::CartePluie ? accueil::Puce::AUCUNE : cb.gauche) {
         case accueil::Puce::PLUIE: {
