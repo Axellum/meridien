@@ -78,6 +78,32 @@ int un_seul_champ_change_a_la_fois() {
     return 0;
 }
 
+// Le profil de l'accueil (ADR-0023) passe par l'hôte comme le thème : l'écran de réglages et la roue d'appui long écrivent par ici.
+int le_profil_de_l_accueil_passe_par_l_hote() {
+    Banc b;
+    VERIFIER(b.hote.nombre("affichage.profil") == 0); // Auto : rien d'épinglé tant que la personne n'a rien choisi
+    b.hote.definir_nombre("affichage.profil", 1);
+    VERIFIER(b.ports.etat_affichage.profil == reglages::ProfilAccueil::Meteo && b.ports.enregistrements == 1);
+    VERIFIER(b.hote.nombre("affichage.profil") == 1);
+    VERIFIER(b.ports.etat_affichage.theme == reglages::Theme::Auto &&
+             b.ports.etat_affichage.luminosite == reglages::LUMINOSITE_DEFAUT); // un seul champ change
+    // Une valeur hors liste est refusée par l'hôte lui-même : jamais un profil épinglé par accident.
+    for (int v : {2, 3, 7, -1, 255}) {
+        b.hote.definir_nombre("affichage.profil", v);
+    }
+    VERIFIER(b.ports.etat_affichage.profil == reglages::ProfilAccueil::Meteo && b.ports.enregistrements == 1);
+    // Changer autre chose ne touche pas au profil, et le dépingler rend la main aux règles.
+    b.hote.definir_nombre("affichage.theme", 2);
+    VERIFIER(b.ports.etat_affichage.profil == reglages::ProfilAccueil::Meteo &&
+             b.ports.etat_affichage.theme == reglages::Theme::Sombre);
+    b.hote.definir_nombre("affichage.profil", 0);
+    VERIFIER(b.ports.etat_affichage.profil == reglages::ProfilAccueil::Auto && b.hote.nombre("affichage.profil") == 0);
+    // Un changement fait ailleurs (la page web) se voit tout de suite.
+    b.ports.etat_affichage.profil = reglages::ProfilAccueil::Meteo;
+    VERIFIER(b.hote.nombre("affichage.profil") == 1);
+    return 0;
+}
+
 int luminosite_qui_eteindrait_l_ecran_est_refusee() {
     Banc b;
     b.ports.etat_affichage.luminosite = 60;
@@ -803,6 +829,7 @@ int la_liste_de_vigie_se_demande_et_ne_se_copie_qu_une_fois_terminee() {
 #define LISTE(X)                                                                                                       \
     X(affichage_passe_par_la_porte_de_la_page_web)                                                                     \
     X(un_seul_champ_change_a_la_fois)                                                                                  \
+    X(le_profil_de_l_accueil_passe_par_l_hote)                                                                         \
     X(luminosite_qui_eteindrait_l_ecran_est_refusee)                                                                   \
     X(choix_hors_liste_ou_inconnu_est_refuse)                                                                          \
     X(ville_affichee_est_celle_de_la_page_web)                                                                         \

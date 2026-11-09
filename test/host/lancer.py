@@ -266,6 +266,9 @@ MUTATIONS = [
 # Mutations des pistes « météo et heure » (json_mini, meteo_openmeteo, heure_fr) et « assistant vocal » : un fichier chacune.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mutations_accueil_auto import MUTATIONS_ACCUEIL_AUTO  # noqa: E402  (mode automatique de l'accueil : choix du profil, raisons, garde-fous)
+from mutations_accueil_cartes import MUTATIONS_ACCUEIL_CARTES  # noqa: E402  (mode automatique : composition de l'écran, carte pluie, bandeau d'alerte agrandi)
+from mutations_accueil_epinglage import MUTATIONS_ACCUEIL_EPINGLAGE  # noqa: E402  (réglage « Profil » : Auto ou épinglé, de la page au pilote)
+from mutations_accueil_pilote import MUTATIONS_ACCUEIL_PILOTE  # noqa: E402  (mode automatique : mesures, gel sous le doigt, lieu, phrases de la pastille)
 from mutations_assistant import MUTATIONS_ASSISTANT  # noqa: E402  (noyau assistant vocal : voir ce fichier)
 from mutations_fournisseurs import MUTATIONS_FOURNISSEURS  # noqa: E402  (sources météo : table, liste par pays, lien avec le lecteur)
 from mutations_fuseaux import MUTATIONS_FUSEAUX  # noqa: E402  (heure du lieu et lever/coucher du soleil : ADR-0012)
@@ -335,6 +338,9 @@ MUTATIONS += MUTATIONS_MER_API
 MUTATIONS += MUTATIONS_MER_LISTE
 MUTATIONS += MUTATIONS_MER_REGLAGE
 MUTATIONS += MUTATIONS_ACCUEIL_AUTO
+MUTATIONS += MUTATIONS_ACCUEIL_PILOTE
+MUTATIONS += MUTATIONS_ACCUEIL_CARTES
+MUTATIONS += MUTATIONS_ACCUEIL_EPINGLAGE
 MUTATIONS += MUTATIONS_NVS_SECURITE
 MUTATIONS += MUTATIONS_GRANDEURS
 

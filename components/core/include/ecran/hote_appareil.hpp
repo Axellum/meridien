@@ -183,6 +183,9 @@ class HoteAppareil final : public HoteReglages {
         if (id == "affichage.luminosite") {
             return p_.affichage().luminosite;
         }
+        if (id == "affichage.profil") {
+            return static_cast<std::int32_t>(p_.affichage().profil);
+        }
         if (id == "alertes.actives") {
             return p_.alertes().actives ? 0 : 1; // « Oui » est l'indice 0
         }
@@ -223,7 +226,7 @@ class HoteAppareil final : public HoteReglages {
             return;
         }
         if (id == "langue.ecran" || id == "langue.assistant" || id == "affichage.theme" ||
-            id == "affichage.luminosite") {
+            id == "affichage.luminosite" || id == "affichage.profil") {
             reglages::Affichage a = p_.affichage();
             if (id == "langue.ecran") {
                 a.langue_ecran = i18n::langue_depuis_indice(valeur);
@@ -231,6 +234,8 @@ class HoteAppareil final : public HoteReglages {
                 a.langue_assistant = i18n::langue_depuis_indice(valeur);
             } else if (id == "affichage.theme") {
                 a.theme = reglages::theme_depuis_indice(valeur);
+            } else if (id == "affichage.profil") {
+                a.profil = reglages::profil_accueil_depuis_indice(valeur);
             } else {
                 a.luminosite = valeur;
             }

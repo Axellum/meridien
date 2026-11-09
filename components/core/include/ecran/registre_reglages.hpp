@@ -90,6 +90,9 @@ inline constexpr Option OPTIONS_LANGUES[i18n::NOMBRE_LANGUES] = {
 inline constexpr Option OPTIONS_THEMES[3] = {
     {"auto", "Auto", true}, {"clair", "Clair", true}, {"sombre", "Sombre", true}};
 
+// Le profil de l'accueil (ADR-0023) : seulement ce que l'appareil sait dessiner. Même ordre que reglages::ProfilAccueil (un test le compare).
+inline constexpr Option OPTIONS_PROFILS[2] = {{"auto", "Auto", true}, {"meteo", "Météo", true}};
+
 // Préréglages par service (docs/api-reglages.md §7 : un préréglage n'existe que pour les services que son fournisseur
 // documente). Le catalogue complet (adresse, aide, clé requise) est dans ecran/presets_services.hpp.
 inline constexpr Option OPTIONS_PRESETS_STT[3] = {
@@ -258,6 +261,11 @@ inline constexpr Reglage REGISTRE[] = {
      "", Longueur::Caracteres, false, "/api/display", "theme"},
     {"affichage.luminosite", Type::Nombre, Section::Affichage, Etape::Affichage, "Luminosité", "", LUMINOSITE_MIN,
      LUMINOSITE_MAX, LUMINOSITE_DEFAUT, "", nullptr, 0, "%", Longueur::Caracteres, false, "/api/display", "luminosite"},
+    // Le profil de l'accueil (ADR-0023) : hors installation guidée, le défaut « Auto » convient.
+    {"affichage.profil", Type::Choix, Section::Affichage, Etape::Aucune, "Profil",
+     "Auto : l’écran choisit seul, selon la pluie et les alertes. Météo : l’écran reste sur la météo (une alerte "
+     "officielle s’affiche quand même).",
+     0, 1, 0, "", OPTIONS_PROFILS, 2, "", Longueur::Caracteres, false, "/api/display", "profil"},
     // --- Assistant vocal : trois services indépendants (ADR-0002) ---
     detail::service_preset("stt.preset", OPTIONS_PRESETS_STT, 3),
     detail::service_texte("stt.url", "Adresse du service", URL_MAX, "url"),

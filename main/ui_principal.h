@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "ecran/accueil_pilote.hpp"
 #include "ecran/heure_fr.hpp"
 #include "ecran/vigie_bandeau.hpp"
 #include "ecran/visuel_themes.hpp"
@@ -46,6 +47,10 @@ struct EntreesPrincipal {
     // L'alerte officielle de Vigie en vigueur (ADR-0009) : `present` faux = rien n'est dessiné à sa place (pas de bandeau permanent).
     // Quand elle est présente, sa pastille remplace celle de l'alerte déduite de la météo, dans la barre du haut.
     vigie::Bandeau bandeau;
+    // Ce que le mode automatique a décidé (ADR-0023, accueil_pilote.hpp) : la raison dite par la pastille à côté du lieu, et les deux
+    // drapeaux qui changent la zone du bas (la carte pluie, le bandeau d'alerte agrandi). Valeur par défaut : profil Météo, raison
+    // « Auto · Météo », rien d'agrandi. L'écran ne décide rien : il dessine cette présentation (le calcul est dans le noyau pur).
+    accueil::Presentation mode_auto;
 };
 
 // Données du jeu d'icônes et de la police : octets embarqués, qui doivent vivre aussi longtemps que l'écran.

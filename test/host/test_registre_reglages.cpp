@@ -52,6 +52,7 @@ constexpr ChampApi CONTRAT_API[] = {
     {"/api/display", "langue_assistant", Couverture::Direct},
     {"/api/display", "theme", Couverture::Direct},
     {"/api/display", "luminosite", Couverture::Direct},
+    {"/api/display", "profil", Couverture::Direct},
     {"/api/alerts", "actives", Couverture::Direct},
     {"/api/alerts", "adresse", Couverture::Direct},
     {"/api/alerts", "periode_min", Couverture::Direct},
@@ -113,7 +114,7 @@ constexpr int identifiants_uniques_et_bien_formes() {
         for (std::size_t j = i + 1; j < NOMBRE_REGLAGES; ++j)
             VERIFIER(REGISTRE[i].id != REGISTRE[j].id);
     }
-    VERIFIER(NOMBRE_REGLAGES == 25);
+    VERIFIER(NOMBRE_REGLAGES == 26);
     return 0;
 }
 
@@ -297,18 +298,19 @@ constexpr int les_libelles_et_les_aides_sont_des_cles_de_traduction() {
 }
 
 constexpr int les_sections_et_les_etapes_sont_coherentes() {
-    // Réseau 2, Lieu et météo 6 (la ville, sa source météo et les 4 alertes), Langue 2, Affichage 2, Assistant 13,
-    // Appareil 0 : l'appareil n'a que des actions et des informations
+    // Réseau 2, Lieu et météo 6 (la ville, sa source météo et les 4 alertes), Langue 2, Affichage 3 (thème, luminosité, profil de
+    // l'accueil), Assistant 13, Appareil 0 : l'appareil n'a que des actions et des informations
     VERIFIER(compter_section(Section::Reseau) == 2 && compter_section(Section::LieuMeteo) == 6);
-    VERIFIER(compter_section(Section::Langue) == 2 && compter_section(Section::Affichage) == 2);
+    VERIFIER(compter_section(Section::Langue) == 2 && compter_section(Section::Affichage) == 3);
     VERIFIER(compter_section(Section::AssistantVocal) == 13 && compter_section(Section::Appareil) == 0);
     // L'installation : langue, Wi-Fi, lieu, affichage, assistant ont des réglages ; téléphone et récapitulatif n'en ont pas.
     VERIFIER(compter_etape(Etape::Langue) == 1 && compter_etape(Etape::Wifi) == 2 && compter_etape(Etape::Lieu) == 1);
     VERIFIER(compter_etape(Etape::Affichage) == 2 && compter_etape(Etape::Assistant) == 14);
-    // Ni la source météo (« Automatique » convient à tout le monde, on la change plus tard) ni les quatre alertes
-    // (leurs défauts conviennent) ne sont demandées à l'installation.
+    // Ni la source météo (« Automatique » convient à tout le monde, on la change plus tard), ni les quatre alertes (leurs défauts
+    // conviennent), ni le profil de l'accueil (« Auto » convient) ne sont demandés à l'installation.
     VERIFIER(compter_etape(Etape::Telephone) == 0 && compter_etape(Etape::Recapitulatif) == 0 &&
-             compter_etape(Etape::Aucune) == 5);
+             compter_etape(Etape::Aucune) == 6);
+    VERIFIER(chercher("affichage.profil")->etape == Etape::Aucune);
     VERIFIER(chercher("meteo.source")->etape == Etape::Aucune);
     VERIFIER(NOMBRE_ETAPES == 7);
     return 0;

@@ -1,5 +1,6 @@
 // Réglages de la page (contrat main/reglages.h) : langue de l'écran, langue de l'assistant, thème, luminosité en NVS (espace
-// « reglages », clé « affichage », un blob de 5 octets écrit d'un seul coup), et le complément de la ville (région, pays) qui
+// « reglages », clé « affichage », un blob de 5 octets écrit d'un seul coup ; le profil de l'accueil, un octet à part sous la clé
+// « profil », validé dans le même commit), et le complément de la ville (région, pays) qui
 // s'ajoute à la zone de meteo_zone.h sans en créer une seconde : la zone elle-même (nom, position, fuseau) n'est lue et écrite
 // que par zone_lire / zone_ecrire.
 //
@@ -29,6 +30,9 @@ namespace {
 const char *TAG = "reglages";
 constexpr const char *kEspace = "reglages";
 constexpr const char *kCleAffichage = "affichage";
+// Le profil de l'accueil (ADR-0023) : un octet à part (l'indice de reglages::ProfilAccueil), pour ne pas changer le blob « affichage »
+// de 5 octets déjà en service. Absent ou hors table : Auto, c'est-à-dire PAS d'épinglage.
+constexpr const char *kCleProfil = "profil";
 constexpr const char *kCleZoneExtra = "zone_extra";
 constexpr const char *kCleSource = "source_meteo";
 constexpr std::size_t kSourceOctets = 16; // « meteosuisse » + zéro : les identifiants de la table tiennent largement
@@ -154,6 +158,8 @@ void reglages_demarrer() {
         AffichageNvs brut = {};
         size_t taille = sizeof(brut);
         const esp_err_t err = nvs_get_blob(h, kCleAffichage, &brut, &taille);
+        uint8_t profil_brut = 0;
+        const esp_err_t err_profil = nvs_get_u8(h, kCleProfil, &profil_brut);
         nvs_close(h);
         if (err == ESP_OK && taille == sizeof(brut) && brut.version == kVersionAffichage) {
             lu = affichage_depuis_nvs(brut);
@@ -161,6 +167,9 @@ void reglages_demarrer() {
             ESP_LOGW(TAG, "réglages d'affichage non lus (%s, %u octets) : valeurs par défaut", esp_err_to_name(err),
                      static_cast<unsigned>(taille));
         }
+        // Une valeur hors table (NVS abîmée) vaut « Auto » : jamais un profil épinglé par accident.
+        lu.profil =
+            err_profil == ESP_OK ? reglages::profil_accueil_depuis_indice(profil_brut) : reglages::ProfilAccueil::Auto;
     } else if (ouvert != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGW(TAG, "NVS « %s » non ouverte (%s) : valeurs par défaut", kEspace, esp_err_to_name(ouvert));
     }
@@ -186,6 +195,10 @@ bool reglages_enregistrer_affichage(const reglages::Affichage &nouveau) {
         ESP_LOGW(TAG, "luminosité %d %% refusée (5 à 100) : rien n'est changé", nouveau.luminosite);
         return false;
     }
+    if (static_cast<unsigned>(nouveau.profil) >= reglages::NOMBRE_PROFILS_ACCUEIL) {
+        ESP_LOGW(TAG, "profil %u refusé (hors table) : rien n'est changé", static_cast<unsigned>(nouveau.profil));
+        return false;
+    }
     AffichageNvs brut = {};
     brut.version = kVersionAffichage;
     brut.langue_ecran = static_cast<uint8_t>(i18n::indice(nouveau.langue_ecran));
@@ -196,6 +209,10 @@ bool reglages_enregistrer_affichage(const reglages::Affichage &nouveau) {
     esp_err_t err = nvs_open(kEspace, NVS_READWRITE, &h);
     if (err == ESP_OK) {
         err = nvs_set_blob(h, kCleAffichage, &brut, sizeof(brut));
+        if (err == ESP_OK) {
+            err = nvs_set_u8(h, kCleProfil,
+                             static_cast<uint8_t>(nouveau.profil)); // même validation : un seul commit pour les deux
+        }
         if (err == ESP_OK) {
             err = nvs_commit(h);
         }

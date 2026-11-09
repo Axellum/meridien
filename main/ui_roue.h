@@ -25,11 +25,13 @@ namespace ecran {
 #include "ui_roue_icones.inc"
 
 // Un choix du second anneau d'une famille : son mot (déjà traduit), son icône (un glyphe de ui_roue_icones.inc : jamais nul, une icône
-// n'est jamais un rectangle vide) et ce qu'il fait.
+// n'est jamais un rectangle vide) et ce qu'il fait. `actif` : c'est le choix en vigueur (le profil épinglé, ou « Auto »), marqué comme
+// la famille dépliée du premier anneau : filet et icône à la couleur d'accent ; il reste touchable (le choisir de nouveau ne change rien).
 struct ChoixRoue {
     const char *texte;
     const char *icone;
     void (*action)();
+    bool actif = false;
 };
 
 // Une entrée du premier anneau. UNE commande (`action`, `choix` nul) ou UNE famille (`choix` : `nb_choix` choix, `action` nul).
@@ -92,7 +94,7 @@ bool ui_roue_position(PositionRoue *position);
 bool ui_roue_centre_choix(int rang, int32_t *x, int32_t *y);
 
 // Ce que la roue coûte : objets LVGL vivants (0 fermée, 1 ouverte), minuteurs, polices gardées, et la RAM statique de son état en
-// octets (sizeof de l'état : 2 192 sur le PC, 1 436 sur la carte RISC-V 32 bits, pointeurs de 4 octets ; les polices TinyTTF et leurs glyphes sont en PSRAM, non comptés ici).
+// octets (sizeof de l'état : 2 576 sur le PC, 1 628 sur la carte RISC-V 32 bits, pointeurs de 4 octets, depuis `ChoixRoue::actif` ; les polices TinyTTF et leurs glyphes sont en PSRAM, non comptés ici).
 struct CoutRoue {
     int objets;
     int minuteurs;

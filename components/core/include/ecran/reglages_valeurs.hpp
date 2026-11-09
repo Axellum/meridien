@@ -228,6 +228,25 @@ constexpr Theme theme_depuis_indice(int i, Theme defaut = Theme::Auto) noexcept 
     return (i >= 0 && i < static_cast<int>(NOMBRE_THEMES)) ? static_cast<Theme>(i) : defaut;
 }
 
+// Le profil de l'accueil (ADR-0023) : « auto » = les règles de l'ADR-0015 décident, sinon un profil épinglé. Seuls les profils que
+// l'appareil sait dessiner sont offerts (aujourd'hui Météo) ; l'ordre est celui des indices enregistrés en NVS, il ne change jamais.
+enum class ProfilAccueil : std::uint8_t { Auto = 0, Meteo = 1 };
+inline constexpr std::size_t NOMBRE_PROFILS_ACCUEIL = 2;
+inline constexpr std::string_view PROFILS_ACCUEIL[NOMBRE_PROFILS_ACCUEIL] = {"auto", "meteo"};
+
+constexpr std::string_view code(ProfilAccueil p) noexcept { return PROFILS_ACCUEIL[static_cast<std::size_t>(p)]; }
+constexpr std::optional<ProfilAccueil> profil_accueil_depuis_code(std::string_view c) noexcept {
+    for (std::size_t i = 0; i < NOMBRE_PROFILS_ACCUEIL; ++i) {
+        if (PROFILS_ACCUEIL[i] == c)
+            return static_cast<ProfilAccueil>(i);
+    }
+    return std::nullopt;
+}
+// Indice lu en NVS -> profil ; hors de 0..1 (une NVS abîmée) : `defaut`, c'est-à-dire PAS d'épinglage.
+constexpr ProfilAccueil profil_accueil_depuis_indice(int i, ProfilAccueil defaut = ProfilAccueil::Auto) noexcept {
+    return (i >= 0 && i < static_cast<int>(NOMBRE_PROFILS_ACCUEIL)) ? static_cast<ProfilAccueil>(i) : defaut;
+}
+
 inline constexpr int LUMINOSITE_MIN = 5;
 inline constexpr int LUMINOSITE_MAX = 100;
 // 75 % comme le rétroéclairage du premier démarrage (main.cpp) : moins de courant et de chaleur que 100 %.
@@ -244,14 +263,15 @@ struct Affichage {
     i18n::Langue langue_assistant = i18n::Langue::Fr;
     Theme theme = Theme::Auto;
     int luminosite = LUMINOSITE_DEFAUT;
+    ProfilAccueil profil = ProfilAccueil::Auto;
 };
 
 constexpr bool operator==(const Affichage &a, const Affichage &b) noexcept {
     return a.langue_ecran == b.langue_ecran && a.langue_assistant == b.langue_assistant && a.theme == b.theme &&
-           a.luminosite == b.luminosite;
+           a.luminosite == b.luminosite && a.profil == b.profil;
 }
 
-enum class ErreurAffichage : std::uint8_t { Aucune, LangueEcran, LangueAssistant, Theme, Luminosite };
+enum class ErreurAffichage : std::uint8_t { Aucune, LangueEcran, LangueAssistant, Theme, Luminosite, Profil };
 
 struct ResultatAffichage {
     ErreurAffichage erreur = ErreurAffichage::Aucune;
@@ -308,6 +328,18 @@ constexpr ResultatAffichage valider_affichage(const json::Valeur &corps, const A
             return r;
         }
         n.luminosite = static_cast<int>(v);
+    }
+    const json::Valeur pr = corps.champ("profil");
+    if (pr.existe()) {
+        char t[16] = {};
+        bool tronque = false;
+        pr.copier_texte(t, sizeof t, &tronque);
+        const auto v = pr.genre() == json::Genre::Chaine && !tronque ? profil_accueil_depuis_code(t) : std::nullopt;
+        if (!v) {
+            r.erreur = ErreurAffichage::Profil;
+            return r;
+        }
+        n.profil = *v;
     }
     r.valeur = n;
     return r;

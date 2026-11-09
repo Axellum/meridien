@@ -796,6 +796,42 @@ constexpr int affichage_lu_avec_les_listes_de_l_appareil() {
     VERIFIER(texte_est(r, "langues[6].nom", i18n::NOMS[6]) && texte_est(r, "langues_assistant[2].code", "de"));
     VERIFIER(texte_est(r, "themes[0]", "auto") && texte_est(r, "themes[1]", "clair") &&
              texte_est(r, "themes[2]", "sombre"));
+    // Le profil de l'accueil (ADR-0023) : « auto » par défaut, et seulement les profils que l'appareil dessine.
+    VERIFIER(texte_est(r, "profil", "auto") && taille_de(r, "profils") == 2 && texte_est(r, "profils[0]", "auto") &&
+             texte_est(r, "profils[1]", "meteo"));
+    return 0;
+}
+
+constexpr int le_profil_de_l_accueil_se_regle_et_se_relit() {
+    Banc b;
+    VERIFIER(b.connecter());
+    api::Reponse r = b.avec_jeton(Methode::Put, "/api/display", {}, R"({"profil":"meteo"})");
+    VERIFIER(r.statut == 200 && texte_est(r, "profil", "meteo") && entier_est(r, "luminosite", 75));
+    VERIFIER(b.hote.aff.profil == rg::ProfilAccueil::Meteo && b.hote.enreg_affichage == 1);
+    VERIFIER(b.hote.aff.theme == rg::Theme::Auto); // les autres champs ne bougent pas
+    r = b.avec_jeton(Methode::Get, "/api/display");
+    VERIFIER(texte_est(r, "profil", "meteo"));
+    // Même valeur : rien n'est écrit.
+    VERIFIER(b.avec_jeton(Methode::Put, "/api/display", {}, R"({"profil":"meteo"})").statut == 200);
+    VERIFIER(b.hote.enreg_affichage == 1);
+    // Le dépingler rend la main aux règles.
+    r = b.avec_jeton(Methode::Put, "/api/display", {}, R"({"profil":"auto","theme":"clair"})");
+    VERIFIER(r.statut == 200 && texte_est(r, "profil", "auto") && texte_est(r, "theme", "clair"));
+    VERIFIER(b.hote.aff.profil == rg::ProfilAccueil::Auto && b.hote.enreg_affichage == 2);
+    return 0;
+}
+
+constexpr int un_profil_inconnu_est_refuse_sans_rien_changer() {
+    Banc b;
+    VERIFIER(b.connecter());
+    auto put = [&](sv corps) { return b.avec_jeton(Methode::Put, "/api/display", {}, corps); };
+    VERIFIER(put(R"({"profil":"meteo"})").statut == 200);
+    VERIFIER(est_erreur(put(R"({"profil":"surf"})"), 422, "profil_inconnu", "profil")); // pas encore dessiné
+    VERIFIER(est_erreur(put(R"({"profil":"Meteo"})"), 422, "profil_inconnu", "profil"));
+    VERIFIER(est_erreur(put(R"({"profil":1})"), 422, "profil_inconnu", "profil"));
+    VERIFIER(est_erreur(put(R"({"profil":""})"), 422, "profil_inconnu", "profil"));
+    VERIFIER(est_erreur(put(R"({"profil":"auto","theme":"noir"})"), 422, "theme_inconnu", "theme"));
+    VERIFIER(b.hote.aff.profil == rg::ProfilAccueil::Meteo && b.hote.enreg_affichage == 1); // le profil n'a pas bougé
     return 0;
 }
 
@@ -1415,6 +1451,7 @@ constexpr sv PHRASES[] = {
     "Cette langue n’est pas disponible pour l’écran.",
     "Cette langue n’est pas disponible pour l’assistant.",
     "Ce thème n’existe pas.",
+    "Ce profil n’existe pas.",
     "La luminosité doit être entre 5 et 100 %.",
     "Cette recherche est trop longue.",
     "Tapez au moins 3 lettres.",
@@ -1603,6 +1640,8 @@ constexpr int chaque_message_de_l_api_est_traduit_dans_chaque_langue() {
     X(changer_de_ville_hors_pays_remet_automatique_et_la_reponse_le_dit)                                               \
     X(source_non_enregistree_donne_500)                                                                                \
     X(affichage_lu_avec_les_listes_de_l_appareil)                                                                      \
+    X(le_profil_de_l_accueil_se_regle_et_se_relit)                                                                     \
+    X(un_profil_inconnu_est_refuse_sans_rien_changer)                                                                  \
     X(affichage_modifie_champ_par_champ)                                                                               \
     X(affichage_inchange_n_ecrit_rien)                                                                                 \
     X(affichage_refuse_tout_ou_rien)                                                                                   \

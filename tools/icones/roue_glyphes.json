@@ -37,11 +37,29 @@
       "mdi": "compass-rose",
       "point": "F1382",
       "ou": "centre de la roue, « Aller à »"
+    },
+    {
+      "id": "profil",
+      "mdi": "monitor-dashboard",
+      "point": "F0A07",
+      "ou": "bouton « Profil » du premier anneau (famille : Auto ou un profil épinglé, ADR-0023)"
+    },
+    {
+      "id": "profil_auto",
+      "mdi": "refresh-auto",
+      "point": "F18F2",
+      "ou": "choix « Auto » du second anneau de « Profil »"
+    },
+    {
+      "id": "profil_meteo",
+      "mdi": "weather-partly-cloudy",
+      "point": "F0595",
+      "ou": "choix « Météo » du second anneau de « Profil », et pastille du profil épinglé"
     }
   ],
   "sortie": {
     "fichier": "main/assets/mdi_roue.ttf",
-    "sha256": "9f4f0f0586ca160248d884ea9ffb84e4c5810ef50c7d32b74170179946e6a873",
-    "taille": 1564
+    "sha256": "cff73de8eff840fbc6eb73033cd6582472fe246a2683dd664f508e7d5dd6138c",
+    "taille": 2140
   }
 }

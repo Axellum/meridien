@@ -219,6 +219,8 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Clair": "Licht"
 "Sombre": "Donker"
 "Luminosité": "Helderheid"
+"Profil": "Profiel"
+"Auto : l’écran choisit seul, selon la pluie et les alertes. Météo : l’écran reste sur la météo (une alerte officielle s’affiche quand même).": "Auto: het scherm kiest zelf, op basis van regen en waarschuwingen. Weer: het scherm blijft bij het weer (een officiële waarschuwing verschijnt toch)."
 "Enregistré": "Opgeslagen"
 
 # --- Page de réglages : Wi-Fi ---
@@ -292,6 +294,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Cette langue n’est pas disponible pour l’écran.": "Deze taal is niet beschikbaar voor het scherm."
 "Cette langue n’est pas disponible pour l’assistant.": "Deze taal is niet beschikbaar voor de assistent."
 "Ce thème n’existe pas.": "Dit thema bestaat niet."
+"Ce profil n’existe pas.": "Dit profiel bestaat niet."
 "La luminosité doit être entre 5 et 100 %.": "De helderheid moet tussen 5 en 100 % liggen."
 "Cette adresse n’est pas valide.": "Dit adres is ongeldig."
 "L’adresse doit commencer par http:// ou https://.": "Het adres moet beginnen met http:// of https://."

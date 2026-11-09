@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "ecran/accueil.hpp"
+#include "ecran/accueil_cartes.hpp"
 #include "ecran/heure_lieu.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_wmo.hpp"
@@ -66,6 +67,10 @@ struct PlaceOfficielle {
     const dz::Police *police = nullptr;
     char texte[vigie::BANDEAU_TEXTE_CAP + 4] = {};
     char autres[8] = {};
+    // Le bandeau d'alerte AGRANDI (orange ou rouge, ADR-0015 règle 1) : une grande carte au lieu d'une puce. Le titre de l'émetteur est
+    // alors posé sur deux lignes au plus (`texte`), la fenêtre « 14–22 h » sur la sienne (`fenetre`).
+    bool grande = false;
+    char fenetre[24] = {};
 };
 
 struct Vue {
@@ -91,6 +96,18 @@ struct Vue {
     int extra_h = 0; // hauteur de référence gagnée au-delà de 720 (la 7B) : elle va à la carte des jours
     ThemePrincipal theme_gris = kThemeCiel; // le thème de la météo périmée (accueil::theme_grise)
     accueil::EpisodePluie pluie;            // la pluie à annoncer dans le bandeau (recalculée à chaque mise à jour)
+    // Le mode automatique (ADR-0023) : ce qui a été décidé, la composition de la zone du bas qui en découle et ses rectangles.
+    accueil::Presentation mode;
+    accueil::Composition composition = accueil::Composition::Normale;
+    std::uint32_t cle_disposition =
+        0;                           // composition + alerte + tuile : quand elle change, les rectangles sont recalculés
+    accueil::CartePluie carte_pluie; // le contenu de la carte pluie (ou de la tuile de pluie) ; `presente` faux : rien
+    Rect rect_alerte;                // la grande carte d'alerte (composition d'alerte) ; vide sinon
+    Rect rect_tuile;                 // la tuile de pluie à côté d'elle ; vide sinon
+    bool bas_en_bande = false;       // la zone du bas est la bande réduite des cinq jours
+    bool alerte_dans_bandeau = false; // une alerte (officielle, ou déduite de la météo) occupe le bandeau
+    bool tuile_dit_quelque_chose =
+        false; // la composition d'alerte a de quoi remplir la tuile (pluie, ou données périmées)
     int diametre_anneau = 88;
     int objets = 0;
     void (*appui_long)(int32_t x, int32_t y) = nullptr;
@@ -390,8 +407,22 @@ void calculer_disposition() {
         g.rect[Z_HORLOGE] = en_pixels(z.horloge);
         g.rect[Z_MAINTENANT] = en_pixels(z.maintenant);
         g.rect[Z_HEURES] = en_pixels(z.heures);
-        g.rect[Z_BANDEAU] = en_pixels(z.bandeau);
-        g.rect[Z_SEMAINE] = en_pixels(z.jours);
+        g.rect_alerte = {};
+        g.rect_tuile = {};
+        g.bas_en_bande = false;
+        if (g.composition == accueil::Composition::Normale) {
+            g.rect[Z_BANDEAU] = en_pixels(z.bandeau);
+            g.rect[Z_SEMAINE] = en_pixels(z.jours);
+            return;
+        }
+        // Le mode automatique a ajouté quelque chose à la zone du bas (ADR-0023) : le noyau pur calcule les rectangles.
+        const accueil::ZonesAuto a = accueil::disposer_auto(ref_l, ref_h, g.portrait, g.composition,
+                                                            g.alerte_dans_bandeau, g.tuile_dit_quelque_chose);
+        g.rect[Z_BANDEAU] = en_pixels(a.bandeau);
+        g.rect[Z_SEMAINE] = en_pixels(a.bas);
+        g.rect_alerte = en_pixels(a.alerte);
+        g.rect_tuile = en_pixels(a.tuile);
+        g.bas_en_bande = a.bas_en_bande;
         return;
     }
     // Composition calme : l'heure géante au centre, la météo du moment dessous, les sept jours en bas ; ni courbe d'heures ni bandeau
@@ -797,29 +828,38 @@ void voile_entre(const dz::Pinceau &pc, const accueil::CourbeMonotone &haut, con
 
 // ---- zone : lieu ----
 
+// La pastille du mode automatique (ADR-0023), plus bas avec les autres puces : elle dit POURQUOI l'écran est tel qu'il est.
+int dessiner_pastille_mode(const Ctx &c, int x, int largeur_max);
+
 void dessiner_barre_accueil(const Ctx &c) {
     const ThemePrincipal &t = *g.theme;
     const VueMeteo &m = g.e.meteo;
     const int centre = c.y + c.h / 2;
-    // « Exemple » se pose après le lieu ; la zone entière est au lieu (les réglages s'ouvrent par la roue d'appui long).
+    // « Exemple » se pose après le lieu et la pastille du mode ; la zone entière est au lieu (les réglages s'ouvrent par la roue d'appui
+    // long).
     int bord = c.x + c.w - px(16);
     const int w_exemple = m.exemple ? largeur_etat_exemple() : 0;
     if (m.exemple) {
         bord -= w_exemple + px(16);
     }
+    // Le lieu garde au plus 55 % de la barre : la pastille du mode a toujours de quoi se dire à côté d'un nom long.
+    const int bord_lieu = std::min(bord, c.x + c.w * 55 / 100);
     int x_fin = c.x + px(6);
     if (m.ville[0] != '\0') {
         const int icone = px(28);
         icones::piece(c.pc.couche, Piece::epingle, icone, c.x + px(6), centre - icone / 2, t.texte_2);
         const int x_texte = c.x + px(44);
-        const Ajuste a = ajuster({&g.petit, &g.mini}, m.ville, std::max(px(40), bord - x_texte));
-        const int w = std::min(bord - x_texte, dz::largeur_texte(*a.police, a.texte));
+        const Ajuste a = ajuster({&g.petit, &g.mini}, m.ville, std::max(px(40), bord_lieu - x_texte));
+        const int w = std::min(bord_lieu - x_texte, dz::largeur_texte(*a.police, a.texte));
         dz::texte(c.pc, *a.police, a.texte, x_texte, centre - dz::hauteur_ligne(*a.police) / 2,
                   std::max(px(40), w) + px(4), LV_TEXT_ALIGN_LEFT, t.texte_2);
         x_fin = x_texte + w;
     }
+    const int x_pastille = x_fin + px(16);
+    x_fin =
+        dessiner_pastille_mode(c, x_pastille, c.x + c.w - px(6) - (m.exemple ? w_exemple + px(16) : 0) - x_pastille);
     if (m.exemple) {
-        const int x = x_fin + px(16);
+        const int x = (x_fin > 0 ? x_fin : x_pastille - px(16)) + px(16);
         dz::rect(c.pc, x, centre - px(18), w_exemple, px(36), px(18), t.avertissement);
         dz::texte(c.pc, g.petit, texte_principal::t(texte_principal::kExemple), x,
                   centre - dz::hauteur_ligne(g.petit) / 2, w_exemple, LV_TEXT_ALIGN_CENTER, t.texte_sur_couleur);
@@ -1119,15 +1159,431 @@ void texte_de_pluie(char *sortie, std::size_t n, bool avec_cumul) {
     }
 }
 
+// ---- le mode automatique : la pastille, la carte pluie, la tuile, la bande des jours (ADR-0023) ----------------------------------
+
+// La teinte de la pastille du mode : un RÔLE du thème (le noyau dit le ton, jamais une couleur).
+std::uint32_t teinte_du_mode(const ThemePrincipal &t) {
+    switch (accueil::ton_de(g.mode.raison)) {
+    case accueil::Ton::Pluie:
+        return t.pluie;
+    case accueil::Ton::Alerte:
+        return g.e.bandeau.present ? couleur_officielle(t, static_cast<int>(g.e.bandeau.niveau)) : t.avertissement;
+    case accueil::Ton::Epingle:
+        return t.accent;
+    case accueil::Ton::Neutre:
+        break;
+    }
+    return t.texte_3;
+}
+
+// La pastille « Auto · pluie proche » à côté du lieu, suivie de « Auto en pause » quand un profil est épinglé. Rend le bord droit de ce
+// qui a été dessiné (0 : rien, faute de place). Le texte est coupé par « … » plutôt que de déborder.
+int dessiner_pastille_mode(const Ctx &c, int x, int largeur_max) {
+    const int h = px(36);
+    const int pad = px(14);
+    if (largeur_max < px(90)) {
+        return 0;
+    }
+    const ThemePrincipal &t = *g.theme;
+    const int centre = c.y + c.h / 2;
+    const char *phrase = texte_principal::t(accueil::phrase_pastille(g.mode.raison, g.mode.profil));
+    const Ajuste a = ajuster({&g.petit, &g.mini}, phrase, largeur_max - 2 * pad);
+    const int w_texte = std::min(largeur_max - 2 * pad, dz::largeur_texte(*a.police, a.texte));
+    const int w = w_texte + 2 * pad;
+    fond_de_puce(c.pc, x, centre - h / 2, w, h, teinte_du_mode(t), 51, 166);
+    dz::texte(c.pc, *a.police, a.texte, x + pad, centre - dz::hauteur_ligne(*a.police) / 2, w_texte + px(4),
+              LV_TEXT_ALIGN_LEFT, t.texte);
+    int fin = x + w;
+    if (g.mode.epingle) {
+        const char *pause = texte_principal::t(accueil::PHRASE_AUTO_EN_PAUSE);
+        const int w_pause = dz::largeur_texte(g.mini, pause);
+        const int x_pause = fin + px(12);
+        if (x_pause + w_pause <= x + largeur_max) {
+            dz::texte(c.pc, g.mini, pause, x_pause, centre - dz::hauteur_ligne(g.mini) / 2, w_pause + px(4),
+                      LV_TEXT_ALIGN_LEFT, t.texte_3);
+            fin = x_pause + w_pause;
+        }
+    }
+    return fin;
+}
+
+const char *texte_force_pluie(accueil::NiveauPluie n) {
+    switch (n) {
+    case accueil::NiveauPluie::FAIBLE:
+        return texte_principal::t("Pluie faible");
+    case accueil::NiveauPluie::MOYEN:
+        return texte_principal::t("Pluie modérée");
+    case accueil::NiveauPluie::FORT:
+        break;
+    }
+    return texte_principal::t("Pluie forte");
+}
+
+// « Pluie modérée · puis plus forte vers 15 h » (la force de l'heure du début, puis un mot si une heure plus forte suit).
+void texte_de_force(char *sortie, std::size_t n) {
+    const accueil::CartePluie &cp = g.carte_pluie;
+    sortie[0] = '\0';
+    if (!cp.force_connue) {
+        return;
+    }
+    std::snprintf(sortie, n, "%s", texte_force_pluie(cp.force));
+    if (cp.plus_forte_plus_tard && cp.pic_s > 0) {
+        char heure[16] = {};
+        accueil::formater_heure_phrase(heure_du(cp.pic_s), en_francais(), heure, sizeof heure);
+        const std::size_t deja = std::strlen(sortie);
+        std::snprintf(sortie + deja, n - deja, "%s", POINT_MEDIAN);
+        const std::size_t apres = std::strlen(sortie);
+        std::snprintf(sortie + apres, n - apres, texte_principal::t("puis plus forte vers %s"), heure);
+    }
+}
+
+// « environ 5 h · 6,5 mm en tout » : la durée seulement si elle est connue, le cumul seulement s'il est connu et non nul.
+void texte_de_duree(char *sortie, std::size_t n) {
+    const accueil::CartePluie &cp = g.carte_pluie;
+    sortie[0] = '\0';
+    if (cp.duree_h > 0) {
+        std::snprintf(sortie, n, texte_principal::t("environ %d h"), cp.duree_h);
+    }
+    // Le cumul vient de la carte quand elle est là, sinon de l'épisode annoncé (une pluie plus tardive que la carte, dite par la tuile).
+    const int cumul = cp.presente ? cp.cumul_dix_mm : g.pluie.cumul_dix_mm;
+    if (connu(cumul) && cumul > 0) {
+        char mm[16];
+        fmt_dixieme(mm, sizeof mm, cumul);
+        const std::size_t deja = std::strlen(sortie);
+        if (deja > 0) {
+            std::snprintf(sortie + deja, n - deja, "%s", POINT_MEDIAN);
+        }
+        const std::size_t apres = std::strlen(sortie);
+        std::snprintf(sortie + apres, n - apres, texte_principal::t("%s mm en tout"), mm);
+    }
+}
+
+// La durée et le cumul : sur une ligne (la police la plus grande qui tient), sinon, pour une langue longue ou un cumul à trois chiffres,
+// sur deux lignes coupées à leur point médian. Jamais le cumul rogné par « … » tant qu'il y a un point où couper.
+struct BlocDuree {
+    const Police *police = nullptr;
+    int lignes = 0; // 0 : rien à dire
+};
+
+// La plus large des lignes de `s` (séparées par « \n »), dans la police `p`.
+int largeur_de_la_plus_large_ligne(const Police &p, const char *s) {
+    int maxi = 0;
+    while (*s != '\0') {
+        const char *fin = std::strchr(s, '\n');
+        char ligne[96];
+        const std::size_t n =
+            std::min(fin != nullptr ? static_cast<std::size_t>(fin - s) : std::strlen(s), sizeof ligne - 1);
+        std::memcpy(ligne, s, n);
+        ligne[n] = '\0';
+        maxi = std::max(maxi, dz::largeur_texte(p, ligne));
+        if (fin == nullptr) {
+            break;
+        }
+        s = fin + 1;
+    }
+    return maxi;
+}
+
+// Prépare `duree` (elle peut y gagner un « \n ») pour une boîte de `largeur` pixels.
+BlocDuree composer_duree(char *duree, int largeur) {
+    BlocDuree b;
+    if (duree[0] == '\0') {
+        return b;
+    }
+    b.lignes = 1;
+    b.police = &g.petit;
+    if (dz::largeur_texte(g.petit, duree) <= largeur) {
+        return b;
+    }
+    b.police = &g.mini;
+    if (dz::largeur_texte(g.mini, duree) <= largeur) {
+        return b;
+    }
+    char *point = std::strstr(duree, POINT_MEDIAN);
+    if (point == nullptr) {
+        return b; // rien où couper : la ligne sera tronquée par « … » (jamais vu : une durée et un cumul se séparent toujours)
+    }
+    const std::size_t n_point = std::strlen(POINT_MEDIAN);
+    std::memmove(point + 1, point + n_point, std::strlen(point + n_point) + 1);
+    *point = '\n';
+    b.lignes = 2;
+    b.police = largeur_de_la_plus_large_ligne(g.petit, duree) <= largeur ? &g.petit : &g.mini;
+    return b;
+}
+
+int hauteur_de_la_duree(const BlocDuree &b) {
+    return b.lignes > 0 ? b.lignes * dz::hauteur_ligne(*b.police) + px(8) : 0;
+}
+
+// `y` : le haut du bloc.
+void poser_la_duree(const Ctx &c, const BlocDuree &b, const char *duree, int x, int y, int w, std::uint32_t rgb) {
+    if (b.lignes >= 2) {
+        dz::texte(c.pc, *b.police, duree, x, y, w, LV_TEXT_ALIGN_LEFT, rgb, LV_OPA_COVER, b.lignes);
+    } else if (b.lignes == 1) {
+        texte_ajuste(c.pc, {&g.petit, &g.mini}, duree, x, y + dz::hauteur_ligne(g.petit) / 2, w, LV_TEXT_ALIGN_LEFT,
+                     rgb);
+    }
+}
+
+// Les barres de la pluie heure par heure (la carte pluie et, en plus petit, la tuile). Chaque barre a la couleur de son niveau et une
+// hauteur proportionnelle à la pluie de l'heure sur l'échelle de la carte ; une heure sèche est un petit trait, une heure inconnue
+// n'a rien. `reperes` : deux lignes fines à 1 et 3 mm/h, avec leur valeur à gauche. `etiquettes` : l'heure sous chaque barre (une sur deux
+// quand la place manque).
+void dessiner_graphique_pluie(const dz::Pinceau &pc, const ThemePrincipal &t, int x, int y, int w, int h,
+                              bool etiquettes, bool reperes) {
+    const accueil::CartePluie &cp = g.carte_pluie;
+    if (cp.n <= 0 || w <= 0 || h <= 0) {
+        return;
+    }
+    const int h_etiq = etiquettes ? dz::hauteur_ligne(g.mini) + px(6) : 0;
+    const int h_barres = h - h_etiq;
+    if (h_barres < px(24)) {
+        return;
+    }
+    const char *const REPERES[2] = {"1 mm/h", "3 mm/h"};
+    const int gouttiere = reperes ? dz::largeur_texte(g.mini, REPERES[1]) + px(12) : 0;
+    const int x0 = x + gouttiere;
+    const int pas = (w - gouttiere) / cp.n;
+    const int base = y + h_barres;
+    if (reperes) {
+        const int seuils[2] = {accueil::SEUIL_MODEREE_DIX, accueil::SEUIL_FORTE_DIX};
+        for (int i = 0; i < 2; ++i) {
+            if (!accueil::repere_visible(seuils[i], cp.echelle_dix)) {
+                continue;
+            }
+            const int yy = base - accueil::hauteur_du_repere(seuils[i], cp.echelle_dix, h_barres);
+            dz::rect(pc, x0, yy, w - gouttiere, std::max(1, px(1)), 0, t.texte, 40);
+            dz::texte(pc, g.mini, REPERES[i], x, yy - dz::hauteur_ligne(g.mini) / 2, gouttiere - px(8),
+                      LV_TEXT_ALIGN_RIGHT, t.texte_3);
+        }
+    }
+    dz::rect(pc, x0, base, w - gouttiere, std::max(1, px(2)), 0, t.texte, 60);
+    const int largeur_barre = std::max(px(8), pas - px(16));
+    char etiquette[16];
+    // Toutes les étiquettes, ou une sur deux : jamais un mélange selon la largeur de chaque heure (« 9 h » est plus courte que « 10 h »).
+    int plus_large = 0;
+    for (int i = 0; etiquettes && i < cp.n; ++i) {
+        accueil::formater_heure_phrase(heure_du(cp.barre[i].instant_s), en_francais(), etiquette, sizeof etiquette);
+        plus_large = std::max(plus_large, dz::largeur_texte(g.mini, etiquette));
+    }
+    const bool toutes = plus_large + px(4) <= pas;
+    for (int i = 0; i < cp.n; ++i) {
+        const accueil::BarrePluie &b = cp.barre[i];
+        const int cx = x0 + pas * i + pas / 2;
+        const int hb = accueil::hauteur_de_barre(b.dix_mm, cp.echelle_dix, h_barres, px(6));
+        if (hb > 0) {
+            dz::rect(pc, cx - largeur_barre / 2, base - hb, largeur_barre, hb, std::min(px(8), largeur_barre / 2),
+                     accueil::couleur_niveau_pluie(t, b.niveau));
+        } else if (connu(b.dix_mm)) {
+            dz::rect(pc, cx - px(10), base - px(6), px(20), px(4), px(2), t.texte, 36); // sec : un trait
+        }
+        if (!etiquettes) {
+            continue;
+        }
+        accueil::formater_heure_phrase(heure_du(b.instant_s), en_francais(), etiquette, sizeof etiquette);
+        if (toutes || i % 2 == 0) {
+            dz::texte(pc, g.mini, etiquette, cx - pas, base + px(6), 2 * pas, LV_TEXT_ALIGN_CENTER, t.texte_2);
+        }
+    }
+}
+
+// La carte pluie (ADR-0015 règle 2) : elle recouvre la zone des cinq jours. À gauche (en haut en portrait) le compte à rebours, la
+// force de la pluie, sa durée et son cumul ; à droite (en bas) les barres des prochaines heures.
+void dessiner_carte_pluie(const Ctx &c) {
+    const ThemePrincipal &t = *g.theme;
+    carte_de_verre(c, px(28));
+    const accueil::CartePluie &cp = g.carte_pluie;
+    if (!cp.presente) {
+        return;
+    }
+    const int pad = px(32);
+    const int x0 = c.x + pad;
+    const int w_tout = c.w - 2 * pad;
+    const int w_texte = g.portrait ? w_tout : w_tout * 46 / 100;
+
+    char tete[96], force[128], duree[96];
+    texte_de_pluie(tete, sizeof tete, false);
+    texte_de_force(force, sizeof force);
+    texte_de_duree(duree, sizeof duree);
+    const BlocDuree bloc_duree = composer_duree(duree, w_texte);
+
+    const int icone = px(56);
+    const int x_tete = x0 + icone + px(16);
+    const Ajuste a_tete = ajuster({&g.temperature, &g.titre, &g.corps}, tete, w_texte - icone - px(16));
+    const int h_tete = std::max(icone, dz::hauteur_ligne(*a_tete.police));
+    const int h_force = force[0] != '\0' ? dz::hauteur_ligne(g.corps) + px(10) : 0;
+    const int h_duree = hauteur_de_la_duree(bloc_duree);
+    const int h_bloc = h_tete + h_force + h_duree + (h_force > 0 || h_duree > 0 ? px(10) : 0);
+    int y = c.y + std::max(px(24), g.portrait ? px(32) : (c.h - h_bloc) / 2);
+
+    icones::piece(c.pc.couche, Piece::parapluie, icone, x0, y + (h_tete - icone) / 2, t.pluie);
+    dz::texte(c.pc, *a_tete.police, a_tete.texte, x_tete, y + (h_tete - dz::hauteur_ligne(*a_tete.police)) / 2,
+              w_texte - icone - px(16) + px(4), LV_TEXT_ALIGN_LEFT, t.texte);
+    y += h_tete + px(10);
+    if (force[0] != '\0') {
+        const int rayon = px(9);
+        const std::uint32_t teinte = accueil::couleur_niveau_pluie(t, cp.force);
+        dz::disque(c.pc, x0 + rayon, y + dz::hauteur_ligne(g.corps) / 2, rayon, teinte);
+        texte_ajuste(c.pc, {&g.corps, &g.petit, &g.mini}, force, x0 + 2 * rayon + px(12),
+                     y + dz::hauteur_ligne(g.corps) / 2, w_texte - 2 * rayon - px(12), LV_TEXT_ALIGN_LEFT, t.texte);
+        y += h_force;
+    }
+    if (bloc_duree.lignes > 0) {
+        poser_la_duree(c, bloc_duree, duree, x0, y, w_texte, t.texte_2);
+        y += h_duree;
+    }
+    if (g.portrait) {
+        const int y_graph = y + px(20);
+        dessiner_graphique_pluie(c.pc, t, x0, y_graph, w_tout, c.y + c.h - pad - y_graph, true, true);
+    } else {
+        const int x_graph = x0 + w_texte + px(40);
+        dessiner_graphique_pluie(c.pc, t, x_graph, c.y + px(28), c.x + c.w - pad - x_graph, c.h - px(28) - px(24), true,
+                                 true);
+    }
+}
+
+// La tuile de la composition d'alerte (à droite de la grande carte d'alerte, sous elle en portrait) : la pluie qui arrive, en petit, ou
+// la mention des données périmées. En portrait elle tient sur une ligne (la même puce que le bandeau d'avant), en paysage elle est une
+// carte avec sa phrase et ses barres.
+void dessiner_tuile(const Ctx &c) {
+    const ThemePrincipal &t = theme_meteo();
+    const ThemePrincipal &normal = *g.theme;
+    const VueMeteo &m = g.e.meteo;
+    const Rect &r = g.rect_tuile;
+    if (r.w <= 0 || r.h <= 0) {
+        return;
+    }
+    const bool perimee = m.perimee;
+    if (g.portrait) {
+        if (perimee) {
+            char hhmm[16], s[96];
+            fmt_hhmm(hhmm, sizeof hhmm, m.instant_s);
+            std::snprintf(s, sizeof s, texte_principal::t("Données de %s · périmées"), hhmm);
+            puce(c.pc, normal, r, normal.avertissement, 51, 166, Piece::hors_ligne, s);
+        } else {
+            char s[96];
+            texte_de_pluie(s, sizeof s, true);
+            puce(c.pc, t, r, t.pluie, 51, 166, Piece::parapluie, s);
+        }
+        return;
+    }
+    dz::rect_bord(c.pc, r.x, r.y, r.w, r.h, px(28), normal.carte, normal.carte_opa, normal.texte, 20, px(2));
+    const int pad = px(24);
+    const int icone = px(44);
+    if (perimee) {
+        // « Données de 07:52 » puis « périmées » : la phrase est coupée à son point médian, pas au milieu d'un mot.
+        char hhmm[16], s[96];
+        fmt_hhmm(hhmm, sizeof hhmm, m.instant_s);
+        std::snprintf(s, sizeof s, texte_principal::t("Données de %s · périmées"), hhmm);
+        if (char *point = std::strstr(s, POINT_MEDIAN); point != nullptr) {
+            const std::size_t n_point = std::strlen(POINT_MEDIAN);
+            std::memmove(point + 1, point + n_point, std::strlen(point + n_point) + 1);
+            *point = '\n';
+        }
+        const int h_bloc = icone + px(12) + 2 * dz::hauteur_ligne(g.petit);
+        const int y0 = r.y + std::max(pad, (r.h - h_bloc) / 2);
+        icones::piece(c.pc.couche, Piece::hors_ligne, icone, r.x + pad, y0, normal.avertissement);
+        dz::texte(c.pc, g.petit, s, r.x + pad, y0 + icone + px(12), r.w - 2 * pad, LV_TEXT_ALIGN_LEFT, normal.texte,
+                  LV_OPA_COVER, 2);
+        return;
+    }
+    char tete[96], duree[96];
+    texte_de_pluie(tete, sizeof tete, false);
+    texte_de_duree(duree, sizeof duree);
+    const BlocDuree bloc_duree = composer_duree(duree, r.w - 2 * pad);
+    // Sans barres (une pluie plus tardive que la carte) le contenu est court : on le centre dans la tuile.
+    const int h_duree = hauteur_de_la_duree(bloc_duree);
+    const int h_texte = icone + px(8) + h_duree;
+    const int y0 = g.carte_pluie.n > 0 ? r.y + pad : r.y + std::max(pad, (r.h - h_texte) / 2);
+    icones::piece(c.pc.couche, Piece::parapluie, icone, r.x + pad, y0, t.pluie);
+    const int x_texte = r.x + pad + icone + px(12);
+    texte_ajuste(c.pc, {&g.corps, &g.petit, &g.mini}, tete, x_texte, y0 + icone / 2, r.x + r.w - pad - x_texte,
+                 LV_TEXT_ALIGN_LEFT, t.texte);
+    int y = y0 + icone + px(8);
+    if (bloc_duree.lignes > 0) {
+        poser_la_duree(c, bloc_duree, duree, r.x + pad, y, r.w - 2 * pad, t.texte_2);
+        y += h_duree;
+    }
+    dessiner_graphique_pluie(c.pc, t, r.x + pad, y + px(4), r.w - 2 * pad, r.y + r.h - pad - y - px(4), false, false);
+}
+
+// Les cinq jours réduits à une bande (composition d'alerte) : le nom du jour, l'icône, la maximale et la minimale. Pas de ruban, de
+// vent ni de pluie : la place est donnée à l'alerte.
+void dessiner_bande_jours(const Ctx &c) {
+    const ThemePrincipal &t = theme_meteo();
+    const VueMeteo &m = g.e.meteo;
+    carte_de_verre(c, px(28));
+    const int debut = premier_jour();
+    const int n = std::min(COLONNES_JOURS, m.nb_jours - debut);
+    if (n <= 0) {
+        return;
+    }
+    const JourPrevu *jours = m.jours + debut;
+    const std::int64_t numero_aujourdhui = ecran::heure::numero_jour_local(g.e.maintenant_s, fuseau());
+    const int x0 = c.x + px(24);
+    const int largeur = c.w - 2 * px(24);
+    const int pas = largeur / n;
+    const bool large = pas >= px(200);
+    for (int i = 0; i < n; ++i) {
+        const JourPrevu &j = jours[i];
+        const int cx = x0 + largeur * (2 * i + 1) / (2 * n);
+        const bool aujourdhui = numero_du_jour_prevu(j) == numero_aujourdhui;
+        char nom[24];
+        jour_court(i18n::langue_courante(), ecran::heure::jour_semaine_du_jour(j.date_s, fuseau()), nom, sizeof nom);
+        if (nom[0] >= 'a' && nom[0] <= 'z') {
+            nom[0] = static_cast<char>(nom[0] - 'a' + 'A');
+        }
+        char haut[24], bas[24];
+        fmt_temp(haut, sizeof haut, j.max_dix);
+        fmt_temp(bas, sizeof bas, j.min_dix);
+        const std::uint32_t c_haut = connu(j.max_dix) ? couleur_temperature(j.max_dix, t.rampe) : t.texte_3;
+        const std::uint32_t c_bas = connu(j.min_dix) ? couleur_temperature(j.min_dix, t.rampe) : t.texte_3;
+        const std::uint32_t c_nom = aujourdhui ? t.accent : t.texte_2;
+        const int cote = large ? px(48) : px(40);
+        if (large) {
+            // Une seule rangée : le nom, l'icône, « 14° / 8° ».
+            const int w_nom = dz::largeur_texte(g.petit, nom);
+            const int w_haut = dz::largeur_texte(g.corps, haut);
+            const int w_bas = dz::largeur_texte(g.mini, bas);
+            const int sep = px(8);
+            const int w_tout = w_nom + px(12) + cote + px(12) + w_haut + sep + w_bas;
+            int x = cx - w_tout / 2;
+            const int milieu = c.y + c.h / 2;
+            texte_base(c.pc, g.petit, nom, x, milieu + px(9), w_nom + px(4), LV_TEXT_ALIGN_LEFT, c_nom);
+            x += w_nom + px(12);
+            icones::meteo(c.pc.couche, icone_pour_code(j.code, true), cote, x, milieu - cote / 2, t);
+            x += cote + px(12);
+            texte_base(c.pc, g.corps, haut, x, milieu + px(11), w_haut + px(4), LV_TEXT_ALIGN_LEFT, c_haut);
+            x += w_haut + sep;
+            texte_base(c.pc, g.mini, bas, x, milieu + px(8), w_bas + px(4), LV_TEXT_ALIGN_LEFT, c_bas);
+        } else {
+            // Colonne étroite (portrait) : le nom au-dessus, l'icône et la maximale dessous.
+            dz::texte(c.pc, g.mini, nom, cx - pas / 2, c.y + px(6), pas, LV_TEXT_ALIGN_CENTER, c_nom);
+            const int w_haut = dz::largeur_texte(g.corps, haut);
+            const int w_tout = cote + px(6) + w_haut;
+            int x = cx - w_tout / 2;
+            const int milieu = c.y + c.h - px(6) - cote / 2;
+            icones::meteo(c.pc.couche, icone_pour_code(j.code, true), cote, x, milieu - cote / 2, t);
+            x += cote + px(6);
+            texte_base(c.pc, g.corps, haut, x, milieu + px(11), w_haut + px(4), LV_TEXT_ALIGN_LEFT, c_haut);
+        }
+    }
+}
+
 void dessiner_bandeau(const Ctx &c) {
     const ThemePrincipal &t = theme_meteo();
     const ThemePrincipal &normal = *g.theme;
     const VueMeteo &m = g.e.meteo;
     const Alerte al = alerte_du_jour();
+    if (g.composition == accueil::Composition::AlerteAgrandie) {
+        // La grande carte d'alerte est l'objet g.pastille (elle reçoit l'appui) ; ici, la tuile à côté d'elle.
+        dessiner_tuile(c);
+        return;
+    }
     const accueil::ContenuBandeau cb =
         accueil::composer_bandeau(m.connue, m.perimee, g.pluie.genre, g.e.bandeau.present, al != Alerte::AUCUNE);
     const Rect gauche = moitie_du_bandeau(false);
-    switch (cb.gauche) {
+    switch (g.composition == accueil::Composition::CartePluie ? accueil::Puce::AUCUNE : cb.gauche) {
     case accueil::Puce::PLUIE: {
         char s[96];
         texte_de_pluie(s, sizeof s, true);
@@ -1160,7 +1616,8 @@ void dessiner_bandeau(const Ctx &c) {
     }
     if (cb.droite == accueil::Puce::ALERTE_METEO) {
         // L'alerte déduite de la météo du jour : pas d'appui (seule l'alerte officielle ouvre la page des alertes).
-        puce(c.pc, t, moitie_du_bandeau(true), couleur_alerte(t, al), 51, 166, piece_alerte(al), texte_alerte(al));
+        const Rect r = g.composition == accueil::Composition::CartePluie ? g.rect[Z_BANDEAU] : moitie_du_bandeau(true);
+        puce(c.pc, t, r, couleur_alerte(t, al), 51, 166, piece_alerte(al), texte_alerte(al));
     }
     // L'alerte officielle est dessinée par l'objet g.pastille, posé sur cette moitié (il reçoit l'appui).
 }
@@ -1193,6 +1650,34 @@ void texte_officielle(const vigie::Bandeau &b, int largeur, char *sortie, std::s
     std::snprintf(sortie, n, "%s%s%s", a.texte, liaison, fenetre);
 }
 
+// La grande carte d'alerte (composition d'alerte, ADR-0015 règle 1) : le titre de l'émetteur sur deux lignes au plus, la fenêtre sur la
+// sienne. Les positions sont calculées au dessin (sur_dessin_pastille) ; ici seulement le texte, coupé par « … » s'il est trop long.
+PlaceOfficielle placer_carte_alerte(const Rect &r) {
+    PlaceOfficielle p;
+    const vigie::Bandeau &b = g.e.bandeau;
+    p.x = r.x;
+    p.y = r.y;
+    p.w = r.w;
+    p.h = r.h;
+    p.grande = true;
+    if (b.autres > 0) {
+        std::snprintf(p.autres, sizeof p.autres, "+%u", static_cast<unsigned>(b.autres));
+        p.d_autres = std::max(px(36), dz::largeur_texte(g.petit, p.autres) + px(18));
+        p.x_autres = p.w - px(28) - p.d_autres;
+    }
+    if (b.debut_s > 0 && b.fin_s > 0) {
+        accueil::formater_fenetre(heure_du(b.debut_s), heure_du(b.fin_s), en_francais(), p.fenetre, sizeof p.fenetre);
+    }
+    const int largeur = p.w - 2 * px(28);
+    const Ajuste a = ajuster({&g.corps}, b.texte, 2 * largeur - largeur / 6);
+    std::snprintf(p.texte, sizeof p.texte, "%s", a.texte);
+    p.police = &g.corps;
+    p.w_texte = largeur;
+    p.x_texte = px(28);
+    p.ok = p.w > 0 && p.h > 0;
+    return p;
+}
+
 PlaceOfficielle placer_puce_officielle() {
     PlaceOfficielle p;
     const vigie::Bandeau &b = g.e.bandeau;
@@ -1200,7 +1685,11 @@ PlaceOfficielle placer_puce_officielle() {
     if (!b.present || zone.w <= 0 || zone.h <= 0) {
         return p;
     }
-    const Rect r = moitie_du_bandeau(true);
+    if (g.composition == accueil::Composition::AlerteAgrandie && g.rect_alerte.w > 0 && g.rect_alerte.h > 0) {
+        return placer_carte_alerte(g.rect_alerte);
+    }
+    // Seule, la puce prend toute la largeur du bandeau (la carte pluie dit la pluie) ; sinon la moitié droite.
+    const Rect r = g.composition == accueil::Composition::CartePluie ? zone : moitie_du_bandeau(true);
     p.x = r.x;
     p.y = r.y;
     p.w = r.w;
@@ -1578,7 +2067,13 @@ void sur_dessin(lv_event_t *evenement) {
         break;
     case Z_SEMAINE:
         if (g.est_accueil) {
-            dessiner_jours(c);
+            if (g.composition == accueil::Composition::CartePluie) {
+                dessiner_carte_pluie(c);
+            } else if (g.bas_en_bande) {
+                dessiner_bande_jours(c);
+            } else {
+                dessiner_jours(c);
+            }
         } else {
             dessiner_semaine(c);
         }
@@ -1602,6 +2097,46 @@ void sur_dessin_pastille(lv_event_t *evenement) {
     const dz::Pinceau pc = {couche, g.theme};
     const ThemePrincipal &t = *g.theme;
     const int centre = a.y1 + p.h / 2;
+    if (g.est_accueil && p.grande) {
+        // Le bandeau AGRANDI (alerte orange ou rouge, ADR-0015 règle 1) : une grande carte de verre teinté du niveau, jamais grisée. En
+        // haut l'icône, le niveau en mots et le « +N » ; dessous le titre de l'émetteur (deux lignes au plus) puis la fenêtre horaire.
+        const std::uint32_t rgb = couleur_officielle(t, static_cast<int>(g.e.bandeau.niveau));
+        const int rayon = px(28);
+        dz::rect_bord(pc, a.x1, a.y1, p.w, p.h, rayon, rgb, 77, rgb, 166, std::max(1, px(2)));
+        if (lv_obj_has_state(objet, LV_STATE_PRESSED)) {
+            dz::rect(pc, a.x1, a.y1, p.w, p.h, rayon, t.texte, 40);
+        }
+        const int pad = px(28);
+        const int icone = px(56);
+        const int x = a.x1 + pad;
+        const int largeur = p.w - 2 * pad;
+        // Le titre de l'émetteur : en grand quand il tient sur une ligne, sinon en plus petit sur deux lignes au plus. Le bloc entier
+        // (icône, titre, fenêtre) est centré dans la carte.
+        const dz::Police &f_titre = dz::largeur_texte(g.titre, p.texte) > largeur ? g.corps : g.titre;
+        const int lignes = dz::largeur_texte(f_titre, p.texte) > largeur ? 2 : 1;
+        const int h_fenetre = p.fenetre[0] != '\0' ? dz::hauteur_ligne(g.corps) + px(6) : 0;
+        const int h_bloc = icone + px(12) + lignes * dz::hauteur_ligne(f_titre) + px(6) + h_fenetre;
+        int y = a.y1 + std::max(px(20), (p.h - h_bloc) / 2);
+        icones::piece(couche, Piece::alerte, icone, x, y, rgb);
+        const bool rouge = g.e.bandeau.niveau == vigie::Niveau::Rouge;
+        const int x_libelle = x + icone + px(16);
+        const int w_libelle = p.w - 2 * pad - icone - px(16) - (p.d_autres > 0 ? p.d_autres + px(16) : 0);
+        texte_ajuste(pc, {&g.titre, &g.corps, &g.petit}, texte_principal::t(rouge ? "Alerte rouge" : "Alerte orange"),
+                     x_libelle, y + icone / 2, w_libelle, LV_TEXT_ALIGN_LEFT, t.texte);
+        if (p.d_autres > 0) {
+            const int d = p.d_autres;
+            dz::disque(pc, a.x1 + p.x_autres + d / 2, y + icone / 2, d / 2, rgb);
+            dz::texte(pc, g.petit, p.autres, a.x1 + p.x_autres, y + icone / 2 - dz::hauteur_ligne(g.petit) / 2, d,
+                      LV_TEXT_ALIGN_CENTER, t.texte_sur_couleur);
+        }
+        y += icone + px(12);
+        dz::texte(pc, f_titre, p.texte, x, y, largeur, LV_TEXT_ALIGN_LEFT, t.texte, LV_OPA_COVER, lignes);
+        y += lignes * dz::hauteur_ligne(f_titre) + px(6);
+        if (p.fenetre[0] != '\0') {
+            dz::texte(pc, g.corps, p.fenetre, x, y, largeur, LV_TEXT_ALIGN_LEFT, t.texte_2);
+        }
+        return;
+    }
     if (g.est_accueil) {
         // Dans le bandeau : la même puce que les autres (verre teinté du niveau), jamais grisée : un avis en vigueur reste un avis.
         const std::uint32_t rgb = couleur_officielle(t, static_cast<int>(g.e.bandeau.niveau));
@@ -1900,6 +2435,33 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     g.pluie = accueil::dans_l_horizon(
         accueil::episode_de_pluie(m.heures, m.nb_heures, g.e.maintenant_s, m.pluie_dans_min), g.e.maintenant_s);
 
+    // Le mode automatique (ADR-0023) : le noyau a décidé (accueil_pilote.hpp), l'écran dessine. Une composition que les données de cet
+    // écran ne soutiennent pas retombe sur la composition d'avant (jamais une carte vide) : le bandeau agrandi sans alerte officielle,
+    // la carte pluie sans la pluie qu'elle devait dire.
+    g.mode = g.est_accueil ? g.e.mode_auto : accueil::Presentation{};
+    const Alerte al_jour = alerte_du_jour();
+    const accueil::ContenuBandeau cb =
+        accueil::composer_bandeau(m.connue, m.perimee, g.pluie.genre, g.e.bandeau.present, al_jour != Alerte::AUCUNE);
+    g.carte_pluie = accueil::composer_carte_pluie(g.pluie, m.heures, m.nb_heures, g.e.maintenant_s, g.portrait ? 8 : 9);
+    accueil::Composition composition = accueil::composition_de(g.mode);
+    if (composition == accueil::Composition::AlerteAgrandie && !g.e.bandeau.present) {
+        composition = g.mode.carte_pluie ? accueil::Composition::CartePluie : accueil::Composition::Normale;
+    }
+    if (composition == accueil::Composition::CartePluie && !g.carte_pluie.presente) {
+        composition = accueil::Composition::Normale;
+    }
+    const bool alerte_bandeau = g.e.bandeau.present || cb.droite == accueil::Puce::ALERTE_METEO;
+    const bool tuile = cb.gauche == accueil::Puce::PLUIE || cb.gauche == accueil::Puce::PERIMEE;
+    const std::uint32_t cle_disposition =
+        static_cast<std::uint32_t>(composition) | (alerte_bandeau ? 4U : 0U) | (tuile ? 8U : 0U);
+    if (cle_disposition != g.cle_disposition) {
+        g.cle_disposition = cle_disposition;
+        g.composition = composition;
+        g.alerte_dans_bandeau = alerte_bandeau;
+        g.tuile_dit_quelque_chose = tuile;
+        appliquer_disposition(); // les rectangles du bandeau et de la zone du bas changent (la pastille de l'alerte suit)
+    }
+
     bool tout = false;
     const int langue = i18n::indice(i18n::langue_courante());
     const auto base = [&](Empreinte &e) {
@@ -1910,12 +2472,37 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     // Le lieu change de fuseau (autre ville choisie sur l'écran ou sur la page web) : les heures, les jours et le soleil se redessinent.
     const std::uint32_t cle_fuseau = ecran::heure::cle_du_fuseau(fuseau());
     std::uint32_t neuf[Z_NOMBRE];
+    // La carte pluie et la tuile : tout ce qu'elles dessinent (le genre de pluie, les minutes, les barres, la durée, le cumul).
+    const auto carte = [&](Empreinte &e) {
+        const accueil::CartePluie &cp = g.carte_pluie;
+        e.u(g.cle_disposition);
+        e.u(cp.presente);
+        e.u(static_cast<std::uint32_t>(cp.genre));
+        e.u(cp.dans_min);
+        e.u(cp.duree_h);
+        e.u(cp.cumul_dix_mm);
+        e.u(cp.force_connue);
+        e.u(static_cast<std::uint32_t>(cp.force));
+        e.u(cp.plus_forte_plus_tard);
+        e.i(cp.pic_s);
+        e.u(cp.echelle_dix);
+        for (int i = 0; i < cp.n; ++i) {
+            e.i(cp.barre[i].instant_s);
+            e.u(cp.barre[i].dix_mm);
+        }
+        e.u(g.pluie.cumul_dix_mm); // le cumul d'une pluie plus tardive, dit par la tuile
+    };
     {
         Empreinte e;
         base(e);
         e.s(m.ville);
         e.u(m.exemple);
-        if (!g.est_accueil) { // la composition de l'horloge dit encore l'alerte et la fraîcheur dans sa barre
+        e.u(static_cast<std::uint32_t>(g.mode.raison)); // la pastille du mode : sa phrase, sa teinte
+        e.u(static_cast<std::uint32_t>(g.mode.profil));
+        e.u(g.mode.epingle);
+        e.u(g.e.bandeau.present ? static_cast<std::uint32_t>(g.e.bandeau.niveau)
+                                : 0U); // la teinte d'une pastille d'alerte
+        if (!g.est_accueil) {          // la composition de l'horloge dit encore l'alerte et la fraîcheur dans sa barre
             e.u(static_cast<std::uint32_t>(alerte_du_jour()));
             e.u(g.e.bandeau.present);
             e.u(g.e.bandeau.empreinte); // texte, niveau et nombre d'autres alertes (noyau : vigie::composer_bandeau)
@@ -1970,6 +2557,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
         e.u(static_cast<std::uint32_t>(alerte_du_jour()));
         e.u(g.e.bandeau.present);
         e.u(g.e.bandeau.empreinte);
+        carte(e); // la tuile de pluie de la composition d'alerte
         neuf[Z_BANDEAU] = e.h;
     }
     {
@@ -1989,6 +2577,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
             e.u(m.jours[i].vent_dix_kmh);
             e.u(m.jours[i].direction_deg);
         }
+        carte(e); // la carte pluie recouvre cette zone ; la composition d'alerte la réduit à une bande
         neuf[Z_SEMAINE] = e.h;
     }
     Empreinte ciel_e;

@@ -98,7 +98,7 @@ const T = (fr, vars) => {
 /* ---------- état de l'appareil (en mémoire) ---------- */
 const etat = {
   nom: 'ecran-1a2b', version: '0.1.0', precedente: '0.0.9', demarre: Date.now(),
-  zone: null, source: 'auto', sourceRetablie: false, display: { langue_ecran: 'fr', langue_assistant: 'fr', theme: 'auto', luminosite: 80 },
+  zone: null, source: 'auto', sourceRetablie: false, display: { langue_ecran: 'fr', langue_assistant: 'fr', theme: 'auto', luminosite: 80, profil: 'auto' },
   alertes: { actives: true, adresse: '', periode_min: 15, niveau_min: 'yellow' },
   mer: { spots: [], choisi: '', vent_min_kn: 12, vent_max_kn: 25 }, // registre vide au départ : l'écran n'a pas de bouton « Mer »
   services: { stt: null, llm: null, tts: null },
@@ -111,6 +111,7 @@ const sessions = new Map();
 let echecsCode = 0, verrouJusqua = 0;
 
 const THEMES = ['auto', 'clair', 'sombre'];
+const PROFILS = ['auto', 'meteo']; // seulement ce que l'appareil sait dessiner (ADR-0023)
 const RESEAUX = [
   { ssid: 'Maison', niveau: 4, force: -55, securise: true },
   { ssid: 'Café Libre', niveau: 3, force: -66, securise: false },
@@ -197,6 +198,10 @@ function validerAffichage(a) {
   if (a.luminosite !== undefined) {
     if (!Number.isInteger(a.luminosite) || a.luminosite < 5 || a.luminosite > 100) throw new Refus(422, 'luminosite', T('La luminosité doit être entre 5 et 100 %.'), 'luminosite');
     r.luminosite = a.luminosite;
+  }
+  if (a.profil !== undefined) {
+    if (!PROFILS.includes(a.profil)) throw new Refus(422, 'profil_inconnu', T('Ce profil n’existe pas.'), 'profil');
+    r.profil = a.profil;
   }
   return r;
 }
@@ -311,7 +316,7 @@ const relire = (id) => {
   const s = etat.services[id];
   return s ? { configure: true, ...s, cle_definie: !!secrets[id] } : { configure: false, cle_definie: false };
 };
-const affichage = () => ({ ...etat.display, langues: LANGUES, langues_assistant: LANGUES, themes: THEMES });
+const affichage = () => ({ ...etat.display, langues: LANGUES, langues_assistant: LANGUES, themes: THEMES, profils: PROFILS });
 
 /* ---------- appels sortants : géocodage et météo réels ---------- */
 async function geocoder(q) {

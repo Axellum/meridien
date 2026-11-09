@@ -83,6 +83,7 @@ inline constexpr Rangee RANGEES_LANGUE[] = {
 inline constexpr Rangee RANGEES_AFFICHAGE[] = {
     {Genre::Reglage, "affichage.theme", Editeur::Pastilles, true},
     {Genre::Reglage, "affichage.luminosite", Editeur::Curseur, true},
+    {Genre::Reglage, "affichage.profil", Editeur::Pastilles, true},
 };
 inline constexpr Rangee RANGEES_STT[] = {
     {Genre::Reglage, "stt.preset", Editeur::Pastilles, true},

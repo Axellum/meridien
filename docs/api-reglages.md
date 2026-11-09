@@ -129,14 +129,15 @@ Empty list → `200 {"resultats":[]}` (the page says "No place found for “Lyon
 
 `GET /api/display` →
 ```json
-{"langue_ecran": "fr", "langue_assistant": "fr", "theme": "auto", "luminosite": 80,
+{"langue_ecran": "fr", "langue_assistant": "fr", "theme": "auto", "luminosite": 80, "profil": "auto",
  "langues": [{"code": "fr", "nom": "Français"}, {"code": "en", "nom": "English"}, {"code": "de", "nom": "Deutsch"},
              {"code": "nl", "nom": "Nederlands"}, {"code": "es", "nom": "Español"}, {"code": "it", "nom": "Italiano"},
              {"code": "tr", "nom": "Türkçe"}],
  "langues_assistant": [{"code": "fr", "nom": "Français"}, "… same list …"],
- "themes": ["auto", "clair", "sombre"]}
+ "themes": ["auto", "clair", "sombre"],
+ "profils": ["auto", "meteo"]}
 ```
-There are **two distinct language settings** (ADR-0006): `langue_ecran` (what the screen, the settings page and the device's sentences are written in) and `langue_assistant` (the language the voice assistant understands and speaks, §7). Both default to `fr`. `PUT /api/display` accepts the four modifiable fields (`langue_ecran`, `langue_assistant`, `theme`, `luminosite`), each optional (absent = unchanged); `langues`, `langues_assistant` and `themes` are read-only: **the lists come from the device**, the page does not fix them. `nom` is the language's name **in that language**. A code that is not in the list → `422`, "This language isn’t available for the screen." (`langue_ecran`) or "This language isn’t available for the assistant." (`langue_assistant`). `luminosite`: integer 5 to 100 (in %); the floor of 5 avoids a screen made unreadable from the page (otherwise `422`, "Brightness must be between 5 and 100%."). Changes take effect on the screen as soon as the response is sent. After a change of `langue_ecran`, the following responses (messages, preset names and help, weather label, test steps) are in the new language and the page reloads its texts (§13). The former single `langue` field no longer exists (see §10 for old backups).
+There are **two distinct language settings** (ADR-0006): `langue_ecran` (what the screen, the settings page and the device's sentences are written in) and `langue_assistant` (the language the voice assistant understands and speaks, §7). Both default to `fr`. `PUT /api/display` accepts the five modifiable fields (`langue_ecran`, `langue_assistant`, `theme`, `luminosite`, `profil`), each optional (absent = unchanged); `langues`, `langues_assistant`, `themes` and `profils` are read-only: **the lists come from the device**, the page does not fix them. `nom` is the language's name **in that language**. A code that is not in the list → `422`, "This language isn’t available for the screen." (`langue_ecran`) or "This language isn’t available for the assistant." (`langue_assistant`). `luminosite`: integer 5 to 100 (in %); the floor of 5 avoids a screen made unreadable from the page (otherwise `422`, "Brightness must be between 5 and 100%."). `profil` is the home screen's profile (ADR-0023): `auto` (the screen chooses by itself, from the rain and the official alerts, ADR-0015) or a pinned profile; `profils` lists **only the profiles the device can draw** (today `auto` and `meteo`), and `auto` is the default and what a corrupt stored value falls back to (never a pinned profile by accident). A code that is not in `profils` → `422`, "This profile doesn’t exist." (`profil_inconnu`). Pinning does not hide an official orange or red alert. Changes take effect on the screen as soon as the response is sent. After a change of `langue_ecran`, the following responses (messages, preset names and help, weather label, test steps) are in the new language and the page reloads its texts (§13). The former single `langue` field no longer exists (see §10 for old backups).
 
 ## 7. STT / LLM / TTS services
 
@@ -246,7 +247,7 @@ Content of the export: zone, display, services — **never** a key, nor a Wi-Fi 
 ```json
 {"format": "ecran-autonome-reglages", "version": 1, "exporte_le": "2026-11-06T12:00:00Z",
  "zone": {"nom": "Lyon", "…": "…", "fuseau": "Europe/Paris"},
- "affichage": {"langue_ecran": "fr", "langue_assistant": "fr", "theme": "auto", "luminosite": 80},
+ "affichage": {"langue_ecran": "fr", "langue_assistant": "fr", "theme": "auto", "luminosite": 80, "profil": "auto"},
  "services": {"llm": {"preset": "lmstudio", "url": "…", "modele": "…"}},
  "cles_a_ressaisir": ["stt"]}
 ```
@@ -473,14 +474,15 @@ Liste vide → `200 {"resultats":[]}` (la page dit « Aucun lieu trouvé pour «
 
 `GET /api/display` →
 ```json
-{"langue_ecran": "fr", "langue_assistant": "fr", "theme": "auto", "luminosite": 80,
+{"langue_ecran": "fr", "langue_assistant": "fr", "theme": "auto", "luminosite": 80, "profil": "auto",
  "langues": [{"code": "fr", "nom": "Français"}, {"code": "en", "nom": "English"}, {"code": "de", "nom": "Deutsch"},
              {"code": "nl", "nom": "Nederlands"}, {"code": "es", "nom": "Español"}, {"code": "it", "nom": "Italiano"},
              {"code": "tr", "nom": "Türkçe"}],
  "langues_assistant": [{"code": "fr", "nom": "Français"}, "… même liste …"],
- "themes": ["auto", "clair", "sombre"]}
+ "themes": ["auto", "clair", "sombre"],
+ "profils": ["auto", "meteo"]}
 ```
-Il y a **deux réglages de langue distincts** (ADR-0006) : `langue_ecran` (la langue des textes de l'écran, de la page de réglages et des phrases de l'appareil) et `langue_assistant` (la langue que l'assistant vocal comprend et parle, §7). Les deux valent `fr` par défaut. `PUT /api/display` accepte les quatre champs modifiables (`langue_ecran`, `langue_assistant`, `theme`, `luminosite`), chacun facultatif (absent = inchangé) ; `langues`, `langues_assistant` et `themes` sont en lecture seule : **les listes viennent de l'appareil**, la page ne les fixe pas. `nom` est le nom de la langue **dans cette langue**. Un code absent de la liste → `422`, « Cette langue n’est pas disponible pour l’écran. » (`langue_ecran`) ou « Cette langue n’est pas disponible pour l’assistant. » (`langue_assistant`). `luminosite` : entier 5 à 100 (en %) ; le plancher à 5 évite un écran rendu illisible depuis la page (sinon `422`, « La luminosité doit être entre 5 et 100 %. »). Les changements s'appliquent à l'écran dès la réponse. Après un changement de `langue_ecran`, les réponses suivantes (messages, noms et aides des préréglages, libellé météo, étapes de test) sont dans la nouvelle langue et la page recharge ses textes (§13). L'ancien champ unique `langue` n'existe plus (voir §10 pour les anciennes sauvegardes).
+Il y a **deux réglages de langue distincts** (ADR-0006) : `langue_ecran` (la langue des textes de l'écran, de la page de réglages et des phrases de l'appareil) et `langue_assistant` (la langue que l'assistant vocal comprend et parle, §7). Les deux valent `fr` par défaut. `PUT /api/display` accepte les cinq champs modifiables (`langue_ecran`, `langue_assistant`, `theme`, `luminosite`, `profil`), chacun facultatif (absent = inchangé) ; `langues`, `langues_assistant`, `themes` et `profils` sont en lecture seule : **les listes viennent de l'appareil**, la page ne les fixe pas. `nom` est le nom de la langue **dans cette langue**. Un code absent de la liste → `422`, « Cette langue n’est pas disponible pour l’écran. » (`langue_ecran`) ou « Cette langue n’est pas disponible pour l’assistant. » (`langue_assistant`). `luminosite` : entier 5 à 100 (en %) ; le plancher à 5 évite un écran rendu illisible depuis la page (sinon `422`, « La luminosité doit être entre 5 et 100 %. »). `profil` est le profil de l'écran d'accueil (ADR-0023) : `auto` (l'écran choisit seul, d'après la pluie et les alertes officielles, ADR-0015) ou un profil épinglé ; `profils` ne liste **que les profils que l'appareil sait dessiner** (aujourd'hui `auto` et `meteo`), et `auto` est le défaut, comme la valeur de repli d'une valeur abîmée en mémoire (jamais un profil épinglé par accident). Un code absent de `profils` → `422`, « Ce profil n’existe pas. » (`profil_inconnu`). Épingler ne cache pas une alerte officielle orange ou rouge. Les changements s'appliquent à l'écran dès la réponse. Après un changement de `langue_ecran`, les réponses suivantes (messages, noms et aides des préréglages, libellé météo, étapes de test) sont dans la nouvelle langue et la page recharge ses textes (§13). L'ancien champ unique `langue` n'existe plus (voir §10 pour les anciennes sauvegardes).
 
 ## 7. Services STT / LLM / TTS
 
@@ -590,7 +592,7 @@ Contenu de l'export : zone, affichage, services — **jamais** de clé, ni de mo
 ```json
 {"format": "ecran-autonome-reglages", "version": 1, "exporte_le": "2026-11-06T12:00:00Z",
  "zone": {"nom": "Lyon", "…": "…", "fuseau": "Europe/Paris"},
- "affichage": {"langue_ecran": "fr", "langue_assistant": "fr", "theme": "auto", "luminosite": 80},
+ "affichage": {"langue_ecran": "fr", "langue_assistant": "fr", "theme": "auto", "luminosite": 80, "profil": "auto"},
  "services": {"llm": {"preset": "lmstudio", "url": "…", "modele": "…"}},
  "cles_a_ressaisir": ["stt"]}
 ```
