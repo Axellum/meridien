@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "ecran/accueil.hpp"
+#include "ecran/accueil_bande_pluie.hpp"
 #include "ecran/accueil_cartes.hpp"
 #include "ecran/heure_lieu.hpp"
 #include "ecran/i18n.hpp"
@@ -108,9 +109,11 @@ struct Vue {
     std::uint32_t cle_disposition =
         0;                           // composition + alerte + tuile : quand elle change, les rectangles sont recalculés
     accueil::CartePluie carte_pluie; // le contenu de la carte pluie (ou de la tuile de pluie) ; `presente` faux : rien
-    Rect rect_alerte;                // la grande carte d'alerte (composition d'alerte) ; vide sinon
-    Rect rect_tuile;                 // la tuile de pluie à côté d'elle ; vide sinon
-    bool bas_en_bande = false;       // la zone du bas est la bande réduite des cinq jours
+    accueil::BandePluie
+        bande; // la bande de pluie de la ligne centrale (ADR-0027) : une barre par quart d'heure ; `presente` faux : rien
+    Rect rect_alerte;                 // la grande carte d'alerte (composition d'alerte) ; vide sinon
+    Rect rect_tuile;                  // la tuile de pluie à côté d'elle ; vide sinon
+    bool bas_en_bande = false;        // la zone du bas est la bande réduite des cinq jours
     bool alerte_dans_bandeau = false; // une alerte (officielle, ou déduite de la météo) occupe le bandeau
     bool tuile_dit_quelque_chose =
         false; // la composition d'alerte a de quoi remplir la tuile (pluie, ou données périmées)
@@ -1584,6 +1587,115 @@ void dessiner_bande_jours(const Ctx &c) {
     }
 }
 
+// ---- la bande de pluie (ADR-0027) : la ligne centrale, une barre par quart d'heure ----
+
+// La phrase de la bande, sur UNE ligne (la zone du bandeau n'a la place que d'une ligne). Il pleut : « Pluie modérée · fin dans 42 min »
+// (la fin seulement si les quarts la donnent et si `avec_fin`) ; sinon « Pluie dans 25 min » ou « Pluie dès 15 h ».
+void texte_de_bande(char *sortie, std::size_t n, bool avec_fin) {
+    const accueil::BandePluie &b = g.bande;
+    if (b.en_cours) {
+        std::snprintf(sortie, n, "%s", texte_force_pluie(b.force));
+        if (avec_fin && b.fin_dans_min >= 0) {
+            const std::size_t deja = std::strlen(sortie);
+            std::snprintf(sortie + deja, n - deja, "%s", POINT_MEDIAN);
+            const std::size_t apres = std::strlen(sortie);
+            std::snprintf(sortie + apres, n - apres, texte_principal::t("fin dans %d min"), b.fin_dans_min);
+        }
+        return;
+    }
+    const std::int64_t debut_s = b.barre[b.premier].debut_s;
+    const int dans_min = static_cast<int>((debut_s - g.e.maintenant_s + 59) / 60);
+    if (dans_min < accueil::PLUIE_BIENTOT_MIN) {
+        std::snprintf(sortie, n, texte_principal::t("Pluie dans %d min"), dans_min > 1 ? dans_min : 1);
+    } else {
+        char heure[16] = {};
+        accueil::formater_heure_phrase(heure_du(debut_s), en_francais(), heure, sizeof heure);
+        std::snprintf(sortie, n, texte_principal::t("Pluie dès %s"), heure);
+    }
+}
+
+// La bande : l'icône et la phrase à gauche, puis une barre par quart d'heure (la couleur dit la force, la hauteur la quantité), l'heure
+// sous les barres de chaque demi-heure (de chaque heure si la place manque, aucune sinon), un repère « maintenant » en haut et un
+// trait pointillé à « dans une heure » (le seuil du mode automatique). `r` : la moitié gauche du bandeau (l'alerte a la droite).
+void dessiner_bande_pluie(const Ctx &c, const Rect &r) {
+    const accueil::BandePluie &b = g.bande;
+    if (!b.presente || b.n <= 0 || r.w <= 0 || r.h <= 0) {
+        return;
+    }
+    const ThemePrincipal &t = theme_meteo();
+    const ThemePrincipal &normal = *g.theme;
+    dz::rect_bord(c.pc, r.x, r.y, r.w, r.h, px(24), normal.carte, normal.carte_opa, normal.texte, 20, px(2));
+
+    const int pad = px(18);
+    const int cote = px(30);
+    icones::piece(c.pc.couche, Piece::parapluie, cote, r.x + pad, r.y + r.h / 2 - cote / 2, t.pluie);
+    const int x_texte = r.x + pad + cote + px(12);
+    const int w_max = (r.w - 2 * pad - cote - px(12)) * 45 / 100;
+    char s[96];
+    texte_de_bande(s, sizeof s, true);
+    if (dz::largeur_texte(g.mini, s) > w_max) {
+        texte_de_bande(s, sizeof s, false); // la fin part avant que la phrase soit coupée par « … »
+    }
+    const Ajuste a = ajuster({&g.petit, &g.mini}, s, w_max);
+    const int w_texte = std::min(w_max, dz::largeur_texte(*a.police, a.texte));
+    dz::texte(c.pc, *a.police, a.texte, x_texte, r.y + (r.h - dz::hauteur_ligne(*a.police)) / 2, w_texte + px(4),
+              LV_TEXT_ALIGN_LEFT, t.texte);
+
+    const int gx0 = x_texte + w_texte + px(32);
+    const int gx1 = r.x + r.w - pad;
+    const int largeur = gx1 - gx0;
+    if (largeur < b.n * px(14)) {
+        return; // plus de place pour les barres : la phrase reste
+    }
+    const int pas = largeur / b.n;
+    // La ligne ne fait que 62 px de référence : les barres prennent tout ce que les heures et le repère « maintenant » leur laissent.
+    const int base_etiquettes = r.y + r.h - px(4);
+    const int y_bas = base_etiquettes - dz::hauteur_chiffres(g.mini) - px(3);
+    const int y_haut = r.y + px(9);
+    const int h_barres = y_bas - y_haut;
+    if (h_barres < px(10)) {
+        return;
+    }
+    // Les étiquettes : toutes les demi-heures si elles tiennent, sinon toutes les heures, sinon aucune.
+    char etiquette[16];
+    int plus_large = 0;
+    for (int i = 0; i < b.n; ++i) {
+        ecran::heure::formater_etiquette_heure(heure_du(b.barre[i].debut_s), en_francais(), etiquette,
+                                               sizeof etiquette);
+        plus_large = std::max(plus_large, dz::largeur_texte(g.mini, etiquette));
+    }
+    const int modulo = 2 * pas >= plus_large + px(8) ? 30 : (4 * pas >= plus_large + px(8) ? 60 : 0);
+
+    dz::rect(c.pc, gx0, y_bas, largeur, std::max(1, px(2)), 0, t.texte, 60);
+    const int largeur_barre =
+        std::clamp(pas * 45 / 100, px(8), px(26)); // des barres, pas des galets : comme les pastilles de la courbe
+    for (int i = 0; i < b.n; ++i) {
+        const accueil::BarreQuart &q = b.barre[i];
+        const int cx = gx0 + pas * i + pas / 2;
+        const int hb = accueil::hauteur_de_barre_quart(q.dix_mm_h, b.echelle_dix_h, h_barres, px(5));
+        if (hb > 0) {
+            dz::rect(c.pc, cx - largeur_barre / 2, y_bas - hb, largeur_barre, hb, std::min(px(8), largeur_barre / 2),
+                     accueil::couleur_niveau_pluie(t, q.niveau));
+        } else if (q.dix_mm >= 0) {
+            dz::rect(c.pc, cx - px(10), y_bas - px(4), px(20), px(4), px(2), t.texte, 36); // sec : un trait
+        } // sans valeur : rien, jamais un trait sec
+        const ecran::heure::HeureLocale local = heure_du(q.debut_s);
+        if (modulo > 0 && local.minute % modulo == 0) {
+            ecran::heure::formater_etiquette_heure(local, en_francais(), etiquette, sizeof etiquette);
+            texte_base(c.pc, g.mini, etiquette, cx - pas, base_etiquettes, 2 * pas, LV_TEXT_ALIGN_CENTER, t.texte_2);
+        }
+    }
+    if (b.plus_une_heure_pm >= 0) {
+        const int x = gx0 + static_cast<int>(static_cast<std::int64_t>(largeur) * b.plus_une_heure_pm / 1000);
+        for (int y = y_haut; y < y_bas; y += px(7)) {
+            dz::rect(c.pc, x, y, std::max(1, px(1)), px(3), 0, t.texte, 110);
+        }
+    }
+    const int x_maintenant = gx0 + static_cast<int>(static_cast<std::int64_t>(largeur) * b.maintenant_pm / 1000);
+    dz::triangle(c.pc, x_maintenant - px(5), r.y + px(2), x_maintenant + px(5), r.y + px(2), x_maintenant, r.y + px(8),
+                 t.accent);
+}
+
 void dessiner_bandeau(const Ctx &c) {
     const ThemePrincipal &t = theme_meteo();
     const ThemePrincipal &normal = *g.theme;
@@ -1597,36 +1709,42 @@ void dessiner_bandeau(const Ctx &c) {
     const accueil::ContenuBandeau cb =
         accueil::composer_bandeau(m.connue, m.perimee, g.pluie.genre, g.e.bandeau.present, al != Alerte::AUCUNE);
     const Rect gauche = moitie_du_bandeau(false);
-    switch (g.composition == accueil::Composition::CartePluie ? accueil::Puce::AUCUNE : cb.gauche) {
-    case accueil::Puce::PLUIE: {
-        char s[96];
-        texte_de_pluie(s, sizeof s, true);
-        if (dz::largeur_texte(g.mini, s) > gauche.w - gauche.h - px(4) - px(24)) {
-            texte_de_pluie(s, sizeof s,
-                           false); // le cumul est le détail : il part avant que la phrase soit coupée par « … »
+    if (g.bande.presente && cb.gauche != accueil::Puce::PERIMEE) {
+        // Il pleut ou il va pleuvoir dans les deux heures : la bande de pluie prend la place de la puce, TOUJOURS sur la moitié gauche
+        // (les deux moitiés du bandeau gardent leur place : la pluie à gauche, l'alerte à droite ; Axel, 09/11/2026).
+        dessiner_bande_pluie(c, gauche);
+    } else {
+        switch (g.composition == accueil::Composition::CartePluie ? accueil::Puce::AUCUNE : cb.gauche) {
+        case accueil::Puce::PLUIE: {
+            char s[96];
+            texte_de_pluie(s, sizeof s, true);
+            if (dz::largeur_texte(g.mini, s) > gauche.w - gauche.h - px(4) - px(24)) {
+                texte_de_pluie(s, sizeof s,
+                               false); // le cumul est le détail : il part avant que la phrase soit coupée par « … »
+            }
+            puce(c.pc, t, gauche, t.pluie, 51, 166, Piece::parapluie, s);
+            break;
         }
-        puce(c.pc, t, gauche, t.pluie, 51, 166, Piece::parapluie, s);
-        break;
-    }
-    case accueil::Puce::PERIMEE: {
-        char hhmm[16], s[96];
-        fmt_hhmm(hhmm, sizeof hhmm, m.instant_s);
-        std::snprintf(s, sizeof s, texte_principal::t("Données de %s · périmées"), hhmm);
-        puce(c.pc, normal, gauche, normal.avertissement, 51, 166, Piece::hors_ligne, s);
-        break;
-    }
-    case accueil::Puce::CALME: {
-        // Centrée sur toute la largeur : il n'y a rien d'autre à dire.
-        const Rect r = {c.x + (c.w - gauche.w) / 2, gauche.y, gauche.w, gauche.h};
-        fond_de_puce(c.pc, r.x, r.y, r.w, r.h, normal.texte_3, 26, 64);
-        coche_dans_rond(c.pc, r.x + r.h / 2, r.y + r.h / 2, px(13), normal.texte_3);
-        const int x_texte = r.x + r.h + px(4);
-        texte_ajuste(c.pc, {&g.petit, &g.mini}, texte_principal::t("Rien à signaler dans les prochaines heures"),
-                     x_texte, r.y + r.h / 2, r.x + r.w - px(24) - x_texte, LV_TEXT_ALIGN_LEFT, normal.texte);
-        break;
-    }
-    default:
-        break;
+        case accueil::Puce::PERIMEE: {
+            char hhmm[16], s[96];
+            fmt_hhmm(hhmm, sizeof hhmm, m.instant_s);
+            std::snprintf(s, sizeof s, texte_principal::t("Données de %s · périmées"), hhmm);
+            puce(c.pc, normal, gauche, normal.avertissement, 51, 166, Piece::hors_ligne, s);
+            break;
+        }
+        case accueil::Puce::CALME: {
+            // Centrée sur toute la largeur : il n'y a rien d'autre à dire.
+            const Rect r = {c.x + (c.w - gauche.w) / 2, gauche.y, gauche.w, gauche.h};
+            fond_de_puce(c.pc, r.x, r.y, r.w, r.h, normal.texte_3, 26, 64);
+            coche_dans_rond(c.pc, r.x + r.h / 2, r.y + r.h / 2, px(13), normal.texte_3);
+            const int x_texte = r.x + r.h + px(4);
+            texte_ajuste(c.pc, {&g.petit, &g.mini}, texte_principal::t("Rien à signaler dans les prochaines heures"),
+                         x_texte, r.y + r.h / 2, r.x + r.w - px(24) - x_texte, LV_TEXT_ALIGN_LEFT, normal.texte);
+            break;
+        }
+        default:
+            break;
+        }
     }
     if (cb.droite == accueil::Puce::ALERTE_METEO) {
         // L'alerte déduite de la météo du jour : pas d'appui (seule l'alerte officielle ouvre la page des alertes).
@@ -2543,11 +2661,17 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     const accueil::ContenuBandeau cb =
         accueil::composer_bandeau(m.connue, m.perimee, g.pluie.genre, g.e.bandeau.present, al_jour != Alerte::AUCUNE);
     g.carte_pluie = accueil::composer_carte_pluie(g.pluie, m.heures, m.nb_heures, g.e.maintenant_s, g.portrait ? 8 : 9);
+    // La bande de pluie de la ligne centrale (ADR-0027) : les quarts d'heure ne couvrent le moment que si la météo n'est pas périmée.
+    g.bande = (m.connue && !m.perimee)
+                  ? accueil::composer_bande_pluie(m.quarts_debut_s, m.quarts_dix_mm, m.nb_quarts, g.e.maintenant_s)
+                  : accueil::BandePluie{};
     accueil::Composition composition = accueil::composition_de(g.mode);
     if (composition == accueil::Composition::AlerteAgrandie && !g.e.bandeau.present) {
         composition = g.mode.carte_pluie ? accueil::Composition::CartePluie : accueil::Composition::Normale;
     }
-    if (composition == accueil::Composition::CartePluie && !g.carte_pluie.presente) {
+    // La grande carte qui recouvrait les cinq jours n'est plus choisie (ADR-0027) : la pluie est dite par la bande de la ligne
+    // centrale, les cinq jours restent visibles. (La carte et son dessin ne sont pas encore retirés du code.)
+    if (composition == accueil::Composition::CartePluie) {
         composition = accueil::Composition::Normale;
     }
     const bool alerte_bandeau = g.e.bandeau.present || cb.droite == accueil::Puce::ALERTE_METEO;
@@ -2653,6 +2777,17 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
         e.u(g.pluie.genre == accueil::GenrePluie::BIENTOT ? g.pluie.dans_min : 0); // « dans N min » change à la minute
         e.i(g.pluie.genre == accueil::GenrePluie::PLUS_TARD ? g.pluie.debut_s / 60 : 0);
         e.u(g.pluie.cumul_dix_mm);
+        // La bande de pluie : les barres, et la minute (« fin dans N min », « Pluie dans N min » et le repère « maintenant » avancent).
+        e.u(g.bande.presente);
+        if (g.bande.presente) {
+            e.i(g.e.maintenant_s / 60);
+            e.u(static_cast<std::uint32_t>(g.bande.n));
+            e.u(static_cast<std::uint32_t>(g.bande.echelle_dix_h));
+            for (int i = 0; i < g.bande.n; ++i) {
+                e.i(g.bande.barre[i].debut_s);
+                e.u(static_cast<std::uint32_t>(g.bande.barre[i].dix_mm));
+            }
+        }
         e.i(m.perimee ? m.instant_s / 60 : 0); // « Données de 07:52 »
         e.u(static_cast<std::uint32_t>(alerte_du_jour()));
         e.u(g.e.bandeau.present);

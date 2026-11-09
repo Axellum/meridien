@@ -42,6 +42,25 @@ namespace {
 
 using namespace donnees;
 using ecran::vigie::Niveau;
+using ecran::visuel::VUE_QUARTS_MAX;
+
+// Les quarts d'heure d'une pluie qui commence dans `dans_min` minutes, comme l'appareil les garde (ADR-0027) : le quart écoulé d'abord, neuf en
+// tout. À partir du début : 0,2 / 0,4 / 0,8 / 1,2 / 0,9 / 0,5 / 0,2 / 0,1 mm par quart d'heure (de faible à fort, puis ça s'éteint).
+void avec_quarts(VueMeteo &v, int64_t maintenant_s, int dans_min) {
+    static const int dix[VUE_QUARTS_MAX] = {2, 4, 8, 12, 9, 5, 2, 1, 0};
+    v.nb_quarts = VUE_QUARTS_MAX;
+    v.quarts_debut_s = (maintenant_s / 900) * 900 - 900;
+    const int64_t debut_pluie_s = maintenant_s + static_cast<int64_t>(dans_min) * 60;
+    for (int i = 0; i < VUE_QUARTS_MAX; ++i) {
+        const int64_t t0 = v.quarts_debut_s + static_cast<int64_t>(i) * 900;
+        if (t0 + 900 <= debut_pluie_s) {
+            v.quarts_dix_mm[i] = 0;
+            continue;
+        }
+        const int k = t0 > debut_pluie_s ? static_cast<int>((t0 - debut_pluie_s + 899) / 900) : 0;
+        v.quarts_dix_mm[i] = k < VUE_QUARTS_MAX ? dix[k] : 0;
+    }
+}
 
 // La météo de l'esquisse, avec de la pluie qui commence dans `dans_min` minutes : à partir de l'heure courante 0,3 / 0,8 / 1,6 / 3,1 /
 // 1,2 / 0,4 mm (un orage qui monte puis s'éteint), puis plus rien.
@@ -63,6 +82,7 @@ VueMeteo avec_pluie_dans(int64_t maintenant_s, int dans_min) {
     v.jours[0].pluie_dix_mm = total;
     v.jours[0].proba_pct = 85;
     v.jours[0].code = 81;
+    avec_quarts(v, maintenant_s, dans_min);
     return v;
 }
 
@@ -130,7 +150,32 @@ void pluie_en_cours(const banc::Contexte &c) {
     afficher(c, decider(entrees(c, 0, avec_pluie_dans(c.instant_utc_s, 0))));
 }
 
-// Une alerte jaune (pas agrandie) et la pluie proche : la carte pluie, l'alerte garde sa bande en pleine largeur.
+// Les quarts d'heure RÉELS d'Open-Meteo pour la maison le 09/11/2026 à 12 h 18 (voir docs/mesures/bande-pluie.md) : le quart écoulé 1,9 mm,
+// puis 0,7 / 0,1 / 0,1 mm, puis sec. À rendre avec -Instant 2026-11-09T11:18:00Z.
+void bande_reelle(const banc::Contexte &c) {
+    VueMeteo v = avec_pluie_dans(c.instant_utc_s, 0);
+    static const int reel[VUE_QUARTS_MAX] = {19, 7, 1, 1, 0, 0, 0, 0, 0};
+    for (int i = 0; i < VUE_QUARTS_MAX; ++i) {
+        v.quarts_dix_mm[i] = reel[i];
+    }
+    afficher(c, decider(entrees(c, 0, v)));
+}
+
+// La pluie ne commence que dans 95 minutes (dans la bande de deux heures, mais pas « dans l'heure ») : « Pluie dès … », pas de carte.
+void bande_plus_tard(const banc::Contexte &c) {
+    afficher(c, decider(entrees(c, 0, avec_pluie_dans(c.instant_utc_s, 95))));
+}
+
+// Il pleut jusqu'au bout de la bande : pas de « fin dans N min » (la fin n'est pas dans les données).
+void bande_longue(const banc::Contexte &c) {
+    VueMeteo v = avec_pluie_dans(c.instant_utc_s, 0);
+    for (int i = 0; i < VUE_QUARTS_MAX; ++i) {
+        v.quarts_dix_mm[i] = 3 + (i % 3);
+    }
+    afficher(c, decider(entrees(c, 0, v)));
+}
+
+// Une alerte jaune (pas agrandie) et la pluie proche : la bande de pluie, l'alerte garde la moitié droite du bandeau.
 void jaune_et_pluie(const banc::Contexte &c) {
     ecran::EntreesPrincipal e = entrees(c, 0, avec_pluie_dans(c.instant_utc_s, 12));
     e.bandeau = alerte(c.instant_utc_s, Niveau::Jaune, "Vent violent");
@@ -396,9 +441,12 @@ namespace banc {
 
 const Scene kScenes[] = {
     {"defaut", "Auto · Météo (rien de proche)", defaut},
-    {"pluie-proche", "Auto · pluie proche : la carte pluie", pluie_proche},
-    {"pluie-en-cours", "Il pleut : la carte pluie", pluie_en_cours},
-    {"jaune-et-pluie", "Alerte jaune + pluie proche", jaune_et_pluie},
+    {"pluie-proche", "Auto · pluie proche : la bande de pluie", pluie_proche},
+    {"pluie-en-cours", "Il pleut : la bande de pluie", pluie_en_cours},
+    {"bande-reelle", "La bande avec les quarts d'heure réels du 09/11 à 12 h 18", bande_reelle},
+    {"bande-plus-tard", "La bande, pluie dans 95 min", bande_plus_tard},
+    {"bande-longue", "La bande, il pleut jusqu'au bout (pas de fin)", bande_longue},
+    {"jaune-et-pluie", "Alerte jaune + pluie proche : la bande sur la moitié gauche", jaune_et_pluie},
     {"alerte-orange", "Auto · alerte orange : bandeau agrandi", alerte_orange},
     {"alerte-orange-sans-pluie", "Alerte orange, aucune pluie à dire", alerte_orange_sans_pluie},
     {"alerte-rouge-et-pluie", "Alerte rouge + 2 autres + pluie dans 12 min", alerte_rouge_et_pluie},
