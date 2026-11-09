@@ -102,6 +102,16 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 **Solution.** A buffer sized for the worst case of the format (48 bytes there). **Seen on** ESP-IDF 5.5.5, 06/11/2026. **Status**: resolved.
 
+#### Building with `-O2` (`CONFIG_COMPILER_OPTIMIZATION_PERF=y`) stops on three warnings that `-Og` does not show
+
+**Symptom.** With `-Og` (ESP-IDF's default) the build is clean; with `-O2` it stops on `-Werror=stringop-truncation` in `main/meteo_zone.cpp` (`strncpy` of the zone name and time zone), on `-Werror=format-truncation` in `main/ui_principal.cpp` (`snprintf` of the official-alert chip text, title + separator + window) and in `components/bsp_tab5/tab5_rtc.cpp` (`snprintf` of the date `%04d-%02d-…`).
+
+**Cause.** `-O2` inlines the callers, so GCC sees the real buffer sizes and the unknown ranges of the numbers, and the default `-Werror=all` of the ESP-IDF build turns the warning into an error. Disabling the error (`CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS`, or `-Wno-error=…`) would hide the same warning everywhere else.
+
+**Solution.** The code, not the warning: the copy of `meteo_zone.cpp` stops at `N - 1` bytes in a loop (the cut of `strncpy`, written out); the two `snprintf` read their return value (GCC's level 1 only warns when it is ignored) and leave an empty text if `snprintf` fails. The text produced is unchanged. The three files above were the only ones to fail on the Tab5; the Waveshare 7B build in `-O2` is also clean (see the pull request).
+
+**Seen on** the author's PC, ESP-IDF 5.5.5 (GCC 14.2.0), base `c3fd97b`, 09/11/2026. **Evidence**: `ninja -k 0` of the Tab5 in `-O2` listed exactly these three files, then the whole build passed with no warning. **Status**: resolved (compiled; not flashed, no behaviour change measured on a board).
+
 #### A PowerShell script is refused: a deletion aimed at the ESP-IDF folder
 
 The safeguard of the author's AI session tool refuses any command containing a `Remove-Item` aimed at the ESP-IDF folder owned by ESPHome, even inside a script written elsewhere. Do not delete in scripts; move or ignore. **Status**: worked around.
@@ -762,6 +772,16 @@ La recette de remise en état (trois écritures : début de flash, application, 
 **Cause.** La compilation d'ESP-IDF utilise `-Werror=all` : un `snprintf` dans un tampon que le compilateur ne peut pas prouver assez grand (ici 40 octets pour « min %s · max %s » avec deux textes de 15 octets) est une erreur, pas un avertissement.
 
 **Solution.** Un tampon dimensionné pour le pire cas du format (48 octets ici). **Vu sur** ESP-IDF 5.5.5, 06/11/2026. **Statut** : résolu.
+
+#### La compilation en `-O2` (`CONFIG_COMPILER_OPTIMIZATION_PERF=y`) s'arrête sur trois avertissements que `-Og` ne montre pas
+
+**Symptôme.** En `-Og` (le défaut d'ESP-IDF) la compilation est propre ; en `-O2` elle s'arrête sur `-Werror=stringop-truncation` dans `main/meteo_zone.cpp` (`strncpy` du nom de la zone et du fuseau), sur `-Werror=format-truncation` dans `main/ui_principal.cpp` (`snprintf` du texte de la puce d'alerte officielle, titre + séparateur + fenêtre) et dans `components/bsp_tab5/tab5_rtc.cpp` (`snprintf` de la date `%04d-%02d-…`).
+
+**Cause.** `-O2` intègre les appelants : GCC voit alors les vraies tailles des tampons et les plages inconnues des nombres, et le `-Werror=all` par défaut de la compilation d'ESP-IDF transforme l'avertissement en erreur. Désactiver l'erreur (`CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS`, ou `-Wno-error=…`) cacherait le même avertissement partout ailleurs.
+
+**Solution.** Le code, pas l'avertissement : la copie de `meteo_zone.cpp` s'arrête à `N - 1` octets dans une boucle (la coupe de `strncpy`, écrite en clair) ; les deux `snprintf` lisent leur retour (le niveau 1 de GCC n'avertit que s'il est ignoré) et laissent un texte vide si `snprintf` échoue. Le texte produit ne change pas. Ces trois fichiers étaient les seuls à échouer sur le Tab5 ; la compilation de la Waveshare 7B en `-O2` est propre aussi (voir la pull request).
+
+**Vu sur** PC de l'auteur, ESP-IDF 5.5.5 (GCC 14.2.0), base `c3fd97b`, 09/11/2026. **Preuve** : `ninja -k 0` du Tab5 en `-O2` a listé exactement ces trois fichiers, puis toute la compilation est passée sans avertissement. **Statut** : résolu (compilé ; non flashé, aucun changement de comportement mesuré sur une carte).
 
 #### Un script PowerShell est refusé : suppression visant le dossier d'ESP-IDF
 

@@ -1179,7 +1179,11 @@ void texte_officielle(const vigie::Bandeau &b, int largeur, char *sortie, std::s
         return;
     }
     const Ajuste a = ajuster({&p}, b.texte, largeur - w_fenetre);
-    std::snprintf(sortie, n, "%s%s%s", a.texte, liaison, fenetre);
+    // Un titre plus long que le tampon serait coupé à n - 1 octets par snprintf (ajuster() le borne à la largeur de la puce : cela
+    // n'arrive pas) ; on lit le retour pour ne jamais laisser un texte à moitié écrit si snprintf échoue.
+    if (std::snprintf(sortie, n, "%s%s%s", a.texte, liaison, fenetre) < 0) {
+        sortie[0] = '\0';
+    }
 }
 
 PlaceOfficielle placer_puce_officielle() {

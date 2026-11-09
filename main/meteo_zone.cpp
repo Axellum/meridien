@@ -56,9 +56,14 @@ Courante par_defaut() {
 }
 
 // Copie un texte déjà validé (terminé par un zéro) en mettant à zéro tout le reste du tampon, pour ne rien écrire d'autre en NVS.
+// La copie s'arrête à N - 1 octets (le dernier reste à zéro) : la coupe de strncpy, écrite pour que le compilateur la voie.
 template <std::size_t N> void copier_texte(char (&vers)[N], const char *depuis) {
     std::memset(vers, 0, N);
-    std::strncpy(vers, depuis, N - 1);
+    std::size_t n = 0;
+    while (n < N - 1 && depuis[n] != '\0') {
+        ++n;
+    }
+    std::memcpy(vers, depuis, n);
 }
 
 bool depuis_nvs(const ZoneNvs &brut, Courante &sortie) {

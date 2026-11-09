@@ -64,8 +64,12 @@ void formater(int64_t epoch_s, char *sortie, size_t taille) {
     time_t t = static_cast<time_t>(epoch_s);
     struct tm tm;
     gmtime_r(&t, &tm);
-    snprintf(sortie, taille, "%04d-%02d-%02d %02d:%02d:%02d UTC", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-             tm.tm_hour, tm.tm_min, tm.tm_sec);
+    // 23 caractères pour une année de 4 chiffres, dans un tampon de 32 : la coupe à taille - 1 octets de snprintf ne joue pas. On lit
+    // le retour pour ne jamais laisser un texte à moitié écrit si snprintf échoue.
+    if (snprintf(sortie, taille, "%04d-%02d-%02d %02d:%02d:%02d UTC", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                 tm.tm_hour, tm.tm_min, tm.tm_sec) < 0) {
+        sortie[0] = '\0';
+    }
 }
 
 board_time_source_t vers_board(rtc::SourceHeure s) {
