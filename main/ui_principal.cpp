@@ -28,8 +28,8 @@
 //   accueil (thèmes « ciel », « tableau sombre », « clair »), paysage 1280 x 720
 //   +-- lieu -------------------+--------------------------+
 //   | heure                  |  courbe des 12 prochaines |
-//   | date                   |  heures : icônes, pluie,  |
-//   | météo du moment        |  maximum et minimum       |
+//   | date                   |  heures : colonnes en     |
+//   | météo du moment        |  couleur, icônes, extrêmes|
 //   +-- bandeau : la pluie ---+--- l'alerte -------------+
 //   | cinq jours : nom et icône, 14° / 8°, ruban des températures, vent, pluie |
 //
@@ -926,8 +926,12 @@ void dessiner_heures_accueil(const Ctx &c) {
     const int y_bas = c.y + (a_pluie ? px(202) : px(208));
     const int y_etiquette = c.y + px(286); // ligne de base des heures
 
-    // La colonne de l'heure en cours, teintée d'accent.
-    dz::rect(c.pc, c.x + pad_x + px(1), c.y + px(14), pas - px(2), px(276), px(14), t.accent, 31);
+    // Les colonnes, une couleur chacune pour suivre une heure du regard (de son icône à son point et à son étiquette) : la première,
+    // l'heure en cours, en accent ; les suivantes en trois couleurs du thème qui reviennent dans l'ordre, toutes aussi marquées.
+    for (int i = 0; i < n; ++i) {
+        dz::rect(c.pc, x_col(i) - pas / 2 + px(1), c.y + px(14), pas - px(2), px(276), px(14),
+                 accueil::couleur_de_colonne(t, i), 31);
+    }
 
     // Les points de la courbe : les heures dont la température est connue.
     accueil::Pt pts[COLONNES_HEURES];
@@ -996,11 +1000,18 @@ void dessiner_heures_accueil(const Ctx &c) {
         tracer_courbe(c.pc, courbe, teintes, std::max(2, px(5)), std::max(3, px(6)));
     }
 
-    // Les icônes du temps de chaque heure.
+    // Les icônes du temps : une à la première heure, puis une nouvelle chaque fois que le temps change d'une heure à l'autre (douze
+    // icônes côte à côte chargeaient la carte ; un temps qui dure ne la répète pas).
+    IdIcone icone_de[COLONNES_HEURES];
+    for (int i = 0; i < n; ++i) {
+        icone_de[i] = icone_pour_code(h[i].code, h[i].jour);
+    }
     const int cote_icone = px(38);
     for (int i = 0; i < n; ++i) {
-        icones::meteo(c.pc.couche, icone_pour_code(h[i].code, h[i].jour), cote_icone, x_col(i) - cote_icone / 2,
-                      y_icones - cote_icone / 2, t);
+        if (accueil::a_une_icone_heure(icone_de, n, i)) {
+            icones::meteo(c.pc.couche, icone_de[i], cote_icone, x_col(i) - cote_icone / 2, y_icones - cote_icone / 2,
+                          t);
+        }
     }
 
     // Le maximum (au-dessus de son point) et le minimum (en dessous, sauf si la barre de pluie de sa colonne y monte : au-dessus).

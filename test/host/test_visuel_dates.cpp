@@ -16,6 +16,8 @@ constexpr bool egal(const char *a, std::string_view b) { return std::string_view
 constexpr HeureLocale VENDREDI = {2026, 11, 6, 10, 40, 0, 5, 3600, false};
 // Dimanche 1er novembre 2026.
 constexpr HeureLocale PREMIER = {2026, 11, 1, 8, 0, 0, 0, 3600, false};
+// Samedi 15 août 2026 : un mois dont l'accent est dans le mot (« août »), son initiale reste une lettre ASCII.
+constexpr HeureLocale AOUT = {2026, 8, 15, 10, 0, 0, 6, 7200, true};
 // Mercredi 30 septembre 2026 : la date la plus longue en espagnol.
 constexpr HeureLocale LONGUE = {2026, 9, 30, 20, 8, 0, 3, 7200, true};
 
@@ -37,6 +39,25 @@ constexpr int sans_annee_la_date_est_plus_courte() {
     VERIFIER(formater_date(Langue::Es, VENDREDI, t, sizeof t, false) > 0 && egal(t, "viernes, 6 de noviembre"));
     VERIFIER(formater_date(Langue::Tr, VENDREDI, t, sizeof t, false) > 0 && egal(t, "6 Kasım Cuma"));
     VERIFIER(formater_date(Langue::De, VENDREDI, t, sizeof t, false) > 0 && egal(t, "Freitag, 6. November"));
+    return 0;
+}
+
+constexpr int avec_les_initiales_le_jour_et_le_mois_commencent_par_une_majuscule() {
+    char t[64] = {};
+    // La date de l'accueil : sans l'année, « Vendredi 6 Novembre ».
+    VERIFIER(formater_date(Langue::Fr, VENDREDI, t, sizeof t, false, true) > 0 && egal(t, "Vendredi 6 Novembre"));
+    VERIFIER(formater_date(Langue::Fr, VENDREDI, t, sizeof t, true, true) > 0 && egal(t, "Vendredi 6 Novembre 2026"));
+    VERIFIER(formater_date(Langue::Fr, PREMIER, t, sizeof t, false, true) > 0 && egal(t, "Dimanche 1er Novembre"));
+    VERIFIER(formater_date(Langue::Fr, AOUT, t, sizeof t, false, true) > 0 && egal(t, "Samedi 15 Août"));
+    // Les langues dont les noms commencent déjà par une majuscule ne changent pas ; le « de » espagnol reste en minuscule.
+    VERIFIER(formater_date(Langue::En, VENDREDI, t, sizeof t, false, true) > 0 && egal(t, "Friday, 6 November"));
+    VERIFIER(formater_date(Langue::De, VENDREDI, t, sizeof t, false, true) > 0 && egal(t, "Freitag, 6. November"));
+    VERIFIER(formater_date(Langue::Tr, VENDREDI, t, sizeof t, false, true) > 0 && egal(t, "6 Kasım Cuma"));
+    VERIFIER(formater_date(Langue::Nl, VENDREDI, t, sizeof t, false, true) > 0 && egal(t, "Vrijdag 6 November"));
+    VERIFIER(formater_date(Langue::Es, VENDREDI, t, sizeof t, false, true) > 0 && egal(t, "Viernes, 6 de Noviembre"));
+    VERIFIER(formater_date(Langue::It, VENDREDI, t, sizeof t, false, true) > 0 && egal(t, "Venerdì 6 Novembre"));
+    // Sans l'option (le défaut), rien ne change : la page des alertes écrit « samedi 8 novembre » en minuscules.
+    VERIFIER(formater_date(Langue::Fr, VENDREDI, t, sizeof t, false) > 0 && egal(t, "vendredi 6 novembre"));
     return 0;
 }
 
@@ -137,6 +158,7 @@ constexpr int chaque_jour_et_chaque_mois_est_traduit_dans_les_sept_langues() {
 #define LISTE(X)                                                                                                       \
     X(la_date_suit_la_tournure_de_chaque_langue)                                                                       \
     X(sans_annee_la_date_est_plus_courte)                                                                              \
+    X(avec_les_initiales_le_jour_et_le_mois_commencent_par_une_majuscule)                                              \
     X(le_premier_du_mois_est_ecrit_1er_en_francais_seulement)                                                          \
     X(une_date_invalide_ou_un_tampon_trop_petit_donne_un_texte_vide)                                                   \
     X(la_date_la_plus_longue_tient_dans_quarante_octets)                                                               \
