@@ -58,6 +58,10 @@ extern "C" void app_main(void) {
     }
     ecran::memoire_jalon("après board_init (écran, tactile, LVGL, tampons)");
 
+    // La météo du cache NVS est relue AVANT l'écran principal : sa première image la montre au lieu de « météo indisponible »
+    // jusqu'au passage suivant du minuteur. Sans Wi-Fi ni heure, comme le reste de la relecture du cache.
+    ecran::meteo_client_relire_cache();
+
     if (board_display_lock(0)) {
         // Écran principal (heure, date, météo) chargé ; l'écran « Bonjour » des phases 1a/1b devient l'écran de diagnostic
         // (appui long sur le fond pour passer de l'un à l'autre).
@@ -77,7 +81,7 @@ extern "C" void app_main(void) {
     ecran::reseau_demarrer(boot);
     ecran::memoire_jalon("après le lancement de la tâche réseau (pile 8 Ko)");
     ecran::
-        meteo_client_demarrer(); // météo Open-Meteo : cache NVS lu tout de suite, requêtes dès que le Wi-Fi et l'heure sont là
+        meteo_client_demarrer(); // météo Open-Meteo : cache NVS déjà relu avant la première image, requêtes dès le Wi-Fi et l'heure
     ecran::memoire_jalon("après le lancement de la tâche météo (pile 12 Ko, cache NVS)");
     ecran::
         vigie_client_demarrer(); // alertes officielles de Vigie : premier essai 60 à 120 s après que le réseau et l'heure soient prêts
