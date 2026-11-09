@@ -4,8 +4,8 @@
 //
 // LVGL PUR (contrat d'interface n° 3) : aucun en-tête ESP-IDF, le banc de rendu PC (tools/rendu) compile ce fichier tel quel.
 //
-// Un seul objet LVGL : le voile plein écran, posé sur la couche supérieure, qui dessine tout (disques, anneaux, mots, icônes) dans son
-// événement DRAW_MAIN et reçoit les touchers. Toutes les positions et les zones tactiles viennent de `ecran::roue` (roue_geometrie.hpp),
+// Un seul objet LVGL : un objet plein écran SANS fond (aucun voile sur l'écran principal depuis le 09/11/2026), posé sur la couche
+// supérieure, qui dessine tout (disques, anneaux, mots, icônes) dans son événement DRAW_MAIN et reçoit les touchers. Toutes les positions et les zones tactiles viennent de `ecran::roue` (roue_geometrie.hpp),
 // jamais recalculées ici ; ce qu'un toucher décide vient de `roue_commande.hpp` (testé sur le PC). Aucune animation : la roue
 // apparaît, se replie ou se ferme d'un coup. Les objets sont créés à l'ouverture et détruits à la fermeture ; les polices (Roboto et le
 // sous-ensemble d'icônes mdi_roue.ttf, en PSRAM) sont gardées d'une ouverture à l'autre.
@@ -62,7 +62,7 @@ struct ContexteRoue {
 // argument est invalide ou si une police n'a pas pu être créée. À appeler dans la tâche LVGL, verrou pris.
 bool ui_roue_ouvrir(const ContexteRoue &ctx, const EntreeRoue *entrees, int n, int32_t x, int32_t y);
 
-// Ferme la roue (le voile est supprimé au passage suivant du minuteur de LVGL). Sans effet si elle est fermée.
+// Ferme la roue (son objet est supprimé au passage suivant du minuteur de LVGL). Sans effet si elle est fermée.
 void ui_roue_fermer();
 
 bool ui_roue_ouverte();

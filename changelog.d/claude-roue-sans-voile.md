@@ -1,0 +1,3 @@
+### Changed
+
+- **Press-and-hold wheel without a veil**: the wheel no longer dims the screen behind it. The full-screen translucent layer (59 % of the theme's background colour) took too long to appear, according to the author; only the wheel is drawn now, on the home page as it is. A touch outside the buttons still folds the second ring or closes the wheel. *La roue d'appui long ne ternit plus l'écran derrière elle : seule la roue est dessinée, sur l'accueil tel qu'il est.* ([ADR-0021](../docs/decisions/0021-roue-d-appui-long-sur-l-ecran-principal.md), [measurements](../docs/mesures/roue.md)) Seen on: the PC render bench only (outside the wheel the render is identical, pixel for pixel, to the home page without it); not tested on board, so the speed gain is not measured.

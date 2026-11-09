@@ -24,7 +24,6 @@ using roue::Point;
 // (vu à la compilation de la 7B, 08/11/2026) ; copier une constante n'a pas de temporaire à poser.
 const roue::Anneau ANNEAU_VIDE = {};
 
-constexpr std::uint8_t OPA_VOILE = 150; // le voile sur l'écran principal (couleur : fond du thème)
 constexpr std::uint8_t OPA_BANDE =
     36; // la bande de verre sous chaque anneau (couleur : texte du thème au premier anneau, accent au second ; très transparente)
 constexpr std::uint8_t OPA_DISQUE = 240; // le disque d'un bouton
@@ -42,6 +41,8 @@ constexpr const char *MOT_MOYEU = "Aller à";                 // la clé frança
 
 struct Etat {
     bool ouverte = false;
+    // L'objet plein écran de la roue : SANS fond depuis le 09/11/2026 (il ne dessine que la roue et reçoit les touchers). Son nom date du
+    // voile qu'il posait sur l'écran principal avant ; il est gardé tel quel pour ne pas toucher aux lignes d'autres branches.
     lv_obj_t *voile = nullptr;
     lv_timer_t *minuteur = nullptr;
     const visuel::ThemePrincipal *theme = nullptr;
@@ -228,7 +229,8 @@ void dessiner(lv_event_t *evenement) {
     lv_layer_t *couche = lv_event_get_layer(evenement);
     const dz::Pinceau pc = {couche, g.theme};
     const visuel::ThemePrincipal &t = *g.theme;
-    dz::rect(pc, 0, 0, g.largeur, g.hauteur, 0, t.fond, OPA_VOILE);
+    // Pas de voile sur l'écran principal (retiré le 09/11/2026, demande d'Axel : il mettait trop de temps à s'afficher) : seule la roue est
+    // dessinée, sur l'accueil tel qu'il est. L'objet reste plein écran et cliquable : un toucher hors de la roue la referme.
     bande(pc, g.roue.premier, g.m.rayon_1, g.m.diametre_1, t.texte);
     for (int i = 0; i < g.roue.premier.n; ++i) {
         dessiner_bouton(pc, g.roue.premier.bouton[i], g.entrees[i].icone, g.sous == i && !g.sous_second, g.famille == i,
