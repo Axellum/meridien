@@ -19,6 +19,7 @@ namespace ecran::visuel {
 
 inline constexpr int VUE_HEURES_MAX = 24;
 inline constexpr int VUE_JOURS_MAX = 7;
+inline constexpr int VUE_QUARTS_MAX = 9; // le quart d'heure écoulé + les deux heures qui viennent (METEO_QUARTS_MAX)
 inline constexpr std::size_t VUE_VILLE_MAX = 40; // octets, zéro final compris
 
 struct HeurePrevue {
@@ -75,6 +76,11 @@ struct VueMeteo {
     HeurePrevue heures[VUE_HEURES_MAX] = {};
     int nb_jours = 0;
     JourPrevu jours[VUE_JOURS_MAX] = {};
+    // la pluie par quart d'heure (Open-Meteo `minutely_15`) : `quarts_dix_mm[i]` = dixièmes de mm tombés pendant
+    // [quarts_debut_s + 900 i, + 900) ; INCONNU_DIX si la valeur manque. La bande de pluie de l'accueil les lit (ADR-0027).
+    int nb_quarts = 0;
+    std::int64_t quarts_debut_s = 0;
+    int quarts_dix_mm[VUE_QUARTS_MAX] = {};
 };
 
 namespace detail {
