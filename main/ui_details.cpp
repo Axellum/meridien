@@ -119,7 +119,7 @@ void texte_centre(const dz::Pinceau &pc, const Police &p, const char *s, int x, 
 // La trame se répète toutes les 8 colonnes : l'image n'est qu'une TUILE de kLargeurTuileCiel colonnes sur toute la hauteur (92 Ko à
 // 1280 x 720 au lieu de 1,8 Mo), que LVGL répète (`bg_image_tiled`). Les pixels sont les mêmes que ceux d'une image de la taille de
 // l'écran. Pourquoi : relue de la PSRAM à chaque bande repeinte, l'image pleine taille a rendu la repeinte de l'accueil nettement plus
-// lente (239 -> 183 ms mesurés sur la 7B avec la tuile). Cette page n'a pas été chronométrée : docs/mesures/details-ciel-en-mosaique.md.
+// lente (239 -> 183 ms mesurés sur la 7B avec la tuile). Mesuré sur cette page (7B) : ouverture 187 -> 102 ms, docs/mesures/details-ciel-en-mosaique.md.
 constexpr int kLargeurTuileCiel = 64; // multiple de 8 : la trame de Bayer ne se raccorde qu'à ce prix
 constexpr std::uint8_t BAYER_8[8][8] = {{0, 32, 8, 40, 2, 34, 10, 42},  {48, 16, 56, 24, 50, 18, 58, 26},
                                         {12, 44, 4, 36, 14, 46, 6, 38}, {60, 28, 52, 20, 62, 30, 54, 22},
