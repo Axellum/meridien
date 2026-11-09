@@ -167,3 +167,4 @@ const char *remplir(const char *modele_fr, const ecran::texte::Parametre *p, std
 }
 
 } // namespace ecran::ui
+// Essai jetable de la CI (PR 23), ne pas fusionner.
