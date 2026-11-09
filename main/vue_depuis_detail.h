@@ -105,6 +105,15 @@ inline VueMeteo vue_depuis_detail(const MeteoDetail &d, const char *ville) noexc
                               : INCONNU;
     }
     v.nb_jours = nj;
+    // La pluie par quart d'heure, telle que le contrat la donne (le premier est en général le quart écoulé) : la bande de pluie de
+    // l'accueil choisit elle-même le quart en cours. Un quart sans valeur reste INCONNU_DIX, jamais zéro.
+    const int nq = d.nb_quarts < VUE_QUARTS_MAX ? d.nb_quarts : VUE_QUARTS_MAX;
+    if (nq > 0 && d.quarts_debut_epoch_s > 0) {
+        v.nb_quarts = nq;
+        v.quarts_debut_s = d.quarts_debut_epoch_s;
+        for (int i = 0; i < nq; ++i)
+            v.quarts_dix_mm[i] = dix(d.quarts_precipitation_mm[i]);
+    }
     return v;
 }
 

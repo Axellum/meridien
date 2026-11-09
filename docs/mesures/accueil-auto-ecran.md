@@ -9,6 +9,8 @@
 > running, drawing time, how the five AI-written languages read to a native speaker, whether the composition matches the sketches
 > (they were not found).
 
+> **Mise à jour du 09/11/2026 (ADR-0027)** : la grande carte pluie décrite ci-dessous **n'est plus choisie** ; la bande de pluie de la ligne centrale la remplace ([docs/mesures/bande-pluie.md](bande-pluie.md)). Les chiffres de cette page datent du 08/11/2026 et ne sont pas refaits ; les captures `auto-pluie-*`, `auto-jaune-et-pluie-1024x600` et `auto-alerte-rouge-et-pluie-*` ont été refaites et montrent maintenant la bande (la planche des sept langues, elle, montre encore l'ancienne carte).
+
 **Vu sur** : PC d'Axel (Windows 11) ; clang++ 23.1.5 avec AddressSanitizer + UBSan (tests), g++ 14.2.0 croisé d'ESP-IDF en mode
 « syntaxe » (mêmes tests, rien d'exécuté), clang-format 23.1.5 ; LVGL 9.5.0 (rendu PC) ; ESP-IDF 5.5.5 (compilation) ; commit `bbf6799`
 (arbre propre, version `jalon-1a-tab5-st7121-284-gbbf6799`, sans « -dirty »), 08/11/2026. **Aucune carte** (ni Tab5 ni 7B), **rien flashé**,

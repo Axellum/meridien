@@ -156,6 +156,10 @@ inline constexpr Texte PHRASES[] = {
       "%d dk sonra yağmur"}},
     {"Pluie en cours",
      {"Raining now", "Es regnet", "Het regent", "Está lloviendo", "Sta piovendo", "Şu an yağmur yağıyor"}},
+    // La bande de pluie (ADR-0027) : « Pluie modérée · fin dans 42 min ».
+    {"fin dans %d min",
+     {"ends in %d min", "Ende in %d Min.", "stopt over %d min", "termina en %d min", "finisce tra %d min",
+      "%d dk sonra biter"}},
     {"ressenti %s", {"feels like %s", "gefühlt %s", "voelt als %s", "sensación %s", "percepita %s", "hissedilen %s"}},
     {"Données de %s · périmées",
      {"Data from %s · outdated", "Daten von %s · veraltet", "Gegevens van %s · verouderd", "Datos de %s · antiguos",
