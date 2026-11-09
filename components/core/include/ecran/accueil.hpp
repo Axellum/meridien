@@ -11,7 +11,8 @@
 //   5. les repères d'heures, les extrêmes de la courbe, l'ordonnée d'un point ;
 //   6. ce que dit le bandeau (pluie, alerte, « rien à signaler », « données périmées ») ;
 //   7. la mise en page des zones, en pixels de référence (1280 x 720 ; 1024 x 600 = 1280 x 750 réduit à 80 %) ;
-//   8. le thème « grisé » des valeurs périmées.
+//   8. le thème « grisé » des valeurs périmées ;
+//   9. les icônes (seulement quand le temps change) et les colonnes teintées de la carte des heures.
 // Les valeurs inconnues sont INCONNU (-1) ou INCONNU_DIX (-32768) comme dans visuel_vue.hpp : l'accueil cache ce qu'il ne connaît pas.
 #pragma once
 
@@ -587,6 +588,35 @@ constexpr visuel::ThemePrincipal theme_grise(const visuel::ThemePrincipal &t) no
     for (std::uint32_t &c : g.rampe.teinte)
         c = griser(c, f);
     return g;
+}
+
+// ================================================================================================== 9. icônes et colonnes des heures
+
+// Sur la carte des heures, une icône à la première colonne, puis une nouvelle icône à chaque heure dont le temps diffère de celui de
+// l'heure d'avant (douze icônes côte à côte chargeaient la carte ; un temps qui dure ne la répète pas). Le jour qui passe à la nuit en
+// est un : la lune remplace le soleil. `icones` : l'icône de chaque colonne, `nb_colonnes` colonnes.
+constexpr bool a_une_icone_heure(const visuel::IdIcone *icones, int nb_colonnes, int colonne) noexcept {
+    if (icones == nullptr || colonne < 0 || colonne >= nb_colonnes)
+        return false;
+    return colonne == 0 || icones[colonne] != icones[colonne - 1];
+}
+
+// Chaque colonne de la carte des heures est teintée, pour suivre une heure du regard de son icône à son point sur la courbe et à son
+// étiquette : la première (l'heure en cours) en accent, les suivantes en trois couleurs du thème qui reviennent dans l'ordre, si bien que
+// deux colonnes voisines n'ont jamais la même.
+inline constexpr int NB_COULEURS_COLONNES = 3;
+constexpr std::uint32_t couleur_de_colonne(const visuel::ThemePrincipal &t, int colonne) noexcept {
+    if (colonne <= 0)
+        return t.accent;
+    switch ((colonne - 1) % NB_COULEURS_COLONNES) {
+    case 0:
+        return t.metrique[static_cast<int>(visuel::Metrique::VENT)];
+    case 1:
+        return t.metrique[static_cast<int>(visuel::Metrique::HUMIDITE)];
+    default:
+        break;
+    }
+    return t.metrique[static_cast<int>(visuel::Metrique::PRESSION)];
 }
 
 } // namespace ecran::accueil

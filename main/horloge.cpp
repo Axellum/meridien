@@ -92,7 +92,7 @@ bool horloge_date_localisee(int64_t instant_utc_s, i18n::Langue langue, char *so
         return false;
     }
     const heure::HeureLocale locale = heure::en_heure_locale(instant_utc_s, analyse.fuseau);
-    return visuel::formater_date(langue, locale, sortie, capacite) > 0;
+    return visuel::formater_date(langue, locale, sortie, capacite, false, true) > 0;
 }
 
 bool horloge_heure_locale(int64_t instant_utc_s, heure::HeureLocale &sortie) {

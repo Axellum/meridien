@@ -24,6 +24,7 @@ struct Plume {
     std::size_t capacite;
     std::size_t n = 0;
     bool trop = false;
+    bool initiales = false; // vrai : `nom` écrit la première lettre en majuscule
 
     constexpr void car(char c) noexcept {
         if (sortie == nullptr || n + 1 >= capacite) {
@@ -35,6 +36,15 @@ struct Plume {
     constexpr void texte(std::string_view s) noexcept {
         for (char c : s)
             car(c);
+    }
+    // Un nom de jour ou de mois. Avec `initiales`, sa première lettre passe en majuscule si c'est une minuscule ASCII (« lundi » ->
+    // « Lundi », « août » -> « Août ») ; une initiale déjà majuscule (allemand, turc) ou hors ASCII reste telle quelle.
+    constexpr void nom(std::string_view s) noexcept {
+        if (initiales && !s.empty() && s[0] >= 'a' && s[0] <= 'z') {
+            car(static_cast<char>(s[0] - 'a' + 'A'));
+            s.remove_prefix(1);
+        }
+        texte(s);
     }
     constexpr void entier(int v) noexcept {
         if (v < 0) {
@@ -77,10 +87,12 @@ constexpr std::string_view nom_mois_l(i18n::Langue langue, int mois) noexcept {
 }
 
 // Date longue de l'écran. Rend le nombre d'octets écrits (sans le zéro), 0 et un tampon vidé si la date est invalide ou si le
-// tampon est trop petit. `avec_annee` faux : « vendredi 6 novembre ».
+// tampon est trop petit. `avec_annee` faux : « vendredi 6 novembre ». `initiales` vrai : le nom du jour et celui du mois commencent
+// par une majuscule, « Vendredi 6 Novembre » (« Freitag, 6. November » et « 6 Kasım Cuma » l'étaient déjà ; « de » reste en minuscule).
 constexpr std::size_t formater_date(i18n::Langue langue, const heure::HeureLocale &h, char *sortie,
-                                    std::size_t capacite, bool avec_annee = true) noexcept {
+                                    std::size_t capacite, bool avec_annee = true, bool initiales = false) noexcept {
     detail::Plume p{sortie, capacite};
+    p.initiales = initiales;
     if (h.mois < 1 || h.mois > 12 || h.jour < 1 || h.jour > 31 || h.jour_semaine < 0 || h.jour_semaine > 6 ||
         h.an < 0) {
         p.trop = true;
@@ -91,7 +103,7 @@ constexpr std::size_t formater_date(i18n::Langue langue, const heure::HeureLocal
     using i18n::Langue;
     switch (langue) {
     case Langue::Fr:
-        p.texte(j);
+        p.nom(j);
         p.car(' ');
         if (h.jour == 1) {
             p.texte("1er");
@@ -99,47 +111,47 @@ constexpr std::size_t formater_date(i18n::Langue langue, const heure::HeureLocal
             p.entier(h.jour);
         }
         p.car(' ');
-        p.texte(m);
+        p.nom(m);
         break;
     case Langue::En:
-        p.texte(j);
+        p.nom(j);
         p.texte(", ");
         p.entier(h.jour);
         p.car(' ');
-        p.texte(m);
+        p.nom(m);
         break;
     case Langue::De:
-        p.texte(j);
+        p.nom(j);
         p.texte(", ");
         p.entier(h.jour);
         p.texte(". ");
-        p.texte(m);
+        p.nom(m);
         break;
     case Langue::Nl:
     case Langue::It:
-        p.texte(j);
+        p.nom(j);
         p.car(' ');
         p.entier(h.jour);
         p.car(' ');
-        p.texte(m);
+        p.nom(m);
         break;
     case Langue::Es:
-        p.texte(j);
+        p.nom(j);
         p.texte(", ");
         p.entier(h.jour);
         p.texte(" de ");
-        p.texte(m);
+        p.nom(m);
         break;
     case Langue::Tr:
         p.entier(h.jour);
         p.car(' ');
-        p.texte(m);
+        p.nom(m);
         if (avec_annee) {
             p.car(' ');
             p.entier(h.an);
         }
         p.car(' ');
-        p.texte(j);
+        p.nom(j);
         return p.finir();
     }
     if (avec_annee) {
