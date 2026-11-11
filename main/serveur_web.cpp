@@ -65,6 +65,10 @@ constexpr uint32_t kPileServeur = 20480;
 constexpr uint32_t kPileTache = 12288; // la tâche démarre le serveur puis se termine : sa pile est rendue
 constexpr UBaseType_t kPrioriteServeur = 3;
 constexpr uint32_t kPasAttenteIpMs = 1000;
+// Délais de réception : 5 s sans un octet, 5 s en tout pour le corps d'une requête. Un téléphone sur le même Wi-Fi envoie
+// une requête entière en quelques millisecondes ; ces bornes ne gênent qu'un client qui traîne exprès.
+constexpr int kAttenteReceptionS = 5;
+constexpr int64_t kCorpsDelaiUs = 5 * 1000 * 1000;
 
 char g_nom[16] = {};                   // « ecran-f6b6 »
 char g_corps[api::CORPS_MAX + 1] = {}; // corps de la requête en cours (un octet de plus : voir sur_api)
@@ -253,11 +257,16 @@ std::string_view lire_jeton(httpd_req_t *req, char *tampon, size_t taille) {
     return http::jeton_bearer(tampon);
 }
 
-// Lit tout le corps (au plus CORPS_MAX octets) dans g_corps. Faux : la connexion est inutilisable.
+// Lit tout le corps (au plus CORPS_MAX octets) dans g_corps, en kCorpsDelaiUs au plus en tout : un client qui envoie son corps
+// au compte-gouttes ne tient pas le fil du serveur plus longtemps (un corps de 4 Ko arrive en quelques millisecondes sur le Wi-Fi
+// de la maison). Faux : la connexion est inutilisable.
 bool lire_corps(httpd_req_t *req, size_t longueur) {
     size_t recu = 0;
+    const int64_t limite = esp_timer_get_time() + kCorpsDelaiUs;
     while (recu < longueur) {
-        const int r = httpd_req_recv(req, g_corps + recu, longueur - recu);
+        // chaque attente d'octets dure au plus kAttenteReceptionS : la lecture entière ne dépasse pas les deux délais cumulés
+        const int r = esp_timer_get_time() > limite ? HTTPD_SOCK_ERR_TIMEOUT
+                                                    : httpd_req_recv(req, g_corps + recu, longueur - recu);
         if (r == HTTPD_SOCK_ERR_TIMEOUT) {
             httpd_resp_send_err(req, HTTPD_408_REQ_TIMEOUT, nullptr);
             return false;
@@ -294,11 +303,18 @@ esp_err_t sur_api(httpd_req_t *req) {
     rq.requete = uri.requete;
     rq.jeton = jeton;
 
+    // Le bouton « Nouveau code » de l'écran a pu passer depuis la requête précédente : appliqué avant de juger celle-ci.
+    appairage_synchroniser(g_api.appairage());
+
     const size_t longueur = req->content_len;
     const bool trop_gros = longueur > api::CORPS_MAX;
+    // Sans jeton valide sur une route protégée, la réponse est 401 quel que soit le corps : il n'est pas lu (voir corps_a_lire).
+    const bool corps_ignore = !trop_gros && longueur > 0 && !g_api.corps_a_lire(rq);
     if (trop_gros) {
         // Le corps n'est pas lu : l'API répond 413 dès qu'elle voit une taille au-delà de CORPS_MAX (elle ne lit pas les octets).
         rq.corps = std::string_view(g_corps, api::CORPS_MAX + 1);
+    } else if (corps_ignore) {
+        rq.corps = {};
     } else {
         if (!lire_corps(req, longueur)) {
             return ESP_FAIL;
@@ -315,10 +331,12 @@ esp_err_t sur_api(httpd_req_t *req) {
     t.mer_actuel = g_mer_actuel;
     t.mer_neuf = g_mer_neuf;
     const api::Reponse rep = g_api.traiter(rq, t);
+    // une série d'essais ratés a pu tirer un nouveau code : l'écran le montre
+    appairage_synchroniser(g_api.appairage());
     ESP_LOGI(TAG, "%s %.*s -> %d", nom_methode(req->method), static_cast<int>(uri.chemin.size()), uri.chemin.data(),
              rep.statut);
     const esp_err_t err = repondre_api(req, rep);
-    if (trop_gros) {
+    if (trop_gros || corps_ignore) {
         // Le corps non lu fausserait la requête suivante de cette connexion : on la ferme.
         httpd_sess_trigger_close(req->handle, httpd_req_to_sockfd(req));
     }
@@ -392,7 +410,7 @@ bool demarrer_http() {
     // prennent chacun une pour sortir.
     config.max_open_sockets = 5;
     config.lru_purge_enable = true; // un téléphone laisse des connexions ouvertes : la plus ancienne cède la place
-    config.recv_wait_timeout = 10;
+    config.recv_wait_timeout = kAttenteReceptionS;
     config.send_wait_timeout = 10;
     config.uri_match_fn = httpd_uri_match_wildcard;
     const esp_err_t err = httpd_start(&g_serveur, &config);
@@ -476,12 +494,10 @@ void tache_serveur(void *) {
         g_mer_neuf = nullptr;
     }
 
-    // 2. Le code d'appairage est tiré avant d'ouvrir le port : aucune requête ne peut tomber sur un appareil sans code.
+    // 2. Le code d'appairage est tiré avant d'ouvrir le port : aucune requête ne peut tomber sur un appareil sans code. Le serveur
+    //    n'est pas encore démarré : ce fil est le seul à toucher le gestionnaire.
     g_api.appairage().nouveau_code(esp_random());
-    char code[8] = {};
-    const std::string_view c = g_api.appairage().code();
-    std::memcpy(code, c.data(), c.size() < sizeof(code) - 1 ? c.size() : sizeof(code) - 1);
-    appairage_publier_code(code);
+    appairage_synchroniser(g_api.appairage());
 
     if (!demarrer_http()) {
         vTaskDelete(nullptr);
@@ -510,6 +526,15 @@ void serveur_web_demarrer() {
     if (xTaskCreate(tache_serveur, "serveur_web", kPileTache, nullptr, kPrioriteServeur, nullptr) != pdPASS) {
         ESP_LOGE(TAG, "tâche du serveur non créée : la page n'est pas servie");
     }
+}
+
+// Contrat dans appairage.h (le module pur n'appelle pas le générateur matériel). Le code n'est jamais écrit au journal.
+bool appairage_demander_nouveau_code() {
+    const bool fait = appairage_demander_nouveau_code(esp_random());
+    ESP_LOGI(TAG, "nouveau code d'appairage demandé depuis l'écran : %s",
+             fait ? "les sessions seront fermées avant la prochaine requête"
+                  : "page pas encore servie, rien à changer");
+    return fait;
 }
 
 } // namespace ecran

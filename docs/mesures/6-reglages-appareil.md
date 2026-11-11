@@ -20,7 +20,7 @@ Branche `claude/reglages-ecran-aea4e2`. Règle de lecture : ce qui est **constat
 | Adaptateurs ESP-IDF | `main/hote_appareil_esp.cpp` | NVS (rien d'autre que l'espace et la clé au journal), téléchargement HTTPS d'une seule adresse autorisée (tampon de 12 Ko en PSRAM, 8 s), Wi-Fi par `reseau_wifi.h`, version, redémarrage logiciel |
 | Colle : ouvrir les écrans | `main/ui_reglages_ouvrir.cpp` | écran LVGL à part ; « Retour » au premier écran recharge l'écran d'avant et supprime celui-ci avec sa pile |
 | Wi-Fi retenu | `main/wifi_stocke.cpp` | relit l'espace `wifi` pour `reseau.*` (jalon 1b) au prochain démarrage |
-| Bouchon réseau | `main/bouchons/reseau_wifi*` | compilé tant que `main/reseau_wifi.h` n'existe pas |
+| Bouchon réseau | `main/bouchons/reseau_wifi*` | compilé tant que `main/reseau_wifi.h` n'existe pas ; *supprimé le 11/11/2026 (le vrai fichier existe, le bouchon n'était plus compilé)* |
 | Scène de rendu sur l'hôte de l'appareil | `tools/rendu/scenes/scene_hote_appareil.cpp`, `test/host/hote_appareil_faux.hpp` | les vrais écrans au-dessus de la vraie logique, mémoire et appareil factices |
 
 ## 2. Mémoire permanente (NVS) : qui garde quoi
@@ -100,7 +100,7 @@ Ce que ce jalon a fait pour la mémoire : `e686310` envoie les bitmaps de glyphe
 | --- | --- | --- |
 | Recherche et connexion Wi-Fi réelles | bouchon (répond « rien trouvé », « impossible ») | `main/reseau_wifi.h` et son implémentation par la piste `jalon-1b` (retour arrière à 30 s) |
 | Recherche de ville | un téléchargeur à part dans `hote_appareil_esp.cpp` | à remplacer par `geocodage_*` + `VerrouTls` de la piste « page de réglages » dès qu'ils sont fusionnés : un seul TLS à la fois (≈65 Ko de RAM interne chacun) |
-| « Nouveau code » d'appairage | journalise « pas branché » | un crochet dans `main/serveur_web.cpp` ou `appairage.*` |
+| « Nouveau code » d'appairage | ~~journalise « pas branché »~~ **branché le 11/11/2026** (`appairage_demander_nouveau_code`, appliqué par le serveur avant sa requête suivante ; testé sur le PC par `test/host/test_appairage_ecran.cpp`) | l'essai sur la carte : appui à l'écran, ancien code refusé par la page, nouveau accepté (non vérifié sur carte) |
 | Test d'un service (STT, LLM, TTS) | dit honnêtement « pas encore disponible » | mémoire pour un second TLS et le client de chaque service |
 | Réglage de veille de l'écran | absent | l'API existe (`board_sleep_configure()`, `board_sleep_set_local_time_source()`, commit `9a1a58a` de la branche `claude/materiel-tab5-d5c11a`, non fusionnée) ; elle ne se relit pas côté carte, la valeur de référence est celle de la NVS : rappeler `board_sleep_configure()` au démarrage puis à chaque changement. À brancher après la fusion |
 | Reprise de l'installation au démarrage | `ui_installation_ouvrir_si_necessaire()` existe et marche (essai, 4.1) | l'appel est écrit par la piste de l'écran principal (commit `cd362eb` de `claude/ecran-visuel-ba722a`, une fois, juste après `lv_screen_load()`), non fusionné ; **non vérifié** avec cette colle réelle. À la fusion, supprimer `main/bouchons/ui_reglages.h` et `ui_reglages_bouchon.cpp` de cette piste |

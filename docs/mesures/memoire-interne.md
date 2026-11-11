@@ -31,7 +31,7 @@ Critères de « fait » du lot :
 | `memoire` (console série) | une ligne `MEMOIRE` : libre, plus gros bloc, minimum, PSRAM libre, plus gros bloc DMA |
 | `blocs` (console série) | parcours du tas interne (`heap_caps_walk`) : totaux, classes, les 64 plus gros blocs avec leur adresse ; un relevé est aussi pris juste après le démarrage du serveur web, avant la première requête TLS |
 | `piles` (console série) | pour chaque tâche : base de sa pile, marge minimale restante, priorité (à rapprocher des adresses de `blocs`) ; demande `CONFIG_FREERTOS_USE_TRACE_FACILITY` |
-| `tourner3` / `tourner0` (console série) | une tâche sur le cœur 0 calcule 8 s sans jamais s'endormir, à la priorité 3 ou 0 : essai du chien de garde (§6) |
+| `tourner3` / `tourner0` (console série) | une tâche sur le cœur 0 calcule 8 s sans jamais s'endormir, à la priorité 3 ou 0 : essai du chien de garde (§6). Depuis le 11/11/2026, seulement dans un binaire de mesure : `.\tools\idf.ps1 -DMERIDIEN_BANC_ESSAI=ON build` |
 
 Les lignes de journal de deux tâches s'entrelacent parfois (deux cœurs écrivent sur le même port) : une étape illisible dans un démarrage a été relue dans un autre démarrage du même binaire (les valeurs concordent à ± 0,1 Ko).
 

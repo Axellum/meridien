@@ -321,9 +321,6 @@ void rafraichir(lv_timer_t *) {
             entrees.meteo.perimee = meteo::est_perime(releve, instant, echecs);
         }
     }
-#ifdef MERIDIEN_METEO_BOUCHON
-    entrees.meteo.exemple = true; // valeurs d'exemple du bouchon (main/bouchons/) : l'écran le dit
-#endif
 
     // L'alerte officielle de Vigie (ADR-0009) : la dernière réponse lue, ce qui est en vigueur à cet instant, la pastille. Aucune
     // pastille quand les alertes sont désactivées, que l'heure n'est pas sûre (on ne sait pas ce qui est « en vigueur »), qu'aucune

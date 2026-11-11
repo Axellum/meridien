@@ -1,12 +1,12 @@
 // Recherche de lieu par son nom, côté appareil (géocodage d'Open-Meteo, ADR-0003 : l'appareil interroge lui-même le service).
-// Deux clients, UN SEUL téléchargement à la fois, jamais dans la tâche LVGL :
-//   - l'écran (réglages, installation guidée) : `geocodage_chercher` rend la main tout de suite ; il lit ensuite l'état et les
-//     résultats à chaque rafraîchissement. Les noms suivent l'interface des réglages de l'écran (hote_reglages.h) :
-//       lieu_chercher(texte) -> geocodage_chercher      lieu_recherche() -> geocodage_etat      lieu_resultats() -> geocodage_resultats
+// LE SEUL chemin HTTPS vers le géocodage du firmware. Deux clients, UN SEUL téléchargement à la fois, jamais dans la tâche LVGL :
+//   - l'écran (réglages, installation guidée ; ports `telecharger_*` de main/hote_appareil_esp.cpp) : `geocodage_ecran_lancer`
+//     rend la main tout de suite ; l'écran lit ensuite l'état et la réponse brute à chaque rafraîchissement. La lecture de la
+//     réponse et les textes affichés sont dans le noyau (ecran/hote_appareil.hpp, ecran/lieux_geocodage.hpp).
 //   - la page web (main/serveur_web.cpp, GET /api/geocode) : `geocodage_telecharger` attend la réponse, mais le calcul TLS se fait
 //     dans la tâche du module (priorité d'arrière-plan), pas dans celle du serveur HTTP.
 // Le téléchargement prend le verrou TLS commun (verrou_tls.h) : une recherche de ville et une requête météo ne se déroulent jamais
-// en même temps. Toute la logique de lecture et d'état est dans le noyau pur (ecran/geocodage.hpp, testé sur le PC).
+// en même temps.
 //
 // Sécurité : seule l'adresse https://geocoding-api.open-meteo.com/ est joignable d'ici (aucune adresse venue de la page ou de
 // l'écran n'est suivie telle quelle), certificats vérifiés, réponse bornée à 16 Ko. Le texte cherché n'est pas écrit au journal.
@@ -16,21 +16,21 @@
 #include <string_view>
 
 #include "ecran/api_reglages.hpp"
-#include "ecran/geocodage.hpp"
+#include "ecran/hote_appareil.hpp"
 
 namespace ecran {
 
 // ---- pour l'écran ---------------------------------------------------------------------------------------------------------------
-// Lance la recherche de `texte` (3 à 80 caractères ; sinon la recherche est « terminée » sans résultat). Ne bloque pas. Une recherche
-// déjà en cours est remplacée : la dernière demande gagne.
-void geocodage_chercher(std::string_view texte);
-
-// Inactive (rien demandé) / EnCours / Terminee (résultats lisibles, éventuellement zéro) / SansConnexion (pas d'adresse IP, service
-// injoignable, verrou TLS occupé trop longtemps, réponse illisible : la cause exacte est au journal).
-geocodage::Etat geocodage_etat();
-
-// Copie au plus `max` lieux de la recherche terminée dans `sortie` ; rend leur nombre (zéro si elle n'est pas terminée).
-std::size_t geocodage_resultats(geocodage::Lieu *sortie, std::size_t max);
+// Lance le téléchargement de `adresse` (doit commencer par https://geocoding-api.open-meteo.com/). Ne bloque pas. Une demande
+// encore en cours est remplacée : la dernière gagne, la réponse d'une demande remplacée est jetée.
+void geocodage_ecran_lancer(const char *adresse);
+// Inactif (rien demandé) / EnCours / Termine (réponse lisible) / SansInternet (pas d'adresse IP, service injoignable, verrou TLS
+// occupé trop longtemps) / Echec (adresse refusée, réponse refusée ou trop grande, mémoire).
+EtatTelechargement geocodage_ecran_etat();
+// La réponse brute si l'état est Termine (vide sinon), valable jusqu'au prochain `geocodage_ecran_lancer` ou `_liberer`.
+std::string_view geocodage_ecran_corps();
+// Oublie la demande et sa réponse.
+void geocodage_ecran_liberer();
 
 // ---- pour la page web -----------------------------------------------------------------------------------------------------------
 // Télécharge `adresse` (doit commencer par https://geocoding-api.open-meteo.com/) dans `tampon` (`capacite` octets) et attend la fin,
