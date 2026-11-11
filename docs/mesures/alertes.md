@@ -37,7 +37,7 @@ Les dix réponses réelles (`test/host/donnees/vigie_*.json`, provenance et en-t
 
 Sans le filtre `lang` (captées à la main le même jour vers 08:41 UTC, conservées telles quelles) : Eberswalde 7 623 octets au lieu de 2 797 ; La Palma 26 190 au lieu de 19 238. Toutes les réponses : `Cache-Control: public, max-age=60, s-maxage=120`.
 
-**Conséquences pour l'appareil** : un tampon de réception de 64 Ko et un tampon de texte de 64 Ko, tous deux en PSRAM, rendus après chaque essai (la plus grosse réponse mesurée tient en 1 976 octets sur le fil et 19 238 décompressée) ; `Accept-Encoding: gzip` ; l'en-tête gzip est lu par le noyau (`gzip_flux.hpp`) et les octets sont gonflés par `tinfl_decompress` de la ROM (aucune bibliothèque de plus). Une réponse qui ne tient pas dans les tampons est refusée et comptée comme un échec, jamais coupée.
+**Conséquences pour l'appareil** : un tampon de réception de 64 Ko et un tampon de texte de 64 Ko, tous deux en PSRAM, rendus après chaque essai (la plus grosse réponse mesurée tient en 1 976 octets sur le fil et 19 238 décompressée) ; `Accept-Encoding: gzip` ; l'en-tête gzip est lu par le noyau (`gzip_flux.hpp` à l'origine ; depuis le 11/11/2026 `gzip.hpp`, par le client HTTPS commun `main/http_commun.cpp`, CRC-32 vérifié) et les octets sont gonflés par `tinfl_decompress` de la ROM (aucune bibliothèque de plus). Une réponse qui ne tient pas dans les tampons est refusée et comptée comme un échec, jamais coupée.
 
 ## 2. Coût d'une requête et choix de la période
 
