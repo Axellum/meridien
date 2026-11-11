@@ -12,6 +12,7 @@
 > chip, any sea data, the long-press wheel, the automatic mode (other lots). Status: **proposed**, seen on PC renders only, never on a board.
 
 - **Statut** : **proposée**, écrite le 08/11/2026 ; à valider par Axel. **Vu sur** : banc de rendu du PC (LVGL 9.5.0, dessin logiciel,
+- **Note du 12/11/2026** (la décision ne change pas) : dans le firmware de la 7B depuis le 08/11/2026 (`30a7f92`), jamais regardé sur la dalle ni touché au doigt.
   clang), branche `claude/accueil-aere-18e1ff`, 08/11/2026 ; compilé pour le Tab5 et la 7B ; **aucune carte** : le rendu sur le
   panneau, le goût, la lisibilité à 2 m et la RAM en marche ne sont **pas constatés**.
 - **Contexte** : Axel a retenu l'esquisse « croquis aéré » (profil Météo, `00ProjetTab/.claude/esquisses-accueil-meteo`, images

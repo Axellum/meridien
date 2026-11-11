@@ -16,6 +16,7 @@
 > never on a board; the choices the author had to make are listed under "À valider par Axel".
 
 - **Statut** : **proposée**, écrite le 08/11/2026 ; à valider par Axel. Constaté (PC seulement, aucune carte) : 48 tests du noyau
+- **Note du 12/11/2026** (la décision ne change pas) : branché à l'écran depuis par l'[ADR-0023](0023-accueil-mode-automatique-branche.md) ; la carte pluie y est remplacée par la bande de l'[ADR-0027](0027-accueil-bande-de-pluie-sur-la-ligne-centrale.md).
   compilés et exécutés avec AddressSanitizer + UBSan (clang++ 23.1.5) et évalués à la compilation par g++ 14.2 ; 98 mutations
   ciblées, toutes détectées par le test attendu ([docs/mesures/accueil-auto.md](../mesures/accueil-auto.md)). **Non constaté** :
   tout ce qui touche l'écran, la carte, le toucher réel, la durée d'une journée réelle, et le **goût** : les règles et les

@@ -15,19 +15,20 @@ A personal project, shared in case it is useful to someone, built with the help 
 | | |
 |---|---|
 | Development board | M5Stack Tab5, **ST7121 display revision** (1280×720) |
-| Target compatibility | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600), board layer written and built, **not tried on the board yet** ([details](docs/carte-7b.md)) |
+| Second board | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600): runs Meridien since 07/11/2026 (the author's screen at home); a finger and the sound not tried yet ([details](docs/carte-7b.md)) |
 | Version 1 | time/date, weather (Open-Meteo), voice assistant (wake word → STT → LLM → TTS), settings page |
 | Version 2 | Google calendar (through a secret iCal address, see [ADR-0004](docs/decisions/0004-calendrier-par-adresse-ical-secrete.md)) |
 | Out of scope | home automation, Home Assistant, ESPHome |
 
 ## Status
 
-As of 07/11/2026. What is described as running was seen on **two** boards, the author's Tab5 (ST7121 display revision) and his Waveshare 7B, through their serial logs and by the author looking at them. The exact list, with commits and dates, is in **[docs/compatibilite.md](docs/compatibilite.md)**.
+As of 07/11/2026, with a note of 12/11/2026 below. What is described as running was seen on **two** boards, the author's Tab5 (ST7121 display revision) and his Waveshare 7B, through their serial logs and by the author looking at them. The exact list, with commits and dates, is in **[docs/compatibilite.md](docs/compatibilite.md)**.
 
 - **Runs on the Tab5 ST7121**: the display and the touch, Wi-Fi through the ESP32-C6 (with an automatic roll-back when a new network does not work), the time (network first, the hardware clock as a fallback), the weather from Open-Meteo (current conditions, 24 hours, 7 days, rain per quarter of an hour, kept across restarts), the main screen (a sky drawn from the time of day and the weather, themes) and the settings screens. What was not looked at or not measured is written as such in the compatibility table.
 - **Runs on the Waveshare 7B** (one evening of trials, 07/11/2026): the display (the author looked at it and said it displays well), Wi-Fi through the ESP32-C6, the time, the weather at start-up (the HTTPS answer is read and kept) and the first screens. Not tried on this board: the touch with a finger, the sound, the settings screens, the alerts (their first request is not in the log), changing the time zone, and anything the screen shows beyond “it displays well”. Of the features merged that evening only the weather and the time zone were seen working. Detail, commits and dates: [docs/compatibilite.md](docs/compatibilite.md).
+- **Since then (note of 12/11/2026)**: the 7B has stayed on Meridien and was reflashed at the author's request with each new `main`, the last one `851d420` on 11/11/2026. That firmware holds the newer screens (the press-and-hold wheel, the Details page, the automatic mode of the home screen, the rain strip, the sea page): they run on the board, and the weather, alert and sea requests answer in its serial log ([docs/mesures/7b-memoire-interne.md](docs/mesures/7b-memoire-interne.md)), but **none of these screens has been looked at on the panel or touched with a finger**. Row by row: [docs/compatibilite.md](docs/compatibilite.md).
 - **Not running yet**: the voice assistant (its logic is written and checked on a PC, and no real speech or language service has been called; echo cancellation, the wake word and the speech-to-LLM-to-speech chain are not started), the Google calendar, the captive portal. On the Waveshare 7B, a finger on the touch screen and the sound have **not been tried** (see above).
-- **Languages**: the screen texts exist in seven languages (French is the source, then English, German, Dutch, Spanish, Italian, Turkish). The German and Turkish texts have not been reviewed by a native speaker.
+- **Languages**: the screen texts exist in seven languages (French is the source, then English, German, Dutch, Spanish, Italian, Turkish). Only French has been read by its author; the six other languages were written by an AI and **none has been reviewed by a native speaker** ([i18n/README.md](i18n/README.md)).
 - **Checked on a PC, without a board**: the core (weather, time zones, time, voice-assistant logic, settings) runs under AddressSanitizer and UBSan, with mutation testing (a change of the code that no test notices fails the check); the settings web page runs against a fake device. This says nothing about the behaviour on the board.
 - **Known limits**, written in [SECURITY.md](SECURITY.md): the Wi-Fi password and the settings are kept in the device's flash **without encryption**, and the settings page is served over plain local HTTP behind a 6-digit pairing code.
 
@@ -78,7 +79,7 @@ main/                   application: main screen, settings screens, Wi-Fi, weath
 components/core/        pure C++ core, no ESP-IDF, testable on a PC
 components/board_api/   common board interface (pure C)
 components/bsp_tab5/    Tab5 board support: display, touch, I/O expander, backlight, clock, audio, power
-components/bsp_waveshare_7b/  Waveshare 7B board support (never run on the board)
+components/bsp_waveshare_7b/  Waveshare 7B board support (runs on the author's 7B since 07/11/2026)
 boards/                 partitions and chip settings, one folder per board
 i18n/                   screen texts in seven languages
 web/                    settings page, fake device (Node), browser tests
@@ -110,19 +111,20 @@ Un projet personnel, partagé au cas où il servirait à quelqu'un, fait avec l'
 | | |
 |---|---|
 | Carte de développement | M5Stack Tab5, **révision d'écran ST7121** (1280×720) |
-| Compatibilité visée | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600), couche carte écrite et compilée, **pas encore essayée sur la carte** ([détails](docs/carte-7b.md#version-française)) |
+| Deuxième carte | Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024×600) : tourne Meridien depuis le 07/11/2026 (l'écran de l'auteur à la maison) ; un doigt et le son pas encore essayés ([détails](docs/carte-7b.md#version-française)) |
 | Version 1 | heure/date, météo (Open-Meteo), assistant vocal (mot d'activation → STT → LLM → TTS), page de réglages |
 | Version 2 | calendrier Google (par adresse iCal secrète, voir [ADR-0004](docs/decisions/0004-calendrier-par-adresse-ical-secrete.md)) |
 | Hors périmètre | domotique, Home Assistant, ESPHome |
 
 ## État
 
-Au 07/11/2026. Ce qui est décrit comme « tourne » a été vu sur **deux** cartes, le Tab5 de l'auteur (révision d'écran ST7121) et sa Waveshare 7B, par leurs journaux série et par l'auteur qui les regardait. La liste exacte, avec commits et dates, est dans **[docs/compatibilite.md](docs/compatibilite.md#version-française)**.
+Au 07/11/2026, avec une note du 12/11/2026 plus bas. Ce qui est décrit comme « tourne » a été vu sur **deux** cartes, le Tab5 de l'auteur (révision d'écran ST7121) et sa Waveshare 7B, par leurs journaux série et par l'auteur qui les regardait. La liste exacte, avec commits et dates, est dans **[docs/compatibilite.md](docs/compatibilite.md#version-française)**.
 
 - **Tourne sur le Tab5 ST7121** : l'écran et le tactile, le Wi-Fi par l'ESP32-C6 (avec un retour arrière automatique quand un nouveau réseau ne marche pas), l'heure (le réseau d'abord, l'horloge matérielle en secours), la météo d'Open-Meteo (conditions du moment, 24 heures, 7 jours, pluie par quarts d'heure, gardée d'un redémarrage à l'autre), l'écran principal (un ciel dessiné d'après l'heure et la météo, des thèmes) et les écrans de réglages. Ce qui n'a pas été regardé ou pas mesuré est écrit comme tel dans le tableau de compatibilité.
 - **Tourne sur la Waveshare 7B** (une soirée d'essais, 07/11/2026) : l'affichage (l'auteur l'a regardé et dit qu'il s'affiche bien), le Wi-Fi par l'ESP32-C6, l'heure, la météo au démarrage (la réponse HTTPS est lue et gardée) et les premiers écrans. Pas essayés sur cette carte : le tactile au doigt, le son, les écrans de réglages, les alertes (leur première requête n'est pas dans le journal), le changement de fuseau, et tout ce que l'écran montre au-delà de « il s'affiche bien ». Des fonctions fusionnées ce soir-là, seules la météo et le fuseau ont été vus à l'œuvre. Détail, commits et dates : [docs/compatibilite.md](docs/compatibilite.md#version-française).
+- **Depuis (note du 12/11/2026)** : la 7B est restée sous Meridien et a été reflashée à la demande de l'auteur avec chaque nouveau `main`, le dernier `851d420` le 11/11/2026. Ce firmware contient les écrans plus récents (la roue d'appui long, la page Détails, le mode automatique de l'accueil, la bande de pluie, la page mer) : ils tournent sur la carte, et les requêtes météo, alertes et mer répondent dans son journal série ([docs/mesures/7b-memoire-interne.md](docs/mesures/7b-memoire-interne.md)), mais **aucun de ces écrans n'a été regardé sur la dalle ni touché au doigt**. Ligne par ligne : [docs/compatibilite.md](docs/compatibilite.md#version-française).
 - **Ne tourne pas encore** : l'assistant vocal (sa logique est écrite et vérifiée sur un PC, et aucun vrai service de voix ou de langage n'a été appelé ; l'annulation d'écho, le mot d'activation et la chaîne voix → LLM → voix ne sont pas commencés), le calendrier Google, le portail captif. Sur la Waveshare 7B, un doigt sur l'écran tactile et le son n'ont **pas été essayés** (voir plus haut).
-- **Langues** : les textes de l'écran existent en sept langues (le français est la source, puis anglais, allemand, néerlandais, espagnol, italien, turc). Les textes allemands et turcs n'ont pas été relus par un locuteur natif.
+- **Langues** : les textes de l'écran existent en sept langues (le français est la source, puis anglais, allemand, néerlandais, espagnol, italien, turc). Seul le français a été relu, par l'auteur ; les six autres langues ont été écrites par une IA et **aucune n'a été relue par un locuteur** ([i18n/README.md](i18n/README.md)).
 - **Vérifié sur un PC, sans carte** : le noyau (météo, fuseaux, heure, logique de l'assistant vocal, réglages) tourne sous AddressSanitizer et UBSan, avec des mutations (un changement du code qu'aucun test ne remarque fait échouer le contrôle) ; la page web de réglages tourne contre un faux appareil. Cela ne dit rien du comportement sur la carte.
 - **Limites connues**, écrites dans [SECURITY.md](SECURITY.md#version-française) : le mot de passe Wi-Fi et les réglages sont gardés dans la flash de l'appareil **sans chiffrement**, et la page de réglages est servie en HTTP local simple derrière un code d'appairage à 6 chiffres.
 
@@ -173,7 +175,7 @@ main/                   application : écran principal, écrans de réglages, Wi
 components/core/        noyau en C++ pur, sans ESP-IDF, testable sur le PC
 components/board_api/   interface commune des cartes (C pur)
 components/bsp_tab5/    support de la carte Tab5 : écran, tactile, expandeur d'E/S, rétroéclairage, horloge, audio, alimentation
-components/bsp_waveshare_7b/  support de la Waveshare 7B (jamais lancé sur la carte)
+components/bsp_waveshare_7b/  support de la Waveshare 7B (tourne sur la 7B de l'auteur depuis le 07/11/2026)
 boards/                 partitions et réglages de puce, un dossier par carte
 i18n/                   textes de l'écran en sept langues
 web/                    page de réglages, faux appareil (Node), tests dans le navigateur
