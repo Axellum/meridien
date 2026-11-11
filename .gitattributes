@@ -8,3 +8,8 @@ test/host/donnees/*.gz binary
 test/host/donnees/mer_*.txt text eol=lf
 test/host/donnees/mer_*.inc text eol=lf
 test/host/donnees/attendu_mer_*.inc text eol=lf
+# Captures des tests (JSON des services, littéraux .inc qui en sont tirés) : les octets du fil, en LF partout. Sans cela un
+# poste Windows (autocrlf=true) les lit en CRLF : controle_python_fournisseurs.py --verifier y échoue alors que tout est à
+# jour, et les tests C++ du PC ne lisent pas les mêmes octets que la CI.
+test/host/donnees/*.json text eol=lf
+test/host/donnees/*.inc text eol=lf
