@@ -378,7 +378,7 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 **Cause.** The public instance compresses only bodies of about 500 bytes or more (the 9 other real answers are gzip, chunked, 365 to 1 976 bytes on the wire).
 
-**Solution.** `main/vigie_client.cpp` decides from the first two bytes (`gzip_flux::est_gzip`), never from the length or from the header alone; a plain body is read as it is. A body that is neither JSON nor valid gzip is refused and counted as a failure (back-off), never half-read.
+**Solution.** The client decides from the first two bytes, never from the length or from the header alone; a plain body is read as it is. Since 11/11/2026 Vigie goes through the common HTTPS client (`main/http_commun.cpp`, `gzip::decider`: no `Content-Encoding` and no `1f 8b` → read as it is), which also checks the CRC-32 of the inflated text (before, only its size). A body that is neither JSON nor valid gzip is refused and counted as a failure (back-off), never half-read.
 
 **Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Evidence**: `test/host/donnees/vigie_hambourg.json` (426 bytes, read by the core tests) and `vigie_captures.json` (`content_encoding: null`). **Status**: handled on the PC; the board has not received any answer yet.
 
@@ -1100,7 +1100,7 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 **Cause.** L'instance publique ne compresse que les corps d'environ 500 octets ou plus (les 9 autres réponses réelles sont en gzip, chunked, de 365 à 1 976 octets sur le fil).
 
-**Solution.** `main/vigie_client.cpp` décide d'après les deux premiers octets (`gzip_flux::est_gzip`), jamais d'après la longueur ni l'en-tête seul ; un corps en clair est lu tel quel. Un corps qui n'est ni du JSON ni du gzip valide est refusé et compté comme un échec (éloignement), jamais lu à moitié.
+**Solution.** Le client décide d'après les deux premiers octets, jamais d'après la longueur ni l'en-tête seul ; un corps en clair est lu tel quel. Depuis le 11/11/2026, Vigie passe par le client HTTPS commun (`main/http_commun.cpp`, `gzip::decider` : ni `Content-Encoding` ni `1f 8b` → lu tel quel), qui vérifie aussi le CRC-32 du texte décompressé (avant : sa taille seulement). Un corps qui n'est ni du JSON ni du gzip valide est refusé et compté comme un échec (éloignement), jamais lu à moitié.
 
 **Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Preuve** : `test/host/donnees/vigie_hambourg.json` (426 octets, lu par les tests du noyau) et `vigie_captures.json` (`content_encoding: null`). **Statut** : géré sur le PC ; la carte n'a pas encore reçu de réponse.
 

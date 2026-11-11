@@ -308,7 +308,10 @@ function carteVille() {
       liste.replaceChildren(...r.resultats.map((l) => h('li', {}, h('button', { type: 'button', class: 'lieu', onclick: () => choisir(l) },
         ico('pin'), h('div', {}, h('b', { text: l.nom }), h('small', { text: [l.region, l.pays].filter(Boolean).join(' · ') }))))));
       liste.hidden = !r.resultats.length;
-      retours.replaceChildren(r.resultats.length ? '' : retour('info', t('ville.aucun_lieu', { q })));
+      /* Les lieux viennent de GeoNames (CC BY 4.0), via le géocodage d'Open-Meteo : le crédit suit la liste, comme celui des spots. */
+      retours.replaceChildren(r.resultats.length
+        ? h('p', { class: 'aide' }, ...nets(liensLicences(tNoeuds('ville.credit', { lien: h('a', { href: 'https://www.geonames.org/', target: '_blank', rel: 'noopener', text: 'GeoNames' }) }))))
+        : retour('info', t('ville.aucun_lieu', { q })));
     } catch (e) {
       if (e.name === 'AbortError' || mon !== seq) return;
       liste.hidden = true;

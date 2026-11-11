@@ -521,6 +521,26 @@ void panneau_soleil(const Dessin &c) {
     paragraphe(c, gp.petit, T(mer::Texte::Regles), in.avis, 2, t.texte_3);
 }
 
+// ---- le pied ----------------------------------------------------------------------------------------------------------------------------
+
+// Le crédit des données de mer (CC BY 4.0 : Open-Meteo, Copernicus Marine, marée EOT20 ; formes longues dans THIRD_PARTY.md) et
+// l'avertissement de l'ADR-0018. En paysage, une ligne : le crédit à gauche, l'avertissement à droite ; en portrait, l'un sous l'autre.
+void pied(const Dessin &c) {
+    const ThemePrincipal &t = c.t;
+    const geo::Rect &r = g.d.pied;
+    const char *avertissement = T(mer::Texte::PasNavigation);
+    if (g.d.portrait) {
+        const int h = r.h / 2;
+        ligne(c, gp.petit, T(mer::Texte::Credit), geo::Rect{r.x, r.y, r.w, h}, LV_TEXT_ALIGN_LEFT, t.texte_3);
+        ligne(c, gp.petit, avertissement, geo::Rect{r.x, r.y + h, r.w, r.h - h}, LV_TEXT_ALIGN_LEFT, t.texte_3);
+        return;
+    }
+    const int w_avertissement = dz::largeur_texte(gp.petit, avertissement);
+    ligne(c, gp.petit, avertissement, r, LV_TEXT_ALIGN_RIGHT, t.texte_3);
+    ligne(c, gp.petit, T(mer::Texte::Credit), geo::Rect{r.x, r.y, r.w - w_avertissement - M(24), r.h},
+          LV_TEXT_ALIGN_LEFT, t.texte_3);
+}
+
 // ---- le détail --------------------------------------------------------------------------------------------------------------------------
 
 // Ce qu'on dessine à côté d'un critère : des blocs de points, une pastille de verdict ou un tiret.
@@ -648,6 +668,7 @@ void sur_dessin(lv_event_t *evenement) {
     legende(c);
     panneau_maree(c);
     panneau_soleil(c);
+    pied(c);
     if (g.detail >= 0) {
         detail(c);
     }

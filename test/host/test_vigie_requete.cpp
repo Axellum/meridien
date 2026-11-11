@@ -1,15 +1,16 @@
 // Tests du noyau pur « Vigie, côté requête » : adresse de base (vigie_requete.hpp), cadence des requêtes (vigie_planning.hpp) et en-tête
-// gzip des réponses (gzip_flux.hpp).
+// gzip des réponses (gzip.hpp, celui du client commun main/http_commun.cpp, CRC-32 compris).
 //
 // Les adresses attendues viennent de capturer_vigie.py, qui a reçu les réponses de Vigie avec ELLES (donnees/attendu_vigie_urls.inc, relues
 // par controle_python_vigie.py : l'adresse construite par le script Python est celle que l'index des captures a enregistrée). Les flux gzip
 // sont les octets REÇUS sur le fil (donnees/vigie_<lieu>.gz.inc) ; la longueur de leur en-tête et leur taille décompressée sont lues par
-// Python avec zlib, flux DEFLATE vérifié (donnees/attendu_vigie_<lieu>.gz.inc). Les cas limites sont écrits à la main.
+// Python avec zlib, flux DEFLATE vérifié (donnees/attendu_vigie_<lieu>.gz.inc), et le texte décompressé est donnees/vigie_<lieu>.inc
+// (son CRC-32 doit être celui du pied). Les cas limites sont écrits à la main.
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
 
-#include "ecran/gzip_flux.hpp"
+#include "ecran/gzip.hpp"
 #include "ecran/vigie_planning.hpp"
 #include "ecran/vigie_requete.hpp"
 #include "mini.hpp"
@@ -366,6 +367,9 @@ constexpr int jamais_moins_d_une_minute_entre_deux_requetes() {
 }
 
 // ---- gzip ------------------------------------------------------------------------------------------------------------
+// Vigie passe par le client commun (main/http_commun.cpp) : l'enveloppe gzip est lue par ecran/gzip.hpp (en-tête, pied, CRC-32),
+// testé en détail par test_gzip.cpp. Ici : les cas d'en-tête propres aux réponses de Vigie, et surtout les VRAIES réponses de Vigie,
+// acceptées intactes et refusées dès qu'un octet du pied, du texte ou de la longueur change.
 
 constexpr std::uint8_t FIN_VIDE[] = {0, 0, 0, 0, 0, 0, 0, 0}; // CRC-32 et ISIZE factices
 
@@ -386,12 +390,25 @@ constexpr std::size_t flux(std::uint8_t *d, std::uint8_t drapeaux, const std::ui
     return p;
 }
 
+// Écrit le CRC16 de l'en-tête (FHCRC, RFC 1952) dans les deux octets qui précèdent le flux DEFLATE.
+constexpr void signer_entete(std::uint8_t *d, std::size_t n) {
+    const std::size_t pos = n - 1 - 8 - 2; // [en-tête ... CRC16][1 octet DEFLATE][pied de 8]
+    const std::uint32_t crc = ecran::gzip::crc32(d, pos);
+    d[pos] = static_cast<std::uint8_t>(crc & 0xFFU);
+    d[pos + 1] = static_cast<std::uint8_t>((crc >> 8) & 0xFFU);
+}
+
+constexpr std::size_t debut_flux(const std::uint8_t *d, std::size_t n) {
+    const ecran::gzip::Separation s = ecran::gzip::separer(d, n);
+    return s.ok() ? s.debut_flux : 0;
+}
+
 constexpr int un_en_tete_sans_option_vaut_dix_octets() {
     std::uint8_t d[64] = {};
     const std::size_t n = flux(d, 0, nullptr, 0);
     VERIFIER(n == 19);
-    VERIFIER(ecran::gzip_flux::est_gzip(d, n));
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 10);
+    VERIFIER(ecran::gzip::ressemble_a_gzip(d, n));
+    VERIFIER(debut_flux(d, n) == 10);
     return 0;
 }
 
@@ -399,20 +416,24 @@ constexpr int le_nom_le_commentaire_l_extra_et_le_crc_allongent_l_en_tete() {
     std::uint8_t d[96] = {};
     const std::uint8_t nom[] = {'a', '.', 'j', 's', 'o', 'n', 0};
     std::size_t n = flux(d, 0x08, nom, sizeof nom); // FNAME
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 10 + 7);
+    VERIFIER(debut_flux(d, n) == 10 + 7);
     const std::uint8_t commentaire[] = {'c', 'e', 0};
     n = flux(d, 0x10, commentaire, sizeof commentaire); // FCOMMENT
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 10 + 3);
+    VERIFIER(debut_flux(d, n) == 10 + 3);
     const std::uint8_t extra[] = {5, 0, 1, 2, 3, 4, 5}; // longueur 5, petit-boutiste, puis 5 octets
     n = flux(d, 0x04, extra, sizeof extra);             // FEXTRA
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 10 + 2 + 5);
-    const std::uint8_t crc[] = {0x12, 0x34};
+    VERIFIER(debut_flux(d, n) == 10 + 2 + 5);
+    const std::uint8_t crc[] = {0, 0};
     n = flux(d, 0x02, crc, sizeof crc); // FHCRC
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 10 + 2);
-    const std::uint8_t tout[] = {3, 0,   9,   9, 9,    'n',
-                                 0, 'c', 'c', 0, 0x12, 0x34}; // extra de 3, nom, commentaire, CRC : dans cet ordre
+    signer_entete(d, n);
+    VERIFIER(debut_flux(d, n) == 10 + 2);
+    d[10] ^= 0x01; // CRC16 de l'en-tête faux : refusé
+    VERIFIER(ecran::gzip::separer(d, n).erreur == ecran::gzip::Erreur::CrcEntete);
+    const std::uint8_t tout[] = {3, 0,   9,   9, 9, 'n',
+                                 0, 'c', 'c', 0, 0, 0}; // extra de 3, nom, commentaire, CRC : dans cet ordre
     n = flux(d, 0x1E, tout, sizeof tout);
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 10 + 2 + 3 + 2 + 3 + 2);
+    signer_entete(d, n);
+    VERIFIER(debut_flux(d, n) == 10 + 2 + 3 + 2 + 3 + 2);
     const std::uint8_t extra_long[] = {0x00, 0x01}; // longueur 256 (0x0100) : le deuxième octet pèse 256
     std::uint8_t grand[400] = {};
     std::size_t p = 0;
@@ -427,83 +448,114 @@ constexpr int le_nom_le_commentaire_l_extra_et_le_crc_allongent_l_en_tete() {
     p += 256;
     grand[p++] = 0x03;
     p += 8;
-    VERIFIER(ecran::gzip_flux::longueur_entete(grand, p) == 10 + 2 + 256);
+    VERIFIER(debut_flux(grand, p) == 10 + 2 + 256);
     return 0;
 }
 
 constexpr int un_en_tete_coupe_ou_invalide_est_refuse() {
+    using ecran::gzip::Erreur;
+    using ecran::gzip::separer;
     std::uint8_t d[96] = {};
     const std::uint8_t nom_sans_zero[] = {'a', 'b'};
     std::size_t n = flux(d, 0x08, nom_sans_zero, sizeof nom_sans_zero);
-    // Nom jamais terminé dans l'en-tête : le premier zéro est dans la fin factice (faite de zéros), il ne reste plus la place du flux : refusé.
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 0);
+    // Nom jamais terminé dans l'en-tête : le premier zéro est dans la fin factice (faite de zéros), il ne reste plus la place du pied.
+    VERIFIER(!separer(d, n).ok());
     const std::uint8_t extra_trop_long[] = {0xFF, 0xFF};
     n = flux(d, 0x04, extra_trop_long, sizeof extra_trop_long);
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 0);
+    VERIFIER(separer(d, n).erreur == Erreur::ChampTronque);
     n = flux(d, 0x20, nullptr, 0); // bit réservé
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 0);
+    VERIFIER(separer(d, n).erreur == Erreur::BitsReserves);
     n = flux(d, 0x80, nullptr, 0);
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 0);
+    VERIFIER(separer(d, n).erreur == Erreur::BitsReserves);
     n = flux(d, 0, nullptr, 0);
     d[0] = 0x1E; // mauvais octet magique
-    VERIFIER(!ecran::gzip_flux::est_gzip(d, n) && ecran::gzip_flux::longueur_entete(d, n) == 0);
+    VERIFIER(!ecran::gzip::ressemble_a_gzip(d, n) && separer(d, n).erreur == Erreur::Signature);
     d[0] = 0x1F;
     d[1] = 0x8A;
-    VERIFIER(!ecran::gzip_flux::est_gzip(d, n) && ecran::gzip_flux::longueur_entete(d, n) == 0);
+    VERIFIER(!ecran::gzip::ressemble_a_gzip(d, n) && separer(d, n).erreur == Erreur::Signature);
     d[1] = 0x8B;
     d[2] = 7; // méthode inconnue
-    VERIFIER(!ecran::gzip_flux::est_gzip(d, n) && ecran::gzip_flux::longueur_entete(d, n) == 0);
+    VERIFIER(separer(d, n).erreur == Erreur::Methode);
     d[2] = 8;
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 10);
-    VERIFIER(ecran::gzip_flux::longueur_entete(nullptr, 100) == 0);
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, 0) == 0);
+    VERIFIER(debut_flux(d, n) == 10);
+    VERIFIER(separer(nullptr, 100).erreur == Erreur::TropCourt);
+    VERIFIER(separer(d, 0).erreur == Erreur::TropCourt);
     return 0;
 }
 
 constexpr int il_faut_la_place_d_un_octet_de_flux_et_de_la_fin() {
+    using ecran::gzip::Erreur;
     std::uint8_t d[32] = {};
     const std::size_t n = flux(d, 0, nullptr, 0); // 10 + 1 + 8
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n) == 10);
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, n - 1) == 0); // plus d'octet de flux
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, 10) == 0);
-    VERIFIER(ecran::gzip_flux::longueur_entete(d, 3) == 0);
+    VERIFIER(debut_flux(d, n) == 10);
+    VERIFIER(ecran::gzip::separer(d, n - 1).erreur == Erreur::FluxAbsent); // plus d'octet de flux
+    VERIFIER(ecran::gzip::separer(d, 10).erreur == Erreur::PiedAbsent);
+    VERIFIER(ecran::gzip::separer(d, 3).erreur == Erreur::TropCourt);
     return 0;
 }
 
 constexpr int la_taille_annoncee_se_lit_en_petit_boutiste() {
+    using ecran::gzip::Erreur;
     std::uint8_t d[32] = {};
     std::size_t n = flux(d, 0, nullptr, 0);
     d[n - 4] = 0x78;
     d[n - 3] = 0x56;
     d[n - 2] = 0x34;
     d[n - 1] = 0x12;
-    VERIFIER(ecran::gzip_flux::taille_annoncee(d, n) == 0x12345678LL);
+    VERIFIER(ecran::gzip::separer(d, n).taille == 0x12345678U);
     d[n - 4] = d[n - 3] = d[n - 2] = d[n - 1] = 0xFF;
-    VERIFIER(ecran::gzip_flux::taille_annoncee(d, n) == 4294967295LL);
+    VERIFIER(ecran::gzip::separer(d, n).taille == 4294967295U);
     d[n - 4] = d[n - 3] = d[n - 2] = d[n - 1] = 0;
-    VERIFIER(ecran::gzip_flux::taille_annoncee(d, n) == 0);
-    VERIFIER(ecran::gzip_flux::taille_annoncee(d, 17) == -1);
-    VERIFIER(ecran::gzip_flux::taille_annoncee(nullptr, 100) == -1);
+    VERIFIER(ecran::gzip::separer(d, n).taille == 0);
+    VERIFIER(ecran::gzip::separer(d, 17).erreur == Erreur::PiedAbsent);
+    VERIFIER(ecran::gzip::separer(nullptr, 100).erreur == Erreur::TropCourt);
     return 0;
 }
 
 constexpr int le_json_en_clair_n_est_pas_du_gzip() {
     const std::uint8_t clair[] = {'{', '"', 'v', 'e', 'r', 's', 'i', 'o', 'n', '"'};
-    VERIFIER(!ecran::gzip_flux::est_gzip(clair, sizeof clair));
-    VERIFIER(ecran::gzip_flux::longueur_entete(clair, sizeof clair) == 0);
+    VERIFIER(!ecran::gzip::ressemble_a_gzip(clair, sizeof clair));
+    // Sans Content-Encoding, un corps qui commence par « { » est lu tel quel (main/http_commun.cpp).
+    VERIFIER(ecran::gzip::decider(ecran::gzip::Codage::Aucun, false) == ecran::gzip::Decision::Brut);
     // La plus petite réponse réelle de Vigie (hambourg, 426 octets) arrive sans compression : elle commence par « { ».
     VERIFIER(HAMBOURG.size() > 0 && HAMBOURG[0] == '{');
-    VERIFIER(!ecran::gzip_flux::est_gzip(static_cast<const std::uint8_t *>(nullptr), 0));
+    VERIFIER(!ecran::gzip::ressemble_a_gzip(static_cast<const std::uint8_t *>(nullptr), 0));
     return 0;
 }
 
+// Le texte JSON d'une capture, en octets (les tests évalués à la compilation ne peuvent pas convertir `const char *`).
+inline constexpr std::size_t TEXTE_MAX =
+    20000; // la plus grande réponse décompressée de Vigie : 19 238 octets (La Palma)
+struct Texte {
+    std::uint8_t octets[TEXTE_MAX] = {};
+    std::size_t n = 0;
+};
+constexpr Texte en_octets(sv json) {
+    Texte t;
+    for (const char c : json)
+        t.octets[t.n++] = static_cast<std::uint8_t>(c);
+    return t;
+}
+
+// Ce que le client commun accepte, une fois `tinfl` passé : l'enveloppe est bonne et le pied (CRC-32 et taille) est celui du texte.
+constexpr bool accepte(const std::uint8_t *fil, std::size_t n, const std::uint8_t *texte, std::size_t n_texte) {
+    const ecran::gzip::Separation s = ecran::gzip::separer(fil, n);
+    return s.ok() && ecran::gzip::verifier_donnees(s, texte, n_texte) == ecran::gzip::Erreur::Aucune;
+}
+
 template <std::size_t N> constexpr int reel(const std::uint8_t (&octets)[N], const AttGz &attendu, sv json) {
-    VERIFIER(ecran::gzip_flux::est_gzip(octets, N));
-    VERIFIER(ecran::gzip_flux::longueur_entete(octets, N) == attendu.entete);
-    VERIFIER(ecran::gzip_flux::taille_annoncee(octets, N) == attendu.taille);
+    VERIFIER(N <= 4096); // le plus gros flux réel tient en 1 976 octets
+    VERIFIER(ecran::gzip::ressemble_a_gzip(octets, N));
+    const ecran::gzip::Separation s = ecran::gzip::separer(octets, N);
+    VERIFIER(s.ok());
+    VERIFIER(s.debut_flux == attendu.entete);
+    VERIFIER(static_cast<long long>(s.taille) == attendu.taille);
     VERIFIER(static_cast<std::size_t>(attendu.taille) ==
              json.size());     // la taille annoncée est celle du corps décompressé
     VERIFIER(N < json.size()); // et le flux est bien plus court : la compression sert
+    // Le CRC-32 du pied est celui du texte que Python a décompressé : une vraie réponse passe le contrôle du client commun.
+    const Texte t = en_octets(json);
+    VERIFIER(accepte(octets, N, t.octets, t.n));
     return 0;
 }
 
@@ -517,6 +569,45 @@ constexpr int les_flux_reels_ont_la_longueur_d_en_tete_et_la_taille_lues_par_zli
     VERIFIER(reel(GZ_OSLO, ATT_GZ_OSLO, JSON_OSLO) == 0);
     VERIFIER(reel(GZ_TOKYO, ATT_GZ_TOKYO, JSON_TOKYO) == 0);
     VERIFIER(reel(GZ_VALENCE, ATT_GZ_VALENCE, JSON_VALENCE) == 0);
+    return 0;
+}
+
+// Une vraie réponse de Vigie dont un seul octet change : CRC-32 du pied, texte rendu par `tinfl` (même longueur), taille annoncée,
+// ou flux coupé d'un octet. Avant le client commun, Vigie ne comparait que la taille : un pied ou un texte faux passaient.
+template <std::size_t N> constexpr int alteree(const std::uint8_t (&octets)[N], sv json) {
+    std::uint8_t fil[4096] = {};
+    VERIFIER(N <= sizeof fil);
+    for (std::size_t i = 0; i < N; ++i)
+        fil[i] = octets[i];
+    Texte t = en_octets(json);
+    VERIFIER(accepte(fil, N, t.octets, t.n)); // intacte : acceptée
+
+    fil[N - 8] ^= 0x01; // un bit du CRC-32 annoncé
+    VERIFIER(!accepte(fil, N, t.octets, t.n));
+    fil[N - 8] ^= 0x01;
+    fil[N - 5] ^= 0x80; // le dernier bit du CRC-32 annoncé
+    VERIFIER(!accepte(fil, N, t.octets, t.n));
+    fil[N - 5] ^= 0x80;
+
+    t.octets[t.n / 2] ^= 0x20; // le texte décompressé diffère d'un bit, même longueur
+    VERIFIER(!accepte(fil, N, t.octets, t.n));
+    t.octets[t.n / 2] ^= 0x20;
+
+    fil[N - 4] ^= 0x01; // la taille annoncée
+    VERIFIER(!accepte(fil, N, t.octets, t.n));
+    fil[N - 4] ^= 0x01;
+    VERIFIER(!accepte(fil, N, t.octets, t.n - 1)); // texte rendu plus court que la taille annoncée
+
+    VERIFIER(!accepte(fil, N - 1, t.octets, t.n)); // flux tronqué d'un octet : le pied lu n'est plus le bon
+    VERIFIER(!accepte(fil, N - 8, t.octets, t.n)); // flux tronqué de tout son pied
+    VERIFIER(accepte(fil, N, t.octets, t.n));      // et remise en état : de nouveau acceptée
+    return 0;
+}
+
+constexpr int une_reponse_reelle_alteree_d_un_octet_est_refusee() {
+    VERIFIER(alteree(GZ_ANCONA, JSON_ANCONA) == 0);
+    VERIFIER(alteree(GZ_LA_PALMA, JSON_LA_PALMA) == 0); // la plus grande
+    VERIFIER(alteree(GZ_TOKYO, JSON_TOKYO) == 0);
     return 0;
 }
 
@@ -542,7 +633,8 @@ constexpr int les_flux_reels_ont_la_longueur_d_en_tete_et_la_taille_lues_par_zli
     X(il_faut_la_place_d_un_octet_de_flux_et_de_la_fin)                                                                \
     X(la_taille_annoncee_se_lit_en_petit_boutiste)                                                                     \
     X(le_json_en_clair_n_est_pas_du_gzip)                                                                              \
-    X(les_flux_reels_ont_la_longueur_d_en_tete_et_la_taille_lues_par_zlib)
+    X(les_flux_reels_ont_la_longueur_d_en_tete_et_la_taille_lues_par_zlib)                                             \
+    X(une_reponse_reelle_alteree_d_un_octet_est_refusee)
 
 TESTS_A_LA_COMPILATION(LISTE)
 
