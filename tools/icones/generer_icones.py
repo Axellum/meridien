@@ -45,10 +45,21 @@ TABLE_UI = RACINE / "main" / "ui_meteo_icones_table.inc"
 GRILLE = 128  # unités du dessin
 SURECH = 8  # échantillons par pixel et par axe
 
-# Tailles (côté du carré, en pixels) de chaque famille. L'écran choisit la plus grande qui tient dans la place voulue.
+# ÉCHELLE des tailles (côté du carré, en pixels) de chaque famille : l'écran choisit la plus grande qui tient dans la place voulue
+# (visuel::choisir_taille). Ne pas la changer : elle fixe la taille dessinée pour chaque place, donc les pixels de l'écran.
 TAILLES_METEO = (44, 60, 84, 120, 168, 232)
 TAILLES_INFO = (28, 40, 56, 80)
 TAILLES_LUNE = (64, 112)  # phases de lune : un disque entier, donc moins de tailles
+
+# Tailles EMBARQUÉES dans le binaire : seulement celles de l'échelle que l'écran choisit vraiment. Relevé du 11/11/2026 (lot de
+# taille L11) : le banc de rendu instrumenté, toutes les scènes, les sept langues, 1280x720, 1024x600, 720x1280 et 600x1024, trois
+# instants, n'a choisi que météo 44, 120 (portrait de l'horloge en vedette) et 168 (horloge en vedette en paysage), info 28, 40 et
+# 56, lune 64. Les autres (60, 84, 232, 80, 112 : 486 Ko) ne sont plus générées. Une place qui choisirait une taille absente
+# n'affiche rien et le dit : visuel::taille_* rend 0 (test_visuel_icones), main/ui_meteo_icones.cpp écrit « ICONE_ABSENTE » dans le
+# journal et le banc de rendu échoue sur ce mot. Remettre la taille ici, régénérer, et c'est réparé.
+EMBARQUEES_METEO = (44, 120, 168)
+EMBARQUEES_INFO = (28, 40, 56)
+EMBARQUEES_LUNE = (64,)
 
 
 # ------------------------------------------------------------------------------------------------------------------------
@@ -589,11 +600,11 @@ def toutes_les_pieces():
     """[(nom, fonction, tailles, famille)] dans l'ordre des identifiants (jamais réordonné : c'est l'ABI du binaire)."""
     pieces = []
     for nom, f in PIECES_METEO.items():
-        pieces.append((nom, f, TAILLES_METEO, "meteo"))
+        pieces.append((nom, f, EMBARQUEES_METEO, "meteo"))
     for nom, f in PIECES_INFO.items():
-        pieces.append((nom, f, TAILLES_INFO, "info"))
+        pieces.append((nom, f, EMBARQUEES_INFO, "info"))
     for i in range(NB_PHASES):
-        pieces.append((f"phase_{i:02d}", (lambda t, i=i: phase_lune(t, i)), TAILLES_LUNE, "lune"))
+        pieces.append((f"phase_{i:02d}", (lambda t, i=i: phase_lune(t, i)), EMBARQUEES_LUNE, "lune"))
     return pieces
 
 
@@ -635,10 +646,14 @@ def ecrire_table(pieces) -> str:
     for i, nom in enumerate(noms_pieces):
         L.append(f"    X({nom}, {pieces[i][3].upper()}){' \\' if i + 1 < len(noms_pieces) else ''}")
     L.append("")
-    L.append("// Tailles disponibles par famille.")
+    L.append("// Échelle des tailles par famille (choix de la taille dessinée pour une place).")
     L.append("inline constexpr int TAILLES_METEO[] = {" + ", ".join(map(str, TAILLES_METEO)) + "};")
     L.append("inline constexpr int TAILLES_INFO[] = {" + ", ".join(map(str, TAILLES_INFO)) + "};")
     L.append("inline constexpr int TAILLES_LUNE[] = {" + ", ".join(map(str, TAILLES_LUNE)) + "};")
+    L.append("// Tailles embarquées dans le binaire (sous-ensemble de l'échelle) : une autre taille choisie n'a pas de pixels.")
+    L.append("inline constexpr int EMBARQUEES_METEO[] = {" + ", ".join(map(str, EMBARQUEES_METEO)) + "};")
+    L.append("inline constexpr int EMBARQUEES_INFO[] = {" + ", ".join(map(str, EMBARQUEES_INFO)) + "};")
+    L.append("inline constexpr int EMBARQUEES_LUNE[] = {" + ", ".join(map(str, EMBARQUEES_LUNE)) + "};")
     L.append(f"inline constexpr int NB_PHASES_LUNE = {NB_PHASES};")
     L.append("")
     L.append("// Composition : nom de l'icône, puis jusqu'à 3 couples (pièce, rôle de teinte).")
@@ -674,6 +689,9 @@ def verifier_composition():
         for piece, role in couches:
             assert piece in PIECES_METEO, f"{nom} : pièce inconnue {piece}"
             assert role in roles, f"{nom} : rôle inconnu {role}"
+    for echelle, embarquees in ((TAILLES_METEO, EMBARQUEES_METEO), (TAILLES_INFO, EMBARQUEES_INFO), (TAILLES_LUNE, EMBARQUEES_LUNE)):
+        assert embarquees and set(embarquees) <= set(echelle), f"tailles embarquées hors de l'échelle : {embarquees}"
+        assert list(embarquees) == sorted(embarquees), f"tailles embarquées non croissantes : {embarquees}"
 
 
 # ------------------------------------------------------------------------------------------------------------------------
@@ -700,7 +718,7 @@ def apercu(dossier: Path):
         planche.paste(Image.new("RGB", masque.size, teinte), (x + e.x0, y + e.y0), masque)
 
     for nom_fond, fond, texte in (("sombre", (15, 20, 26), (230, 236, 242)), ("clair", (244, 240, 232), (30, 36, 44))):
-        for taille in (232, 84, 44):
+        for taille in (168, 120, 44):
             noms = list(ICONES_METEO)
             colonnes = 8 if taille >= 120 else 12
             cell = taille + 20
@@ -713,19 +731,19 @@ def apercu(dossier: Path):
             planche.save(dossier / f"meteo_{nom_fond}_{taille}.png")
         # informations
         noms_info = list(PIECES_INFO)
-        taille = 80
+        taille = 56
         cell = taille + 20
         planche = Image.new("RGB", (8 * cell + 20, math.ceil(len(noms_info) / 8) * cell + 20), fond)
         for n, nom in enumerate(noms_info):
             poser(planche, nom, taille, 20 + (n % 8) * cell, 20 + (n // 8) * cell, texte)
-        planche.save(dossier / f"info_{nom_fond}_80.png")
+        planche.save(dossier / f"info_{nom_fond}_56.png")
         petit = Image.new("RGB", (len(noms_info) * 48 + 20, 100), fond)
         for n, nom in enumerate(noms_info):
             poser(petit, nom, 28, 20 + n * 48, 10, texte)
             poser(petit, nom, 40, 20 + n * 48, 48, texte)
         petit.save(dossier / f"info_{nom_fond}_petit.png")
         # phases de lune
-        taille = 112
+        taille = 64
         planche = Image.new("RGB", (NB_PHASES * (taille + 12) + 20, taille + 40), fond)
         for i in range(NB_PHASES):
             x, y = 20 + i * (taille + 12), 20

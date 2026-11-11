@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "esp_log.h"
 #include "ui_meteo_dessin.h"
 
 // Le binaire des pixels (main/assets/icones_meteo.bin), embarqué comme la police (EMBED_FILES de main/CMakeLists.txt) ; sur le
@@ -11,6 +12,8 @@ extern const std::uint8_t icones_meteo_octets[] asm("_binary_icones_meteo_bin_st
 namespace ecran::icones {
 
 namespace {
+
+const char *TAG = "icones";
 
 struct Entree {
     std::uint16_t piece;
@@ -84,6 +87,16 @@ void piece(lv_layer_t *couche, visuel::Piece p, int cote, int x, int y, std::uin
         return;
     }
     const int taille = taille_choisie(p, cote);
+    if (taille == 0) {
+        // La place choisit une taille de l'échelle que le binaire n'embarque pas (tools/icones/generer_icones.py) : rien n'est
+        // dessiné. Signalé une fois par démarrage (le dessin repasse à chaque image) ; le banc de rendu échoue sur ce mot.
+        static bool signale = false;
+        if (!signale) {
+            signale = true;
+            ESP_LOGE(TAG, "ICONE_ABSENTE : pièce %d, place de %d px, taille non embarquée", static_cast<int>(p), cote);
+        }
+        return;
+    }
     const Entree *e = chercher(static_cast<int>(p), taille);
     if (e == nullptr || e->dsc.header.w == 0 || e->dsc.header.h == 0) {
         return;

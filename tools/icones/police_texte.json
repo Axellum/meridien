@@ -1,0 +1,15 @@
+{
+  "source": {
+    "description": "Roboto Bold 3.015 servie par Google Fonts le 08/10/2026 (copie de Tab5/fonts/roboto_700.ttf du dépôt Tab5)",
+    "taille": 124292,
+    "sha256": "35757eaa996b3359022f47f164a67ee9eac04971af24c5b8fbd4b89e844ff190",
+    "latin_absents": "ƀƁƂƃƄƅƆƇƈƉƊƋƌƍƎƐƑƓƔƕƖƗƘƙƚƛƜƝƞƟƢƣƤƥƦƧƨƩƪƫƬƭƮƱƲƳƴƵƶƷƸƹƺƻƼƽƾƿǀǁǂǃǄǅǆǇǈǉǊǋǌǍǎǏǐǑǒǓǔǕǖǗǘǙǚǛǜǝǞǟǠǡǢǣǤǥǦǧǨǩǪǫǬǭǮǯǱǲǳǴǵǶǷǸǹȀȁȂȃȄȅȆȇȈȉȊȋȌȍȎȏȐȑȒȓȔȕȖȗȜȝȞȟȠȡȢȣȤȥȦȧȨȩȪȫȬȭȮȯȰȱȲȳȴȵȶȸȹȺȻȼȽȾȿɀɁɂɃɄɅɆɇɈɉɊɋɌɍɎɏ"
+  },
+  "blocs_retires": [],
+  "sortie": {
+    "fichier": "main/assets/roboto_700.ttf",
+    "taille": 88644,
+    "sha256": "ebf2751243006e05da023c3c5620d266e07dac48b3f025e84752b7bfd6622cb0",
+    "caracteres": 927
+  }
+}
