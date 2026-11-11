@@ -59,7 +59,7 @@ esp_err_t sur_evenement_http(esp_http_client_event_t *evt) {
     case HTTP_EVENT_ON_CONNECTED:
         rec->connecte = true;
         rec->apres_connexion = mesurer_memoire();
-        // Une redirection rouvre une connexion : ni le corps ni le Content-Encoding de la réponse précédente ne comptent plus.
+        // Une nouvelle connexion repart de zéro (par prudence : les redirections ne sont jamais suivies, http_commun.h).
         rec->n = 0;
         rec->trop = false;
         rec->codage[0] = '\0';
@@ -214,6 +214,7 @@ __attribute__((noinline)) void interpreter(const Reception &rec, size_t capacite
         return;
     }
     r.octets = d.octets;
+    r.duree_decompression_us = static_cast<int>(d.duree_us);
     // Les deux tailles, pour juger du gain sur la carte : octets sur le fil, octets décompressés, part du fil en pour cent.
     ESP_LOGI(TAG,
              "réponse : HTTP %d, gzip, %u octets sur le fil, %u octets décompressés (%u %% du texte), décompression "
@@ -246,6 +247,11 @@ Reponse obtenir(const Requete &requete, LireCorps lire, void *utilisateur) {
         r.issue = Issue::Requete;
         return r;
     }
+    if (requete.taille_envoi < 512) {
+        ESP_LOGE(TAG, "requête non envoyée : tampon d'envoi trop petit (%d octets)", requete.taille_envoi);
+        r.issue = Issue::Requete;
+        return r;
+    }
     if (requete.taille_max == 0 || requete.taille_max > kTailleMaxAbsolue) {
         ESP_LOGE(TAG, "requête non envoyée : taille maximale de réponse demandée hors limites (%u octets)",
                  static_cast<unsigned>(requete.taille_max));
@@ -270,11 +276,12 @@ Reponse obtenir(const Requete &requete, LireCorps lire, void *utilisateur) {
     config.event_handler = sur_evenement_http;
     config.user_data = &rec;
     config.crt_bundle_attach =
-        esp_crt_bundle_attach;    // certificats racine du paquet d'ESP-IDF (Mozilla) : le serveur est vérifié
-    config.buffer_size = 2048;    // en-têtes de réponse
-    config.buffer_size_tx = 1024; // ligne de requête : 885 octets au plus avec le plus long `models=` d'Open-Meteo
-                                  // (test_meteo_appareil.cpp, ADR-0010) ; 512 par défaut ne suffit pas
+        esp_crt_bundle_attach; // certificats racine du paquet d'ESP-IDF (Mozilla) : le serveur est vérifié
+    config.buffer_size = 2048; // en-têtes de réponse
+    config.buffer_size_tx = requete.taille_envoi;
     config.keep_alive_enable = false;
+    // Aucune redirection suivie (http_commun.h) : esp_http_client rend la main sur la réponse 3xx, comptée comme `Http`.
+    config.disable_auto_redirect = true;
 
     // Un seul TLS à la fois dans tout le firmware (verrou_tls.h) : la poignée de main demande ≈ 65 Ko de RAM interne, et la carte
     // n'en a pas assez pour deux (une recherche de ville et cette requête, par exemple). Le verrou couvre exactement
@@ -321,6 +328,9 @@ Reponse obtenir(const Requete &requete, LireCorps lire, void *utilisateur) {
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "requête échouée : %s (errno %d) après %d ms", esp_err_to_name(err), erreur_socket, r.duree_ms);
         r.issue = Issue::Reseau;
+    } else if (r.statut_http >= 300 && r.statut_http < 400) {
+        ESP_LOGW(TAG, "réponse refusée : redirection HTTP %d, jamais suivie", r.statut_http);
+        r.issue = Issue::Http;
     } else if (r.statut_http == 429) {
         r.issue = Issue::TropDeRequetes;
     } else if (r.statut_http != 200) {

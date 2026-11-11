@@ -10,26 +10,25 @@
 // priorité plus haute que celle de la tâche d'inactivité, le chien de garde des tâches se déclenche (constaté par jalon-1b sur la
 // tâche météo). Elle traite d'abord la demande de la page web (un navigateur attend), puis celle de l'écran.
 //
-// Les gros tampons (deux réponses brutes de 16 Ko : celle en cours, celle que l'écran lit ; adresses) sont en PSRAM, alloués au premier usage ; la RAM interne ne sert
-// qu'à la pile de la tâche, à deux sémaphores, et à ce que mbedtls et esp_http_client prennent pendant la poignée de main (≈ 65 Ko,
-// sous le verrou TLS commun : verrou_tls.h). Le texte cherché n'est jamais écrit au journal (c'est un lieu, donc une donnée privée).
+// Le téléchargement passe par le client HTTPS commun (main/http_commun.h : verrou TLS commun, gzip avec CRC-32 vérifié, redirections
+// refusées). Les gros tampons (deux réponses de 16 Ko : celle en cours, celle que l'écran lit ; adresses) sont en PSRAM, alloués au
+// premier usage, plus les deux tampons du client commun, en PSRAM le temps d'une requête ; la RAM interne ne sert qu'à la pile de
+// la tâche, à deux sémaphores, et à ce que mbedtls et esp_http_client prennent pendant la poignée de main (≈ 65 Ko, sous le verrou
+// TLS commun : verrou_tls.h). Le texte cherché n'est jamais écrit au journal (c'est un lieu, donc une donnée privée).
 #include "geocodage.h"
 
 #include <cstdint>
 #include <cstring>
 #include <new>
 
-#include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
-#include "esp_http_client.h"
 #include "esp_log.h"
-#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
+#include "http_commun.h"
 #include "reseau.h"
-#include "verrou_tls.h"
 
 namespace ecran {
 
@@ -39,10 +38,12 @@ const char *TAG = "geocodage";
 
 // Seule adresse joignable d'ici.
 constexpr std::string_view kAutorise = "https://geocoding-api.open-meteo.com/";
-constexpr size_t kTailleReponse = 16384; // réponse brute d'Open-Meteo : ≈ 5 Ko pour huit lieux
+constexpr size_t kTailleReponse = 16384; // réponse d'Open-Meteo, décompressée : ≈ 5 Ko pour huit lieux
 constexpr int kDelaiHttpMs = 8000;       // connexion, TLS et lecture : au-delà, la recherche est un échec
 constexpr uint32_t kAttenteVerrouMs =
-    15000;                                 // une requête météo en cours (15 s au plus) ne fait pas échouer la recherche
+    15000;                         // une requête météo en cours (15 s au plus) ne fait pas échouer la recherche
+constexpr int kTailleEnvoi = 1536; // adresse (jusqu'à 1 Ko avec 80 caractères accentués) + en-têtes
+constexpr const char *kAgentUtilisateur = "Meridien/ESP32-P4 (recherche de ville)";
 constexpr uint32_t kAttentePageMs = 30000; // attente maximale du serveur HTTP : verrou + téléchargement + marge
 constexpr uint32_t kPileTache = 12288;     // la poignée de main TLS demande plusieurs Ko de pile
 constexpr UBaseType_t kPrioriteTache = tskIDLE_PRIORITY;
@@ -105,25 +106,21 @@ Contexte *contexte() {
 
 // ---- téléchargement ---------------------------------------------------------------------------------------------------------------
 
-struct Reception {
-    char *donnees;
+// Où la lecture du corps copie la réponse (client_http::LireCorps).
+struct Copie {
+    char *tampon;
     size_t capacite;
-    size_t n;
-    bool trop;
+    size_t taille;
 };
 
-esp_err_t sur_evenement_http(esp_http_client_event_t *evt) {
-    auto *rec = static_cast<Reception *>(evt->user_data);
-    if (rec != nullptr && evt->event_id == HTTP_EVENT_ON_DATA && evt->data_len > 0 && evt->data != nullptr) {
-        const size_t len = static_cast<size_t>(evt->data_len);
-        if (rec->n + len > rec->capacite) {
-            rec->trop = true; // plus grand que prévu : on ne lit pas une réponse à moitié
-        } else {
-            std::memcpy(rec->donnees + rec->n, evt->data, len);
-            rec->n += len;
-        }
+bool copier_corps(std::string_view corps, void *utilisateur) {
+    auto *c = static_cast<Copie *>(utilisateur);
+    if (corps.size() > c->capacite) {
+        return false; // ne peut pas arriver : la borne de la requête est la capacité du tampon
     }
-    return ESP_OK;
+    std::memcpy(c->tampon, corps.data(), corps.size());
+    c->taille = corps.size();
+    return true;
 }
 
 // Télécharge `adresse` (zéro final) dans `tampon`. Appelé seulement depuis la tâche du module.
@@ -135,51 +132,36 @@ api::Telechargement telecharger(const char *adresse, char *tampon, size_t capaci
     if (!reseau_etat().ip_obtenue) {
         return api::Telechargement::SansInternet;
     }
-    const int64_t debut_us = esp_timer_get_time();
-    VerrouTls verrou(kAttenteVerrouMs);
-    if (!verrou.pris()) {
-        ESP_LOGW(TAG, "verrou TLS occupé depuis plus de %u ms : recherche abandonnée",
-                 static_cast<unsigned>(kAttenteVerrouMs));
-        return api::Telechargement::SansInternet;
-    }
-
-    Reception rec = {tampon, capacite, 0, false};
-    esp_http_client_config_t config = {};
-    config.url = adresse;
-    config.method = HTTP_METHOD_GET;
-    config.timeout_ms = kDelaiHttpMs;
-    config.event_handler = sur_evenement_http;
-    config.user_data = &rec;
-    config.crt_bundle_attach = esp_crt_bundle_attach; // le serveur est vérifié (certificats racine d'ESP-IDF)
-    config.buffer_size = 2048;
-    config.buffer_size_tx = 1536; // adresse (jusqu'à 1 Ko avec 80 caractères accentués) + en-têtes
-    config.keep_alive_enable = false;
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == nullptr) {
-        ESP_LOGW(TAG, "client HTTP non créé (mémoire interne libre : %u octets)",
-                 static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
-        return api::Telechargement::Echec;
-    }
-    esp_http_client_set_header(client, "Accept", "application/json");
-    const esp_err_t err = esp_http_client_perform(client);
-    const int statut = esp_http_client_get_status_code(client);
-    esp_http_client_cleanup(client);
+    Copie copie = {tampon, capacite, 0};
+    client_http::Requete requete;
+    requete.adresse = adresse;
+    requete.user_agent = kAgentUtilisateur;
+    requete.accept = "application/json";
+    requete.delai_ms = kDelaiHttpMs;
+    requete.taille_max = capacite;
+    requete.attente_verrou_tls_ms = kAttenteVerrouMs;
+    requete.taille_envoi = kTailleEnvoi;
+    const client_http::Reponse r = client_http::obtenir(requete, copier_corps, &copie);
     // Pour le budget de mémoire interne (jalon-1b) : ce qui reste, et le plus bas atteint depuis le démarrage.
     ESP_LOGI(TAG,
-             "téléchargement fini en %d ms (HTTP %d, %u octets) ; RAM interne libre %u, minimum depuis le démarrage %u",
-             static_cast<int>((esp_timer_get_time() - debut_us) / 1000), statut, static_cast<unsigned>(rec.n),
-             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+             "téléchargement fini en %d ms (HTTP %d, %u octets sur le fil%s, %u lus) ; RAM interne libre %u, minimum "
+             "depuis le démarrage %u",
+             r.duree_ms, r.statut_http, static_cast<unsigned>(r.octets_fil), r.gzip ? " (gzip)" : "",
+             static_cast<unsigned>(r.octets), static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
              static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)));
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "requête échouée (%s)", esp_err_to_name(err));
+    switch (r.issue) {
+    case client_http::Issue::Ok:
+        taille = copie.taille;
+        return api::Telechargement::Ok;
+    case client_http::Issue::Reseau:
+        // DNS, connexion, TLS, délai, ou verrou TLS occupé plus de 15 s (une requête météo en cours) : comme avant.
+        ESP_LOGW(TAG, "requête échouée (réseau, ou verrou TLS occupé plus de %u ms)",
+                 static_cast<unsigned>(kAttenteVerrouMs));
         return api::Telechargement::SansInternet;
-    }
-    if (statut != 200 || rec.trop) {
-        ESP_LOGW(TAG, "réponse refusée (HTTP %d%s)", statut, rec.trop ? ", trop grande" : "");
+    default:
+        ESP_LOGW(TAG, "réponse refusée (HTTP %d, issue %d)", r.statut_http, static_cast<int>(r.issue));
         return api::Telechargement::Echec;
     }
-    taille = rec.n;
-    return api::Telechargement::Ok;
 }
 
 // ---- la tâche ---------------------------------------------------------------------------------------------------------------------
@@ -286,7 +268,7 @@ void geocodage_ecran_lancer(const char *adresse) {
         c->ecran.etat = EtatTelechargement::Echec;
     } else {
         std::memcpy(c->ecran.adresse, adresse, n);
-        c->ecran.adresse[n] = ' ';
+        c->ecran.adresse[n] = '\0';
         c->ecran.a_faire = true;
         c->ecran.etat = EtatTelechargement::EnCours;
         if (!lancer_tache(c)) { // pas de tâche possible : l'écran ne reste pas sur « en cours »
