@@ -105,3 +105,11 @@ CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 # (CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE) : spi_flash/cache_utils.c fait assert sur la pile (docs/mesures/memoire-interne.md).
 # Apres un changement de ces defaults : supprimer sdkconfig (les defaults ne sont relus que sur un sdkconfig neuf).
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# Certificats racine : le paquet COMPLET d'IDF reste (defaut CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL, ~69 Ko). Le paquet
+# « commun » (DEFAULT_CMN, ~40 Ko de moins) a ete examine le 11/11/2026 (lot L11) : chaine servie par chaque hote fixe
+# (openssl s_client -showcerts) contre cmn_crt_authorities.csv d'IDF 5.5.5. Open-Meteo (api, geocoding-api, marine-api),
+# api.weather.gov et vigie.auxfilsdesidees.fr : ISRG Root X1, present ; api.openai.com, generativelanguage.googleapis.com : GTS Root
+# R4 / GlobalSign Root CA, presents ; api.met.no : HARICA TLS RSA Root CA 2021 (signee par Hellenic Academic RootCA 2015), ABSENTE
+# du paquet commun -> plus de meteo met.no. S'y ajoutent les adresses saisies par l'utilisateur (Vigie, service « Personnalise ») dont
+# la racine est inconnue d'avance. Ne pas basculer sans refaire ce releve.
