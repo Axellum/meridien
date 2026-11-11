@@ -578,8 +578,8 @@ void sur_evenement_ip(void *, esp_event_base_t, int32_t id, void *donnees) {
     });
     ESP_LOGI(TAG, "adresse IP obtenue : %s à %d ms", ip, static_cast<int>(ms));
     demarrer_sntp();
-    sntp_rapide_demarrer(marquer_heure_recue); // l'heure arrive sans attendre la relance de 15 s de lwIP
-    appliquer(wifi::sur_adresse_ip(g_essai));  // sans effet hors d'un essai ou d'un retour arrière
+    sntp_rapide_sur_ip(marquer_heure_recue);  // à chaque IP : l'heure arrive sans attendre la relance de 15 s de lwIP
+    appliquer(wifi::sur_adresse_ip(g_essai)); // sans effet hors d'un essai ou d'un retour arrière
 }
 
 // Initialise la pile IP et le Wi-Fi (routé vers le coprocesseur par esp_wifi_remote) et lance la connexion au réseau `depart` (sans
