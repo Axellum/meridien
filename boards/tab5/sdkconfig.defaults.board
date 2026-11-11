@@ -21,14 +21,7 @@ CONFIG_IDF_EXPERIMENTAL_FEATURES=y
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_HEX=y
 CONFIG_SPIRAM_SPEED_200M=y
-# Memoire interne (budget du jalon 1b, docs/mesures/memoire-interne.md) : le tas interne du P4 fait ~455 Ko, dont 216 Ko pour les
-# tampons d'ecran. Tout ce qui n'est ni DMA ni pile de tache va en PSRAM :
-#  - malloc() ne prend l'interne que jusqu'a 256 octets (defaut d'IDF : 16384) : 66 Ko libres de plus avant la premiere requete
-#    TLS (177,6 Ko au lieu de 111,7 Ko) ;
-#  - mbedTLS (tampons d'entree et de sortie, certificats) en PSRAM : environ 29 Ko de moins en interne pendant une prise de contact
-#    TLS, de quoi en faire deux a la fois (meteo et geocodage). Prix mesure : prise de contact de 2,8 s au lieu de 1,5 s.
-CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256
-CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+# Memoire interne (malloc interne jusqu'a 256 octets, mbedTLS en PSRAM) : reglages communs, dans sdkconfig.defaults.
 
 # Interface en paysage : rotation LOGICIELLE de LVGL (la rotation materielle de la dalle ne marche pas sur ST7121), faite par
 # l'accelerateur PPA du P4 dans le flush d'esp_lvgl_port, comme ESPHome (`rotation: 270`). Sans cette option le port tourne les
