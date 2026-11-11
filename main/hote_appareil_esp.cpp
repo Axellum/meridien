@@ -250,7 +250,7 @@ class PortsEsp final : public PortsAppareil {
   private:
 };
 
-// L'hôte et ses deux portes, dans un seul bloc : ≈ 7,5 Ko (5 048 + 2 428 octets sur le Tab5, nm du 11/11/2026). En PSRAM et non en
+// L'hôte et ses deux portes, dans un seul bloc : ≈ 5 Ko (5 048 octets pour l'hôte sur le Tab5, nm du 11/11/2026). En PSRAM et non en
 // variables statiques, qui iraient en RAM interne : ils ne servent qu'aux tâches de l'interface et du serveur web, jamais à une
 // interruption, au DMA, au Wi-Fi ou au TLS (les téléchargements passent par http_commun.cpp, avec ses propres tampons).
 struct Objets {
