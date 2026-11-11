@@ -366,7 +366,7 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 **Solution.** The weather task runs at `tskIDLE_PRIORITY` (0) and shares the core with the idle task slice by slice (1 ms). The watchdog stays enabled and unchanged: do not disable it or lengthen it to hide this symptom.
 
-**Seen on** Tab5 ST7121, `2a05811`, 07/11/2026. **Evidence**: the temporary serial commands `tourner3` and `tourner0` (a task pinned to core 0 computes for 8 s): the watchdog fires 5.0 s after the start at priority 3 and does not fire at priority 0. **Status**: resolved.
+**Seen on** Tab5 ST7121, `2a05811`, 07/11/2026. **Evidence**: the temporary serial commands `tourner3` and `tourner0` (a task pinned to core 0 computes for 8 s): the watchdog fires 5.0 s after the start at priority 3 and does not fire at priority 0. **Status**: resolved. Since 11/11/2026 these two commands are only in a measurement build (`.\tools\idf.ps1 -DMERIDIEN_BANC_ESSAI=ON build`), never in the normal firmware.
 
 ---
 
@@ -1077,7 +1077,7 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 **Solution.** La tâche météo tourne à `tskIDLE_PRIORITY` (0) et partage le cœur avec la tâche d'inactivité tranche par tranche (1 ms). Le chien de garde reste actif et inchangé : ne pas le désactiver ni l'allonger pour masquer ce symptôme.
 
-**Vu sur** Tab5 ST7121, `2a05811`, 07/11/2026. **Preuve** : les commandes série provisoires `tourner3` et `tourner0` (une tâche épinglée sur le cœur 0 calcule 8 s) : le chien de garde se déclenche 5,0 s après le début à la priorité 3 et ne se déclenche pas à la priorité 0. **Statut** : résolu.
+**Vu sur** Tab5 ST7121, `2a05811`, 07/11/2026. **Preuve** : les commandes série provisoires `tourner3` et `tourner0` (une tâche épinglée sur le cœur 0 calcule 8 s) : le chien de garde se déclenche 5,0 s après le début à la priorité 3 et ne se déclenche pas à la priorité 0. **Statut** : résolu. Depuis le 11/11/2026 ces deux commandes ne sont que dans un binaire de mesure (`.\tools\idf.ps1 -DMERIDIEN_BANC_ESSAI=ON build`), jamais dans le firmware normal.
 
 ---
 

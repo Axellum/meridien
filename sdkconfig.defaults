@@ -39,8 +39,8 @@ CONFIG_LWIP_SNTP_MAX_SERVERS=2
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
 CONFIG_HTTPD_MAX_URI_LEN=1024
 
-# Outil de mesure PROVISOIRE (commande serie " piles ", jalon 1b) : liste des taches avec la base et la marge de leur pile.
-# A retirer avec la commande avant la phase 2.
+# Outil de diagnostic (commande serie " piles ") : liste des taches avec la base et la marge de leur pile. Garde dans tous les
+# binaires (menage du firmware, 11/11/2026) : la commande reste, seules les commandes d'essai destructif sont sorties du binaire.
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 
 # Code compile pour la vitesse (-O2). Le defaut d'IDF est -Og (« debug ») : il laisse le calcul de l'interface deux fois plus lent.

@@ -53,15 +53,15 @@ target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_LIST_DIR}/assets/icones
 # Design Icons (tools/icones/generer_police_roue.py -> main/assets/mdi_roue.ttf, 3 glyphes). Symboles : _binary_mdi_roue_ttf_start / _end.
 target_sources(${COMPONENT_LIB} PRIVATE "ui_roue.cpp")
 target_add_binary_data(${COMPONENT_LIB} "${CMAKE_CURRENT_LIST_DIR}/assets/mdi_roue.ttf" BINARY)
-# Banc d'essai PROVISOIRE de l'interface Wi-Fi (commandes serie "wifi_scan", "wifi_faux"...), a retirer avant la phase 2.
-target_sources(${COMPONENT_LIB} PRIVATE "banc_wifi.cpp")
-# Contrat n 1 (main/meteo_etat.h), propriete de la session meteo-appareil. Tant que ce fichier n'existe pas, un BOUCHON
-# (main/bouchons/, valeurs d'exemple marquees "Exemple" a l'ecran) permet de compiler. Des que le vrai fichier est la, le
-# bouchon n'est plus ni compile ni dans le chemin d'inclusion : le dossier main/bouchons/ est alors a supprimer.
-set(_meridien_bouchons FALSE)
-if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/meteo_etat.h")
-    target_sources(${COMPONENT_LIB} PRIVATE "bouchons/meteo_etat_bouchon.cpp")
-    set(_meridien_bouchons TRUE)
+# Commandes serie d'ESSAI (binaire de mesure seulement, JAMAIS dans le binaire normal : OFF par defaut) :
+#   .\tools\idf.ps1 -DMERIDIEN_BANC_ESSAI=ON build
+# - banc_wifi.cpp : "wifi_scan", "wifi_faux", "wifi_faux_abandon", "wifi_inconnu", "wifi_bon" (docs/mesures/wifi-retour-arriere.md) ;
+# - "tourner3" / "tourner0" de commande_serie.cpp : une tache occupe le coeur 0 pendant 8 s pour declencher (ou non) le chien de
+#   garde (docs/mesures/memoire-interne.md section 6).
+set(MERIDIEN_BANC_ESSAI OFF CACHE BOOL "Commandes serie d'essai : banc Wi-Fi, tourner3/tourner0 (jamais dans le binaire normal)")
+if(MERIDIEN_BANC_ESSAI)
+    target_sources(${COMPONENT_LIB} PRIVATE "banc_wifi.cpp")
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE MERIDIEN_BANC_ESSAI=1)
 endif()
 # Reglages et installation guidee (ADR-0007, session reglages-ecran) : les ecrans (LVGL pur, rendus aussi sur le PC), la colle
 # qui les ouvre (ui_reglages_ouvrir.cpp : ecran de la carte, police, hote) et l'hote de l'appareil (hote_appareil_esp.cpp : memoire
@@ -89,16 +89,6 @@ foreach(_lv_symbole lv_mem_init lv_mem_deinit lv_mem_add_pool lv_mem_remove_pool
                     lv_mem_monitor_core lv_mem_test_core)
     target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,-u,${_lv_symbole}")
 endforeach()
-# Contrat reseau des reglages (recherche de reseaux, essai d'un nouveau Wi-Fi avec retour arriere) : a fournir par jalon-1b dans
-# main/reseau_wifi.h. Tant que ce fichier n'existe pas, un BOUCHON (main/bouchons/reseau_wifi*.{h,cpp}) repond "rien trouve" et
-# "impossible" : l'ecran le dit au lieu d'attendre. Des que le vrai fichier est la, le bouchon n'est plus compile.
-if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/reseau_wifi.h")
-    target_sources(${COMPONENT_LIB} PRIVATE "bouchons/reseau_wifi_bouchon.cpp")
-    set(_meridien_bouchons TRUE)
-endif()
-if(_meridien_bouchons)
-    target_include_directories(${COMPONENT_LIB} PRIVATE "bouchons")
-endif()
 
 # La page de reglages (web/app) est embarquee dans le firmware, compressee en gzip, par tools/embarquer_web.py : le fichier
 # C++ genere (web_fichiers.cpp) est dans le dossier de construction, jamais dans git. Il est refait des qu'un fichier de
