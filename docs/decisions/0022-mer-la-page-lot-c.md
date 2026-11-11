@@ -3,7 +3,7 @@
 > **English summary.** Lot C of the "sea" page: **the page itself**, its seven-language texts and its layout, **with nothing that opens
 > it** (the long-press wheel is lot D, on the ground of the long-press wheel ADR of pull request #11). Three pure-core files
 > decide everything a test can decide without a screen: `mer_textes.hpp` (every word and phrase, in the seven languages of
-> [ADR-0006](0006-i18n-francais-cle.md); French is the key), `mer_page.hpp` (what to show: a verdict is **never** shown for a sea that is
+> [ADR-0006](0006-ecran-en-sept-langues.md); French is the key), `mer_page.hpp` (what to show: a verdict is **never** shown for a sea that is
 > absent or too old, an activity that cannot be judged here never gets a default "Good", unreadable coastal warnings are **never** painted
 > as a calm banner, no clock means no age, no next tide, no coefficient and no "now" marker), `mer_geometrie.hpp` (the layout in pixels
 > for 1280x720, 1024x600 and 720x1280, scaled on the short side; the cards keep a minimum height and the page refuses to exist rather than

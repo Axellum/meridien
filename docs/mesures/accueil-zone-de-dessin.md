@@ -31,7 +31,7 @@ Méthode : l'autotest des réglages (`MERIDIEN_AUTOTEST_REGLAGES=ON`, [reglages.
 
 ## 2 bis. L'image est la même : rendu du banc du PC, pixel pour pixel
 
-Le banc de rendu du PC (`.\tools\rendre.ps1`, [outils.md](outils.md)) repeint l'écran par tampons partiels avec le même LVGL 9.5 et les mêmes `main/ui_*.cpp` : il exerce donc le test de zone. Scène `principal`, 18 variantes × 2 tailles (1280×720 et 1024×600), langue `fr`, rendues **avec** et **sans** le test de zone (même arbre, le patch retiré puis remis), puis comparées pixel pour pixel :
+Le banc de rendu du PC (`.\tools\rendre.ps1`, [outils.md](../outils.md)) repeint l'écran par tampons partiels avec le même LVGL 9.5 et les mêmes `main/ui_*.cpp` : il exerce donc le test de zone. Scène `principal`, 18 variantes × 2 tailles (1280×720 et 1024×600), langue `fr`, rendues **avec** et **sans** le test de zone (même arbre, le patch retiré puis remis), puis comparées pixel pour pixel :
 
 | Hauteur du tampon | Images identiques (avant / après) |
 | --- | --- |
