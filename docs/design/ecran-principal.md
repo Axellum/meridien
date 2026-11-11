@@ -72,7 +72,7 @@ registry (owned by the `reglages-ecran` session) is needed to reach it.
 |---|---|---|
 | LVGL objects of the screen | 9 (screen, 6 drawing zones, Settings button, touch ring) | `ui_principal_cout()` read in the code |
 | Fonts | 7 TinyTTF sizes from the one embedded Roboto Bold | code |
-| Icon set | 825,032 bytes in flash, 0 bytes of RAM for the pixels | `main/assets/icones_meteo.bin` |
+| Icon set | 336,748 bytes in flash (825,032 before 11/11/2026: sizes never picked removed), 0 bytes of RAM for the pixels | `main/assets/icones_meteo.bin` |
 | Sky image | 1,843,200 bytes at 1280 × 720 (RGB565), in PSRAM, rebuilt only when the moment or weather class changes; gradient fallback if the allocation fails | computed from the size |
 | Firmware | 2,722,192 bytes, 35 % of the 4 MB app partition free | `build/meridien.bin` |
 | PC redraw (relative, **not** the board) | construction 2–4 ms, first full render 2–4 ms at 1280 × 720 | `BANC_CHRONO=1`, 9800X3D |
@@ -184,7 +184,7 @@ réglages (propriété de la session `reglages-ecran`) pour l'atteindre.
 |---|---|---|
 | Objets LVGL de l'écran | 9 (écran, 6 zones de dessin, bouton Réglages, anneau tactile) | `ui_principal_cout()`, lu dans le code |
 | Polices | 7 tailles TinyTTF du seul Roboto Bold embarqué | code |
-| Jeu d'icônes | 825 032 octets en flash, 0 octet de RAM pour les pixels | `main/assets/icones_meteo.bin` |
+| Jeu d'icônes | 336 748 octets en flash (825 032 avant le 11/11/2026 : tailles jamais choisies retirées), 0 octet de RAM pour les pixels | `main/assets/icones_meteo.bin` |
 | Image du ciel | 1 843 200 octets en 1280 × 720 (RGB565), en PSRAM, refaite seulement quand le moment ou la classe de temps change ; repli sur un dégradé si l'allocation échoue | calculé d'après la taille |
 | Firmware | 2 722 192 octets, 35 % de la partition d'application de 4 Mo libre | `build/meridien.bin` |
 | Redessin sur le PC (relatif, **pas** la carte) | construction 2 à 4 ms, premier rendu complet 2 à 4 ms en 1280 × 720 | `BANC_CHRONO=1`, 9800X3D |
