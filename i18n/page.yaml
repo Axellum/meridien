@@ -55,6 +55,7 @@
 "ville.aucun_lieu": "Aucun lieu trouvé pour « {q} »."
 "ville.min3": "Tapez au moins 3 lettres."
 "ville.enregistree": "Ville enregistrée : {ville}"
+"ville.credit": "Lieux : {lien} (licence CC BY 4.0)"
 "meteo.attribution": "Données météo : {lien} (licence CC BY 4.0)"
 "meteo.attribution_metno": "Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)"
 "meteo.attribution_nws": "Données météo : {lien} (données ouvertes)"

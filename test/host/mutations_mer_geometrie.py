@@ -158,11 +158,28 @@ MUTATIONS_MER_GEOMETRIE = [
     ),
     (
         GE,
-        "hauteur - d.marge - y_cartes - 2 * mesures_carte(m).hauteur_min - 4 * d.ecart - 2 * h_legende;",
-        "hauteur - d.marge - y_cartes - 2 * mesures_carte(m).hauteur_min - 3 * d.ecart - 2 * h_legende;",
+        "bas_panneaux - y_cartes - 2 * mesures_carte(m).hauteur_min - 4 * d.ecart - 2 * h_legende;",
+        "bas_panneaux - y_cartes - 2 * mesures_carte(m).hauteur_min - 3 * d.ecart - 2 * h_legende;",
         TG,
         HAUTEURS,
         "un intervalle n'est pas compté : les cartes perdent quelques pixels sur les écrans les plus courts, leur contenu se recouvre",
+    ),
+    # ---- le pied (crédit des données de mer, « pas pour la navigation ») ------------------------------------------------------------------------
+    (
+        GE,
+        "const int bas_panneaux = d.pied.y - ecart_pied;",
+        "const int bas_panneaux = d.pied.y;",
+        TG,
+        ZONES,
+        "le pied colle aux panneaux de la marée et du soleil : le crédit touche leur bord",
+    ),
+    (
+        GE,
+        "d.marge_bas = mis(4, m);",
+        "d.marge_bas = mis(16, m);",
+        TG,
+        ZONES,
+        "le pied garde toute la marge du bas : les cartes perdent la hauteur qu'il devait prendre dans la marge",
     ),
     # ---- l'intérieur d'une carte --------------------------------------------------------------------------------------------------------------
     (

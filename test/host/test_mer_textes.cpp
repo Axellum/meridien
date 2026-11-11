@@ -114,6 +114,20 @@ constexpr int la_langue_choisit_la_bonne_colonne() {
     return 0;
 }
 
+constexpr int le_credit_et_l_avertissement_de_navigation_sont_dans_les_sept_langues() {
+    // CC BY 4.0 (Open-Meteo, Copernicus Marine, EOT20) : les trois sources et la licence, telles quelles, dans chaque langue ; et
+    // l'avertissement de l'ADR-0018, jamais vide.
+    constexpr std::string_view NOMS[] = {"Open-Meteo", "Copernicus Marine", "EOT20", "(CC BY 4.0)"};
+    for (int l = 0; l < static_cast<int>(ecran::i18n::NOMBRE_LANGUES); ++l) {
+        const Langue langue = static_cast<Langue>(l);
+        for (std::string_view nom : NOMS)
+            VERIFIER(contient(texte(Texte::Credit, langue), nom));
+        VERIFIER(!texte(Texte::PasNavigation, langue).empty());
+    }
+    VERIFIER(texte(Texte::PasNavigation, Langue::En) == "Estimates, not for navigation");
+    return 0;
+}
+
 constexpr int une_valeur_hors_enumeration_ne_dit_rien() {
     VERIFIER(texte(Texte::Nombre, Langue::En).empty());
     VERIFIER(nom_activite(Activite::Nombre, Langue::Fr).empty());
@@ -754,6 +768,7 @@ constexpr int le_bandeau_choisit_le_plus_important() {
     X(aucune_cle_n_est_en_double)                                                                                      \
     X(une_traduction_garde_les_marqueurs_de_la_cle_francaise)                                                          \
     X(la_langue_choisit_la_bonne_colonne)                                                                              \
+    X(le_credit_et_l_avertissement_de_navigation_sont_dans_les_sept_langues)                                           \
     X(une_valeur_hors_enumeration_ne_dit_rien)                                                                         \
     X(les_quatre_activites_les_trois_verdicts_et_les_criteres_ont_leur_mot)                                            \
     X(chaque_paire_du_contrat_a_son_mot_et_aucune_autre)                                                               \

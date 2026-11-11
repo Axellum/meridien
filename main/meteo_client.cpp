@@ -289,7 +289,7 @@ Essai aller_retour(const char *url, const char *user_agent, const char *accept, 
 // Open-Meteo. `modeles` : la valeur de `models=` de la source choisie (vide pour « Automatique » : l'adresse est alors celle d'avant
 // ce réglage, à l'octet près ; c'est aussi l'adresse du repli). La première ligne de la requête fait 885 octets au plus avec le plus
 // long modèle de la table (test_meteo_appareil.cpp) ; esp_http_client envoie les en-têtes par morceaux, seule cette ligne et le
-// premier en-tête doivent tenir dans `buffer_size_tx` (1024 octets, http_commun.cpp).
+// premier en-tête doivent tenir dans `buffer_size_tx` (1024 octets, `Requete::taille_envoi`, http_commun.h).
 Essai interroger(const PositionE5 &position, std::string_view modeles, meteo::Meteo &sortie) {
     char url[meteo::TAILLE_REQUETE_MAX];
     if (meteo::construire_requete(position.latitude_e5, position.longitude_e5, url, sizeof(url), modeles) == 0) {

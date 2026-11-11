@@ -3,8 +3,8 @@
 // Une poignée de main TLS demande ≈ 65 Ko de RAM interne (mesuré par jalon-1b le 06/11/2026) alors que la carte n'en a, au
 // démarrage, qu'environ 110 Ko de libres : deux poignées de main en même temps (la météo et une recherche de ville, par exemple)
 // épuisent la mémoire. Tout code qui ouvre une connexion HTTPS prend ce verrou AVANT `esp_http_client_init` et le rend APRÈS
-// `esp_http_client_cleanup` (ou `esp_tls_conn_destroy`). Aujourd'hui : la recherche de ville (main/geocodage.cpp) ; la météo
-// (main/meteo_client.cpp) doit le prendre autour de sa requête.
+// `esp_http_client_cleanup` (ou `esp_tls_conn_destroy`). Aujourd'hui un seul code le fait : le client HTTPS commun
+// (main/http_commun.cpp), par lequel passent la météo, Vigie, la mer, la liste des spots et la recherche de ville.
 //
 // Mutex FreeRTOS non récursif : une tâche qui le tient ne doit pas le reprendre. Créé au premier appel (statique, sans allocation).
 #pragma once
