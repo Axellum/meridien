@@ -5,7 +5,8 @@
 # installés par pip ou téléchargés le sont à la version exacte utilisée sur le PC d'Axel.
 #
 # Dépôt public depuis le 08/11/2026 (privé avant : minutes facturables). Les jobs lourds ne tournent que quand il le faut :
-#   - pull_request : tests-noyau (verdict de changements + noyau-clang + noyau-gpp), ruff, clang-format, gitleaks, firmware-tab5 ;
+#   - pull_request : tests-noyau (verdict de changements + noyau-clang + noyau-gpp), ruff, clang-format, gitleaks, firmware-tab5,
+#     firmware-waveshare-7b ;
 #   - push sur main et lancement manuel : en plus parcours-web (réseau) ;
 #   - lancement manuel seulement : mutations-noyau (très longue, voir plus bas).
 name: CI
@@ -308,7 +309,7 @@ jobs:
 
   # Compile VRAIMENT le projet : conteneur officiel espressif/idf (ESP-IDF 5.5.5, image figée par son empreinte), sdkconfig
   # neuf, composants gérés téléchargés selon dependencies.lock. Ne prouve ni l'affichage ni le tactile : rien n'est flashé.
-  # La 7B s'ajoutera ici (même commande avec -DBOARD=...) quand sa couche carte existera.
+  # La Waveshare 7B a son job juste après (firmware-waveshare-7b).
   firmware-tab5:
     name: firmware-tab5
     runs-on: ubuntu-24.04
@@ -342,3 +343,50 @@ jobs:
           test -d managed_components/lvgl__lvgl
           echo "--- dependencies.lock inchangé par la compilation"
           git diff --exit-code -- dependencies.lock
+
+  # Même compilation pour la Waveshare 7B (-DBOARD=waveshare-7b, ADR-0005) : même image ESP-IDF, sdkconfig neuf, composants
+  # gérés selon boards/waveshare-7b/dependencies.lock. Vérifie aussi que le sdkconfig produit est bien celui de la 7B (flash
+  # 32 Mo, remise à zéro du C6 par GPIO54) et qu'il porte les réglages communs de mémoire interne (sdkconfig.defaults).
+  # Ne prouve rien sur la carte : rien n'est flashé.
+  firmware-waveshare-7b:
+    name: firmware-waveshare-7b
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compiler la Waveshare 7B (ESP-IDF 5.5.5, esp32p4)
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
+        with:
+          esp_idf_version: v5.5.5@sha256:a9231d0697ab8f7517cc072e93b7c83e04907bfbfba80b6440d7dbbf90665cf2
+          target: esp32p4
+          command: idf.py -DBOARD=waveshare-7b set-target esp32p4 && idf.py -DBOARD=waveshare-7b build && idf.py -DBOARD=waveshare-7b size
+      - name: Preuves que le projet a été compilé
+        run: |
+          set -eu
+          echo "--- binaire"
+          ls -l build/meridien.bin
+          sha256sum build/meridien.bin
+          test ! -e build/ecran_autonome.bin
+          echo "--- description du projet"
+          python3 - <<'EOF'
+          import json
+          d = json.load(open("build/project_description.json"))
+          print({k: d[k] for k in ("project_name", "target", "idf_ver", "build_dir") if k in d})
+          assert d["project_name"] == "meridien" and d["target"] == "esp32p4", d["project_name"]
+          composants = d.get("build_components", [])
+          assert "bsp_waveshare_7b" in composants and "bsp_tab5" not in composants, composants
+          print("couche carte : bsp_waveshare_7b")
+          EOF
+          echo "--- sdkconfig de la 7B et réglages communs de mémoire interne"
+          grep -E '^CONFIG_(ESPTOOLPY_FLASHSIZE_32MB|ESP_HOSTED_SDIO_GPIO_RESET_SLAVE|SPIRAM_MALLOC_ALWAYSINTERNAL|MBEDTLS_EXTERNAL_MEM_ALLOC)=' sdkconfig
+          grep -qx 'CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y' sdkconfig
+          grep -qx 'CONFIG_ESP_HOSTED_SDIO_GPIO_RESET_SLAVE=54' sdkconfig
+          grep -qx 'CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256' sdkconfig
+          grep -qx 'CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y' sdkconfig
+          echo "--- composants gérés téléchargés"
+          ls managed_components
+          test -d managed_components/lvgl__lvgl
+          echo "--- verrous de dépendances inchangés par la compilation"
+          git diff --exit-code -- boards/waveshare-7b/dependencies.lock dependencies.lock
