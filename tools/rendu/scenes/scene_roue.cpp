@@ -497,10 +497,12 @@ void parcours_famille(const banc::Contexte &c) {
 // ---- la zone repeinte : ouvrir, déplier, fermer la roue sur un accueil déjà peint ------------------------------------------------------
 //
 // L'accueil (et la roue) sont d'abord peints en entier (lv_refr_now) ; puis le geste est fait et le banc ne repeint que ce que LVGL a
-// invalidé. Le compte court jusqu'à la fin du rendu qui suit le geste : LVGL invalide aussi en calculant la mise en page, juste avant. Deux constats : (1) chiffré, ce que le geste invalide (LV_EVENT_INVALIDATE_AREA de l'affichage : réunion des zones, leur
+// invalidé. Le compte court jusqu'à la fin du rendu qui suit le geste : LVGL invalide aussi en calculant la mise en page, juste
+// avant. Deux constats : (1) chiffré, ce que le geste invalide (LV_EVENT_INVALIDATE_AREA de l'affichage : réunion des zones, leur
 // nombre, part de l'écran) tient dans la zone de la roue, pas dans tout l'écran ; (2) au pixel, le rendu obtenu doit être IDENTIQUE au
 // rendu complet du même état (`zone-ouverture` = `centre`, `zone-famille` = `famille-centre`, `zone-fermeture` = `accueil-seul`) :
-// sinon un morceau de roue manque ou reste à l'écran. Le second constat se fait hors du banc, en comparant les PNG.
+// sinon un morceau de roue manque ou reste à l'écran. Le second constat se fait hors du banc, en comparant les PNG (à quelques
+// pixels près de l'accueil, découpé autrement en bandes : docs/mesures/roue.md § 7).
 
 lv_area_t g_zone_inv = {0, 0, -1, -1};
 int g_nb_inv = 0;
