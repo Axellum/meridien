@@ -16,9 +16,10 @@
 
 namespace ecran::ressources {
 
-// Glyphes gardés en cache par police (métriques et images A8). Mesuré au banc (scène « ouvertures », docs/mesures/) : la taille la plus
-// partagée en sert au plus 74 sur toutes les pages et les sept langues ; 128 laisse de la marge sans qu'un glyphe chassé ne soit
-// rastérisé à nouveau à chaque image. Même valeur que CONFIG_LV_TINY_TTF_CACHE_GLYPH_CNT : rien ne change pour une page seule.
+// Glyphes gardés en cache par police (métriques et images A8). Mesuré au banc (scène « ouvertures », docs/mesures/ouverture-des-pages.md) :
+// accueil, Détails, Mer, Réglages et Alertes, sept langues, trois tailles d'écran : une police partagée en sert au plus 72 ; 128 laisse de
+// la marge sans qu'un glyphe chassé ne soit rastérisé à nouveau à chaque image. Même valeur que CONFIG_LV_TINY_TTF_CACHE_GLYPH_CNT : rien
+// ne change pour une page seule, et la PSRAM des images de glyphes baisse (une taille n'est plus rastérisée deux fois).
 inline constexpr std::size_t kGlyphesEnCache = 128;
 
 // La police `ttf` (octets TrueType embarqués, gardés par l'appelant pour toute la vie du programme) à `px` pixels. Nulle si TinyTTF ne
