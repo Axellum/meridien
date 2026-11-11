@@ -142,7 +142,42 @@ constexpr int les_tailles_generees_sont_croissantes() {
         VERIFIER(TAILLES_INFO[i] > TAILLES_INFO[i - 1]);
     for (std::size_t i = 1; i < sizeof(TAILLES_LUNE) / sizeof(TAILLES_LUNE[0]); ++i)
         VERIFIER(TAILLES_LUNE[i] > TAILLES_LUNE[i - 1]);
-    VERIFIER(taille_meteo(10000) == TAILLES_METEO[sizeof(TAILLES_METEO) / sizeof(TAILLES_METEO[0]) - 1]);
+    for (std::size_t i = 1; i < sizeof(EMBARQUEES_METEO) / sizeof(EMBARQUEES_METEO[0]); ++i)
+        VERIFIER(EMBARQUEES_METEO[i] > EMBARQUEES_METEO[i - 1]);
+    for (int t : EMBARQUEES_METEO)
+        VERIFIER(contient(TAILLES_METEO, sizeof(TAILLES_METEO) / sizeof(TAILLES_METEO[0]), t));
+    for (int t : EMBARQUEES_INFO)
+        VERIFIER(contient(TAILLES_INFO, sizeof(TAILLES_INFO) / sizeof(TAILLES_INFO[0]), t));
+    for (int t : EMBARQUEES_LUNE)
+        VERIFIER(contient(TAILLES_LUNE, sizeof(TAILLES_LUNE) / sizeof(TAILLES_LUNE[0]), t));
+    return 0;
+}
+
+// Le binaire n'embarque que les tailles que l'écran choisit (relevé au banc de rendu, tools/icones/generer_icones.py) : pour toute
+// place, la taille servie est celle de l'échelle (aucun pixel ne change), ou 0 si l'échelle choisit une taille absente du binaire
+// (l'erreur est alors visible : ICONE_ABSENTE). Les places relevées au banc le 11/11/2026 sont servies telles quelles.
+constexpr int une_taille_absente_du_binaire_est_une_erreur_et_jamais_une_autre_taille() {
+    constexpr std::size_t NM = sizeof(TAILLES_METEO) / sizeof(TAILLES_METEO[0]);
+    constexpr std::size_t NI = sizeof(TAILLES_INFO) / sizeof(TAILLES_INFO[0]);
+    constexpr std::size_t NL = sizeof(TAILLES_LUNE) / sizeof(TAILLES_LUNE[0]);
+    for (int cible = 0; cible <= 400; ++cible) {
+        const int m = taille_meteo(cible);
+        VERIFIER(m == 0 || m == choisir_taille(TAILLES_METEO, NM, cible));
+        const int i = taille_info(cible);
+        VERIFIER(i == 0 || i == choisir_taille(TAILLES_INFO, NI, cible));
+        const int l = taille_lune(cible);
+        VERIFIER(l == 0 || l == choisir_taille(TAILLES_LUNE, NL, cible));
+    }
+    // Places relevées au banc (météo 30 à 206 px, info 22 à 56, lune 38 et 48) : servies, à la taille de l'échelle.
+    VERIFIER(taille_meteo(30) == 44 && taille_meteo(56) == 44);
+    VERIFIER(taille_meteo(137) == 120 && taille_meteo(164) == 120);
+    VERIFIER(taille_meteo(172) == 168 && taille_meteo(206) == 168);
+    VERIFIER(taille_info(22) == 28 && taille_info(38) == 28 && taille_info(48) == 40 && taille_info(56) == 56);
+    VERIFIER(taille_lune(38) == 64 && taille_lune(48) == 64);
+    // Tailles retirées du binaire : une place qui les choisirait obtient 0, jamais une image plus petite en silence.
+    VERIFIER(taille_meteo(60) == 0 && taille_meteo(84) == 0 && taille_meteo(232) == 0 && taille_meteo(10000) == 0);
+    VERIFIER(taille_info(80) == 0 && taille_lune(112) == 0);
+    VERIFIER(taille_servie(TAILLES_METEO, NM, nullptr, 0, 100) == 0);
     return 0;
 }
 
@@ -172,6 +207,7 @@ constexpr int chaque_code_a_un_libelle_dans_les_sept_langues() {
     X(les_phases_de_lune_sont_huit_pieces_consecutives)                                                                \
     X(la_taille_choisie_ne_depasse_jamais_la_place)                                                                    \
     X(les_tailles_generees_sont_croissantes)                                                                           \
+    X(une_taille_absente_du_binaire_est_une_erreur_et_jamais_une_autre_taille)                                         \
     X(chaque_code_a_un_libelle_dans_les_sept_langues)
 
 TESTS_A_LA_COMPILATION(LISTE)

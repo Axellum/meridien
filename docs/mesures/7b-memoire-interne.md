@@ -32,4 +32,25 @@ Comportement : requête météo, Vigie et mer réussies avant et après (« cont
 
 - L'écran après le flash n'a pas été regardé par l'auteur de la mesure (seulement le journal et `/api/status`).
 - Durée des prises de contact TLS sur la 7B : non mesurée (sur le Tab5 : 2,8 s au lieu de 1,5 s, [memoire-interne.md](memoire-interne.md)).
-- Une seule série de 5 min de chaque côté ; pas de mesure sur plusieurs heures.
+- Une seule série de 5 min de chaque côté (la tenue sur 2 h est mesurée au § 5, sur `851d420`).
+
+## 5. Tenue sur 2 h (`851d420`, 11/11/2026)
+
+**Vu sur** : la même Waveshare 7B (ESP32-P4 révision v3.2, ESP-IDF 5.5.5), `main` `851d420` (version lue sur l'appareil `jalon-1a-tab5-st7121-398-g851d4`, compilée le 11/11/2026 à 21:40:41 ; contient le géocodage #33, l'appairage #35, le ménage #36, les crédits #37 et le client HTTPS unique #38), application seule écrite à `0x10000` par la même recette ; mesure de 21 h 43 à 23 h 43 le 11/11/2026.
+
+**Question.** La RAM interne baissait de 152 o à chaque changement de minute de l'horloge (Tab5, [memoire-interne.md](memoire-interne.md), mesure d'avant le passage des objets de LVGL en PSRAM). Est-ce encore le cas sur la 7B ?
+
+**Méthode.** Commande `redemarrer`, puis `memoire` toutes les 5 min de 60 s à 6 960 s (24 relevés) ; pente par régression linéaire (moindres carrés) sur les 24 points. À 30 min (22 h 13 min 37 s), ouverture de la page de réglages depuis le PC (`GET /` → 200, 1 128 octets ; `GET /api/status` → 200). La recherche de ville n'a **pas** été déclenchée : `/api/geocode` exige un jeton, donc le code d'appairage affiché à l'écran.
+
+| Ligne `MEMOIRE` | À 59 s | À 6 958 s | Pente (24 points) |
+|---|---:|---:|---:|
+| `interne_libre` | 296 327 o | 296 163 o | **−2,7 o/min** (min 295 791, max 296 327) |
+| `plus_gros_bloc` | 233 472 o | 233 472 o | 0 |
+| `interne_min` | 283 056 o | 283 056 o | 0 (le creux reste celui du démarrage) |
+| `psram_libre` | 32 050 916 o | 31 832 472 o | −213 o/min à partir de 5 min (−188 Ko pendant les 5 premières minutes : caches du démarrage) |
+
+**Résultat.** La RAM interne est plate : −2,7 o/min contre 152 o/min à chaque minute avant, soit des variations de quelques centaines d'octets sans tendance ; le plus gros bloc et le minimum ne bougent pas en 2 h. La baisse continue est maintenant en PSRAM (−213 o/min, environ 30 Ko en 2 h ; à ce rythme les 31,8 Mo libres dureraient plus de 100 jours : dérivé, non mesuré sur cette durée). Sa source n'est pas cherchée ici.
+
+Comportement pendant les 2 h : 8 réponses météo (une toutes les 15 min), 8 Vigie, 12 mer, toutes avec « 0 échec(s) de suite » ; mêmes deux lignes d'erreur connues qu'au démarrage, aucune autre `E (`, aucune panique, aucun redémarrage ; l'ouverture de la page n'a laissé aucune trace dans la mémoire interne (296 291 o avant et après).
+
+**Non vérifié.** L'écran à l'œil (seulement le journal : l'horloge et « météo à jour » s'y affichent chaque minute) ; le code d'appairage à l'écran ; la recherche de ville ; une durée de plus de 2 h ; la source de la baisse en PSRAM.

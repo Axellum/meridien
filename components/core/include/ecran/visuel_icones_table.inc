@@ -58,10 +58,14 @@
     X(phase_06, LUNE) \
     X(phase_07, LUNE)
 
-// Tailles disponibles par famille.
+// Échelle des tailles par famille (choix de la taille dessinée pour une place).
 inline constexpr int TAILLES_METEO[] = {44, 60, 84, 120, 168, 232};
 inline constexpr int TAILLES_INFO[] = {28, 40, 56, 80};
 inline constexpr int TAILLES_LUNE[] = {64, 112};
+// Tailles embarquées dans le binaire (sous-ensemble de l'échelle) : une autre taille choisie n'a pas de pixels.
+inline constexpr int EMBARQUEES_METEO[] = {44, 120, 168};
+inline constexpr int EMBARQUEES_INFO[] = {28, 40, 56};
+inline constexpr int EMBARQUEES_LUNE[] = {64};
 inline constexpr int NB_PHASES_LUNE = 8;
 
 // Composition : nom de l'icône, puis jusqu'à 3 couples (pièce, rôle de teinte).
