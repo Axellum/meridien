@@ -637,6 +637,10 @@ def main() -> None:
                         erreur(f"rendu de {scene.nom}/{variante} {langue} {taille}")
                     if resultat.stderr.strip():
                         print("  journal du firmware :", resultat.stderr.strip().replace("\n", "\n    "))
+                    # Une place qui choisit une taille d'icône non embarquée n'affiche rien (main/ui_meteo_icones.cpp) : c'est une
+                    # erreur, pas un avis (tailles embarquées : tools/icones/generer_icones.py).
+                    if "ICONE_ABSENTE" in resultat.stderr:
+                        erreur(f"rendu de {scene.nom}/{variante} {langue} {taille} : taille d'icône non embarquée (voir le journal)")
                     lu_l, lu_h, pixels = lire_ppm(ppm)
                     description = (
                         f"Rendu LVGL {version} logiciel sur PC (RGB565 puis RGB888), pas une photo de la carte. "

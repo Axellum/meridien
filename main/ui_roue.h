@@ -4,7 +4,8 @@
 //
 // LVGL PUR (contrat d'interface n° 3) : aucun en-tête ESP-IDF, le banc de rendu PC (tools/rendu) compile ce fichier tel quel.
 //
-// Un seul objet LVGL : un objet plein écran SANS fond (aucun voile sur l'écran principal depuis le 09/11/2026), posé sur la couche
+// Un seul objet LVGL : un objet SANS fond (aucun voile sur l'écran principal depuis le 09/11/2026) de la taille de la roue (depuis le
+// 11/11/2026 : l'ouvrir ou la fermer ne fait repeindre que cette zone) mais dont la zone de toucher couvre l'écran, posé sur la couche
 // supérieure, qui dessine tout (disques, anneaux, mots, icônes) dans son événement DRAW_MAIN et reçoit les touchers. Toutes les positions et les zones tactiles viennent de `ecran::roue` (roue_geometrie.hpp),
 // jamais recalculées ici ; ce qu'un toucher décide vient de `roue_commande.hpp` (testé sur le PC). Aucune animation : la roue
 // apparaît, se replie ou se ferme d'un coup. Les objets sont créés à l'ouverture et détruits à la fermeture ; les polices (Roboto et le

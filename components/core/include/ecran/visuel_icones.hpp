@@ -142,14 +142,36 @@ constexpr int choisir_taille(const int *tailles, std::size_t n, int cible) noexc
     return choix;
 }
 
+// Vrai si `taille` est dans `liste`.
+constexpr bool contient(const int *liste, std::size_t n, int taille) noexcept {
+    for (std::size_t i = 0; liste != nullptr && i < n; ++i) {
+        if (liste[i] == taille)
+            return true;
+    }
+    return false;
+}
+
+// Taille dessinée pour une place de `cible` pixels : celle que l'ÉCHELLE choisit (choisir_taille), si le binaire en a les pixels
+// (tailles EMBARQUÉES, sous-ensemble de l'échelle écrit par tools/icones/generer_icones.py) ; 0 sinon. Le binaire n'embarque que
+// les tailles que l'écran choisit vraiment : une place qui en demanderait une autre n'affiche rien et le signale (ICONE_ABSENTE
+// dans le journal de main/ui_meteo_icones.cpp, échec du banc de rendu) au lieu de dessiner en silence une autre taille.
+constexpr int taille_servie(const int *echelle, std::size_t n_echelle, const int *embarquees, std::size_t n_embarquees,
+                            int cible) noexcept {
+    const int taille = choisir_taille(echelle, n_echelle, cible);
+    return contient(embarquees, n_embarquees, taille) ? taille : 0;
+}
+
 constexpr int taille_meteo(int cible) noexcept {
-    return choisir_taille(TAILLES_METEO, sizeof(TAILLES_METEO) / sizeof(TAILLES_METEO[0]), cible);
+    return taille_servie(TAILLES_METEO, sizeof(TAILLES_METEO) / sizeof(TAILLES_METEO[0]), EMBARQUEES_METEO,
+                         sizeof(EMBARQUEES_METEO) / sizeof(EMBARQUEES_METEO[0]), cible);
 }
 constexpr int taille_info(int cible) noexcept {
-    return choisir_taille(TAILLES_INFO, sizeof(TAILLES_INFO) / sizeof(TAILLES_INFO[0]), cible);
+    return taille_servie(TAILLES_INFO, sizeof(TAILLES_INFO) / sizeof(TAILLES_INFO[0]), EMBARQUEES_INFO,
+                         sizeof(EMBARQUEES_INFO) / sizeof(EMBARQUEES_INFO[0]), cible);
 }
 constexpr int taille_lune(int cible) noexcept {
-    return choisir_taille(TAILLES_LUNE, sizeof(TAILLES_LUNE) / sizeof(TAILLES_LUNE[0]), cible);
+    return taille_servie(TAILLES_LUNE, sizeof(TAILLES_LUNE) / sizeof(TAILLES_LUNE[0]), EMBARQUEES_LUNE,
+                         sizeof(EMBARQUEES_LUNE) / sizeof(EMBARQUEES_LUNE[0]), cible);
 }
 
 } // namespace ecran::visuel

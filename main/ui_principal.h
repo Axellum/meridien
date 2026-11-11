@@ -93,4 +93,8 @@ struct CoutEcran {
 };
 CoutEcran ui_principal_cout();
 
+// Pour les essais : images de voile (sous les courbes des heures et des cinq jours) allouées en ce moment. Deux au plus : chaque
+// voile réutilise ou rend son image quand il est recuit, et ui_principal_creer les rend toutes.
+int ui_principal_images_voile();
+
 } // namespace ecran
