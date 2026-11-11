@@ -519,6 +519,9 @@ async function api(req, res, url) {
   }
   /* zone météo */
   if (m === 'GET' && p === '/api/geocode') {
+    /* Comme le noyau (reglages::parametre_decode) : un « %XX » mal formé ou un UTF-8 invalide dans q est « illisible », pas remplacé en silence. */
+    const brut = (url.search.slice(1).split('&').find((x) => x.split('=')[0] === 'q') || '').slice(2).replace(/\+/g, ' ');
+    try { decodeURIComponent(brut); } catch (e) { throw new Refus(400, 'illisible', T('Cette demande n’est pas lisible.'), 'q'); }
     const q = (url.searchParams.get('q') || '').trim();
     if (q.length < 3) throw new Refus(400, 'trop_court', T('Tapez au moins 3 lettres.'), 'q');
     if (q.length > 80) throw new Refus(400, 'trop_long', T('Cette recherche est trop longue.'), 'q');
