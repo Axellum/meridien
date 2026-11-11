@@ -52,7 +52,7 @@ Without `-Sanitizers`, `CXX` points to plain `clang++` (faster, no detectors): u
 
 ### Continuous integration (GitHub Actions)
 
-`.github/workflows/ci.yml`, triggered by a push to `main`, a pull request, or by hand (`workflow_dispatch`). The repository has been public since 08/11/2026 (private, with billable minutes, before): the long jobs still only run where they are needed. Read-only token (`contents: read`). Every action is pinned to the commit SHA of its tag (tag read in the action's own repository, kept as a comment in the file); pip tools and the downloaded `gitleaks` use the exact version of the PC.
+`.github/workflows/ci.yml`, triggered by a push to `main`, a pull request, or by hand (`workflow_dispatch`). The repository has been public since 08/11/2026 (private, with billable minutes, before): the long jobs still only run where they are needed. Read-only token (`contents: read`). Every action is pinned to the commit SHA of its tag (tag read in the action's own repository, kept as a comment in the file); pip tools and the downloaded `gitleaks` use the exact version of the PC. The pip tools (ruff, clang-format, playwright and its dependencies) are also pinned to the SHA-256 of every published file: `.github/exigences/<tool>.txt`, installed with `pip install --require-hashes -r` (a file changed on PyPI, or a dependency missing from the list, stops the install). To move a tool to another version, regenerate its file (the command is in its header, it needs `uv`), and keep the PC on the same version. Not covered: the Chromium that `playwright install` downloads (informative `parcours-web` job, read-only token).
 
 | Job (stable name) | What it does | Runs on | Make it required? |
 |---|---|---|---|
@@ -221,7 +221,7 @@ Sans `-Sanitizers`, `CXX` pointe sur `clang++` simple (plus rapide, sans détect
 
 ### Intégration continue (GitHub Actions)
 
-`.github/workflows/ci.yml`, déclenché par un push sur `main`, une pull request ou à la main (`workflow_dispatch`). Le dépôt est public depuis le 08/11/2026 (privé, minutes facturables, avant) : les jobs longs ne tournent toujours que là où il le faut. Jeton en lecture seule (`contents: read`). Chaque action est épinglée par le SHA du commit de son tag (tag lu dans le dépôt de l'action, gardé en commentaire dans le fichier) ; les outils pip et le `gitleaks` téléchargé ont la version exacte du PC.
+`.github/workflows/ci.yml`, déclenché par un push sur `main`, une pull request ou à la main (`workflow_dispatch`). Le dépôt est public depuis le 08/11/2026 (privé, minutes facturables, avant) : les jobs longs ne tournent toujours que là où il le faut. Jeton en lecture seule (`contents: read`). Chaque action est épinglée par le SHA du commit de son tag (tag lu dans le dépôt de l'action, gardé en commentaire dans le fichier) ; les outils pip et le `gitleaks` téléchargé ont la version exacte du PC. Les outils pip (ruff, clang-format, playwright et ses dépendances) sont en plus épinglés par l'empreinte SHA-256 de chaque fichier publié : `.github/exigences/<outil>.txt`, installé par `pip install --require-hashes -r` (un fichier changé sur PyPI, ou une dépendance absente de la liste, arrête l'installation). Pour changer la version d'un outil, régénérer son fichier (la commande est dans son en-tête, elle demande `uv`), et garder le PC à la même version. Non couvert : le Chromium que télécharge `playwright install` (job `parcours-web` informatif, jeton en lecture seule).
 
 | Job (nom stable) | Ce qu'il fait | Quand | À rendre obligatoire ? |
 |---|---|---|---|
