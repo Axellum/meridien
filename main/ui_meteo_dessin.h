@@ -149,6 +149,18 @@ inline void rect_bord(const Pinceau &pc, int x, int y, int w, int h, int rayon, 
     lv_draw_rect(pc.couche, &d, &zone);
 }
 
+// Le dégradé vertical de `rect_degrade_v` : la couleur ET l'opacité vont de `haut` (première ligne) à `bas` (dernière). Partagé
+// avec la cuisson des voiles (ui_principal.cpp, voile_entre), qui en tire les MÊMES couleurs ligne par ligne.
+inline lv_grad_dsc_t degrade_v(std::uint32_t haut, std::uint8_t haut_opa, std::uint32_t bas, std::uint8_t bas_opa) {
+    lv_draw_rect_dsc_t d;
+    lv_draw_rect_dsc_init(&d);
+    d.bg_grad.dir = LV_GRAD_DIR_VER;
+    d.bg_grad.stops_count = 2;
+    d.bg_grad.stops[0] = {couleur(haut), haut_opa, 0};
+    d.bg_grad.stops[1] = {couleur(bas), bas_opa, 255};
+    return d.bg_grad;
+}
+
 // Rectangle à dégradé vertical, la couleur ET l'opacité variant de `haut` à `bas` : les voiles sous les courbes. Une bande étroite
 // dont les deux bouts reprennent un dégradé GLOBAL (calculé par l'appelant à ses deux ordonnées) donne le même résultat qu'un
 // dégradé unique sous toute la courbe, sans polygone.
@@ -160,10 +172,7 @@ inline void rect_degrade_v(const Pinceau &pc, int x, int y, int w, int h, std::u
     lv_draw_rect_dsc_t d;
     lv_draw_rect_dsc_init(&d);
     d.bg_opa = LV_OPA_COVER;
-    d.bg_grad.dir = LV_GRAD_DIR_VER;
-    d.bg_grad.stops_count = 2;
-    d.bg_grad.stops[0] = {couleur(haut), haut_opa, 0};
-    d.bg_grad.stops[1] = {couleur(bas), bas_opa, 255};
+    d.bg_grad = degrade_v(haut, haut_opa, bas, bas_opa);
     const lv_area_t zone = {x, y, x + w - 1, y + h - 1};
     if (hors_zone(pc, zone.x1, zone.y1, zone.x2, zone.y2)) {
         return;

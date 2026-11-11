@@ -16,8 +16,11 @@
 //
 // Fixtures (inventées, pas des mesures). « donnees-minimales » montre ce que l'appareil reçoit aujourd'hui du client météo (ni
 // heure par heure, ni tendance, ni cumul de pluie) ; les autres variantes, les données complètes demandées à la session météo.
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 
 #include "banc.h"
 #include "lvgl.h"
@@ -45,8 +48,36 @@ void afficher(const banc::Contexte &contexte, const ecran::EntreesPrincipal &e) 
     lv_screen_load(ecran_lvgl);
 }
 
+// BANC_VOILES=1 : les images des voiles ne fuient pas. 40 mises à jour qui changent la météo (donc les voiles, recuits à chaque fois
+// avec d'autres tailles et formats), un repeint après chacune, deux reconstructions de l'écran ; il ne doit jamais rester plus de
+// deux images. Code de sortie 4 sinon. L'état final est celui de la variante : le PNG ne change pas.
+void verifier_voiles(const banc::Contexte &c, const ecran::EntreesPrincipal &final) {
+    if (std::getenv("BANC_VOILES") == nullptr) {
+        return;
+    }
+    const Cas *const cas[] = {&SOLEIL, &PLUIE, &NEIGE, &ORAGE, &BROUILLARD, &CHALEUR, &PIRES_CAS};
+    int pire = 0;
+    for (int i = 0; i < 40; ++i) {
+        if (i == 13 || i == 27) {
+            afficher(c, final); // reconstruction : ui_principal_creer rend les images de la précédente
+        }
+        ecran::ui_principal_mettre_a_jour(entrees(c, 0, vue(*cas[i % 7], c.instant_utc_s)));
+        lv_refr_now(c.affichage);
+        pire = std::max(pire, ecran::ui_principal_images_voile());
+    }
+    ecran::ui_principal_mettre_a_jour(final);
+    lv_refr_now(c.affichage);
+    std::fprintf(stderr, "voiles : au plus %d images vivantes sur 40 mises à jour, %d à la fin\n", pire,
+                 ecran::ui_principal_images_voile());
+    if (pire > 2) {
+        std::exit(4);
+    }
+}
+
 void depuis(const banc::Contexte &c, const Cas &cas, int64_t decalage = 0) {
-    afficher(c, entrees(c, decalage, vue(cas, c.instant_utc_s + decalage)));
+    const ecran::EntreesPrincipal e = entrees(c, decalage, vue(cas, c.instant_utc_s + decalage));
+    afficher(c, e);
+    verifier_voiles(c, e);
 }
 
 void soleil(const banc::Contexte &c) { depuis(c, SOLEIL); }
