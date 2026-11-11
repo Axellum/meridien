@@ -38,10 +38,14 @@ The pairing token is a **6-digit code shown on the device's screen** (ADR-0003).
 | Route | Role |
 |---|---|
 | `GET /api/status` | Public. `{"nom","modele","version","mode","appairage","langue"}`: `mode` = `station` (on the home Wi-Fi) or `point_d_acces` (commissioning); `appairage` = `"requis"` or `"ok"` depending on whether the request carries a valid token; `langue` = code of the **screen language** (§6), so that the page can speak the right language before pairing. `modele` = the name of the board the firmware runs on, read from the board layer (« M5Stack Tab5 » or « Waveshare 7B »). Nothing else (no IP address, no SSID). |
-| `POST /api/pair` | Body `{"code":"123456"}` → `200 {"jeton":"<32 bytes hex>"}`. Wrong code → `403`, "That code isn’t right. Look at the device’s screen." **5 failed attempts → 60 s lock** (`429`, "Too many attempts. Try again in 60 seconds.", with `reessayer_dans`). |
+| `POST /api/pair` | Body `{"code":"123456"}` → `200 {"jeton":"<32 bytes hex>"}`. Wrong code → `403`, "That code isn’t right. Look at the device’s screen." **5 failed attempts → lock** (`429`, "Too many attempts. Try again in 60 seconds.", with `reessayer_dans` and `Retry-After`). The lock lasts 60 s, then doubles with each further series of 5 failures without a success in between (120 s, 240 s… at most 1 hour). From the 3rd series in a row, each lock also draws a **new code**, shown on the screen; sessions already open stay open. A success brings the lock back to 60 s. The lock is global (not per client). |
 | `DELETE /api/pair` | Closes the current session → `204`. |
 
-The session token lives in RAM (at most 4 sessions; the oldest is closed when a fifth arrives) and disappears on restart: the page then asks for the code again. The code changes on restart and when "New code" is touched on the screen. **Accepted limit**: plain HTTP on the local network; the token can be read by anyone listening to that network (self-signed HTTPS ruled out, ADR-0003).
+The session token lives in RAM (at most 4 sessions; the oldest is closed when a fifth arrives) and disappears on restart: the page then asks for the code again. The code changes on restart, after the 3rd series of failures in a row (above), and when "New code" is touched on the screen: that button also **closes every open session** and **lifts a lock in progress**, so the person in front of the screen is never locked out by someone else on the network. The new code is shown at once; the device applies it before the next request (the old code is then refused).
+
+A request to a protected route without a valid token gets its `401` **without its body being read**, and the connection is closed. A request body must arrive within 5 s (no byte for 5 s, or the whole body not there after 5 s → `408`, connection closed); a phone on the same Wi-Fi sends it in a few milliseconds.
+
+**Accepted limit**: plain HTTP on the local network; the token can be read by anyone listening to that network (self-signed HTTPS ruled out, ADR-0003).
 
 ## 3. Device
 
@@ -383,10 +387,14 @@ Le jeton d'appairage est un **code à 6 chiffres affiché sur l'écran de l'appa
 | Route | Rôle |
 |---|---|
 | `GET /api/status` | Public. `{"nom","modele","version","mode","appairage","langue"}` : `mode` = `station` (sur le Wi-Fi de la maison) ou `point_d_acces` (mise en service) ; `appairage` = `"requis"` ou `"ok"` selon que la requête porte un jeton valide ; `langue` = code de la **langue de l'écran** (§6), pour que la page parle la bonne langue avant l'appairage. `modele` = le nom de la carte sur laquelle tourne le firmware, lu dans la couche carte (« M5Stack Tab5 » ou « Waveshare 7B »). Rien d'autre (pas d'adresse IP, pas de SSID). |
-| `POST /api/pair` | Corps `{"code":"123456"}` → `200 {"jeton":"<32 octets hex>"}`. Mauvais code → `403`, « Ce code n’est pas le bon. Regardez l’écran de l’appareil. ». **5 essais ratés → verrou 60 s** (`429`, « Trop d’essais. Réessayez dans 60 secondes. », avec `reessayer_dans`). |
+| `POST /api/pair` | Corps `{"code":"123456"}` → `200 {"jeton":"<32 octets hex>"}`. Mauvais code → `403`, « Ce code n’est pas le bon. Regardez l’écran de l’appareil. ». **5 essais ratés → verrou** (`429`, « Trop d’essais. Réessayez dans 60 secondes. », avec `reessayer_dans` et `Retry-After`). Le verrou dure 60 s, puis double à chaque nouvelle série de 5 échecs sans succès entre deux (120 s, 240 s… une heure au plus). À partir de la 3e série de suite, chaque verrou tire aussi un **nouveau code**, affiché à l'écran ; les sessions déjà ouvertes restent. Un succès ramène le verrou à 60 s. Le verrou est global (pas par client). |
 | `DELETE /api/pair` | Ferme la session courante → `204`. |
 
-Le jeton de session vit en RAM (4 sessions au plus, la plus ancienne est fermée si une cinquième arrive) et disparaît au redémarrage : la page redemande alors le code. Le code change au redémarrage et quand on touche « Nouveau code » sur l'écran. **Limite assumée** : HTTP en clair sur le réseau local, le jeton peut être lu par quiconque écoute ce réseau (HTTPS auto-signé écarté, ADR-0003).
+Le jeton de session vit en RAM (4 sessions au plus, la plus ancienne est fermée si une cinquième arrive) et disparaît au redémarrage : la page redemande alors le code. Le code change au redémarrage, après la 3e série d'échecs de suite (ci-dessus), et quand on touche « Nouveau code » sur l'écran : ce bouton **ferme aussi toutes les sessions ouvertes** et **lève un verrou en cours**, pour que la personne devant l'écran ne soit jamais enfermée dehors par quelqu'un d'autre sur le réseau. Le nouveau code s'affiche tout de suite ; l'appareil l'applique avant la requête suivante (l'ancien est alors refusé).
+
+Une requête vers une route protégée sans jeton valide reçoit son `401` **sans que son corps soit lu**, et la connexion est fermée. Le corps d'une requête doit arriver en 5 s (5 s sans un octet, ou le corps incomplet au bout de 5 s → `408`, connexion fermée) ; un téléphone sur le même Wi-Fi l'envoie en quelques millisecondes.
+
+**Limite assumée** : HTTP en clair sur le réseau local, le jeton peut être lu par quiconque écoute ce réseau (HTTPS auto-signé écarté, ADR-0003).
 
 ## 3. Appareil
 
