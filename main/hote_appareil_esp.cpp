@@ -9,9 +9,11 @@
 
 #include <cstdio>
 #include <cstring>
+#include <new>
 
 #include "board.h"
 #include "esp_app_desc.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -248,13 +250,37 @@ class PortsEsp final : public PortsAppareil {
   private:
 };
 
+// L'hôte et ses deux portes, dans un seul bloc : ≈ 7,5 Ko (5 048 + 2 428 octets sur le Tab5, nm du 11/11/2026). En PSRAM et non en
+// variables statiques, qui iraient en RAM interne : ils ne servent qu'aux tâches de l'interface et du serveur web, jamais à une
+// interruption, au DMA, au Wi-Fi ou au TLS (les téléchargements passent par http_commun.cpp, avec ses propres tampons).
+struct Objets {
+    MagasinNvs magasin;
+    PortsEsp ports;
+    HoteAppareil hote;
+    Objets() : hote(ports, magasin) {}
+};
+
+HoteAppareil *creer_hote() {
+    void *place = heap_caps_calloc(1, sizeof(Objets), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (place == nullptr) {
+        place = heap_caps_calloc(1, sizeof(Objets), MALLOC_CAP_8BIT);
+    }
+    if (place == nullptr) {
+        // Au démarrage, avec 29 Mo de PSRAM libres : ne devrait jamais arriver. Sans hôte, ni l'écran des réglages ni la page web ne
+        // peuvent marcher : on le dit et on redémarre (board_restart : remise à zéro complète, AGENTS.md).
+        ESP_LOGE(TAG, "pas de place pour l'hôte de l'appareil (%u octets) : redémarrage",
+                 static_cast<unsigned>(sizeof(Objets)));
+        board_restart();
+    }
+    return &(new (place) Objets())->hote;
+}
+
 } // namespace
 
 HoteReglages &hote_de_l_appareil() {
-    static MagasinNvs magasin;
-    static PortsEsp ports;
-    static HoteAppareil hote(ports, magasin);
-    return hote;
+    // Créé au premier appel (l'initialisation d'une variable locale statique est protégée contre deux tâches).
+    static HoteAppareil *const hote = creer_hote();
+    return *hote;
 }
 
 } // namespace ecran
