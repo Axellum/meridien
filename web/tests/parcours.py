@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -120,6 +121,66 @@ def nouveau_contexte(nav, largeur=390, sombre=False):
     page.on("console", lambda m: erreurs_console.append(m.text) if m.type in ("error", "warning") else None)
     page.on("pageerror", lambda e: erreurs_console.append("pageerror : " + str(e)))
     return ctx, page
+
+
+def chaine_cpp(nom):
+    """Une constante texte du noyau (http_requete.hpp), littéraux collés compris : la valeur que le firmware envoie."""
+    texte = (RACINE / "components" / "core" / "include" / "ecran" / "http_requete.hpp").read_text(encoding="utf-8")
+    m = re.search(nom + r'\s*=\s*((?:"[^"]*"\s*)+);', texte)
+    return "".join(re.findall(r'"([^"]*)"', m.group(1))) if m else None
+
+
+def lire_brut(chemin, hote=None):
+    """(statut, en-têtes, corps) d'un GET envoyé hors du navigateur ; `hote` remplace l'en-tête Host (essai de rebinding DNS)."""
+    rq = urllib.request.Request(BASE + chemin)
+    if hote:
+        rq.add_header("Host", hote)
+    try:
+        with urllib.request.urlopen(rq, timeout=10) as r:
+            return r.status, r.headers, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers, e.read()
+
+
+def t_entetes_et_hote(nav):
+    """La page et l'API portent les en-têtes du noyau ; la page ne peut exécuter aucun script écrit dans le HTML ; un en-tête Host
+    qui ne désigne pas l'appareil (rebinding DNS) est refusé. Vaut contre le faux appareil ET contre l'appareil réel."""
+    attendue = chaine_cpp("POLITIQUE_CONTENU")
+    statut, entetes, _ = lire_brut("/")
+    verifier("page : politique de contenu complète, celle du noyau (http_requete.hpp)", statut == 200 and attendue
+             and entetes.get("Content-Security-Policy") == attendue, f"{statut} {entetes.get('Content-Security-Policy')!r}")
+    verifier("page : nosniff et Referrer-Policy no-referrer", entetes.get("X-Content-Type-Options") == "nosniff"
+             and entetes.get("Referrer-Policy") == chaine_cpp("POLITIQUE_REFERENT"), str(dict(entetes)))
+    statut, entetes, _ = lire_brut("/api/status")
+    verifier("API : no-store, nosniff, Referrer-Policy", statut == 200 and entetes.get("Cache-Control") == "no-store"
+             and entetes.get("X-Content-Type-Options") == "nosniff" and entetes.get("Referrer-Policy") == "no-referrer", str(dict(entetes)))
+    for chemin in ("/", "/api/status"):
+        statut, entetes, corps = lire_brut(chemin, hote="attaquant.example")
+        verifier(f"Host étranger sur {chemin} : 403 sobre, rien sur l'appareil", statut == 403 and len(corps) < 64
+                 and b"ecran" not in corps and b"version" not in corps, f"{statut} {corps[:80]!r}")
+    statut, _, _ = lire_brut("/api/status", hote=urllib.parse.urlsplit(BASE).netloc.upper())
+    verifier("Host de l'appareil en majuscules : accepté", statut == 200, str(statut))
+    # Un script écrit dans le HTML (ce qu'une injection produirait) n'est pas exécuté. Page à part : la violation attendue ne
+    # doit pas compter dans les erreurs de console du parcours.
+    p = nav.new_page()
+    try:
+        p.goto(BASE)
+        bloque = p.evaluate("""async () => {
+            const violations = [];
+            document.addEventListener('securitypolicyviolation', (e) => violations.push(e.violatedDirective));
+            const s = document.createElement('script');
+            s.textContent = 'window.__injecte = 1';
+            document.body.append(s);
+            const d = document.createElement('div');
+            d.setAttribute('style', 'width:123px');
+            document.body.append(d);
+            await new Promise((r) => setTimeout(r, 200));
+            return { script: window.__injecte === undefined, style: d.getBoundingClientRect().width !== 123, violations };
+        }""")
+        verifier("politique de contenu : un script en ligne injecté n'est pas exécuté", bloque["script"], str(bloque))
+        verifier("politique de contenu : un style en ligne injecté n'est pas appliqué", bloque["style"], str(bloque))
+    finally:
+        p.close()
 
 
 def jeton(page):
@@ -353,6 +414,7 @@ def main():
                 expect(page.locator("#ville")).to_be_visible()
                 verifier("bon code : la page de réglages s'ouvre", True)
             etape("Appairage par le code affiché à l'écran", t_appairage, page)
+            etape("En-têtes de sécurité, politique de contenu et en-tête Host", lambda: t_entetes_et_hote(nav))
 
             def t_ville():
                 if not REEL:  # l'appareil réel a toujours une ville (Lyon par défaut, contrat meteo_zone.h)
@@ -1456,6 +1518,8 @@ def main():
              f"hôtes {sorted(hotes)} ; {len(hors_appareil)} requête(s) hors appareil, {len(vigie_interceptees)} interceptée(s) ; {hors_appareil[:2]}")
     graves = [m for m in erreurs_console if "Failed to load resource" not in m]
     verifier("console du navigateur : aucune erreur JavaScript", not graves, "; ".join(graves[:3]))
+    csp = [m for m in erreurs_console if "Content Security Policy" in m]
+    verifier("politique de contenu : la page entière la respecte (aucun refus pendant le parcours)", not csp, "; ".join(csp[:3]))
     echecs = [r for r in resultats if not r[1]]
     print(f"\nRÉSULTAT : {len(resultats) - len(echecs)}/{len(resultats)} vérifications OK" + (f", {len(sautes)} étape(s) sautée(s)" if sautes else ""))
     for titre, raison in sautes:

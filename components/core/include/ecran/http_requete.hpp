@@ -122,4 +122,66 @@ constexpr bool etag_correspond(std::string_view si_none_match, std::string_view 
     return false;
 }
 
+// En-têtes de sécurité de la page (docs/api-reglages.md §12). La politique de contenu suit ce que la page fait vraiment :
+//   - scripts et feuilles de style : seulement les fichiers servis par l'appareil (app.js, style.css), aucun code ni style écrit
+//     dans le HTML (pas d'`unsafe-inline` : index.html n'a ni <script> en ligne, ni attribut `style`, ni `onclick`) ;
+//   - requêtes : l'appareil, plus `https:` parce que la page lit elle-même la liste des spots de la mer sur l'adresse Vigie que
+//     l'utilisateur a réglée (https obligatoire, contrôlé par l'appareil) ;
+//   - images : l'appareil (icône d'onglet) ; les icônes de la page sont des <symbol> du HTML, non concernés ;
+//   - ni cadre (`frame-ancestors 'none'` : la page ne s'affiche dans aucune autre), ni <base>, ni envoi de formulaire, ni objet.
+// Le faux serveur de web/ lit cette chaîne ici et l'envoie à l'identique : le parcours Playwright joue la page sous cette règle.
+inline constexpr std::string_view POLITIQUE_CONTENU =
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self' https:; "
+    "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'";
+inline constexpr std::string_view POLITIQUE_REFERENT = "no-referrer";
+
+namespace detail {
+// « a » et « b » sont-ils le même texte, sans tenir compte de la casse des lettres ASCII ?
+constexpr bool egal_sans_casse(std::string_view a, std::string_view b) noexcept {
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (minuscule(a[i]) != minuscule(b[i]))
+            return false;
+    }
+    return true;
+}
+} // namespace detail
+
+inline constexpr std::size_t HOTE_MAX = 64; // un nom « ecran-xxxx.local » ou une adresse IPv4 en font moins de 25
+
+// L'en-tête « Host » d'une requête désigne-t-il bien cet appareil ? Protection contre le rebinding DNS : une page d'Internet dont
+// le nom pointe soudain vers l'adresse locale de l'appareil enverrait ses requêtes avec SON nom dans « Host » ; elles sont refusées.
+// Acceptés, sans tenir compte de la casse, avec ou sans « :80 » (le port du serveur) :
+//   - `ip` : l'adresse IPv4 de l'appareil sur le Wi-Fi de la maison (« 192.168.1.52 ») ;
+//   - `nom` + « .local » (un point final toléré) : son nom mDNS (`nom` = « ecran-1a2b ») ;
+//   - `ip_installation` : l'adresse de l'appareil sur son propre point d'accès d'installation, quand il en ouvre un.
+// Un paramètre vide n'accepte rien. Tout le reste est refusé : en-tête absent ou vide, autre nom, autre port, adresse IPv6, espace.
+constexpr bool hote_autorise(std::string_view hote, std::string_view ip, std::string_view nom,
+                             std::string_view ip_installation = {}) noexcept {
+    if (hote.size() > HOTE_MAX)
+        return false;
+    const std::size_t deux_points = hote.find(':');
+    if (deux_points != std::string_view::npos) {
+        if (hote.substr(deux_points) != ":80")
+            return false;
+        hote = hote.substr(0, deux_points);
+    }
+    if (hote.empty()) // en-tête absent, vide ou réduit à « :80 »
+        return false;
+    if (!ip.empty() && hote == ip)
+        return true;
+    if (!ip_installation.empty() && hote == ip_installation)
+        return true;
+    if (nom.empty())
+        return false;
+    if (hote.back() == '.')
+        hote.remove_suffix(1);
+    constexpr std::string_view suffixe = ".local";
+    if (hote.size() != nom.size() + suffixe.size()) // aussi la garde de substr() ci-dessous
+        return false;
+    return detail::egal_sans_casse(hote.substr(0, nom.size()), nom) &&
+           detail::egal_sans_casse(hote.substr(nom.size()), suffixe);
+}
+
 } // namespace ecran::http
