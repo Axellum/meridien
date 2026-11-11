@@ -32,6 +32,7 @@
 #include "meteo_interne.h"
 #include "reglages.h"
 #include "reseau.h"
+#include "tache_donnees.h"
 
 namespace ecran {
 
@@ -54,13 +55,8 @@ constexpr int kDelaiHttpMs = 15000;             // connexion, TLS et lecture : a
 constexpr uint32_t kPasAttenteMs = 2000;        // contrôle de l'IP et de l'heure avant le premier essai
 constexpr uint32_t kAntiRebondZoneMs = 1500;    // plusieurs changements de zone d'affilée = une seule requête
 constexpr int64_t kInstantMin = 946684800;      // 1er janvier 2000 : en dessous, l'horloge n'est pas réglée
-constexpr uint32_t kPileOctets = 12288;         // la prise de contact TLS demande plusieurs Ko de pile
-// Priorité d'ARRIÈRE-PLAN : la prise de contact TLS calcule plusieurs secondes sans jamais s'endormir. À une priorité au-dessus de
-// celle de la tâche d'inactivité (0), la tâche IDLE du cœur qui l'exécute ne tourne plus et le chien de garde des tâches (5 s) se
-// déclenche. À la priorité 0 elle partage le cœur avec IDLE tranche par tranche (1 ms) : IDLE nourrit le chien de garde.
-constexpr UBaseType_t kPrioriteMeteo = tskIDLE_PRIORITY;
-
-TaskHandle_t g_tache = nullptr;
+constexpr int64_t kTrancheS = 30; // pendant l'attente, l'état « périmé » est relu au moins toutes les 30 s
+// Les requêtes passent par LA tâche réseau des données (tache_donnees.h : pile de 12 Ko, priorité d'arrière-plan), un pas à la fois.
 bool g_cache_relu = false; // le cache NVS a déjà été relu (tâche principale seulement, voir meteo_client_relire_cache)
 
 // ---- mémoire -------------------------------------------------------------------------------------------------------
@@ -712,144 +708,147 @@ bool reseau_et_heure_pretes() {
     return r.ip_obtenue && r.heure_synchronisee && static_cast<int64_t>(std::time(nullptr)) > kInstantMin;
 }
 
-// Attend `delai_s` secondes, en tranches de 30 s pour signaler au journal le moment où la météo devient périmée. Rend vrai si un
-// changement de zone a réveillé la tâche avant la fin.
-bool attendre(int64_t delai_s) {
-    constexpr int64_t kTrancheS = 30;
-    const int64_t fin_s = esp_timer_get_time() / 1000000 + delai_s;
-    MeteoEtat e = {};
-    bool dernier_perime = meteo_etat_lire(&e) && e.perime;
-    for (;;) {
-        const int64_t reste_s = fin_s - esp_timer_get_time() / 1000000;
-        if (reste_s <= 0) {
-            return false;
-        }
-        const int64_t tranche_s = reste_s < kTrancheS ? reste_s : kTrancheS;
-        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(static_cast<uint32_t>(tranche_s) * 1000U)) != 0) {
-            return true;
-        }
-        if (meteo_etat_lire(&e) && e.perime != dernier_perime) {
-            dernier_perime = e.perime;
+// État du rythme des requêtes, entre deux pas. Lu et écrit par la seule tâche réseau des données.
+struct Rythme {
+    bool trop_de_requetes = false; // le dernier échec était un 429
+    bool en_attente = false;       // un délai entre deux requêtes court jusqu'à `fin_attente_s`
+    int64_t fin_attente_s = 0;     // horloge monotone (esp_timer), en secondes
+    bool dernier_perime = false;   // état « périmé » au début de l'attente, pour journaliser son changement
+};
+
+Rythme g_rythme;
+
+int64_t monotone_s() { return esp_timer_get_time() / 1000000; }
+
+// Un pas de la tâche réseau des données (tache_donnees.h). Même rythme que l'ancienne boucle de la tâche « meteo » :
+//   - réseau ou heure pas prêts : nouveau contrôle dans 2 s ;
+//   - pendant le délai entre deux requêtes : l'état « périmé » est relu toutes les 30 s (journal), la requête part à la fin ;
+//   - un changement de zone ou de source (`reveillee`, après l'anti-rebond de 1,5 s de l'ordonnanceur) fait partir la requête tout
+//     de suite, même pendant le délai.
+int64_t pas_meteo(bool reveillee) {
+    Rythme &et = g_rythme;
+    if (reveillee) {
+        et.en_attente = false;
+    }
+    if (et.en_attente) {
+        MeteoEtat e = {};
+        if (meteo_etat_lire(&e) && e.perime != et.dernier_perime) {
+            et.dernier_perime = e.perime;
             journaliser_contrat(e.perime ? "elle vient de devenir périmée" : "elle n'est plus périmée");
         }
+        const int64_t reste_s = et.fin_attente_s - monotone_s();
+        if (reste_s > 0) {
+            return (reste_s < kTrancheS ? reste_s : kTrancheS) * 1000;
+        }
+        et.en_attente = false; // le délai est écoulé
     }
-}
+    if (!reseau_et_heure_pretes()) {
+        return kPasAttenteMs;
+    }
 
-void tache_meteo(void *) {
-    bool trop_de_requetes = false;
-    for (;;) {
-        while (!reseau_et_heure_pretes()) {
-            ulTaskNotifyTake(pdTRUE,
-                             pdMS_TO_TICKS(kPasAttenteMs)); // un changement de zone réveille aussi, sans importance ici
-        }
-
-        journaliser_contrat("réseau et heure prêts, avant la requête");
-        journaliser_detail("réseau et heure prêts, avant la requête");
-        ZoneMeteo zone = {};
-        PositionE5 position = {};
-        zone_lire_e5(&zone, &position);
-        // La source choisie, relue à chaque requête : changer de source (écran ou page) agit à la requête d'après, ou tout de suite.
-        char source[16] = {};
-        reglages_source_meteo(source, sizeof(source));
-        const meteo::fournisseurs::Famille choisie = meteo::fournisseurs::famille_de(source);
-        const std::string_view modeles = meteo::fournisseurs::modeles_de(source); // vide pour un service lu directement
-        ESP_LOGI(TAG, "requête pour « %s », source « %s » (%d échec(s) de suite jusqu'ici)", zone.nom, source,
-                 meteo_etat_echecs());
-        Travail *tr = travail();
-        Essai e = Essai{Issue::Memoire};
-        // Le service qui donne VRAIMENT la météo : la source choisie, ou Open-Meteo quand le service direct a échoué (repli, ADR-0014).
-        meteo::fournisseurs::Famille origine = meteo::fournisseurs::Famille::OpenMeteo;
-        if (tr != nullptr) {
-            if (choisie != meteo::fournisseurs::Famille::OpenMeteo) {
-                const int64_t maintenant_s = static_cast<int64_t>(std::time(nullptr));
-                const int64_t pause_s = g_natif_pas_avant_s.load() - maintenant_s;
-                if (pause_s <= 0) {
-                    e = interroger_natif(choisie, position, zone.fuseau, tr->meteo);
-                    if (e.issue == Issue::Ok) {
-                        origine = choisie;
-                        g_natif_pas_avant_s.store(0);
-                    } else {
-                        ESP_LOGW(TAG,
-                                 "service direct : essai raté (%s, HTTP %d) ; repli sur Open-Meteo « Automatique »",
-                                 nom_issue(e.issue), e.statut_http);
-                        // Pas de nouvel essai au service avant l'écart minimum entre deux requêtes : le repli ne doit pas le faire
-                        // frapper à chaque essai quand il est en panne.
-                        g_natif_pas_avant_s.store(maintenant_s + meteo::fournisseurs::plancher_s(choisie));
-                    }
+    journaliser_contrat("réseau et heure prêts, avant la requête");
+    journaliser_detail("réseau et heure prêts, avant la requête");
+    ZoneMeteo zone = {};
+    PositionE5 position = {};
+    zone_lire_e5(&zone, &position);
+    // La source choisie, relue à chaque requête : changer de source (écran ou page) agit à la requête d'après, ou tout de suite.
+    char source[16] = {};
+    reglages_source_meteo(source, sizeof(source));
+    const meteo::fournisseurs::Famille choisie = meteo::fournisseurs::famille_de(source);
+    const std::string_view modeles = meteo::fournisseurs::modeles_de(source); // vide pour un service lu directement
+    ESP_LOGI(TAG, "requête pour « %s », source « %s » (%d échec(s) de suite jusqu'ici)", zone.nom, source,
+             meteo_etat_echecs());
+    Travail *tr = travail();
+    Essai e = Essai{Issue::Memoire};
+    // Le service qui donne VRAIMENT la météo : la source choisie, ou Open-Meteo quand le service direct a échoué (repli, ADR-0014).
+    meteo::fournisseurs::Famille origine = meteo::fournisseurs::Famille::OpenMeteo;
+    if (tr != nullptr) {
+        if (choisie != meteo::fournisseurs::Famille::OpenMeteo) {
+            const int64_t maintenant_s = static_cast<int64_t>(std::time(nullptr));
+            const int64_t pause_s = g_natif_pas_avant_s.load() - maintenant_s;
+            if (pause_s <= 0) {
+                e = interroger_natif(choisie, position, zone.fuseau, tr->meteo);
+                if (e.issue == Issue::Ok) {
+                    origine = choisie;
+                    g_natif_pas_avant_s.store(0);
                 } else {
-                    ESP_LOGI(TAG, "service direct en pause après un échec (encore %lld s) : Open-Meteo « Automatique »",
-                             static_cast<long long>(pause_s));
+                    ESP_LOGW(TAG, "service direct : essai raté (%s, HTTP %d) ; repli sur Open-Meteo « Automatique »",
+                             nom_issue(e.issue), e.statut_http);
+                    // Pas de nouvel essai au service avant l'écart minimum entre deux requêtes : le repli ne doit pas le faire
+                    // frapper à chaque essai quand il est en panne.
+                    g_natif_pas_avant_s.store(maintenant_s + meteo::fournisseurs::plancher_s(choisie));
                 }
-            }
-            if (origine == meteo::fournisseurs::Famille::OpenMeteo) {
-                e = interroger(position, modeles, tr->meteo);
+            } else {
+                ESP_LOGI(TAG, "service direct en pause après un échec (encore %lld s) : Open-Meteo « Automatique »",
+                         static_cast<long long>(pause_s));
             }
         }
-        // Pile : marge restante la plus basse depuis le début de la tâche (le pic est la prise de contact TLS, juste faite).
-        ESP_LOGI(TAG, "pile de la tâche : %u octets jamais utilisés sur %u",
-                 static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)), static_cast<unsigned>(kPileOctets));
+        if (origine == meteo::fournisseurs::Famille::OpenMeteo) {
+            e = interroger(position, modeles, tr->meteo);
+        }
+    }
+    // Pile : marge restante la plus basse depuis le début de la tâche (le pic est la prise de contact TLS, juste faite).
+    tache_donnees_journaliser_pile(TAG);
 
-        bool immediat = false;
-        bool direct_reussi = false;
-        if (e.issue == Issue::Ok) {
-            PositionE5 maintenant = {};
-            zone_lire_e5(nullptr, &maintenant);
-            char source_apres[16] = {};
-            reglages_source_meteo(source_apres, sizeof(source_apres));
-            if (!(maintenant == position)) {
-                ESP_LOGI(TAG, "la zone a changé pendant la requête : réponse écartée, nouvelle requête");
-                immediat = true;
-            } else if (std::strcmp(source, source_apres) != 0) {
-                // Une réponse de l'ancien modèle ne doit jamais s'afficher sous la nouvelle source.
-                ESP_LOGI(TAG,
-                         "la source a changé pendant la requête (« %s » -> « %s ») : réponse écartée, nouvelle requête",
-                         source, source_apres);
-                immediat = true;
-            } else if (!meteo_etat_publier(tr->meteo, origine)) {
-                ESP_LOGE(TAG, "réponse lue mais non publiée : pas de place pour l'état de la météo");
-                meteo_etat_compter_echec();
-            } else {
-                enregistrer_cache(tr->meteo, position, origine);
-                journaliser_releve(zone, tr->meteo.releve, e, origine);
-                journaliser_contrat("après la réponse");
-                journaliser_detail("après la réponse");
-                trop_de_requetes = false;
-                direct_reussi = origine != meteo::fournisseurs::Famille::OpenMeteo;
-            }
-        } else {
+    bool immediat = false;
+    bool direct_reussi = false;
+    if (e.issue == Issue::Ok) {
+        PositionE5 maintenant = {};
+        zone_lire_e5(nullptr, &maintenant);
+        char source_apres[16] = {};
+        reglages_source_meteo(source_apres, sizeof(source_apres));
+        if (!(maintenant == position)) {
+            ESP_LOGI(TAG, "la zone a changé pendant la requête : réponse écartée, nouvelle requête");
+            immediat = true;
+        } else if (std::strcmp(source, source_apres) != 0) {
+            // Une réponse de l'ancien modèle ne doit jamais s'afficher sous la nouvelle source.
+            ESP_LOGI(TAG,
+                     "la source a changé pendant la requête (« %s » -> « %s ») : réponse écartée, nouvelle requête",
+                     source, source_apres);
+            immediat = true;
+        } else if (!meteo_etat_publier(tr->meteo, origine)) {
+            ESP_LOGE(TAG, "réponse lue mais non publiée : pas de place pour l'état de la météo");
             meteo_etat_compter_echec();
-            trop_de_requetes = (e.issue == Issue::TropDeRequetes);
-            ESP_LOGW(TAG, "essai raté : %s (HTTP %d) ; %d échec(s) de suite", nom_issue(e.issue), e.statut_http,
-                     meteo_etat_echecs());
+        } else {
+            enregistrer_cache(tr->meteo, position, origine);
+            journaliser_releve(zone, tr->meteo.releve, e, origine);
+            journaliser_contrat("après la réponse");
+            journaliser_detail("après la réponse");
+            et.trop_de_requetes = false;
+            direct_reussi = origine != meteo::fournisseurs::Famille::OpenMeteo;
         }
-
-        if (!immediat) {
-            const uint8_t alea = static_cast<uint8_t>(esp_random() & 0xFFU);
-            int64_t delai_s = 0;
-            if (direct_reussi) {
-                // Un service lu directement : pas avant son plancher ni son `Expires`, loin de l'heure ronde (meteo_rythme_natif.hpp).
-                const int64_t maintenant_s = static_cast<int64_t>(std::time(nullptr));
-                delai_s = meteo::fournisseurs::delai_apres_succes_s(origine, maintenant_s, e.expires_s, alea);
-                if (e.expires_s > 0) {
-                    ESP_LOGI(TAG, "en-tête Expires de la réponse : dans %lld s",
-                             static_cast<long long>(e.expires_s - maintenant_s));
-                } else {
-                    ESP_LOGI(TAG,
-                             "en-tête Expires de la réponse : absent ou illisible, le plancher du service s'applique");
-                }
-            } else {
-                delai_s = meteo::delai_avant_essai_s(meteo_etat_echecs(), trop_de_requetes, alea);
-            }
-            ESP_LOGI(TAG, "prochain essai dans %lld s (ou tout de suite si la zone change)",
-                     static_cast<long long>(delai_s));
-            if (!attendre(delai_s)) {
-                continue; // le délai est écoulé
-            }
-        }
-        // Réveil par un changement de zone : on laisse passer une rafale de changements avant de demander.
-        vTaskDelay(pdMS_TO_TICKS(kAntiRebondZoneMs));
-        ulTaskNotifyTake(pdTRUE, 0);
+    } else {
+        meteo_etat_compter_echec();
+        et.trop_de_requetes = (e.issue == Issue::TropDeRequetes);
+        ESP_LOGW(TAG, "essai raté : %s (HTTP %d) ; %d échec(s) de suite", nom_issue(e.issue), e.statut_http,
+                 meteo_etat_echecs());
     }
+
+    if (immediat) {
+        // La zone ou la source a changé pendant la requête : on laisse passer une rafale de changements avant de redemander.
+        return kAntiRebondZoneMs;
+    }
+    const uint8_t alea = static_cast<uint8_t>(esp_random() & 0xFFU);
+    int64_t delai_s = 0;
+    if (direct_reussi) {
+        // Un service lu directement : pas avant son plancher ni son `Expires`, loin de l'heure ronde (meteo_rythme_natif.hpp).
+        const int64_t maintenant_s = static_cast<int64_t>(std::time(nullptr));
+        delai_s = meteo::fournisseurs::delai_apres_succes_s(origine, maintenant_s, e.expires_s, alea);
+        if (e.expires_s > 0) {
+            ESP_LOGI(TAG, "en-tête Expires de la réponse : dans %lld s",
+                     static_cast<long long>(e.expires_s - maintenant_s));
+        } else {
+            ESP_LOGI(TAG, "en-tête Expires de la réponse : absent ou illisible, le plancher du service s'applique");
+        }
+    } else {
+        delai_s = meteo::delai_avant_essai_s(meteo_etat_echecs(), et.trop_de_requetes, alea);
+    }
+    ESP_LOGI(TAG, "prochain essai dans %lld s (ou tout de suite si la zone change)", static_cast<long long>(delai_s));
+    MeteoEtat apres = {};
+    et.dernier_perime = meteo_etat_lire(&apres) && apres.perime;
+    et.fin_attente_s = monotone_s() + delai_s;
+    et.en_attente = true;
+    return (delai_s < kTrancheS ? delai_s : kTrancheS) * 1000;
 }
 
 } // namespace
@@ -858,9 +857,7 @@ void meteo_client_zone_changee() {
     g_natif_pas_avant_s.store(
         0); // un autre lieu (ou une autre source) : le service direct est de nouveau permis tout de suite
     meteo_etat_oublier();
-    if (g_tache != nullptr) {
-        xTaskNotifyGive(g_tache);
-    }
+    tache_donnees_reveiller(ordonnanceur::Source::Meteo);
 }
 
 void meteo_client_source_changee() {
@@ -900,9 +897,8 @@ void meteo_client_demarrer() {
     meteo_client_relire_cache(); // déjà fait avant la première image par main.cpp ; sinon (autre appelant) fait ici
     journaliser_contrat("au démarrage, depuis le cache");
     journaliser_detail("au démarrage, depuis le cache");
-    if (xTaskCreate(tache_meteo, "meteo", kPileOctets, nullptr, kPrioriteMeteo, &g_tache) != pdPASS) {
-        ESP_LOGE(TAG, "tâche météo non créée");
-    }
+    tache_donnees_inscrire(ordonnanceur::Source::Meteo, pas_meteo);
+    tache_donnees_reveiller(ordonnanceur::Source::Meteo); // premier pas : attend le réseau et l'heure, puis demande
 }
 
 } // namespace ecran

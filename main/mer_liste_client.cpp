@@ -21,6 +21,7 @@
 #include "http_commun.h"
 #include "reglages_alertes.h"
 #include "reseau.h"
+#include "tache_donnees.h"
 
 namespace ecran {
 
@@ -36,9 +37,8 @@ constexpr const char *kAccept = "application/json";
 constexpr size_t kTailleMax = 96 * 1024;
 constexpr uint32_t kAttenteVerrouTlsMs = 40000; // une recherche de ville tient le verrou 8 s au plus (geocodage.cpp)
 constexpr int kDelaiHttpMs = 15000;             // connexion, TLS et lecture : au-delà, l'essai est un échec
-constexpr uint32_t kPileOctets = 12288;         // la prise de contact TLS demande plusieurs Ko de pile
-// Priorité d'ARRIÈRE-PLAN (voir geocodage.cpp et meteo_client.cpp : au-dessus de la tâche d'inactivité, le chien de garde se déclenche).
-constexpr UBaseType_t kPriorite = tskIDLE_PRIORITY;
+// La lecture passe par LA tâche réseau des données (tache_donnees.h : pile de 12 Ko, priorité d'arrière-plan), en priorité sur la
+// météo, les alertes et la mer : une personne attend la liste devant l'écran.
 
 struct Contexte {
     SemaphoreHandle_t verrou = nullptr; // protège tout sauf `travail`
@@ -147,8 +147,12 @@ ListeMer lire(Contexte *c) {
     }
 }
 
-void tache(void *) {
+// Un pas de la tâche réseau des données : une lecture, puis plus rien jusqu'à la prochaine demande de l'écran.
+int64_t pas_liste(bool) {
     Contexte *c = contexte();
+    if (c == nullptr) {
+        return ordonnanceur::kPlusRien;
+    }
     const ListeMer fin = lire(c);
     xSemaphoreTake(c->verrou, portMAX_DELAY);
     if (fin == ListeMer::Terminee) {
@@ -160,7 +164,7 @@ void tache(void *) {
     c->etat = fin;
     c->tache_active = false;
     xSemaphoreGive(c->verrou);
-    vTaskDelete(nullptr);
+    return ordonnanceur::kPlusRien;
 }
 
 } // namespace
@@ -190,9 +194,9 @@ void mer_liste_lecture_lancer() {
     }
     c->etat = ListeMer::EnCours;
     c->tache_active = true;
-    if (xTaskCreate(tache, "mer_liste", kPileOctets, nullptr, kPriorite, nullptr) != pdPASS) {
-        ESP_LOGE(TAG, "tâche non créée (mémoire interne libre : %u octets)",
-                 static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+    tache_donnees_inscrire(ordonnanceur::Source::ListeSpots, pas_liste);
+    if (!tache_donnees_reveiller(ordonnanceur::Source::ListeSpots)) {
+        ESP_LOGE(TAG, "tâche réseau des données absente : pas de liste de spots");
         c->etat = ListeMer::Echec;
         c->tache_active = false;
         c->fin_essai_us = maintenant;
