@@ -5,6 +5,7 @@
 
 #include "ecran/texte_modele.hpp"
 #include "ui_reglages_interne.h"
+#include "ui_ressources.h"
 
 namespace ecran::ui {
 
@@ -36,15 +37,13 @@ void env_initialiser(lv_obj_t *racine, const uint8_t *ttf, std::size_t ttf_taill
     g_env.largeur = largeur;
     g_env.hauteur = hauteur;
     g_env.echelle = static_cast<float>(std::min(largeur, hauteur)) / 720.0F;
-    // Les polices sont créées une fois et gardées (TinyTTF ne les libère pas à bas prix) ; la taille suit l'écran à la création.
-    if (g_env.f.texte == nullptr || g_env.ttf != ttf) {
-        g_env.ttf = ttf;
-        g_env.ttf_taille = ttf_taille;
-        g_env.f.titre = lv_tiny_ttf_create_data(ttf, ttf_taille, S(44));
-        g_env.f.texte = lv_tiny_ttf_create_data(ttf, ttf_taille, S(34));
-        g_env.f.petite = lv_tiny_ttf_create_data(ttf, ttf_taille, S(27));
-        g_env.f.touche = lv_tiny_ttf_create_data(ttf, ttf_taille, S(36));
-    }
+    // Les polices viennent du registre partagé (ui_ressources.h) : une instance par taille pour tout l'appareil, jamais détruite.
+    g_env.ttf = ttf;
+    g_env.ttf_taille = ttf_taille;
+    g_env.f.titre = ressources::police(ttf, ttf_taille, S(44));
+    g_env.f.texte = ressources::police(ttf, ttf_taille, S(34));
+    g_env.f.petite = ressources::police(ttf, ttf_taille, S(27));
+    g_env.f.touche = ressources::police(ttf, ttf_taille, S(36));
     env_choisir_theme();
 }
 

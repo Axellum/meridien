@@ -9,6 +9,7 @@
 
 #include "ecran/i18n.hpp"
 #include "ecran/vigie_textes.hpp"
+#include "ui_ressources.h"
 
 // Page des alertes officielles. Une carte par alerte en vigueur (la plus grave d'abord), puis une carte « Sources » qui est TOUJOURS là :
 // Vigie, les sources qu'elle a lues, la mention qu'elles demandent, ce qui peut manquer à la liste, et la phrase fixe qui dit que ce
@@ -29,9 +30,7 @@ struct Page {
     float echelle = 1.0F;
     lv_font_t *titre = nullptr;
     lv_font_t *texte = nullptr;
-    lv_font_t *petite = nullptr;
-    const std::uint8_t *ttf =
-        nullptr; // les polices sont créées une fois, comme celles des réglages (TinyTTF se libère mal)
+    lv_font_t *petite = nullptr; // les trois : celles du registre partagé (ui_ressources.h)
     i18n::Langue langue = i18n::Langue::Fr;
 };
 
@@ -232,7 +231,7 @@ void sur_fermer(lv_event_t *e) {
 }
 
 lv_font_t *creer_police(const ContexteAlertes &ctx, int32_t reference) {
-    return lv_tiny_ttf_create_data(ctx.ttf, ctx.ttf_taille, S(reference));
+    return ressources::police(ctx.ttf, ctx.ttf_taille, S(reference));
 }
 
 } // namespace
@@ -245,13 +244,10 @@ bool ui_alertes_creer(const ContexteAlertes &ctx, const DonneesAlertes &donnees)
     p.ctx = ctx;
     p.echelle = static_cast<float>(std::min(ctx.largeur, ctx.hauteur)) / 720.0F;
     p.langue = i18n::langue_courante();
-    // Les polices sont créées une fois (TinyTTF se libère mal), à la taille de l'écran de la première ouverture.
-    if (p.texte == nullptr || p.ttf != ctx.ttf) {
-        p.ttf = ctx.ttf;
-        p.titre = creer_police(ctx, 44);
-        p.texte = creer_police(ctx, 32);
-        p.petite = creer_police(ctx, 26);
-    }
+    // Les polices viennent du registre partagé (ui_ressources.h) : créées une seule fois pour tout l'appareil, à la taille de l'écran.
+    p.titre = creer_police(ctx, 44);
+    p.texte = creer_police(ctx, 32);
+    p.petite = creer_police(ctx, 26);
     if (p.titre == nullptr || p.texte == nullptr || p.petite == nullptr) {
         return false;
     }
