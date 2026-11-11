@@ -4,7 +4,7 @@
 
 **L'anglais d'abord, puis le français (« Français », plus bas).** Le texte français est l'original ; le texte anglais en est une traduction, écrite par une IA et non relue par un locuteur. Il dit la même chose : en cas de différence, **le français fait foi**. Rien dans l'anglais ne doit affirmer plus que le français (en particulier chaque « non vérifié » reste « non vérifié »).
 
-Contents / Sommaire — English: 1 Rules · 2 Pairing · 3 Device · 4 Wi-Fi · 5 Weather zone · 6 Display and languages · 7 STT/LLM/TTS services · 8 Third-party error sentences · 9 Error format · 10 Export/import · 11 Update · 12 Static files · 13 Languages · 14 Official alerts · 13 Languages. Français : mêmes numéros, dans la partie « Français ».
+Contents / Sommaire — English: 1 Rules · 2 Pairing · 3 Device · 4 Wi-Fi · 5 Weather zone · 6 Display and languages · 7 STT/LLM/TTS services · 8 Third-party error sentences · 9 Error format · 10 Export/import · 11 Update · 12 Static files · 13 Languages · 14 Official alerts · 15 Sea. Français : mêmes numéros, dans la partie « Français ».
 
 ---
 
@@ -64,7 +64,7 @@ A request to a protected route without a valid token gets its `401` **without it
   "internet": true
 }
 ```
-`validee` is false until the new version has passed its self-test (§11). `internet` = last successful outgoing request (weather or test).
+`validee` is false until the new version has passed its self-test (§11). `internet` is true once the device has an IP address **and** has received the time from the network (SNTP): that is the proof of access it uses, not the success of the last request (a weather service failing for hours leaves it `true`; a late SNTP answer leaves it `false` even when the weather already arrived). `memoire_libre` is the free **internal** RAM in bytes (`heap_caps_get_free_size(MALLOC_CAP_INTERNAL)`), not the PSRAM: a few hundred kilobytes on a real device, not the 5 MB of the example.
 
 ## 4. Wi-Fi
 
@@ -112,7 +112,7 @@ Empty list → `200 {"resultats":[]}` (the page says "No place found for “Lyon
  "latitude": 45.74846, "longitude": 4.84671, "fuseau": "Europe/Paris",
  "posix": "CET-1CEST,M3.5.0,M10.5.0/3", "libelle": "Lyon, Auvergne-Rhône-Alpes, France"}
 ```
-`GET /api/location` returns the same shape, or `{"definie": false}` as long as no zone has been chosen (the screen then says "Choose a city in the settings page.").
+`GET /api/location` returns the same shape, or `{"definie": false}` as long as no zone has been chosen (the home screen then leaves the place empty; the sentence "Choose a city in the settings page." exists in the translation table but no screen code shows it, checked on 12/11/2026).
 
 **Weather source** (ADR-0010). The same route carries the weather source of the saved city. `GET /api/location` (and every response of `PUT /api/location`) adds `source_meteo` (stable identifier of the source in use: `auto`, or a national model such as `knmi`), `source_meteo_nom` (the name to show: "Automatic" in the screen language, a service name as it is), `source_meteo_retablie` (see below) and `sources_meteo`, the list **offered for the country of the saved city**, "Automatic" first, then the national service, then the worldwide model (the screen offers exactly the same list):
 ```json
@@ -125,9 +125,9 @@ Empty list → `200 {"resultats":[]}` (the page says "No place found for “Lyon
 ```json
 {"disponible": true, "perimee": false, "mise_a_jour": 1793960400,
  "fournisseur": {"id": "open-meteo", "nom": "Open-Meteo", "lien": "https://open-meteo.com/"}, "repli": false,
- "actuelle": {"temperature": 14.2, "ressentie": 13.1, "code": 2, "libelle": "Partly cloudy", "jour": true}}
+ "actuelle": {"temperature": 14.2, "code": 2, "libelle": "Partly cloudy", "jour": true}}
 ```
-`code` = WMO code (Open-Meteo's own; the conditions of MET Norway and the NWS are mapped onto the same codes); `libelle` = short label from the pure core's WMO table **in the screen language** (§13), never the code alone. `perimee` is true when the last reading is more than 3 h old; `{"disponible": false}` before the first successful reading. `fournisseur` names the service that **really gave** this weather (`id`: `open-meteo`, `met-norway` or `nws`; `nom` and `lien`: what the attribution shows, the licence asks for it wherever the weather is shown). It is not always the chosen source: `repli` is `true` when the chosen source is a service read directly that did not answer, so the weather comes from Open-Meteo "Automatic" in the meantime. The screen and the page then say so ("… is unavailable: the weather comes from Open-Meteo in the meantime.") and cite Open-Meteo, not the service that failed (ADR-0014).
+`code` = WMO code (Open-Meteo's own; the conditions of MET Norway and the NWS are mapped onto the same codes); `libelle` = short label from the pure core's WMO table **in the screen language** (§13), never the code alone. `perimee` is true when the last reading is more than **2 h** old, or when the last **3 requests in a row failed** and it is more than 30 min old, or when the device's clock cannot judge (not set yet, or gone backwards) (`meteo_synthese.hpp`: `DELAI_PERIME_APPAREIL_S`, `ECHECS_POUR_PERIME`, `AGE_PERIME_PAR_ECHECS_S`); the `actuelle` object has no felt temperature (`ressentie`): the device does not send it; `{"disponible": false}` before the first successful reading. `fournisseur` names the service that **really gave** this weather (`id`: `open-meteo`, `met-norway` or `nws`; `nom` and `lien`: what the attribution shows, the licence asks for it wherever the weather is shown). It is not always the chosen source: `repli` is `true` when the chosen source is a service read directly that did not answer, so the weather comes from Open-Meteo "Automatic" in the meantime. The screen and the page then say so ("… is unavailable: the weather comes from Open-Meteo in the meantime.") and cite Open-Meteo, not the service that failed (ADR-0014).
 
 ## 6. Display and languages
 
@@ -225,19 +225,23 @@ Response: the service read back (same shape as `GET`), hence **without** `cle`. 
 
 ## 9. Error format
 
-`4xx`/`5xx`: `{"erreur": {"id": "jeton_invalide", "message": "That code isn’t right.", "champ": "code"}}`. `message` is shown as it is, **in the screen language**. `id` is a stable identifier for tests and debugging, **never shown**, and never translated. `champ` (optional) names the faulty field so that the page can highlight it.
+`4xx`/`5xx`: `{"erreur": {"id": "code_faux", "message": "That code isn’t right. Look at the device’s screen.", "champ": "code"}}`. `message` is shown as it is, **in the screen language**. `id` is a stable identifier for tests and debugging, **never shown**, and never translated. `champ` (optional) names the faulty field so that the page can highlight it.
 
 | Status | When | Typical message |
 |---|---|---|
-| `400` | malformed request | "This request can’t be read." |
-| `401` | no valid token | "Enter the code shown on the device’s screen." |
-| `403` | wrong code | "That code isn’t right. Look at the device’s screen." |
-| `404` | unknown route | "This page doesn’t exist." |
-| `413` | body too big | "This file is too big for the device." |
+| `400` | malformed request (`illisible`, `trop_long`, `trop_court`) | "This request can’t be read." |
+| `401` | no valid token (`non_appaire`) | "Enter the code shown on the device’s screen." |
+| `403` | wrong code (`code_faux`) | "That code isn’t right. Look at the device’s screen." |
+| `404` | unknown `/api/` route (`inconnue`) | "This page doesn’t exist." |
+| `408` | request body not received within 5 s (§2) | none: esp_http_server's own answer, outside this format |
+| `413` | body too big (`trop_gros`) | "This file is too big for the device." |
 | `422` | value refused | one sentence per field (§5, §6, §7) |
 | `429` | pairing lock | "Too many attempts. Try again in 60 seconds." |
 | `500` | internal fault | "The device ran into a problem. Try again." |
-| `503` | busy / no Internet | "The device is busy, try again in a moment." |
+| `501` | function not available yet on this screen (`non_disponible`) | "This feature isn’t available on this screen yet." |
+| `503` | no Internet for a place search (`sans_internet`, §5) | "The device has no Internet access to search for a place." |
+
+Outside this format: a **static file** that does not exist (`/lang/xx.json` included, §12) gets a `404` in plain text (`text/plain`, the French word « Introuvable », whatever the screen language); a method the server does not register (only `GET`, `POST`, `PUT` and `DELETE` are) gets esp_http_server's own `405`. Checked in `main/serveur_web.cpp` on 12/11/2026.
 
 ## 10. Export and import of the settings
 
@@ -289,9 +293,9 @@ A `cle`, `mot_de_passe` or equivalent field in the file is **ignored and reporte
 
 ## 12. Static files
 
-The front end is served as it is by `esp_http_server`: `GET /` → `index.html`, resources with `Content-Encoding: gzip` and `ETag` = firmware version identifier. In `point_d_acces` mode, any unknown address redirects (`302`) to `/` (captive portal). No `/api/` route is cached.
+The front end is served as it is by `esp_http_server`: `GET /` → `index.html`, resources with `Content-Encoding: gzip` and `ETag` = the first 16 hexadecimal digits of the SHA-256 of the gzipped bytes (`tools/embarquer_web.py`), so a file that did not change keeps its tag across firmware versions; `Cache-Control: no-cache` and `If-None-Match` → `304`. In `point_d_acces` mode, any unknown address redirects (`302`) to `/` (captive portal). No `/api/` route is cached.
 
-**Language files.** `GET /lang/<code>.json` (`<code>` ∈ `fr`, `en`, `de`, `nl`, `es`, `it`, `tr`) returns the settings page's texts in that language: a flat JSON object `{"<id>": "<text>"}` (`Content-Type: application/json; charset=utf-8`, gzip like the other files). These files are **public** (no token: the page needs them before pairing) and contain only interface texts. They are generated from `i18n/page.yaml` and `i18n/<code>.yaml` by `components/core/outils/generer_i18n.py`, with the fallback (this language, then English, then French) already applied: a file is always complete. An unknown code → `404` (in `point_d_acces` mode, the usual redirect). The page loads one file at a time (between 2,067 bytes for `en` and 2,338 bytes for `de` gzipped at level 9, measured on 06/11/2026 on the generated files).
+**Language files.** `GET /lang/<code>.json` (`<code>` ∈ `fr`, `en`, `de`, `nl`, `es`, `it`, `tr`) returns the settings page's texts in that language: a flat JSON object `{"<id>": "<text>"}` (`Content-Type: application/json; charset=utf-8`, gzip like the other files). These files are **public** (no token: the page needs them before pairing) and contain only interface texts. They are generated from `i18n/page.yaml` and `i18n/<code>.yaml` by `components/core/outils/generer_i18n.py`, with the fallback (this language, then English, then French) already applied: a file is always complete. An unknown code → `404` (in `point_d_acces` mode, the usual redirect). The page loads one file at a time (between 3,018 bytes for `en` and 3,396 bytes for `de` gzipped at level 9, measured on 12/11/2026 on the files generated in `web/app/lang/` at commit `4b822cf`; 2,067 to 2,338 bytes on 06/11/2026).
 
 ## 13. Languages
 
@@ -301,7 +305,7 @@ Seven languages (ADR-0006), in this fixed order and with these **indices, which 
 - **Assistant language (`langue_assistant`)**: the language the assistant understands (speech recognition) and speaks. Independent of the screen language; there is no separate "spoken language" field on the STT service.
 - **Fallback**, on the device as on the page: the requested language, then English, then the French text itself. A sentence is therefore never empty or replaced by a code. If a language file cannot be loaded, the page uses English, then French; if none loads, it shows the text identifiers (visible and easy to spot).
 - **Who wrote the translations**: French is the author's language and the only one he reviews. The six others (en, de, nl, es, it, tr) were written by an AI (Claude) from French and English, **not reviewed by a speaker**; the dates and a few labels are reused as they are from the Tab5 project's language files, which have been used on a real screen. German and Dutch text length on the real screen, and rendering on a board, are **not verified**.
-- **Open-Meteo attribution.** Open-Meteo's data are under CC BY 4.0 (research note 03: licence read, attribution wording "not specified"; the plan makes the credit a condition of the licence). The page therefore always shows, in the page's language, "Weather data: Open-Meteo (CC BY 4.0 license)" with a link to `https://open-meteo.com/` (text id `meteo.attribution` in `i18n/page.yaml`). Whether and where the **device's own screen** must show it is not decided in this document.
+- **Open-Meteo attribution.** Open-Meteo's data are under CC BY 4.0 (research note 03: licence read, attribution wording "not specified"; the plan makes the credit a condition of the licence). The page therefore always shows, in the page's language, "Weather data: Open-Meteo (CC BY 4.0 license)" with a link to `https://open-meteo.com/` (text id `meteo.attribution` in `i18n/page.yaml`). The **device's own screen** shows the credit of the service that really gave the weather (Open-Meteo, MET Norway or the NWS, `fournisseur` of §5) in its « Place and weather » settings card (see [THIRD_PARTY.md](../THIRD_PARTY.md)); whether the home screen must show it as well is not decided in this document.
 
 ## 14. Official alerts (Vigie)
 
@@ -413,7 +417,7 @@ Une requête vers une route protégée sans jeton valide reçoit son `401` **san
   "internet": true
 }
 ```
-`validee` est faux tant que la nouvelle version n'a pas passé son auto-test (§11). `internet` = dernière requête sortante réussie (météo ou test).
+`validee` est faux tant que la nouvelle version n'a pas passé son auto-test (§11). `internet` est vrai dès que l'appareil a une adresse IP **et** a reçu l'heure du réseau (SNTP) : c'est sa preuve d'accès, pas le succès de la dernière requête (un service météo en échec depuis des heures le laisse à `true` ; une heure SNTP tardive le laisse à `false` alors que la météo est déjà arrivée). `memoire_libre` est la RAM **interne** libre en octets (`heap_caps_get_free_size(MALLOC_CAP_INTERNAL)`), pas la PSRAM : quelques centaines de kilo-octets sur un vrai appareil, pas les 5 Mo de l'exemple.
 
 ## 4. Wi-Fi
 
@@ -461,7 +465,7 @@ Liste vide → `200 {"resultats":[]}` (la page dit « Aucun lieu trouvé pour «
  "latitude": 45.74846, "longitude": 4.84671, "fuseau": "Europe/Paris",
  "posix": "CET-1CEST,M3.5.0,M10.5.0/3", "libelle": "Lyon, Auvergne-Rhône-Alpes, France"}
 ```
-`GET /api/location` renvoie la même forme, ou `{"definie": false}` tant qu'aucune zone n'est choisie (l'écran dit alors « Choisissez une ville dans la page de réglages. »).
+`GET /api/location` renvoie la même forme, ou `{"definie": false}` tant qu'aucune zone n'est choisie (l'accueil laisse alors le lieu vide ; la phrase « Choisissez une ville dans la page de réglages. » existe dans la table de traduction mais aucun code de l'écran ne l'affiche, vérifié le 12/11/2026).
 
 **Source météo** (ADR-0010). La même route porte la source météo de la ville enregistrée. `GET /api/location` (et toutes les réponses de `PUT /api/location`) ajoute `source_meteo` (identifiant stable de la source en service : `auto`, ou un modèle national comme `knmi`), `source_meteo_nom` (le nom à afficher : « Automatique » dans la langue de l'écran, un nom de service tel quel), `source_meteo_retablie` (voir plus bas) et `sources_meteo`, la liste **proposée pour le pays de la ville enregistrée**, « Automatique » en tête, puis le service national, puis le modèle mondial (l'écran propose exactement la même liste) :
 ```json
@@ -474,9 +478,9 @@ Liste vide → `200 {"resultats":[]}` (la page dit « Aucun lieu trouvé pour «
 ```json
 {"disponible": true, "perimee": false, "mise_a_jour": 1793960400,
  "fournisseur": {"id": "open-meteo", "nom": "Open-Meteo", "lien": "https://open-meteo.com/"}, "repli": false,
- "actuelle": {"temperature": 14.2, "ressentie": 13.1, "code": 2, "libelle": "Partiellement nuageux", "jour": true}}
+ "actuelle": {"temperature": 14.2, "code": 2, "libelle": "Partiellement nuageux", "jour": true}}
 ```
-`code` = code WMO (celui d'Open-Meteo ; les conditions de MET Norway et du NWS sont ramenées aux mêmes codes), `libelle` = libellé court du noyau pur (table WMO) **dans la langue de l'écran** (§13), jamais le code seul. `perimee` vrai quand la dernière lecture a plus de 3 h ; `{"disponible": false}` avant la première lecture réussie. `fournisseur` nomme le service qui a **réellement donné** cette météo (`id` : `open-meteo`, `met-norway` ou `nws` ; `nom` et `lien` : ce que l'attribution affiche, la licence l'exige partout où la météo est montrée). Ce n'est pas toujours la source choisie : `repli` vaut `true` quand la source choisie est un service lu directement qui n'a pas répondu, la météo vient alors d'Open-Meteo « Automatique » en attendant. L'écran et la page le disent (« … est indisponible : la météo vient d’Open-Meteo en attendant. ») et citent Open-Meteo, pas le service en échec (ADR-0014).
+`code` = code WMO (celui d'Open-Meteo ; les conditions de MET Norway et du NWS sont ramenées aux mêmes codes), `libelle` = libellé court du noyau pur (table WMO) **dans la langue de l'écran** (§13), jamais le code seul. `perimee` vrai quand la dernière lecture a plus de **2 h**, ou quand les **3 dernières requêtes ont échoué de suite** et qu'elle a plus de 30 min, ou quand l'horloge de l'appareil ne permet pas d'en juger (pas encore réglée, ou revenue en arrière) (`meteo_synthese.hpp` : `DELAI_PERIME_APPAREIL_S`, `ECHECS_POUR_PERIME`, `AGE_PERIME_PAR_ECHECS_S`) ; l'objet `actuelle` n'a pas de température ressentie (`ressentie`) : l'appareil ne l'envoie pas ; `{"disponible": false}` avant la première lecture réussie. `fournisseur` nomme le service qui a **réellement donné** cette météo (`id` : `open-meteo`, `met-norway` ou `nws` ; `nom` et `lien` : ce que l'attribution affiche, la licence l'exige partout où la météo est montrée). Ce n'est pas toujours la source choisie : `repli` vaut `true` quand la source choisie est un service lu directement qui n'a pas répondu, la météo vient alors d'Open-Meteo « Automatique » en attendant. L'écran et la page le disent (« … est indisponible : la météo vient d’Open-Meteo en attendant. ») et citent Open-Meteo, pas le service en échec (ADR-0014).
 
 ## 6. Affichage et langues
 
@@ -574,19 +578,23 @@ Réponse : le service relu (même forme que `GET`), donc **sans** `cle`. Changer
 
 ## 9. Format d'erreur
 
-`4xx`/`5xx` : `{"erreur": {"id": "jeton_invalide", "message": "Ce code n’est pas le bon.", "champ": "code"}}`. `message` est affiché tel quel, **dans la langue de l'écran**. `id` est un identifiant stable pour les tests et la mise au point, **jamais affiché**, jamais traduit. `champ` (facultatif) désigne le champ fautif pour que la page le surligne.
+`4xx`/`5xx` : `{"erreur": {"id": "code_faux", "message": "Ce code n’est pas le bon. Regardez l’écran de l’appareil.", "champ": "code"}}`. `message` est affiché tel quel, **dans la langue de l'écran**. `id` est un identifiant stable pour les tests et la mise au point, **jamais affiché**, jamais traduit. `champ` (facultatif) désigne le champ fautif pour que la page le surligne.
 
 | Statut | Quand | Message type |
 |---|---|---|
-| `400` | requête mal formée | « Cette demande n’est pas lisible. » |
-| `401` | pas de jeton valide | « Entrez le code affiché sur l’écran de l’appareil. » |
-| `403` | mauvais code | « Ce code n’est pas le bon. Regardez l’écran de l’appareil. » |
-| `404` | route inconnue | « Cette page n’existe pas. » |
-| `413` | corps trop gros | « Ce fichier est trop gros pour l’appareil. » |
+| `400` | requête mal formée (`illisible`, `trop_long`, `trop_court`) | « Cette demande n’est pas lisible. » |
+| `401` | pas de jeton valide (`non_appaire`) | « Entrez le code affiché sur l’écran de l’appareil. » |
+| `403` | mauvais code (`code_faux`) | « Ce code n’est pas le bon. Regardez l’écran de l’appareil. » |
+| `404` | route de `/api/` inconnue (`inconnue`) | « Cette page n’existe pas. » |
+| `408` | corps de la requête pas reçu en 5 s (§2) | aucun : réponse d'esp_http_server lui-même, hors de ce format |
+| `413` | corps trop gros (`trop_gros`) | « Ce fichier est trop gros pour l’appareil. » |
 | `422` | valeur refusée | une phrase par champ (§5, §6, §7) |
 | `429` | verrou de l'appairage | « Trop d’essais. Réessayez dans 60 secondes. » |
 | `500` | défaut interne | « L’appareil a rencontré un problème. Réessayez. » |
-| `503` | occupé / pas d'Internet | « L’appareil est occupé, réessayez dans un instant. » |
+| `501` | fonction pas encore disponible sur cet écran (`non_disponible`) | « Cette fonction n’est pas encore disponible sur cet écran. » |
+| `503` | pas d'Internet pour chercher un lieu (`sans_internet`, §5) | « L’appareil n’a pas accès à Internet pour chercher un lieu. » |
+
+Hors de ce format : un **fichier statique** qui n'existe pas (`/lang/xx.json` compris, §12) reçoit un `404` en texte brut (`text/plain`, le mot français « Introuvable », quelle que soit la langue de l'écran) ; une méthode que le serveur n'inscrit pas (seules `GET`, `POST`, `PUT` et `DELETE` le sont) reçoit le `405` d'esp_http_server lui-même. Vérifié dans `main/serveur_web.cpp` le 12/11/2026.
 
 ## 10. Export et import des réglages
 
@@ -638,9 +646,9 @@ Un champ `cle`, `mot_de_passe` ou équivalent dans le fichier est **ignoré et s
 
 ## 12. Fichiers statiques
 
-Le front est servi tel quel par `esp_http_server` : `GET /` → `index.html`, ressources avec `Content-Encoding: gzip` et `ETag` = identifiant de version du firmware. En mode `point_d_acces`, toute adresse inconnue redirige (`302`) vers `/` (portail captif). Aucune route de `/api/` n'est mise en cache.
+Le front est servi tel quel par `esp_http_server` : `GET /` → `index.html`, ressources avec `Content-Encoding: gzip` et `ETag` = les 16 premiers chiffres hexadécimaux du SHA-256 des octets compressés (`tools/embarquer_web.py`), donc un fichier qui n'a pas changé garde son étiquette d'une version du firmware à l'autre ; `Cache-Control: no-cache` et `If-None-Match` → `304`. En mode `point_d_acces`, toute adresse inconnue redirige (`302`) vers `/` (portail captif). Aucune route de `/api/` n'est mise en cache.
 
-**Fichiers de langue.** `GET /lang/<code>.json` (`<code>` ∈ `fr`, `en`, `de`, `nl`, `es`, `it`, `tr`) renvoie les textes de la page de réglages dans cette langue : un objet JSON plat `{"<id>": "<texte>"}` (`Content-Type: application/json; charset=utf-8`, gzip comme les autres fichiers). Ces fichiers sont **publics** (sans jeton : la page en a besoin avant l'appairage) et ne contiennent que des textes d'interface. Ils sont générés depuis `i18n/page.yaml` et `i18n/<code>.yaml` par `components/core/outils/generer_i18n.py`, avec le repli (cette langue, puis l'anglais, puis le français) déjà appliqué : un fichier est toujours complet. Un code inconnu → `404` (en mode `point_d_acces`, la redirection habituelle). La page charge un fichier à la fois (entre 2 067 octets pour `en` et 2 338 octets pour `de` compressés au niveau 9, mesuré le 06/11/2026 sur les fichiers générés).
+**Fichiers de langue.** `GET /lang/<code>.json` (`<code>` ∈ `fr`, `en`, `de`, `nl`, `es`, `it`, `tr`) renvoie les textes de la page de réglages dans cette langue : un objet JSON plat `{"<id>": "<texte>"}` (`Content-Type: application/json; charset=utf-8`, gzip comme les autres fichiers). Ces fichiers sont **publics** (sans jeton : la page en a besoin avant l'appairage) et ne contiennent que des textes d'interface. Ils sont générés depuis `i18n/page.yaml` et `i18n/<code>.yaml` par `components/core/outils/generer_i18n.py`, avec le repli (cette langue, puis l'anglais, puis le français) déjà appliqué : un fichier est toujours complet. Un code inconnu → `404` (en mode `point_d_acces`, la redirection habituelle). La page charge un fichier à la fois (entre 3 018 octets pour `en` et 3 396 octets pour `de` compressés au niveau 9, mesuré le 12/11/2026 sur les fichiers générés dans `web/app/lang/` au commit `4b822cf` ; 2 067 à 2 338 octets le 06/11/2026).
 
 ## 13. Langues
 
@@ -650,7 +658,7 @@ Sept langues (ADR-0006), dans cet ordre figé et avec ces **indices qui ne chang
 - **Langue de l'assistant (`langue_assistant`)** : la langue que l'assistant comprend (reconnaissance vocale) et parle. Indépendante de la langue de l'écran ; le service STT n'a plus de champ « langue parlée » à part.
 - **Repli**, sur l'appareil comme sur la page : la langue demandée, puis l'anglais, puis le texte français lui-même. Une phrase n'est donc jamais vide ni remplacée par un code. Si un fichier de langue ne se charge pas, la page prend l'anglais, puis le français ; si aucun ne se charge, elle montre les identifiants de texte (visible et facile à repérer).
 - **Qui a écrit les traductions** : le français est la langue de l'auteur et la seule qu'il relit. Les six autres (en, de, nl, es, it, tr) sont écrites par une IA (Claude) depuis le français et l'anglais, **non relues par un locuteur** ; les dates et quelques libellés sont repris tels quels des fichiers de langue du projet Tab5, qui ont servi sur un vrai écran. La longueur des textes allemands et néerlandais sur l'écran réel, et le rendu sur une carte, sont **non vérifiés**.
-- **Attribution d'Open-Meteo.** Les données d'Open-Meteo sont sous licence CC BY 4.0 (note de recherche 03 : licence lue, formulation d'attribution « non précisée » ; le plan fait de la mention une condition de la licence). La page affiche donc toujours, dans la langue de la page, « Données météo : Open-Meteo (licence CC BY 4.0) » avec un lien vers `https://open-meteo.com/` (identifiant de texte `meteo.attribution` dans `i18n/page.yaml`). Si et où **l'écran de l'appareil** doit la montrer n'est pas décidé dans ce document.
+- **Attribution d'Open-Meteo.** Les données d'Open-Meteo sont sous licence CC BY 4.0 (note de recherche 03 : licence lue, formulation d'attribution « non précisée » ; le plan fait de la mention une condition de la licence). La page affiche donc toujours, dans la langue de la page, « Données météo : Open-Meteo (licence CC BY 4.0) » avec un lien vers `https://open-meteo.com/` (identifiant de texte `meteo.attribution` dans `i18n/page.yaml`). **L'écran de l'appareil** montre le crédit du service qui a réellement donné la météo (Open-Meteo, MET Norway ou le NWS, `fournisseur` du §5) dans sa carte de réglages « Lieu et météo » (voir [THIRD_PARTY.md](../THIRD_PARTY.md)) ; si l'accueil doit le montrer aussi n'est pas décidé dans ce document.
 
 ## 14. Alertes officielles (Vigie)
 
