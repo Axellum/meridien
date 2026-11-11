@@ -288,21 +288,46 @@ esp_err_t tab5_wifi_power_set(bool on) {
 // Reset de la dalle. La ligne LCD_RST est tenue a bas en push-pull, puis rendue en ENTREE a pull-up (drain ouvert) pour la
 // remonter : la laisser en sortie haute rend l'I2C instable (docs/recherche/01-pile-et-qualite.md ; meme sequence que le BSP
 // d'Espressif, bsp_feature_en.c, cas BSP_FEATURE_LCD).
+//
+// Apres le relachement, le controleur n'accepte une commande que LCD_RESET_RECOVERY_MS plus tard. Cette attente n'est plus faite ici :
+// l'instant du relachement est note et tab5_lcd_wait_reset_recovery() attend seulement ce qui reste, juste avant la premiere commande
+// DSI (tab5_display.c). Entre les deux, le demarrage fait ce qui ne parle pas a la dalle (horloge, alimentation, detection du
+// controleur par le tactile, bus DSI, tampon d'image) : meme delai minimal, recouvert au lieu d'etre attendu a vide. C'est l'ordre
+// du composant esp_lcd_st7121 quand il fait lui-meme le reset materiel (bus DSI cree, PUIS reset, PUIS 120 ms, PUIS commandes).
+#define LCD_RESET_LOW_MS 10       // espp : 10 ms bas ; ESPHome : 5 ms ; composant esp_lcd_st7121 : 10 ms
+#define LCD_RESET_RECOVERY_MS 120 // composant esp_lcd_st7121 (reset materiel) : 120 ms avant la premiere commande
+static int64_t s_lcd_reset_release_us = -1;
+
 esp_err_t tab5_lcd_reset_pulse(void) {
     ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_OUTPUT), TAG, "dir");
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, TAB5_EXPANDER_LCD_RST, 0), TAG, "niveau bas");
     ESP_RETURN_ON_ERROR(
         esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_OUTPUT_MODE_PUSH_PULL), TAG,
         "push-pull");
-    vTaskDelay(pdMS_TO_TICKS(10)); // espp : 10 ms bas ; ESPHome : 5 ms
+    vTaskDelay(pdMS_TO_TICKS(LCD_RESET_LOW_MS));
     ESP_RETURN_ON_ERROR(esp_io_expander_set_pullupdown(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_PULL_UP), TAG,
                         "pull-up");
     ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_INPUT), TAG, "entree");
     ESP_RETURN_ON_ERROR(
         esp_io_expander_set_output_mode(s_expander, TAB5_EXPANDER_LCD_RST, IO_EXPANDER_OUTPUT_MODE_OPEN_DRAIN), TAG,
         "drain ouvert");
-    vTaskDelay(pdMS_TO_TICKS(120)); // le controleur n'accepte SLPOUT que ~120 ms apres le reset
+    s_lcd_reset_release_us = esp_timer_get_time(); // la ligne remonte : le delai de LCD_RESET_RECOVERY_MS part d'ici
     return ESP_OK;
+}
+
+int32_t tab5_lcd_wait_reset_recovery(void) {
+    if (s_lcd_reset_release_us < 0) {
+        return 0; // pas de reset materiel fait par tab5_lcd_reset_pulse : rien a attendre ici
+    }
+    const int64_t fin_us = s_lcd_reset_release_us + (int64_t)LCD_RESET_RECOVERY_MS * 1000;
+    const int64_t reste_us = fin_us - esp_timer_get_time();
+    if (reste_us > 0) {
+        vTaskDelay(pdMS_TO_TICKS((uint32_t)((reste_us + 999) / 1000))); // arrondi a la milliseconde superieure
+    }
+    while (esp_timer_get_time() < fin_us) {
+        vTaskDelay(1); // garde : un tick plus court que prevu ne rapproche pas la commande du reset
+    }
+    return reste_us > 0 ? (int32_t)((reste_us + 999) / 1000) : 0;
 }
 
 esp_err_t tab5_touch_enable(void) {
