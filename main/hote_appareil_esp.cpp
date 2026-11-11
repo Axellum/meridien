@@ -235,11 +235,9 @@ class PortsEsp final : public PortsAppareil {
         reglages::copier_texte(appairage_jeton(), sortie, capacite);
     }
 
-    // NON FAIT : le code appartient au gestionnaire d'appairage du serveur de la page (main/serveur_web.cpp, reglages-appareil) ;
-    // en tirer un autre ici montrerait à l'écran un code que la page n'accepterait pas. À brancher quand le serveur l'expose.
-    void nouveau_code() override {
-        ESP_LOGW(TAG, "nouveau code d'appairage demandé : pas encore branché sur le serveur de la page");
-    }
+    // Le code appartient au gestionnaire du serveur de la page : la demande est affichée tout de suite et appliquée par le serveur
+    // avant sa prochaine requête (sessions fermées, verrou levé ; contrat dans appairage.h).
+    void nouveau_code() override { appairage_demander_nouveau_code(); }
 
     void redemarrer() override {
         ESP_LOGW(TAG, "redémarrage logiciel demandé par l'écran de réglages (board_restart)");

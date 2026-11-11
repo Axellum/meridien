@@ -397,6 +397,81 @@ constexpr int verrou_apres_cinq_essais_avec_compte_a_rebours() {
     return 0;
 }
 
+// Des séries de 5 mauvais codes, chacune à la fin du verrou de la précédente : le verrou double, la 3e série change le code, la
+// session déjà ouverte reste, l'ancien code est refusé et le nouveau (celui que l'écran montrera) accepté.
+constexpr int series_ratees_verrou_qui_double_et_code_renouvele() {
+    Banc b;
+    VERIFIER(b.connecter());
+    const std::uint32_t gen = b.moteur.appairage().generation();
+    constexpr int attendu[] = {60, 120, 240};
+    for (int k = 0; k < 3; ++k) {
+        api::Reponse r;
+        for (int i = 0; i < ap::ESSAIS_MAX; ++i)
+            r = b.appeler(Methode::Post, "/api/pair", {}, R"({"code":"000000"})");
+        VERIFIER(est_erreur(r, 429, "verrouille") && r.reessayer_dans == attendu[k]);
+        VERIFIER(entier_est(r, "erreur.reessayer_dans", attendu[k]));
+        b.hote.horloge += attendu[k] * 1000;
+    }
+    VERIFIER(b.moteur.appairage().generation() == gen + 1 && b.moteur.appairage().code() != "123456");
+    VERIFIER(b.avec_jeton(Methode::Get, "/api/system").statut == 200); // la session ouverte avant reste
+    VERIFIER(b.appeler(Methode::Post, "/api/pair", {}, R"({"code":"123456"})").statut == 403);
+    char corps[32] = "{\"code\":\"";
+    const sv nouveau = b.moteur.appairage().code();
+    for (std::size_t i = 0; i < nouveau.size(); ++i)
+        corps[9 + i] = nouveau[i];
+    corps[15] = '"';
+    corps[16] = '}';
+    VERIFIER(b.appeler(Methode::Post, "/api/pair", {}, sv(corps, 17)).statut == 200);
+    return 0;
+}
+
+// Le bouton « Nouveau code » de l'écran pendant un verrou : les sessions sont fermées (401), le verrou levé, le nouveau code accepté.
+constexpr int nouveau_code_ferme_les_sessions_et_leve_le_verrou() {
+    Banc b;
+    VERIFIER(b.connecter());
+    for (int i = 0; i < ap::ESSAIS_MAX; ++i)
+        b.appeler(Methode::Post, "/api/pair", {}, R"({"code":"000000"})");
+    VERIFIER(b.appeler(Methode::Post, "/api/pair", {}, R"({"code":"123456"})").statut == 429);
+    b.moteur.appairage().nouveau_code(654321);
+    VERIFIER(est_erreur(b.avec_jeton(Methode::Get, "/api/system"), 401, "non_appaire"));
+    VERIFIER(b.appeler(Methode::Post, "/api/pair", {}, R"({"code":"123456"})").statut == 403);
+    VERIFIER(b.appeler(Methode::Post, "/api/pair", {}, R"({"code":"654321"})").statut == 200);
+    return 0;
+}
+
+// Le serveur ne lit le corps que pour une route publique ou un jeton valide ; sinon `traiter` sans corps répond bien 401.
+constexpr int corps_lu_seulement_pour_route_publique_ou_jeton_valide() {
+    Banc b;
+    api::Requete rq;
+    rq.methode = Methode::Post;
+    rq.chemin = "/api/pair";
+    VERIFIER(b.moteur.corps_a_lire(rq));
+    rq.methode = Methode::Get;
+    rq.chemin = "/api/status";
+    VERIFIER(b.moteur.corps_a_lire(rq));
+    VERIFIER(b.connecter());
+    for (const Route &route : ROUTES_PROTEGEES) {
+        rq.methode = route.m;
+        rq.chemin = route.chemin;
+        rq.jeton = {};
+        VERIFIER(!b.moteur.corps_a_lire(rq));
+        VERIFIER(b.appeler(route.m, route.chemin).statut == 401); // la réponse donnée sans lire le corps
+        rq.jeton = "0000000000000000000000000000000000000000000000000000000000000000";
+        VERIFIER(!b.moteur.corps_a_lire(rq));
+        rq.jeton = sv(b.jeton);
+        VERIFIER(b.moteur.corps_a_lire(rq));
+    }
+    // une route publique avec une autre méthode n'est pas publique
+    rq.jeton = {};
+    rq.methode = Methode::Put;
+    rq.chemin = "/api/pair";
+    VERIFIER(!b.moteur.corps_a_lire(rq));
+    rq.methode = Methode::Post;
+    rq.chemin = "/api/status";
+    VERIFIER(!b.moteur.corps_a_lire(rq));
+    return 0;
+}
+
 constexpr int fermer_la_session_retire_l_acces() {
     Banc b;
     VERIFIER(b.connecter());
@@ -1617,6 +1692,9 @@ constexpr int chaque_message_de_l_api_est_traduit_dans_chaque_langue() {
     X(bon_code_donne_un_jeton_qui_ouvre_l_acces)                                                                       \
     X(mauvais_code_403_ou_demande_illisible_400)                                                                       \
     X(verrou_apres_cinq_essais_avec_compte_a_rebours)                                                                  \
+    X(series_ratees_verrou_qui_double_et_code_renouvele)                                                               \
+    X(nouveau_code_ferme_les_sessions_et_leve_le_verrou)                                                               \
+    X(corps_lu_seulement_pour_route_publique_ou_jeton_valide)                                                          \
     X(fermer_la_session_retire_l_acces)                                                                                \
     X(systeme_decrit_l_appareil)                                                                                       \
     X(wifi_en_lecture_seule_sans_secret)                                                                               \

@@ -194,6 +194,111 @@ constexpr int un_nouveau_code_ferme_les_sessions() {
     return 0;
 }
 
+// Cinq mauvais codes à l'instant `t` : rend le dernier résultat (celui du verrou).
+template <class A> constexpr ap::Resultat serie_ratee(ap::Gestionnaire &g, std::int64_t t, A &alea) {
+    ap::Resultat r;
+    for (int i = 0; i < ap::ESSAIS_MAX; ++i)
+        r = g.essayer("999999", t, alea);
+    return r;
+}
+
+constexpr int le_verrou_double_a_chaque_serie_jusqu_a_une_heure() {
+    ap::Gestionnaire g;
+    g.nouveau_code(123456);
+    Alea alea;
+    constexpr int attendu[] = {60, 120, 240, 480, 960, 1920, 3600, 3600, 3600};
+    std::int64_t t = 0;
+    for (int k = 0; k < 9; ++k) {
+        const ap::Resultat r = serie_ratee(g, t, alea);
+        VERIFIER(r.issue == ap::Issue::Verrouille && r.reessayer_dans == attendu[k]);
+        // toujours verrouillé une seconde avant la fin, levé à la fin
+        VERIFIER(g.essayer("999999", t + attendu[k] * 1000 - 1000, alea).issue == ap::Issue::Verrouille);
+        t += attendu[k] * 1000;
+    }
+    VERIFIER(ap::duree_verrou(1) == 60000 && ap::duree_verrou(7) == 3600000 && ap::duree_verrou(1000) == 3600000);
+    return 0;
+}
+
+constexpr int la_troisieme_serie_ratee_change_le_code_sans_fermer_les_sessions() {
+    ap::Gestionnaire g;
+    g.nouveau_code(123456);
+    Alea alea;
+    const ap::Resultat ouverte = g.essayer("123456", 0, alea);
+    VERIFIER(ouverte.issue == ap::Issue::Accepte);
+    const std::uint32_t gen = g.generation();
+    // deux séries : le code ne bouge pas (quelqu'un qui recopie mal garde le code qu'il lit)
+    ap::Resultat r = serie_ratee(g, 0, alea);
+    VERIFIER(!r.code_change && g.code() == "123456");
+    r = serie_ratee(g, 60000, alea);
+    VERIFIER(!r.code_change && g.code() == "123456" && g.generation() == gen && alea.appels == 1);
+    // la troisième : nouveau code, tiré des 4 octets suivants du générateur (7, 8, 9, 10 -> 0x0A090807 = 168364039)
+    r = serie_ratee(g, 180000, alea);
+    VERIFIER(r.code_change && r.reessayer_dans == 240 && alea.appels == 2);
+    VERIFIER(g.code() == "364039" && g.generation() == gen + 1);
+    VERIFIER(g.jeton_valide(ouverte.jeton) && g.sessions_ouvertes() == 1); // la session ouverte reste
+    // le verrou levé : l'ancien code est refusé, le nouveau accepté
+    VERIFIER(g.essayer("123456", 420000, alea).issue == ap::Issue::Refuse);
+    VERIFIER(g.essayer("364039", 420000, alea).issue == ap::Issue::Accepte);
+    // chaque série suivante change encore le code (après un succès, il faut de nouveau trois séries)
+    serie_ratee(g, 420000, alea);
+    serie_ratee(g, 480000, alea);
+    VERIFIER(g.code() == "364039");
+    r = serie_ratee(g, 600000, alea);
+    VERIFIER(r.code_change && g.code() != "364039");
+    const std::uint32_t apres = g.generation();
+    r = serie_ratee(g, 840000, alea);
+    VERIFIER(r.code_change && r.reessayer_dans == 480 && g.generation() == apres + 1);
+    return 0;
+}
+
+constexpr int un_succes_ramene_le_verrou_a_une_minute() {
+    ap::Gestionnaire g;
+    g.nouveau_code(123456);
+    Alea alea;
+    serie_ratee(g, 0, alea);
+    VERIFIER(serie_ratee(g, 60000, alea).reessayer_dans == 120);
+    VERIFIER(g.essayer("123456", 180000, alea).issue == ap::Issue::Accepte);
+    VERIFIER(serie_ratee(g, 180000, alea).reessayer_dans == 60);
+    return 0;
+}
+
+constexpr int un_nouveau_code_leve_le_verrou_et_sa_duree() {
+    ap::Gestionnaire g;
+    g.nouveau_code(123456);
+    Alea alea;
+    std::int64_t t = 0;
+    for (int k = 0; k < 4; ++k) {
+        t += ap::duree_verrou(k) * (k > 0 ? 1 : 0);
+        serie_ratee(g, t, alea);
+    }
+    VERIFIER(g.essayer("123456", t + 1000, alea).issue == ap::Issue::Verrouille);
+    const std::uint32_t gen = g.generation();
+    g.nouveau_code(654321); // le bouton de l'écran, pendant le verrou de 480 s
+    VERIFIER(g.generation() == gen + 1);
+    // plus de verrou, et la série ratée suivante ne verrouille qu'une minute (sans succès entre deux)
+    VERIFIER(serie_ratee(g, t + 1000, alea).reessayer_dans == 60);
+    g.nouveau_code(111111); // pendant ce verrou d'une minute : le bon code passe tout de suite
+    VERIFIER(g.essayer("111111", t + 2000, alea).issue == ap::Issue::Accepte);
+    return 0;
+}
+
+constexpr int le_code_ecrit_est_celui_du_gestionnaire() {
+    constexpr std::uint32_t valeurs[] = {0u, 4217u, 999999u, 1000000u, 1234567u, 4294967295u};
+    for (std::uint32_t v : valeurs) {
+        ap::Gestionnaire g;
+        g.nouveau_code(v);
+        char texte[ap::CODE_CHIFFRES + 1] = {};
+        ap::ecrire_code(v, texte);
+        VERIFIER(sv(texte) == g.code() && texte[ap::CODE_CHIFFRES] == '\0');
+    }
+    ap::Gestionnaire g;
+    VERIFIER(g.generation() == 0);
+    g.nouveau_code(1);
+    g.nouveau_code(1); // même code : c'est quand même un nouveau code (sessions fermées), l'écran doit le savoir
+    VERIFIER(g.generation() == 2);
+    return 0;
+}
+
 constexpr int egalite_a_temps_constant() {
     VERIFIER(ap::egal_temps_constant("abc", "abc"));
     VERIFIER(ap::egal_temps_constant("", ""));
@@ -219,6 +324,11 @@ constexpr int egalite_a_temps_constant() {
     X(fermer_une_session_ne_touche_pas_les_autres)                                                                     \
     X(jeton_inconnu_vide_ou_modifie_est_refuse)                                                                        \
     X(un_nouveau_code_ferme_les_sessions)                                                                              \
+    X(le_verrou_double_a_chaque_serie_jusqu_a_une_heure)                                                               \
+    X(la_troisieme_serie_ratee_change_le_code_sans_fermer_les_sessions)                                                \
+    X(un_succes_ramene_le_verrou_a_une_minute)                                                                         \
+    X(un_nouveau_code_leve_le_verrou_et_sa_duree)                                                                      \
+    X(le_code_ecrit_est_celui_du_gestionnaire)                                                                         \
     X(egalite_a_temps_constant)
 
 TESTS_A_LA_COMPILATION(LISTE)
