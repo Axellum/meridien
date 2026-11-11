@@ -16,6 +16,7 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_touch_gt911.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -29,7 +30,16 @@ static const char *TAG = "ws7b_touch";
 #define RESET_SETTLE_MS 60
 #define PROBE_TIMEOUT_MS 100
 
-static esp_err_t reset_pulse(void) {
+// Instant (ms, esp_timer) ou la ligne de reset est remontee ; RESET_SETTLE_MS se compte depuis lui.
+static uint32_t s_release_ms;
+static bool s_reset_started;
+
+static uint32_t now_ms(void) { return (uint32_t)(esp_timer_get_time() / 1000); }
+
+// Impulsion basse puis remontee, SANS attendre RESET_SETTLE_MS : l'attente est faite par wait_settle(), juste avant la premiere parole
+// I2C. Entre les deux, board_init() cree la dalle (reset GPIO33, 120 ms, initialisation) : le delai court pendant ce travail au lieu
+// d'etre attendu a vide sur le chemin de la premiere image (revue du 12/11/2026). Les valeurs ne changent pas.
+static esp_err_t reset_start(void) {
     const gpio_config_t cfg = {
         .pin_bit_mask = 1ULL << WS7B_PIN_TOUCH_RST,
         .mode = GPIO_MODE_OUTPUT,
@@ -41,9 +51,26 @@ static esp_err_t reset_pulse(void) {
     ESP_RETURN_ON_ERROR(gpio_set_level((gpio_num_t)WS7B_PIN_TOUCH_RST, 0), TAG, "reset bas");
     vTaskDelay(pdMS_TO_TICKS(RESET_LOW_MS));
     ESP_RETURN_ON_ERROR(gpio_set_level((gpio_num_t)WS7B_PIN_TOUCH_RST, 1), TAG, "reset haut");
-    vTaskDelay(pdMS_TO_TICKS(RESET_SETTLE_MS));
+    s_release_ms = now_ms();
+    s_reset_started = true;
     return ESP_OK;
 }
+
+// Ce qui reste de RESET_SETTLE_MS depuis la remontee (rien s'il est ecoule). Le +1 couvre l'arrondi de now_ms() a la milliseconde.
+static void wait_settle(void) {
+    const uint32_t wait = ws7b_wait_remaining(now_ms(), s_release_ms, RESET_SETTLE_MS + 1);
+    if (wait > 0) {
+        vTaskDelay(pdMS_TO_TICKS(wait));
+    }
+}
+
+static esp_err_t reset_pulse(void) {
+    ESP_RETURN_ON_ERROR(reset_start(), TAG, "reset du tactile");
+    wait_settle();
+    return ESP_OK;
+}
+
+esp_err_t ws7b_touch_reset_start(void) { return reset_start(); }
 
 // Adresse a laquelle la puce repond (0 si aucune). Lecture seule : un « START + adresse ».
 static uint8_t find_address(void) {
@@ -60,10 +87,15 @@ esp_err_t ws7b_touch_create(esp_lcd_touch_handle_t *touch, uint8_t *address, cha
     product_id[0] = '\0';
     *address = 0;
 
-    // Reset puis recherche de l'adresse ; un second reset si la puce ne repond pas du tout.
+    // Reset puis recherche de l'adresse ; un second reset si la puce ne repond pas du tout. Le premier reset a pu etre lance plus tot
+    // par ws7b_touch_reset_start() : on n'attend alors que ce qui reste de RESET_SETTLE_MS.
     uint8_t found = 0;
     for (int attempt = 1; attempt <= 2 && found == 0; attempt++) {
-        ESP_RETURN_ON_ERROR(reset_pulse(), TAG, "reset du tactile");
+        if (attempt == 1 && s_reset_started) {
+            wait_settle();
+        } else {
+            ESP_RETURN_ON_ERROR(reset_pulse(), TAG, "reset du tactile");
+        }
         found = find_address();
         if (found == 0) {
             ESP_LOGW(TAG, "GT911 muet aux adresses 0x%02x et 0x%02x (essai %d/2)", WS7B_GT911_ADDR,
