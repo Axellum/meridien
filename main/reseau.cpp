@@ -17,7 +17,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#include "nvs.h"
 #include "sdkconfig.h"
 
 #include "commande_serie.h"
@@ -26,6 +25,7 @@
 #include "horloge.h"
 #include "reseau_wifi.h"
 #include "sntp_rapide.h"
+#include "wifi_stocke.h"
 // Généré par CMake depuis reglages_locaux.cmake (hors git, voir main/CMakeLists.txt) : MERIDIEN_WIFI_SSID et
 // MERIDIEN_WIFI_MOT_DE_PASSE. Sans ce fichier de réglages locaux, ce sont des chaînes vides.
 #include "identifiants_wifi.h"
@@ -671,25 +671,18 @@ bool copier_texte(char *vers, std::size_t capacite, const char *depuis) {
     return true;
 }
 
-// Le réseau retenu en mémoire permanente par l'hôte des réglages (NVS, espace « wifi », clés « ssid » et « mdp » : voir
-// ecran/hote_appareil.hpp de la branche des réglages, main/wifi_stocke.h). Lecture directe tant que cette branche n'est pas fusionnée.
+// Le réseau retenu en mémoire permanente par l'hôte des réglages. La lecture passe par wifi_stocke_lire (main/wifi_stocke.h), qui
+// prend l'espace et les clés NVS aux constantes de l'écriture (ecran/hote_appareil.hpp : stockage::ESPACE_WIFI, CLE_WIFI_SSID,
+// CLE_WIFI_MOT_DE_PASSE) : une seule source, les cartes déjà réglées retrouvent leur réseau.
 bool lire_reseau_retenu(Identifiants &id) {
-    nvs_handle_t h = 0;
-    if (nvs_open("wifi", NVS_READONLY, &h) != ESP_OK) {
-        return false; // rien n'a jamais été retenu
+    if (!wifi_stocke_lire(id.ssid, sizeof(id.ssid), id.mot_de_passe, sizeof(id.mot_de_passe))) {
+        effacer(&id, sizeof(id));
+        return false; // rien n'a jamais été retenu, ou nom de réseau vide
     }
-    std::size_t n = sizeof(id.ssid);
-    const bool ssid_lu = nvs_get_str(h, "ssid", id.ssid, &n) == ESP_OK && id.ssid[0] != '\0';
-    std::size_t m = sizeof(id.mot_de_passe);
-    const bool mdp_lu = nvs_get_str(h, "mdp", id.mot_de_passe, &m) == ESP_OK;
-    nvs_close(h);
-    const std::size_t longueur_mdp = mdp_lu ? std::strlen(id.mot_de_passe) : 0;
-    if (!ssid_lu || (longueur_mdp > 0 && longueur_mdp < 8)) { // un mot de passe WPA fait 8 caractères au moins
+    const std::size_t longueur_mdp = std::strlen(id.mot_de_passe); // vide : réseau ouvert
+    if (longueur_mdp > 0 && longueur_mdp < 8) {                    // un mot de passe WPA fait 8 caractères au moins
         effacer(&id, sizeof(id));
         return false;
-    }
-    if (!mdp_lu) {
-        id.mot_de_passe[0] = '\0'; // réseau ouvert
     }
     id.present = true;
     return true;

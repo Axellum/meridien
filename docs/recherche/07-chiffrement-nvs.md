@@ -21,7 +21,7 @@
 
 | Donnée | Où | Lu dans |
 |---|---|---|
-| Mot de passe Wi-Fi | NVS, espace `wifi`, clé `mdp` (texte). Le pilote Wi-Fi n'en garde pas de copie : `esp_wifi_set_storage(WIFI_STORAGE_RAM)` | `main/reseau.cpp` (ligne 626), `main/wifi_stocke.cpp` |
+| Mot de passe Wi-Fi | NVS, espace `wifi`, clé `mdp` (texte). Le pilote Wi-Fi n'en garde pas de copie : `esp_wifi_set_storage(WIFI_STORAGE_RAM)` | `main/reseau.cpp` (`lire_reseau_retenu`, qui appelle `wifi_stocke_lire`), `main/wifi_stocke.cpp` |
 | Trois clés d'API (STT, LLM, TTS), adresses, modèles, voix | NVS, espace `services` (13 identifiants du registre dont 3 de type secret) | `components/core/include/ecran/registre_reglages.hpp`, `hote_appareil.hpp` |
 | Ville, affichage, progression de l'installation, cache météo (≤ 857 octets), compteur de démarrages | NVS, autres espaces (aucun n'est secret) | `main/meteo_zone.cpp`, `main/meteo_client.cpp`, `main/reglages.cpp`, `main/boot_info.cpp` |
 | Options de sécurité | **aucune** : ni `CONFIG_NVS_ENCRYPTION`, ni chiffrement de flash, ni démarrage sécurisé dans `sdkconfig.defaults` ni dans `boards/*/sdkconfig.defaults.board` | `grep` sur ces fichiers |
