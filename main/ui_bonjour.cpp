@@ -12,10 +12,11 @@
 #include "freertos/task.h"
 #include "lvgl.h"
 
+#include "ecran/i18n.hpp"
+
 #include "horloge.h"
 #include "palette.h"
 #include "reseau.h"
-#include "textes_1b.h"
 
 // Police Roboto Bold embarquée (main/assets/roboto_700.ttf, EMBED_FILES de main/CMakeLists.txt).
 extern const uint8_t roboto_700_start[] asm("_binary_roboto_700_ttf_start");
@@ -28,8 +29,8 @@ namespace {
 const char *TAG = "ui_bonjour";
 const Palette &kCouleurs = kPaletteSombre;
 
-// Textes de l'écran (français, accents compris). La table de traduction du dépôt Tab5 (le texte français est la clé) remplacera
-// ces constantes avec le noyau pur, en phase 2.
+// Textes de l'écran de diagnostic : la clé française de la table commune (i18n/*.yaml, sections « Écran : « Bonjour » » et
+// « Écran : diagnostic »), traduite à l'affichage par `T()`. test/host/controle_i18n.py vérifie que chaque constante est une clé.
 namespace texte {
 constexpr const char *kBonjour = "Bonjour";
 constexpr const char *kSousTitre = "Écran autonome";
@@ -43,6 +44,17 @@ constexpr const char *kDuree = "Carte prête après %d ms";
 constexpr const char *kToucherAucun = "Toucher : aucun";
 constexpr const char *kToucher = "Toucher : x = %d, y = %d";
 constexpr const char *kRedemarrer = "Redémarrer";
+// Heure, date et réseau (ex-main/textes_1b.h, ramenés dans la table le 11/11/2026).
+constexpr const char *kHeureAbsente = "-- h --";
+constexpr const char *kDateAbsente = "Heure du réseau en attente";
+constexpr const char *kWifiReglagesAbsents = "Wi-Fi : réglages absents du firmware";
+constexpr const char *kWifiCoprocesseurAbsent = "Wi-Fi : coprocesseur absent";
+constexpr const char *kWifiCoprocesseurDemarre = "Wi-Fi : coprocesseur en démarrage";
+constexpr const char *kWifiConnexion = "Wi-Fi : connexion en cours";
+constexpr const char *kWifiAdresse = "Wi-Fi : connecté, adresse en cours";
+constexpr const char *kWifiConnecte = "Wi-Fi : connecté";
+constexpr const char *kHeureEnAttente = "Heure : en attente du réseau";
+constexpr const char *kHeureRecue = "Heure : reçue du réseau";
 } // namespace texte
 
 constexpr int32_t kDiametrePoint = 96;
@@ -71,6 +83,9 @@ int g_compteur_rafraichissement = 0;
 bool g_heure_deja_journalisee = false;
 
 lv_color_t couleur(uint32_t rgb) { return lv_color_hex(rgb); }
+
+// Le texte dans la langue de l'écran (table commune, repli anglais puis français).
+const char *T(const char *francais) { return ecran::i18n::tr_c(francais); }
 
 lv_obj_t *creer_colonne(lv_obj_t *parent) {
     lv_obj_t *colonne = lv_obj_create(parent);
@@ -153,7 +168,7 @@ void sur_toucher(lv_event_t *evenement) {
     lv_obj_remove_flag(g_point, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_style_bg_color(g_point, couleur(kCouleurs.accent), 0);
     placer_point(p.x, p.y);
-    lv_label_set_text_fmt(g_libelle_toucher, texte::kToucher, (int)p.x, (int)p.y);
+    lv_label_set_text_fmt(g_libelle_toucher, T(texte::kToucher), (int)p.x, (int)p.y);
 
     if (code == LV_EVENT_PRESSED) {
         g_compteur_appui = 0;
@@ -174,18 +189,18 @@ void sur_bouton_redemarrer(lv_event_t *evenement) {
 
 const char *texte_wifi(const EtatReseau &etat) {
     if (!etat.identifiants_presents) {
-        return texte_1b::kWifiReglagesAbsents;
+        return T(texte::kWifiReglagesAbsents);
     }
     if (etat.coprocesseur_echec) {
-        return texte_1b::kWifiCoprocesseurAbsent;
+        return T(texte::kWifiCoprocesseurAbsent);
     }
     if (!etat.coprocesseur_pret) {
-        return texte_1b::kWifiCoprocesseurDemarre;
+        return T(texte::kWifiCoprocesseurDemarre);
     }
     if (!etat.wifi_connecte) {
-        return texte_1b::kWifiConnexion;
+        return T(texte::kWifiConnexion);
     }
-    return etat.ip_obtenue ? texte_1b::kWifiConnecte : texte_1b::kWifiAdresse;
+    return T(etat.ip_obtenue ? texte::kWifiConnecte : texte::kWifiAdresse);
 }
 
 // Appelé par LVGL (dans sa tâche, verrou pris) deux fois par seconde : heure, date et état du Wi-Fi.
@@ -196,10 +211,22 @@ void rafraichir(lv_timer_t *) {
     const int64_t instant = static_cast<int64_t>(std::time(nullptr));
     const bool heure_connue = etat.heure_synchronisee && horloge_formater(instant, horloge);
 
-    changer_texte(g_libelle_heure, heure_connue ? horloge.heure : texte_1b::kHeureAbsente);
-    changer_texte(g_libelle_date, heure_connue ? horloge.date : texte_1b::kDateAbsente);
+    // En français, l'heure et la date de horloge_formater (« 14 h 05 », « mercredi 11 novembre 2026 ») ; dans les autres langues,
+    // « 14:05 » et la date de la langue (les mêmes fonctions que l'écran principal).
+    const char *heure_affichee = horloge.heure;
+    const char *date_affichee = horloge.date;
+    char heure_langue[8] = {};
+    char date_langue[sizeof horloge.date] = {};
+    if (heure_connue && ecran::i18n::langue_courante() != ecran::i18n::Langue::Fr) {
+        if (horloge_hhmm(instant, heure_langue, sizeof heure_langue))
+            heure_affichee = heure_langue;
+        if (horloge_date_localisee(instant, ecran::i18n::langue_courante(), date_langue, sizeof date_langue))
+            date_affichee = date_langue;
+    }
+    changer_texte(g_libelle_heure, heure_connue ? heure_affichee : T(texte::kHeureAbsente));
+    changer_texte(g_libelle_date, heure_connue ? date_affichee : T(texte::kDateAbsente));
     changer_texte(g_libelle_wifi, texte_wifi(etat));
-    changer_texte(g_libelle_source, etat.heure_synchronisee ? texte_1b::kHeureRecue : texte_1b::kHeureEnAttente);
+    changer_texte(g_libelle_source, T(etat.heure_synchronisee ? texte::kHeureRecue : texte::kHeureEnAttente));
 
     // Journal : le texte exact posé sur l'écran, à la première heure valide puis chaque minute. Le banc compare l'instant UTC
     // à l'horloge du PC (l'écran n'est pas photographié : c'est la trace de ce qui a été affiché).
@@ -243,41 +270,41 @@ void ui_bonjour_creer(const BootInfo &boot) {
     lv_obj_t *colonne_gauche = creer_colonne(ecran);
     lv_obj_t *colonne_droite = creer_colonne(ecran);
 
-    lv_label_set_text(creer_libelle(colonne_gauche, police_titre, kCouleurs.accent), texte::kBonjour);
-    lv_label_set_text(creer_libelle(colonne_gauche, police_texte, kCouleurs.texte_discret), texte::kSousTitre);
+    lv_label_set_text(creer_libelle(colonne_gauche, police_titre, kCouleurs.accent), T(texte::kBonjour));
+    lv_label_set_text(creer_libelle(colonne_gauche, police_texte, kCouleurs.texte_discret), T(texte::kSousTitre));
 
     // Phase 1b : l'heure et la date locales (reçues du réseau), puis l'état du Wi-Fi. Rafraîchis par le minuteur de fin de fonction.
     g_libelle_heure = creer_libelle(colonne_gauche, police_heure, kCouleurs.accent);
     lv_obj_set_style_pad_top(g_libelle_heure, 20, 0);
-    lv_label_set_text(g_libelle_heure, texte_1b::kHeureAbsente);
+    lv_label_set_text(g_libelle_heure, T(texte::kHeureAbsente));
     g_libelle_date = creer_libelle(colonne_gauche, police_date, kCouleurs.texte);
-    lv_label_set_text(g_libelle_date, texte_1b::kDateAbsente);
+    lv_label_set_text(g_libelle_date, T(texte::kDateAbsente));
     g_libelle_wifi = creer_libelle(colonne_gauche, police_petite, kCouleurs.texte_discret);
-    lv_label_set_text(g_libelle_wifi, texte_1b::kWifiCoprocesseurDemarre);
+    lv_label_set_text(g_libelle_wifi, T(texte::kWifiCoprocesseurDemarre));
     g_libelle_source = creer_libelle(colonne_gauche, police_petite, kCouleurs.texte_discret);
-    lv_label_set_text(g_libelle_source, texte_1b::kHeureEnAttente);
+    lv_label_set_text(g_libelle_source, T(texte::kHeureEnAttente));
 
     lv_obj_t *libelle = creer_libelle(colonne_droite, police_texte, kCouleurs.texte);
     lv_obj_set_style_pad_top(libelle, 30, 0);
-    lv_label_set_text_fmt(libelle, texte::kControleur, carte->display_controller);
+    lv_label_set_text_fmt(libelle, T(texte::kControleur), carte->display_controller);
 
-    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), texte::kTactile,
+    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), T(texte::kTactile),
                           carte->touch_controller);
-    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), texte::kCarte,
+    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), T(texte::kCarte),
                           carte->board_name, (int)carte->width, (int)carte->height);
 
     libelle = creer_libelle(colonne_droite, police_texte, kCouleurs.texte);
     lv_obj_set_style_pad_top(libelle, 30, 0);
-    lv_label_set_text_fmt(libelle, boot.counter_persistent ? texte::kDemarrage : texte::kDemarrageNonGarde,
+    lv_label_set_text_fmt(libelle, T(boot.counter_persistent ? texte::kDemarrage : texte::kDemarrageNonGarde),
                           static_cast<unsigned>(boot.boot_count));
-    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), texte::kCause,
-                          boot.reset_reason);
-    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), texte::kDuree,
+    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), T(texte::kCause),
+                          T(boot.reset_reason));
+    lv_label_set_text_fmt(creer_libelle(colonne_droite, police_petite, kCouleurs.texte_discret), T(texte::kDuree),
                           (int)jalons->lvgl_ready_ms);
 
     g_libelle_toucher = creer_libelle(colonne_droite, police_texte, kCouleurs.texte);
     lv_obj_set_style_pad_top(g_libelle_toucher, 40, 0);
-    lv_label_set_text(g_libelle_toucher, texte::kToucherAucun);
+    lv_label_set_text(g_libelle_toucher, T(texte::kToucherAucun));
 
     lv_obj_t *bouton = lv_button_create(colonne_droite);
     lv_obj_set_size(bouton, 420, 110);
@@ -285,7 +312,7 @@ void ui_bonjour_creer(const BootInfo &boot) {
     lv_obj_set_style_radius(bouton, 24, 0);
     lv_obj_add_event_cb(bouton, sur_bouton_redemarrer, LV_EVENT_CLICKED, nullptr);
     lv_obj_t *texte_bouton = lv_label_create(bouton);
-    lv_label_set_text(texte_bouton, texte::kRedemarrer);
+    lv_label_set_text(texte_bouton, T(texte::kRedemarrer));
     lv_obj_set_style_text_font(texte_bouton, police_texte, 0);
     lv_obj_set_style_text_color(texte_bouton, couleur(kCouleurs.bouton_texte), 0);
     lv_obj_center(texte_bouton);
