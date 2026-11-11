@@ -1476,7 +1476,10 @@ void remplir_resultats() {
         lv_label_set_text(g_ville.etat, remplir("Aucun lieu trouvé pour « {q} ».", ps, 1, tampon, sizeof tampon));
         return;
     }
-    lv_label_set_text(g_ville.etat, "");
+    // Les lieux viennent de GeoNames (CC BY 4.0), via le géocodage d'Open-Meteo : le crédit suit la liste, comme celui des spots. Le label
+    // d'état est vide quand il y a des résultats (aucun autre message n'est écrasé) ; sa couleur discrète est posée par lancer_recherche().
+    const Param pg[] = {{"lien", "GeoNames"}};
+    lv_label_set_text(g_ville.etat, remplir("Lieux : {lien} (licence CC BY 4.0)", pg, 1, tampon, sizeof tampon));
     for (std::size_t i = 0; i < n; ++i) {
         creer_rangee_bouton(
             g_ville.resultats, lieux[i].libelle, nullptr,

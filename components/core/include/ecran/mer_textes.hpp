@@ -78,6 +78,8 @@ enum class Texte : std::uint8_t {
     IlYAJ,   // {n}
     Force,   // {n}, l'échelle de Beaufort
     Fermer,
+    Credit, // le crédit des données de mer (CC BY 4.0), en pied de page ; formes longues et URL dans THIRD_PARTY.md
+    PasNavigation, // ADR-0018 : la marée et la houle sont des estimations, pas pour la navigation
     Nombre
 };
 
@@ -157,6 +159,17 @@ inline constexpr Mot TEXTES[] = {
     {"il y a {n} j", {"{n} d ago", "vor {n} T.", "{n} d geleden", "hace {n} d", "{n} g fa", "{n} g önce"}},
     {"Force {n}", {"Force {n}", "Stärke {n}", "Kracht {n}", "Fuerza {n}", "Forza {n}", "Kuvvet {n}"}},
     {"Fermer", {"Close", "Schließen", "Sluiten", "Cerrar", "Chiudi", "Kapat"}},
+    // Les noms propres (Open-Meteo, Copernicus Marine, EOT20) et « CC BY 4.0 » ne se traduisent pas.
+    {"Données mer : Open-Meteo, Copernicus Marine, marée EOT20 (CC BY 4.0)",
+     {"Sea data: Open-Meteo, Copernicus Marine, EOT20 tide (CC BY 4.0)",
+      "Meeresdaten: Open-Meteo, Copernicus Marine, Gezeiten EOT20 (CC BY 4.0)",
+      "Zeegegevens: Open-Meteo, Copernicus Marine, getij EOT20 (CC BY 4.0)",
+      "Datos del mar: Open-Meteo, Copernicus Marine, marea EOT20 (CC BY 4.0)",
+      "Dati del mare: Open-Meteo, Copernicus Marine, marea EOT20 (CC BY 4.0)",
+      "Deniz verileri: Open-Meteo, Copernicus Marine, EOT20 gelgiti (CC BY 4.0)"}},
+    {"Estimations, pas pour la navigation",
+     {"Estimates, not for navigation", "Schätzungen, nicht für die Navigation", "Schattingen, niet voor navigatie",
+      "Estimaciones, no para la navegación", "Stime, non per la navigazione", "Tahmini değerler, seyir için değil"}},
 };
 inline constexpr std::size_t NOMBRE_TEXTES = sizeof(TEXTES) / sizeof(TEXTES[0]);
 static_assert(NOMBRE_TEXTES == static_cast<std::size_t>(Texte::Nombre), "une ligne de TEXTES par Texte");

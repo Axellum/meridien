@@ -154,6 +154,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Aucun lieu trouvé pour « {q} ».": "No place found for “{q}”."
 "Tapez au moins 3 lettres.": "Type at least 3 letters."
 "Ville enregistrée : {ville}": "City saved: {ville}"
+"Lieux : {lien} (licence CC BY 4.0)": "Places: {lien} (CC BY 4.0 license)"
 "Données météo : {lien} (licence CC BY 4.0)": "Weather data: {lien} (CC BY 4.0 license)"
 
 # --- Écran : source de la météo (07/11/2026) ---

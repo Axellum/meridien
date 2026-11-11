@@ -20,7 +20,7 @@ struct Taille {
 // Les trois écrans visés : Tab5 en paysage, Waveshare 7B, Tab5 en portrait.
 constexpr Taille VISEES[] = {{1280, 720}, {1024, 600}, {720, 1280}};
 // D'autres tailles qu'une carte pourrait avoir un jour : la page ne doit pas se mettre à se chevaucher.
-constexpr Taille AUTRES[] = {{800, 480}, {1366, 768}, {1920, 1080}, {600, 1024}, {1080, 1920}};
+constexpr Taille AUTRES[] = {{800, 480}, {1366, 768}, {1920, 1080}, {600, 1040}, {1080, 1920}};
 
 constexpr int NB_VISEES = static_cast<int>(sizeof VISEES / sizeof VISEES[0]);
 constexpr int NB_AUTRES = static_cast<int>(sizeof AUTRES / sizeof AUTRES[0]);
@@ -95,7 +95,7 @@ constexpr int un_ecran_trop_petit_n_a_pas_de_page() {
 
 constexpr int le_sens_vient_de_la_forme_de_l_ecran() {
     VERIFIER(!disposer(1280, 720).portrait && !disposer(1024, 600).portrait);
-    VERIFIER(disposer(720, 1280).portrait && disposer(600, 1024).portrait);
+    VERIFIER(disposer(720, 1280).portrait && disposer(600, 1040).portrait);
     VERIFIER(disposer(720, 720).valide &&
              !disposer(720, 720).portrait); // carré : comme le paysage (et une page, pas rien)
     VERIFIER(disposer(1280, 720).petit_cote == 720 && disposer(1024, 600).petit_cote == 600 &&
@@ -122,7 +122,7 @@ constexpr int chaque_zone_est_dans_l_ecran_et_aucune_n_en_chevauche_une_autre() 
         const Disposition d = disposer(t.w, t.h);
         VERIFIER(d.valide);
         const Rect zones[] = {d.entete,    d.bandeau, d.cartes[0], d.cartes[1], d.cartes[2],
-                              d.cartes[3], d.legende, d.maree,     d.soleil};
+                              d.cartes[3], d.legende, d.maree,     d.soleil,    d.pied};
         VERIFIER(toutes_dans(zones, d.ecran));
         VERIFIER(toutes_separees(zones));
         // Dans l'en-tête : le titre et le bouton Fermer.
@@ -130,8 +130,14 @@ constexpr int chaque_zone_est_dans_l_ecran_et_aucune_n_en_chevauche_une_autre() 
         VERIFIER(toutes_dans(tete, d.entete));
         VERIFIER(toutes_separees(tete));
         // Les marges : rien ne touche le bord de l'écran.
+        // Le pied seul descend dans la marge du bas, plus petite (un texte sans cadre), mais jamais jusqu'au bord.
         for (const Rect &z : zones)
-            VERIFIER(z.x >= d.marge && z.y >= d.marge && z.droite() <= t.w - d.marge && z.bas() <= t.h - d.marge);
+            VERIFIER(z.x >= d.marge && z.y >= d.marge && z.droite() <= t.w - d.marge &&
+                     z.bas() <= t.h - (&z == &zones[9] ? d.marge_bas : d.marge));
+        VERIFIER(d.marge_bas >= 1 && d.marge_bas < d.marge && d.pied.bas() == t.h - d.marge_bas);
+        // Le pied est sous tout le reste, sur toute la largeur utile ; une ligne en paysage, deux en portrait.
+        VERIFIER(d.maree.bas() < d.pied.y && d.soleil.bas() < d.pied.y && d.pied.w == t.w - 2 * d.marge);
+        VERIFIER(d.pied.h == (d.portrait ? 2 : 1) * mis(22, d.petit_cote));
     }
     return 0;
 }
@@ -336,15 +342,19 @@ constexpr int une_page_valide_garde_toujours_des_cartes_assez_hautes() {
 constexpr int un_ecran_portrait_trop_court_n_a_pas_de_page_et_un_assez_haut_en_a_une() {
     // 720 x 900 : les deux cartes d'une rangée, la légende et deux panneaux de 150 ne tiennent pas dans 900 px.
     VERIFIER(!disposer(720, 900).valide);
-    VERIFIER(disposer(720, 1280).valide && disposer(1080, 1920).valide && disposer(600, 1024).valide);
+    VERIFIER(disposer(720, 1280).valide && disposer(1080, 1920).valide && disposer(600, 1040).valide);
+    // La 7B tournée en portrait (600 x 1024) n'a plus de page depuis le pied de deux lignes (crédit, « pas pour la navigation ») : il
+    // manque 10 px pour garder la marée et le soleil à 150. Aucune carte n'affiche l'interface en portrait (Tab5 et 7B sont en paysage).
+    VERIFIER(!disposer(600, 1024).valide && disposer(600, 1033).valide && !disposer(600, 1032).valide);
     // La limite est nette : au-dessus d'une hauteur, la page existe, et plus haut elle existe toujours.
     int premiere = 0;
     for (int h = 721; h <= 1400 && premiere == 0; ++h)
         if (disposer(720, h).valide)
             premiere = h;
-    // 1204 = marge du bas 16 + haut de page 136 (marge, en-tête, bandeau, intervalles) + deux cartes de 334 + quatre intervalles 32
-    //        + légende sur deux lignes 52 + deux panneaux de 150 : si la mise en page change, ce nombre change, et c'est voulu.
-    VERIFIER(premiere == 1204);
+    // 1238 = pied sur deux lignes 44 + sa marge du bas 4 + son écart 2 + haut de page 136 (marge, en-tête, bandeau, intervalles)
+    //        + deux cartes de 334 + quatre intervalles 32 + légende sur deux lignes 52 + deux panneaux de 150 : si la mise en page change,
+    //        ce nombre change, et c'est voulu.
+    VERIFIER(premiere == 1238);
     VERIFIER(!disposer(720, premiere - 1).valide);
     for (int h = premiere; h <= 1400; h += 11)
         VERIFIER(disposer(720, h).valide);
