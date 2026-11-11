@@ -1,15 +1,16 @@
 // Recherche de lieu côté appareil (contrat main/geocodage.h).
 //
-// Ce fichier ne décide de rien : la lecture de la réponse, les règles d'écart et l'état d'une recherche (« la dernière demande
-// gagne ») sont dans le noyau pur ecran/geocodage.hpp, testé sur le PC avec de vraies réponses d'Open-Meteo. Ici : la tâche, le
-// téléchargement HTTPS et le verrou.
+// Ce fichier ne décide de rien : la lecture de la réponse et les règles d'écart sont dans le noyau pur (ecran/lieux_geocodage.hpp
+// pour l'écran, ecran/geocodage.hpp pour la page), testé sur le PC avec de vraies réponses d'Open-Meteo. Ici : la tâche, le
+// téléchargement HTTPS et le verrou. Avant, l'écran avait son propre téléchargeur (tâche « lieu_dl », priorité 3, SANS le verrou
+// TLS) : une recherche de ville pendant une requête météo faisait deux poignées de main à la fois.
 //
 // UNE tâche, créée à la demande et supprimée quand il n'y a plus rien à faire (pas de pile de 12 Ko gardée en permanence : la RAM
 // interne manque). Elle tourne à la priorité d'arrière-plan : la prise de contact TLS calcule plusieurs secondes sans dormir ; à une
 // priorité plus haute que celle de la tâche d'inactivité, le chien de garde des tâches se déclenche (constaté par jalon-1b sur la
 // tâche météo). Elle traite d'abord la demande de la page web (un navigateur attend), puis celle de l'écran.
 //
-// Les gros tampons (réponse brute de 16 Ko, huit lieux, adresses) sont en PSRAM, alloués au premier usage ; la RAM interne ne sert
+// Les gros tampons (deux réponses brutes de 16 Ko : celle en cours, celle que l'écran lit ; adresses) sont en PSRAM, alloués au premier usage ; la RAM interne ne sert
 // qu'à la pile de la tâche, à deux sémaphores, et à ce que mbedtls et esp_http_client prennent pendant la poignée de main (≈ 65 Ko,
 // sous le verrou TLS commun : verrou_tls.h). Le texte cherché n'est jamais écrit au journal (c'est un lieu, donc une donnée privée).
 #include "geocodage.h"
@@ -27,7 +28,6 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
-#include "reglages.h"
 #include "reseau.h"
 #include "verrou_tls.h"
 
@@ -58,15 +58,25 @@ struct Page {
     char adresse[api::ADRESSE_GEOCODAGE_MAX + 1] = {};
 };
 
+// La demande de l'écran : la dernière gagne (chaque demande ou abandon change `generation` ; une réponse arrivée pour une génération
+// dépassée est jetée).
+struct Ecran {
+    bool a_faire = false; // demandée et pas encore prise par la tâche
+    std::uint32_t generation = 0;
+    EtatTelechargement etat = EtatTelechargement::Inactif;
+    size_t taille = 0;
+    char adresse[api::ADRESSE_GEOCODAGE_MAX + 1] = {};
+    char corps[kTailleReponse] = {}; // la réponse que l'écran lit (copiée depuis `travail` sous le verrou)
+};
+
 struct Contexte {
-    SemaphoreHandle_t verrou = nullptr;     // protège `recherche`, `page` et `tache_active`
+    SemaphoreHandle_t verrou = nullptr;     // protège `ecran`, `page` et `tache_active`
     SemaphoreHandle_t page_finie = nullptr; // donné par la tâche quand la demande de la page est finie
-    geocodage::Recherche recherche;
+    Ecran ecran;
     Page page;
     bool tache_active = false;
     // Propres à la tâche (une seule à la fois) : pas besoin du verrou.
     char travail[kTailleReponse];
-    geocodage::Lieu lieux[geocodage::LIEUX_MAX];
     char adresse_ecran[api::ADRESSE_GEOCODAGE_MAX + 1];
 };
 
@@ -193,28 +203,21 @@ void travailler_pour_la_page(Contexte *c) {
     xSemaphoreGive(c->verrou);
 }
 
-void travailler_pour_l_ecran(Contexte *c, const char *texte, std::uint32_t numero) {
-    geocodage::Issue issue = geocodage::Issue::SansConnexion;
-    size_t n = 0;
-    api::Ecrivain adresse(c->adresse_ecran,
-                          api::ADRESSE_GEOCODAGE_MAX); // un octet de plus dans le tampon : le zéro final
-    reglages::adresse_geocodage(texte, reglages_affichage().langue_ecran, adresse);
-    if (adresse.ok()) {
-        c->adresse_ecran[adresse.vue().size()] = '\0';
-        size_t taille = 0;
-        if (telecharger(c->adresse_ecran, c->travail, kTailleReponse, taille) == api::Telechargement::Ok) {
-            if (geocodage::analyser(std::string_view(c->travail, taille), c->lieux, geocodage::LIEUX_MAX, n)) {
-                issue = geocodage::Issue::Trouvee;
-                ESP_LOGI(TAG, "recherche de lieu : %u résultat(s)", static_cast<unsigned>(n));
-            } else {
-                ESP_LOGW(TAG, "réponse illisible (ce n'est pas un objet JSON)");
-            }
-        }
-    } else {
-        ESP_LOGW(TAG, "adresse de la recherche trop longue");
-    }
+void travailler_pour_l_ecran(Contexte *c, std::uint32_t numero) {
+    size_t taille = 0;
+    const api::Telechargement r = telecharger(c->adresse_ecran, c->travail, kTailleReponse, taille);
     xSemaphoreTake(c->verrou, portMAX_DELAY);
-    c->recherche.terminer(numero, issue, c->lieux, n); // jetée si une demande plus récente est arrivée entre-temps
+    if (numero ==
+        c->ecran.generation) { // sinon une demande plus récente (ou un abandon) est arrivée entre-temps : jetée
+        if (r == api::Telechargement::Ok) {
+            std::memcpy(c->ecran.corps, c->travail, taille);
+            c->ecran.taille = taille;
+            c->ecran.etat = EtatTelechargement::Termine;
+        } else {
+            c->ecran.etat =
+                r == api::Telechargement::SansInternet ? EtatTelechargement::SansInternet : EtatTelechargement::Echec;
+        }
+    }
     xSemaphoreGive(c->verrou);
 }
 
@@ -222,7 +225,6 @@ void tache_geocodage(void *) {
     Contexte *c = contexte();
     for (;;) {
         enum class Quoi { Rien, Page, Ecran } quoi = Quoi::Rien;
-        char texte[reglages::RECHERCHE_OCTETS_MAX + 1] = {};
         std::uint32_t numero = 0;
         xSemaphoreTake(c->verrou, portMAX_DELAY);
         if (c->page.en_attente && c->page.abandonne) {
@@ -230,7 +232,11 @@ void tache_geocodage(void *) {
         }
         if (c->page.en_attente) {
             quoi = Quoi::Page;
-        } else if (c->recherche.prendre(texte, numero)) {
+        } else if (c->ecran.a_faire) {
+            std::memcpy(c->adresse_ecran, c->ecran.adresse,
+                        sizeof c->adresse_ecran); // copie : la demande peut être remplacée
+            numero = c->ecran.generation;
+            c->ecran.a_faire = false;
             quoi = Quoi::Ecran;
         } else {
             c->tache_active = false; // sous le verrou : une demande qui arrive maintenant relancera une tâche
@@ -243,7 +249,7 @@ void tache_geocodage(void *) {
         if (quoi == Quoi::Page) {
             travailler_pour_la_page(c);
         } else {
-            travailler_pour_l_ecran(c, texte, numero);
+            travailler_pour_l_ecran(c, numero);
         }
     }
 }
@@ -266,44 +272,66 @@ bool lancer_tache(Contexte *c) {
 
 // ---- l'écran ----------------------------------------------------------------------------------------------------------------------
 
-void geocodage_chercher(std::string_view texte) {
+void geocodage_ecran_lancer(const char *adresse) {
     Contexte *c = contexte();
     if (c == nullptr) {
         return;
     }
     xSemaphoreTake(c->verrou, portMAX_DELAY);
-    const reglages::ErreurRecherche refus = c->recherche.demander(texte);
-    if (refus == reglages::ErreurRecherche::Aucune && !lancer_tache(c)) {
-        // pas de tâche possible : la demande est close tout de suite, l'écran ne reste pas sur « en cours »
-        char pris[reglages::RECHERCHE_OCTETS_MAX + 1] = {};
-        std::uint32_t numero = 0;
-        if (c->recherche.prendre(pris, numero)) {
-            c->recherche.terminer(numero, geocodage::Issue::SansConnexion, nullptr, 0);
+    ++c->ecran.generation;
+    c->ecran.taille = 0;
+    const size_t n = adresse != nullptr ? std::strlen(adresse) : 0;
+    if (n == 0 || n > api::ADRESSE_GEOCODAGE_MAX) {
+        c->ecran.a_faire = false;
+        c->ecran.etat = EtatTelechargement::Echec;
+    } else {
+        std::memcpy(c->ecran.adresse, adresse, n);
+        c->ecran.adresse[n] = ' ';
+        c->ecran.a_faire = true;
+        c->ecran.etat = EtatTelechargement::EnCours;
+        if (!lancer_tache(c)) { // pas de tâche possible : l'écran ne reste pas sur « en cours »
+            c->ecran.a_faire = false;
+            c->ecran.etat = EtatTelechargement::Echec;
         }
     }
     xSemaphoreGive(c->verrou);
 }
 
-geocodage::Etat geocodage_etat() {
+EtatTelechargement geocodage_ecran_etat() {
     Contexte *c = contexte();
     if (c == nullptr) {
-        return geocodage::Etat::SansConnexion;
+        return EtatTelechargement::Echec;
     }
     xSemaphoreTake(c->verrou, portMAX_DELAY);
-    const geocodage::Etat etat = c->recherche.etat();
+    const EtatTelechargement e = c->ecran.etat;
     xSemaphoreGive(c->verrou);
-    return etat;
+    return e;
 }
 
-std::size_t geocodage_resultats(geocodage::Lieu *sortie, std::size_t max) {
+std::string_view geocodage_ecran_corps() {
     Contexte *c = contexte();
-    if (c == nullptr || sortie == nullptr) {
-        return 0;
+    if (c == nullptr) {
+        return {};
     }
     xSemaphoreTake(c->verrou, portMAX_DELAY);
-    const std::size_t n = c->recherche.resultats(sortie, max);
+    const std::string_view v = c->ecran.etat == EtatTelechargement::Termine
+                                   ? std::string_view(c->ecran.corps, c->ecran.taille)
+                                   : std::string_view();
     xSemaphoreGive(c->verrou);
-    return n;
+    return v;
+}
+
+void geocodage_ecran_liberer() {
+    Contexte *c = contexte();
+    if (c == nullptr) {
+        return;
+    }
+    xSemaphoreTake(c->verrou, portMAX_DELAY);
+    ++c->ecran.generation; // une réponse encore en route sera jetée
+    c->ecran.a_faire = false;
+    c->ecran.etat = EtatTelechargement::Inactif;
+    c->ecran.taille = 0;
+    xSemaphoreGive(c->verrou);
 }
 
 // ---- la page web ------------------------------------------------------------------------------------------------------------------
