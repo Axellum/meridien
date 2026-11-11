@@ -9,8 +9,10 @@
 
 namespace ecran {
 
-// Lance, une seule fois, la tâche d'acquisition. À appeler dès l'obtention de l'adresse IP. `quand_regle` est appelée depuis cette
-// tâche, une fois l'horloge du système réglée (peut être nul).
-void sntp_rapide_demarrer(void (*quand_regle)());
+// À appeler à CHAQUE adresse IP obtenue (démarrage, retour du Wi-Fi, changement de réseau). Lance une demande d'heure, sauf si une
+// demande est déjà en cours ; une demande échouée est relancée après 10 s, 20 s, 40 s… jusqu'à 10 min (règles et tests :
+// components/core/include/ecran/sntp.hpp). `quand_regle` est appelée depuis la tâche de demande, une fois l'horloge du système
+// réglée (peut être nul). Journal : « heure reçue N ms après l'IP ».
+void sntp_rapide_sur_ip(void (*quand_regle)());
 
 } // namespace ecran
