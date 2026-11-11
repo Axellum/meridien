@@ -5,8 +5,9 @@
 //  - sans INT, l'adresse I2C de la puce (0x5D ou 0x14) n'est pas imposee par le niveau de INT au reset : on essaie les deux ;
 //  - le reset (RESET_TP) est sur GPIO23 [schema et ESPHome] ; le BSP Waveshare declare cette broche « NC, partagee avec le reset de
 //    la dalle ». Ecart NON tranche (aucun essai sur la carte) : ce fichier pilote GPIO23 ET suppose que le reset de la dalle
-//    (GPIO33, fait AVANT, par ws7b_display.c) peut aussi reinitialiser la puce. L'ordre dans board_init() (dalle, puis tactile)
-//    garantit que l'adresse trouvee ici est celle qui sera utilisee ;
+//    (GPIO33, fait par ws7b_display.c) peut aussi reinitialiser la puce. Depuis le 12/11/2026 l'impulsion sur GPIO23 est lancee
+//    AVANT la dalle (ws7b_touch_reset_start), mais l'adresse est toujours cherchee APRES elle : celle trouvee ici est donc celle qui
+//    sera utilisee, quel que soit le reset qui a touche la puce en dernier ;
 //  - le GT911 est monte a l'envers de la dalle : miroir X et Y GARDES (BSP Waveshare et ESPHome). Le point rendu au code appelant
 //    est dans le repere de la dalle ; c'est LVGL qui applique ensuite la rotation de l'interface (comme sur le Tab5).
 #include <stdio.h>
