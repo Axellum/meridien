@@ -392,8 +392,10 @@ def construire_scenes(scenes: list, lvgl: Path, archive: Path, jobs: int) -> dic
         exe = dossier / f"rendu_{scene.nom}.exe"
         # -static : sans lui l'exécutable cherche libc++.dll dans le PATH et refuse de démarrer hors d'une session
         # env_hote.ps1.
+        # --wrap=lv_draw_label : chaque texte dessiné passe d'abord par le contrôle de place du banc (banc.cpp, G-15).
         resultat = lancer(
-            [clangxx, "-static", *(str(objet_de(f)) for f in fichiers), str(police_o), str(archive), "-o", str(exe)]
+            [clangxx, "-static", "-Wl,--wrap=lv_draw_label", *(str(objet_de(f)) for f in fichiers), str(police_o),
+             str(archive), "-o", str(exe)]
         )
         if resultat.returncode != 0:
             print(resultat.stdout + resultat.stderr, file=sys.stderr)
@@ -609,7 +611,7 @@ def main() -> None:
 
     epoch = instant_en_epoch(args.instant)
     version = version_lvgl(lvgl)
-    ecrits, groupes = [], {}
+    ecrits, groupes, debordements = [], {}, []
     for scene in scenes:
         variantes = [v for v in scene.variantes if not args.variante or v[0] in args.variante]
         if args.variante and not variantes:
@@ -634,8 +636,15 @@ def main() -> None:
                     if resultat.returncode != 0:
                         print(resultat.stdout + resultat.stderr, file=sys.stderr)
                         erreur(f"rendu de {scene.nom}/{variante} {langue} {taille}")
-                    if resultat.stderr.strip():
-                        print("  journal du firmware :", resultat.stderr.strip().replace("\n", "\n    "))
+                    journal = []
+                    for ligne in resultat.stderr.splitlines():
+                        if ligne.startswith("DEBORDE\t"):
+                            _, raison, texte = (ligne.split("\t", 2) + ["", ""])[:3]
+                            debordements.append((scene.nom, variante, langue, taille, raison, texte))
+                        elif ligne.strip():
+                            journal.append(ligne)
+                    if journal:
+                        print("  journal du firmware :", "\n    ".join(journal))
                     lu_l, lu_h, pixels = lire_ppm(ppm)
                     description = (
                         f"Rendu LVGL {version} logiciel sur PC (RGB565 puis RGB888), pas une photo de la carte. "
@@ -659,6 +668,14 @@ def main() -> None:
     if not ecrits:
         erreur("aucun PNG écrit : voir les avis ci-dessus (variante, langue ou scène sans correspondance)")
     print(f"{len(ecrits)} PNG écrit(s) dans {args.sortie}")
+    # Contrôle de place (banc.cpp) : chaque texte coupé, abrégé, hors écran ou hors de son cadre, par écran rendu. Ce n'est pas un
+    # échec du rendu (une abréviation peut être voulue) : la liste est à lire, écrite à côté des PNG.
+    rapport = args.sortie / "debordements.tsv"
+    lignes = ["scene\tvariante\tlangue\ttaille\traison\ttexte"] + ["\t".join(d) for d in debordements]
+    rapport.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+    print(f"contrôle de place : {len(debordements)} texte(s) qui ne tiennent pas -> {chemin_relatif(rapport)}")
+    for d in debordements[:40]:
+        print(f"  DEBORDE {d[0]}/{d[1]} {d[2]} {d[3]} : {d[4]} : « {d[5][:70]} »")
 
 
 if __name__ == "__main__":
