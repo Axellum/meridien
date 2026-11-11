@@ -154,6 +154,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Aucun lieu trouvé pour « {q} ».": "“{q}” için yer bulunamadı."
 "Tapez au moins 3 lettres.": "En az 3 harf yaz."
 "Ville enregistrée : {ville}": "Şehir kaydedildi: {ville}"
+"Lieux : {lien} (licence CC BY 4.0)": "Yerler: {lien} (CC BY 4.0 lisansı)"
 "Données météo : {lien} (licence CC BY 4.0)": "Hava durumu verileri: {lien} (CC BY 4.0 lisansı)"
 
 # --- Écran : source de la météo (07/11/2026) ---

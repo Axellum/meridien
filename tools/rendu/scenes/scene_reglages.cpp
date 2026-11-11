@@ -82,6 +82,16 @@ void lieu_vide(const banc::Contexte &ctx) {
     aller("section:1");
 }
 
+// La recherche de ville a trouvé des lieux : la liste, et au-dessus le crédit des données de lieux (GeoNames, CC BY 4.0).
+void ville_resultats(const banc::Contexte &ctx) {
+    en_service(ctx);
+    g_hote.lieux_connus = {"Saint-Malo, Bretagne, France", "Saint-Malo-de-Guersac, Pays de la Loire, France",
+                           "Saint-Malo-de-Phily, Bretagne, France", "Saint-Malo-des-Trois-Fontaines, Bretagne, France"};
+    aller("section:1/ville");
+    ecran::ui_simuler_saisie("Saint-Malo", true);
+    tourner();
+}
+
 void lieu_alertes(const banc::Contexte &ctx) {
     en_service(ctx);
     aller("section:1:1");
@@ -302,6 +312,7 @@ const Scene kScenes[] = {
     {"wifi-liste", "Réseau : choix d'un réseau", wifi_liste},
     {"lieu", "Lieu et météo : ville choisie", lieu},
     {"lieu-vide", "Lieu et météo : pas de ville", lieu_vide},
+    {"ville-resultats", "Recherche de ville : quatre lieux trouvés, crédit GeoNames", ville_resultats},
     {"lieu-alertes", "Lieu et météo : alertes officielles (Vigie)", lieu_alertes},
     {"alertes-adresse-saisie", "Alertes officielles : saisie de l'adresse de Vigie", alertes_adresse_saisie},
     {"mer-vide", "La mer : aucun spot gardé", mer_vide},
