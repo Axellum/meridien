@@ -8,6 +8,9 @@
 // mêmes fichiers que le firmware : les phrases de l'API sortent dans la langue de l'écran). Le reste (Wi-Fi, mise à
 // jour, redémarrage) est simulé.
 //
+// En-têtes de sécurité (politique de contenu, nosniff, Referrer-Policy) et refus d'un en-tête Host étranger : comme l'appareil,
+// la politique étant lue dans http_requete.hpp.
+//
 // Usage : node web/faux-serveur/serveur.mjs
 //   PORT=8080 (page + API), PORT_SERVICE=PORT+1 (faux service compatible OpenAI pour tester la carte « Assistant »)
 //   CODE_APPAIRAGE=123456, VERROU_S=60, CLE_MOCK=cle-de-test-123, REBOOT_MS=4000
@@ -72,6 +75,16 @@ function poserZone(z) {
   etat.source = sourcesPour(z.code_pays).some((f) => f.id === avant) ? avant : 'auto';
   etat.sourceRetablie = avant !== etat.source;
 }
+/* Les en-têtes de sécurité de l'appareil (http_requete.hpp) : la même politique de contenu, lue dans le noyau, pas recopiée. Le parcours
+   Playwright joue donc la page sous la règle exacte du firmware (un script ou un style écrit dans le HTML y serait bloqué). */
+const TEXTE_HTTP = readFileSync(path.join(NOYAU, 'http_requete.hpp'), 'utf8');
+const chaineCpp = (nom) => {
+  const m = TEXTE_HTTP.match(new RegExp(nom + String.raw`\s*=\s*((?:"[^"]*"\s*)+);`));
+  if (!m) throw new Error(nom + ' illisible : http_requete.hpp a changé de forme ?');
+  return [...m[1].matchAll(/"([^"]*)"/g)].map((x) => x[1]).join('');
+};
+const POLITIQUE_CONTENU = chaineCpp('POLITIQUE_CONTENU');
+const ENTETES_COMMUNS = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': chaineCpp('POLITIQUE_REFERENT') };
 const WMO = new Map([...readFileSync(path.join(NOYAU, 'meteo_wmo.hpp'), 'utf8').matchAll(/case (\d+): return \{"([^"]+)"/g)].map((m) => [Number(m[1]), m[2]]));
 if (FUSEAUX.size < 400 || WMO.size !== 29) throw new Error('Tables du noyau illisibles : ' + FUSEAUX.size + ' fuseaux, ' + WMO.size + ' codes météo');
 
@@ -142,7 +155,7 @@ const presets = () => ({
 class Refus extends Error {
   constructor(statut, id, message, champ, extra) { super(message); Object.assign(this, { statut, id, champ, extra }); }
 }
-const REPONSES_JSON = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
+const REPONSES_JSON = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...ENTETES_COMMUNS };
 function json(res, statut, corps, extra = {}) {
   const b = JSON.stringify(corps);
   res.writeHead(statut, { ...REPONSES_JSON, ...extra });
@@ -644,7 +657,8 @@ async function statique(req, res, url) {
   if (!fichier.startsWith(APP + path.sep)) throw new Refus(404, 'inconnue', T('Cette page n’existe pas.'));
   let corps;
   try { corps = await readFile(fichier); } catch (e) { throw new Refus(404, 'inconnue', T('Cette page n’existe pas.')); }
-  const entetes = { 'Content-Type': MIME[path.extname(fichier)] || 'application/octet-stream', 'Cache-Control': 'no-store' };
+  const entetes = { 'Content-Type': MIME[path.extname(fichier)] || 'application/octet-stream', 'Cache-Control': 'no-store',
+    'Content-Security-Policy': POLITIQUE_CONTENU, ...ENTETES_COMMUNS };
   if (/\bgzip\b/.test(req.headers['accept-encoding'] || '')) { corps = zlib.gzipSync(corps, { level: 9 }); entetes['Content-Encoding'] = 'gzip'; }
   res.writeHead(200, entetes);
   res.end(corps);
@@ -653,6 +667,12 @@ async function statique(req, res, url) {
 const appareil = http.createServer(async (req, res) => {
   try {
     if (Date.now() < etat.redemarreJusqua) return req.socket.destroy(); // l'appareil redémarre : plus personne ne répond
+    /* Comme l'appareil (http::hote_autorise) : un en-tête Host qui ne le désigne pas (rebinding DNS) reçoit 403, une ligne de texte,
+       et la connexion est fermée. Ici l'appareil s'appelle 127.0.0.1 ou localhost, sur son port. */
+    if (![`127.0.0.1:${PORT}`, `localhost:${PORT}`].includes(String(req.headers.host || '').toLowerCase())) {
+      res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'close', ...ENTETES_COMMUNS });
+      return res.end('Forbidden');
+    }
     const url = new URL(req.url, 'http://appareil');
     if (url.pathname.startsWith('/api/')) await api(req, res, url);
     else if (req.method === 'GET') await statique(req, res, url);

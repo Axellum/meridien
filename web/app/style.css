@@ -10,6 +10,9 @@ body{margin:0;background:var(--fond);color:var(--texte);font:16px/1.5 system-ui,
 h1,h2,p,ul{margin:0}
 ul{padding:0;list-style:none}
 [hidden]{display:none!important}
+/* Ni style ni script écrits dans le HTML : la politique de contenu de l'appareil (style-src 'self') les refuserait. */
+.icones{position:absolute}
+.sans-js{padding:24px}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 b{font-weight:650}
