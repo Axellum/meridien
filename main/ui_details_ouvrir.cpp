@@ -109,9 +109,6 @@ grandeurs::Page composer_page() {
             vue.perimee = meteo::est_perime(releve, instant, echecs);
         }
     }
-#ifdef MERIDIEN_METEO_BOUCHON
-    vue.exemple = true; // valeurs d'exemple du bouchon (main/bouchons/) : la page le dit
-#endif
 
     // Les règles du fuseau du lieu ; si son nom n'est pas dans la table, le décalage fixe de la réponse météo, comme l'accueil.
     heure::Fuseau fuseau = {};

@@ -6,7 +6,6 @@
 #include <cstring>
 #include <unistd.h>
 
-#include "banc_wifi.h"
 #include "board.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -14,6 +13,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+
+#if MERIDIEN_BANC_ESSAI
+#include "banc_wifi.h"
+#endif
 
 namespace ecran {
 
@@ -25,8 +28,10 @@ constexpr const char *kCommandeRedemarrer = "redemarrer";
 constexpr const char *kCommandeMemoire = "memoire";
 constexpr const char *kCommandeBlocs = "blocs";
 constexpr const char *kCommandePiles = "piles";
+#if MERIDIEN_BANC_ESSAI
 constexpr const char *kCommandeTourner3 = "tourner3";
 constexpr const char *kCommandeTourner0 = "tourner0";
+#endif
 
 // --- Budget de la mémoire interne (jalon 1b, provisoire) ---------------------------------------------------------------------
 // « blocs » parcourt le tas interne (heap_caps_walk) et rend : le total utilisé et libre, le nombre de blocs par classe de taille,
@@ -154,7 +159,8 @@ void journaliser_classes(const char *etape) {
 }
 
 // « piles » : pour chaque tâche, l'adresse de base de sa pile (à rapprocher des lignes BLOC), la marge minimale restante et la
-// priorité. Demande CONFIG_FREERTOS_USE_TRACE_FACILITY=y, activé seulement dans le sdkconfig local des binaires de mesure.
+// priorité. Demande CONFIG_FREERTOS_USE_TRACE_FACILITY=y (sdkconfig.defaults : dans tous les binaires, la commande reste un outil
+// de diagnostic).
 void journaliser_piles() {
 #if CONFIG_FREERTOS_USE_TRACE_FACILITY
     const UBaseType_t nombre = uxTaskGetNumberOfTasks();
@@ -178,7 +184,8 @@ void journaliser_piles() {
 #endif
 }
 
-// « tourner3 » / « tourner0 » : essai du chien de garde des tâches (provisoire). Une tâche épinglée sur le cœur 0 calcule 8 s sans jamais
+#if MERIDIEN_BANC_ESSAI
+// « tourner3 » / « tourner0 » : essai du chien de garde des tâches (binaire de mesure seulement, -DMERIDIEN_BANC_ESSAI=ON). Une tâche épinglée sur le cœur 0 calcule 8 s sans jamais
 // s'endormir, à la priorité 3 (celle qu'avait la météo) ou 0 (celle de la tâche d'inactivité). À 3, IDLE0 ne tourne plus : le
 // chien de garde (5 s) doit se déclencher ; à 0, il ne doit pas.
 void tache_tourner(void *) {
@@ -195,8 +202,10 @@ void lancer_tourner(UBaseType_t priorite) {
     ESP_LOGI(TAG, "TOURNER priorité %u : début", static_cast<unsigned>(priorite));
     xTaskCreatePinnedToCore(tache_tourner, "tourner", 3072, nullptr, priorite, nullptr, 0);
 }
+#endif
 
 void traiter(const char *ligne) {
+#if MERIDIEN_BANC_ESSAI
     if (std::strcmp(ligne, kCommandeTourner3) == 0) {
         lancer_tourner(3);
         return;
@@ -205,6 +214,7 @@ void traiter(const char *ligne) {
         lancer_tourner(0);
         return;
     }
+#endif
     if (std::strcmp(ligne, kCommandePiles) == 0) {
         journaliser_piles();
         return;
@@ -230,9 +240,11 @@ void traiter(const char *ligne) {
         vTaskDelay(pdMS_TO_TICKS(200)); // laisser partir le journal sur l'USB
         board_restart();
     }
-    if (banc_wifi_lancer(ligne)) { // « wifi_scan », « wifi_faux »… (banc provisoire de l'interface Wi-Fi)
+#if MERIDIEN_BANC_ESSAI
+    if (banc_wifi_lancer(ligne)) { // « wifi_scan », « wifi_faux »… (banc d'essai de l'interface Wi-Fi)
         return;
     }
+#endif
     ESP_LOGI(TAG, "commande inconnue ignorée");
 }
 

@@ -20,7 +20,7 @@ Branche `claude/reglages-ecran-aea4e2`. Règle de lecture : ce qui est **constat
 | Adaptateurs ESP-IDF | `main/hote_appareil_esp.cpp` | NVS (rien d'autre que l'espace et la clé au journal), téléchargement HTTPS d'une seule adresse autorisée (tampon de 12 Ko en PSRAM, 8 s), Wi-Fi par `reseau_wifi.h`, version, redémarrage logiciel |
 | Colle : ouvrir les écrans | `main/ui_reglages_ouvrir.cpp` | écran LVGL à part ; « Retour » au premier écran recharge l'écran d'avant et supprime celui-ci avec sa pile |
 | Wi-Fi retenu | `main/wifi_stocke.cpp` | relit l'espace `wifi` pour `reseau.*` (jalon 1b) au prochain démarrage |
-| Bouchon réseau | `main/bouchons/reseau_wifi*` | compilé tant que `main/reseau_wifi.h` n'existe pas |
+| Bouchon réseau | `main/bouchons/reseau_wifi*` | compilé tant que `main/reseau_wifi.h` n'existe pas ; *supprimé le 11/11/2026 (le vrai fichier existe, le bouchon n'était plus compilé)* |
 | Scène de rendu sur l'hôte de l'appareil | `tools/rendu/scenes/scene_hote_appareil.cpp`, `test/host/hote_appareil_faux.hpp` | les vrais écrans au-dessus de la vraie logique, mémoire et appareil factices |
 
 ## 2. Mémoire permanente (NVS) : qui garde quoi
