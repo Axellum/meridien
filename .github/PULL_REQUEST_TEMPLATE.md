@@ -9,8 +9,8 @@
 
 ## Checklist
 
-- [ ] `.\tools\verifier.ps1` passes locally (secrets, core tests actually run, ruff), or I say below why it does not
-- [ ] If `components/core/` changed: `python test/host/lancer.py` shows the mode « complet (compilé + exécuté) » and `--mutations` still detects every mutation
+- [ ] `.\tools\verifier.ps1` passes locally (secrets, core tests actually run, independent checks, ruff, formatting), or I say below why it does not
+- [ ] If `components/core/` or `test/host/` changed: `python test/host/lancer.py` shows the mode « complet (compilé + exécuté) », and `python test/host/lancer.py --mutations --seulement <the test files I touched>` detects every one of their mutations (last line pasted below). The complete campaign is never required
 - [ ] I did not write "tested" or "done" without a board, a commit and a date. A green build is not "done" (see `AGENTS.md`, « Fait »)
 - [ ] Commits touching firmware or a board end with the `Carte:` and `Teste-sur:` lines (see `AGENTS.md`, « Git »)
 - [ ] No secret, no MAC address, no real IP address, no personal path in the diff
