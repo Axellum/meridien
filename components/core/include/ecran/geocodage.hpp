@@ -6,8 +6,8 @@
 //   2. `vers_zone` : un `Lieu` choisi -> la ville à enregistrer (`reglages::Zone`), avec les MÊMES règles que la page
 //                    (`reglages::valider_zone`) : un lieu que l'écran accepte est un lieu que la page aurait accepté, et inversement.
 //   3. `Recherche` : l'état d'une recherche demandée par l'écran (en cours / terminée / sans connexion), « la dernière demande
-//                    gagne ». Pas de verrou ici (noyau pur) : main/geocodage.cpp le met sous un mutex et lui adjoint la tâche et le
-//                    téléchargement. Le noyau ne sait pas ce qu'est un fil.
+//                    gagne ». Pas de verrou ici (noyau pur). Plus appelé par le firmware depuis le 11/11/2026 : l'écran passe par
+//                    HoteAppareil (ecran/hote_appareil.hpp, lieux_geocodage.hpp) et le téléchargement brut de main/geocodage.cpp.
 //
 // Règles de lecture (inchangées depuis la première version de la page, jalon « réglages ») : un lieu sans nom, sans fuseau, au nom
 // qui n'est pas de l'UTF-8 valide ou contient un octet de contrôle, ou aux coordonnées hors plage est écarté ; une région ou un pays

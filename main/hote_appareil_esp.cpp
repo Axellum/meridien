@@ -4,7 +4,7 @@
 //  - MagasinNvs   : la mémoire permanente (NVS), clés de 15 octets au plus, chaque écriture validée (nvs_commit) avant de rendre
 //                   vrai. Aucune valeur n'est écrite au journal : les clés d'accès et le mot de passe Wi-Fi n'y passent jamais.
 //  - PortsEsp     : l'affichage et la ville de la page web (main/reglages.*), la météo, le Wi-Fi (main/reseau_wifi.h), le
-//                   téléchargement du géocodage (tâche à part, tampon en PSRAM), la version, le redémarrage.
+//                   téléchargement du géocodage (main/geocodage.*, sous le verrou TLS commun), la version, le redémarrage.
 #include "hote_appareil_esp.h"
 
 #include <cstdio>
@@ -12,18 +12,14 @@
 
 #include "board.h"
 #include "esp_app_desc.h"
-#include "esp_crt_bundle.h"
-#include "esp_heap_caps.h"
-#include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
-#include "freertos/task.h"
 #include "nvs.h"
 
 #include "appairage.h"
 #include "ecran/hote_appareil.hpp"
+#include "geocodage.h"
 #include "mer_liste_client.h"
 #include "meteo_etat.h"
 #include "meteo_interne.h"
@@ -145,186 +141,6 @@ class MagasinNvs final : public Magasin {
     }
 };
 
-// ---- téléchargement de la recherche de lieu --------------------------------------------------------------------------------
-
-// Une seule adresse est joignable d'ici : le géocodage d'Open-Meteo (même liste d'autorisation que la page web). La réponse tient
-// dans un tampon de PSRAM rendu dès qu'elle est lue ; la tâche de téléchargement n'existe que le temps d'une recherche (8 Ko de
-// pile interne pendant la poignée de main TLS, puis rendus).
-class Telechargeur {
-  public:
-    Telechargeur() : verrou_(xSemaphoreCreateMutex()) {}
-
-    void lancer(const char *adresse) {
-        xSemaphoreTake(verrou_, portMAX_DELAY);
-        std::snprintf(url_, sizeof url_, "%s", adresse);
-        ++generation_;
-        etat_ = EtatTelechargement::EnCours;
-        taille_ = 0;
-        if (tampon_ == nullptr) {
-            tampon_ = static_cast<char *>(heap_caps_malloc(kCorpsMax, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-            if (tampon_ == nullptr) {
-                tampon_ = static_cast<char *>(heap_caps_malloc(kCorpsMax, MALLOC_CAP_8BIT));
-            }
-        }
-        if (tampon_ == nullptr) {
-            ESP_LOGW(TAG, "recherche de lieu : pas de mémoire pour la réponse (%u octets)",
-                     static_cast<unsigned>(kCorpsMax));
-            etat_ = EtatTelechargement::Echec;
-        } else if (!actif_) {
-            actif_ = true;
-            if (xTaskCreate(&Telechargeur::tache, "lieu_dl", 8192, this, 3, nullptr) != pdPASS) {
-                actif_ = false;
-                etat_ = EtatTelechargement::Echec;
-                ESP_LOGW(TAG, "recherche de lieu : tâche non créée (mémoire interne)");
-            }
-        }
-        xSemaphoreGive(verrou_);
-    }
-
-    EtatTelechargement etat() {
-        xSemaphoreTake(verrou_, portMAX_DELAY);
-        const EtatTelechargement e = etat_;
-        xSemaphoreGive(verrou_);
-        return e;
-    }
-
-    std::string_view corps() {
-        xSemaphoreTake(verrou_, portMAX_DELAY);
-        const std::string_view v = etat_ == EtatTelechargement::Termine && tampon_ != nullptr
-                                       ? std::string_view(tampon_, taille_)
-                                       : std::string_view();
-        xSemaphoreGive(verrou_);
-        return v;
-    }
-
-    // Oublie la demande et la réponse. Si la tâche travaille encore, elle verra que sa demande est périmée, rendra le tampon et
-    // s'arrêtera ; sinon le tampon est rendu tout de suite.
-    void liberer() {
-        xSemaphoreTake(verrou_, portMAX_DELAY);
-        ++generation_;
-        url_[0] = '\0';
-        taille_ = 0;
-        etat_ = EtatTelechargement::Inactif;
-        if (!actif_) {
-            heap_caps_free(tampon_);
-            tampon_ = nullptr;
-        }
-        xSemaphoreGive(verrou_);
-    }
-
-  private:
-    static constexpr std::size_t kCorpsMax = 12 * 1024; // huit lieux tiennent en 4 Ko ; le reste est une marge
-    static constexpr std::size_t kAdresseMax = api::ADRESSE_GEOCODAGE_MAX + 1;
-    static constexpr int kDelaiMs = 8000;
-    static constexpr std::string_view kAutorise = "https://geocoding-api.open-meteo.com/";
-
-    struct Reception {
-        char *donnees;
-        std::size_t capacite;
-        std::size_t n;
-        bool trop;
-    };
-
-    static esp_err_t sur_evenement(esp_http_client_event_t *evt) {
-        auto *rec = static_cast<Reception *>(evt->user_data);
-        if (rec != nullptr && evt->event_id == HTTP_EVENT_ON_DATA && evt->data_len > 0 && evt->data != nullptr) {
-            const std::size_t len = static_cast<std::size_t>(evt->data_len);
-            if (rec->n + len > rec->capacite) {
-                rec->trop = true; // plus grand que prévu : une réponse à moitié lue n'est jamais utilisée
-            } else {
-                std::memcpy(rec->donnees + rec->n, evt->data, len);
-                rec->n += len;
-            }
-        }
-        return ESP_OK;
-    }
-
-    // Faux « résultat » = EtatTelechargement ; `n` = nombre d'octets reçus si Termine.
-    static EtatTelechargement telecharger(const char *adresse, char *tampon, std::size_t &n) {
-        n = 0;
-        if (std::string_view(adresse).substr(0, kAutorise.size()) != kAutorise) {
-            return EtatTelechargement::Echec;
-        }
-        if (!reseau_etat().ip_obtenue) {
-            return EtatTelechargement::SansInternet;
-        }
-        Reception rec = {tampon, kCorpsMax, 0, false};
-        esp_http_client_config_t config = {};
-        config.url = adresse;
-        config.method = HTTP_METHOD_GET;
-        config.timeout_ms = kDelaiMs;
-        config.event_handler = &Telechargeur::sur_evenement;
-        config.user_data = &rec;
-        config.crt_bundle_attach = esp_crt_bundle_attach; // le serveur est vérifié (certificats racine d'ESP-IDF)
-        config.buffer_size = 2048;
-        config.buffer_size_tx = 1536;
-        config.keep_alive_enable = false;
-        esp_http_client_handle_t client = esp_http_client_init(&config);
-        if (client == nullptr) {
-            return EtatTelechargement::Echec;
-        }
-        esp_http_client_set_header(client, "Accept", "application/json");
-        const esp_err_t err = esp_http_client_perform(client);
-        const int statut = esp_http_client_get_status_code(client);
-        esp_http_client_cleanup(client);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "recherche de lieu : requête échouée (%s)", esp_err_to_name(err));
-            return EtatTelechargement::SansInternet;
-        }
-        if (statut != 200 || rec.trop) {
-            ESP_LOGW(TAG, "recherche de lieu : réponse refusée (HTTP %d%s)", statut, rec.trop ? ", trop grande" : "");
-            return EtatTelechargement::Echec;
-        }
-        n = rec.n;
-        return EtatTelechargement::Termine;
-    }
-
-    static void tache(void *arg) {
-        auto *t = static_cast<Telechargeur *>(arg);
-        for (;;) {
-            char *adresse = t->travail_; // copie à part : la demande peut être remplacée pendant le téléchargement
-            xSemaphoreTake(t->verrou_, portMAX_DELAY);
-            std::snprintf(adresse, kAdresseMax, "%s", t->url_);
-            const std::uint32_t ma_generation = t->generation_;
-            char *tampon = t->tampon_;
-            xSemaphoreGive(t->verrou_);
-
-            std::size_t n = 0;
-            EtatTelechargement fin = EtatTelechargement::Inactif;
-            if (adresse[0] != '\0' && tampon != nullptr) {
-                fin = telecharger(adresse, tampon, n);
-            }
-
-            xSemaphoreTake(t->verrou_, portMAX_DELAY);
-            if (ma_generation == t->generation_) { // la demande est toujours celle de l'écran
-                t->etat_ = fin == EtatTelechargement::Inactif ? EtatTelechargement::Echec : fin;
-                t->taille_ = n;
-                t->actif_ = false;
-                xSemaphoreGive(t->verrou_);
-                break;
-            }
-            if (t->url_[0] == '\0') { // demande annulée (liberer) : on rend le tampon et on s'arrête
-                heap_caps_free(t->tampon_);
-                t->tampon_ = nullptr;
-                t->actif_ = false;
-                xSemaphoreGive(t->verrou_);
-                break;
-            }
-            xSemaphoreGive(t->verrou_); // une nouvelle recherche est arrivée pendant celle-ci : on la prend
-        }
-        vTaskDelete(nullptr);
-    }
-
-    SemaphoreHandle_t verrou_;
-    char url_[kAdresseMax] = {};
-    char travail_[kAdresseMax] = {}; // lu et écrit par la tâche seule
-    std::uint32_t generation_ = 0;
-    bool actif_ = false;
-    EtatTelechargement etat_ = EtatTelechargement::Inactif;
-    char *tampon_ = nullptr;
-    std::size_t taille_ = 0;
-};
-
 // ---- le reste de l'appareil ---------------------------------------------------------------------------------------------
 
 class PortsEsp final : public PortsAppareil {
@@ -397,10 +213,11 @@ class PortsEsp final : public PortsAppareil {
         return w;
     }
 
-    void telecharger_lancer(const char *adresse) override { dl_.lancer(adresse); }
-    EtatTelechargement telecharger_etat() override { return dl_.etat(); }
-    std::string_view telecharger_corps() override { return dl_.corps(); }
-    void telecharger_liberer() override { dl_.liberer(); }
+    // La recherche de lieu passe par le seul client HTTPS du géocodage (main/geocodage.cpp : tâche d'arrière-plan, verrou TLS).
+    void telecharger_lancer(const char *adresse) override { geocodage_ecran_lancer(adresse); }
+    EtatTelechargement telecharger_etat() override { return geocodage_ecran_etat(); }
+    std::string_view telecharger_corps() override { return geocodage_ecran_corps(); }
+    void telecharger_liberer() override { geocodage_ecran_liberer(); }
 
     // La mer (ADR-0026) : le registre des spots est celui de la page web (main/reglages_mer.*, qui valide, écrit en NVS et réveille le
     // client réseau) ; la liste de Vigie est lue par une tâche à part (main/mer_liste_client.cpp).
@@ -429,7 +246,6 @@ class PortsEsp final : public PortsAppareil {
     std::int64_t maintenant_ms() override { return esp_timer_get_time() / 1000; }
 
   private:
-    Telechargeur dl_;
 };
 
 } // namespace
