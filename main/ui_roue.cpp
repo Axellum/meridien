@@ -39,10 +39,16 @@ constexpr int POINT_FAMILLE = 6; // rayon du point qui dit « ce bouton déplie 
 constexpr const char *POINTS_DE_SUSPENSION = "\xE2\x80\xA6"; // « … »
 constexpr const char *MOT_MOYEU = "Aller à";                 // la clé française ; traduite par `traduire`
 
+// Marge autour de ce que la roue dessine (anticrénelage des disques et de l'arc, débord d'un glyphe hors de sa boîte), en pixels.
+constexpr int MARGE_ZONE = 4;
+constexpr double PI = 3.14159265358979323846;
+
 struct Etat {
     bool ouverte = false;
-    // L'objet plein écran de la roue : SANS fond depuis le 09/11/2026 (il ne dessine que la roue et reçoit les touchers). Son nom date du
-    // voile qu'il posait sur l'écran principal avant ; il est gardé tel quel pour ne pas toucher aux lignes d'autres branches.
+    // L'objet de la roue, sans fond : il dessine la roue et reçoit les touchers. Depuis le 11/11/2026 il a la taille de la roue
+    // (`zone_de_la_roue`) et non plus celle de l'écran : l'ouvrir ou le fermer ne fait repeindre que cette zone, pas tout l'accueil.
+    // Sa zone de toucher, elle, couvre tout l'écran (`lv_obj_set_ext_click_area`) : un toucher hors de la roue la referme toujours.
+    // Son nom date du voile qu'il posait sur l'écran principal avant le 09/11/2026.
     lv_obj_t *voile = nullptr;
     lv_timer_t *minuteur = nullptr;
     const visuel::ThemePrincipal *theme = nullptr;
@@ -164,10 +170,14 @@ int dans_le_tour(int degres) { return ((degres % 360) + 360) % 360; }
 // géométrie (disposer, roue_geometrie.hpp) : y = moyeu.y - r sin(angle) quand la roue est au-dessus du moyeu (90 : en haut, sens
 // trigonométrique), mais y = moyeu.y + r sin(angle) quand elle est en dessous (`dessous`, 90 : en bas). Ceux de LVGL tournent dans le
 // sens horaire depuis la droite : l'angle de la géométrie tel quel en dessous, 360 - angle au-dessus.
-void bande(const dz::Pinceau &pc, const roue::Anneau &a, int rayon, int diametre, std::uint32_t couleur) {
-    if (a.n <= 0) {
-        return;
-    }
+struct ArcDeBande {
+    int exterieur; // rayon extérieur, en pixels
+    int epaisseur;
+    int debut; // angles de LVGL, dans [0, 360[
+    int fin;
+};
+
+ArcDeBande arc_de_bande(const roue::Anneau &a, int rayon, int diametre) {
     int plus_petit = a.bouton[0].angle;
     int plus_grand = a.bouton[0].angle;
     for (int i = 1; i < a.n; ++i) {
@@ -177,8 +187,16 @@ void bande(const dz::Pinceau &pc, const roue::Anneau &a, int rayon, int diametre
     const int marge = echelle(BANDE_MARGE);
     const int premier = g.roue.dessous ? plus_petit : 360 - plus_grand;
     const int dernier = g.roue.dessous ? plus_grand : 360 - plus_petit;
-    dz::arc(pc, g.roue.moyeu.x, g.roue.moyeu.y, rayon + diametre / 2 + marge, diametre + 2 * marge,
-            dans_le_tour(premier - BANDE_PAD_DEG), dans_le_tour(dernier + BANDE_PAD_DEG), couleur, OPA_BANDE, true);
+    return {rayon + diametre / 2 + marge, diametre + 2 * marge, dans_le_tour(premier - BANDE_PAD_DEG),
+            dans_le_tour(dernier + BANDE_PAD_DEG)};
+}
+
+void bande(const dz::Pinceau &pc, const roue::Anneau &a, int rayon, int diametre, std::uint32_t couleur) {
+    if (a.n <= 0) {
+        return;
+    }
+    const ArcDeBande b = arc_de_bande(a, rayon, diametre);
+    dz::arc(pc, g.roue.moyeu.x, g.roue.moyeu.y, b.exterieur, b.epaisseur, b.debut, b.fin, couleur, OPA_BANDE, true);
 }
 
 void dessiner_mot(const dz::Pinceau &pc, const roue::Mot &mot, const char *texte) {
@@ -230,7 +248,7 @@ void dessiner(lv_event_t *evenement) {
     const dz::Pinceau pc = {couche, g.theme};
     const visuel::ThemePrincipal &t = *g.theme;
     // Pas de voile sur l'écran principal (retiré le 09/11/2026, demande d'Axel : il mettait trop de temps à s'afficher) : seule la roue est
-    // dessinée, sur l'accueil tel qu'il est. L'objet reste plein écran et cliquable : un toucher hors de la roue la referme.
+    // dessinée, sur l'accueil tel qu'il est. Tout ce qui est dessiné ici doit tenir dans `zone_de_la_roue` (l'objet coupe le reste).
     bande(pc, g.roue.premier, g.m.rayon_1, g.m.diametre_1, t.texte);
     for (int i = 0; i < g.roue.premier.n; ++i) {
         dessiner_bouton(pc, g.roue.premier.bouton[i], g.entrees[i].icone, g.sous == i && !g.sous_second, g.famille == i,
@@ -252,10 +270,113 @@ void dessiner(lv_event_t *evenement) {
     }
 }
 
+// ---- la zone de la roue -------------------------------------------------------------------------------------------------------------
+
+// Le rectangle qui contient tout ce que `dessiner` peut poser, mêmes nombres que lui (un peu plus large, jamais moins : ce qui en
+// sortirait serait coupé). Le banc le vérifie : les rendus de la scène `roue` sont identiques au pixel à ceux de l'objet plein écran.
+struct Boite {
+    int x1 = 0;
+    int y1 = 0;
+    int x2 = -1;
+    int y2 = -1;
+    bool vide = true;
+
+    void ajouter(int ax1, int ay1, int ax2, int ay2) {
+        if (vide) {
+            x1 = ax1;
+            y1 = ay1;
+            x2 = ax2;
+            y2 = ay2;
+            vide = false;
+            return;
+        }
+        x1 = std::min(x1, ax1);
+        y1 = std::min(y1, ay1);
+        x2 = std::max(x2, ax2);
+        y2 = std::max(y2, ay2);
+    }
+    void disque(int cx, int cy, int r) { ajouter(cx - r, cy - r, cx + r, cy + r); }
+};
+
+// L'arc de la bande : ses deux bouts arrondis (un disque de la demi-épaisseur, au milieu de la bande) et, à l'extérieur, chaque point
+// cardinal que l'arc traverse (LVGL : 0 à droite, 90 en bas, sens horaire du début à la fin). Ce rectangle est exact.
+void zone_bande(Boite &b, const roue::Anneau &a, int rayon, int diametre) {
+    if (a.n <= 0) {
+        return;
+    }
+    const ArcDeBande arc = arc_de_bande(a, rayon, diametre);
+    const double milieu = arc.exterieur - arc.epaisseur / 2.0;
+    const Point c = g.roue.moyeu;
+    for (const int angle : {arc.debut, arc.fin}) {
+        const double t = angle * PI / 180.0;
+        b.disque(c.x + static_cast<int>(std::lround(milieu * std::cos(t))),
+                 c.y + static_cast<int>(std::lround(milieu * std::sin(t))), arc.epaisseur / 2 + 1);
+    }
+    const int course = dans_le_tour(arc.fin - arc.debut);
+    for (int cardinal = 0; cardinal < 360; cardinal += 90) {
+        if (dans_le_tour(cardinal - arc.debut) <= course) {
+            const double t = cardinal * PI / 180.0;
+            const int x = c.x + static_cast<int>(std::lround(arc.exterieur * std::cos(t)));
+            const int y = c.y + static_cast<int>(std::lround(arc.exterieur * std::sin(t)));
+            b.ajouter(x, y, x, y);
+        }
+    }
+}
+
+// Les boutons d'un anneau : le disque (et son contour, posé dedans), le point de famille, le mot.
+void zone_boutons(Boite &b, const roue::Anneau &a) {
+    const int rayon = g.m.diametre_1 / 2; // comme dessiner_bouton
+    const int h = dz::hauteur_ligne(g.mot);
+    for (int i = 0; i < a.n; ++i) {
+        const roue::Bouton &bt = a.bouton[i];
+        b.disque(bt.x, bt.y, rayon);
+        b.disque(bt.x + rayon * 7 / 10, bt.y - rayon * 7 / 10, echelle(POINT_FAMILLE));
+        if (bt.mot.largeur > 0) {
+            const int x = bt.mot.x - bt.mot.largeur / 2;
+            const int y = bt.mot.y - h / 2;
+            b.ajouter(x, y, x + bt.mot.largeur - 1, y + h - 1);
+        }
+    }
+}
+
+lv_area_t zone_de_la_roue() {
+    Boite b;
+    zone_bande(b, g.roue.premier, g.m.rayon_1, g.m.diametre_1);
+    zone_boutons(b, g.roue.premier);
+    // Le moyeu : son halo, le plus grand de ses disques, et son mot (comme dessiner_moyeu).
+    const Point c = g.roue.moyeu;
+    b.disque(c.x, c.y, g.m.jauge / 2 + echelle(14));
+    const int y_mot = c.y + g.m.moyeu * 14 / 100 - dz::hauteur_ligne(g.mot) / 2 + g.m.moyeu * 8 / 100;
+    b.ajouter(c.x - g.m.jauge / 2, y_mot, c.x - g.m.jauge / 2 + g.m.jauge - 1, y_mot + dz::hauteur_ligne(g.mot) - 1);
+    if (g.famille >= 0 && g.famille < g.n) {
+        zone_bande(b, g.second, g.m.rayon_2, g.m.diametre_2);
+        zone_boutons(b, g.second);
+    }
+    // Avec sa marge, ramenée à l'écran (ce qui dépasse ne se voit pas).
+    const int largeur = static_cast<int>(g.largeur); // int32_t est un `long` sur le RISC-V
+    const int hauteur = static_cast<int>(g.hauteur);
+    const lv_area_t z = {std::max(0, b.x1 - MARGE_ZONE), std::max(0, b.y1 - MARGE_ZONE),
+                         std::min(largeur - 1, b.x2 + MARGE_ZONE), std::min(hauteur - 1, b.y2 + MARGE_ZONE)};
+    if (b.vide || z.x1 > z.x2 || z.y1 > z.y2) {
+        return {0, 0, g.largeur - 1, g.hauteur - 1}; // ne peut pas arriver ; l'écran entier plutôt qu'une roue coupée
+    }
+    return z;
+}
+
 // ---- ouverture, dépliement, fermeture -------------------------------------------------------------------------------------------
+
+// Donne à l'objet la zone de la roue (elle change quand une famille se déplie ou se replie, ou que la roue est reposée) : quand elle
+// change, LVGL invalide l'ancienne zone et la nouvelle.
+void placer() {
+    const lv_area_t z = zone_de_la_roue();
+    lv_obj_set_pos(g.voile, z.x1, z.y1);
+    lv_obj_set_size(g.voile, lv_area_get_width(&z), lv_area_get_height(&z));
+    lv_obj_update_layout(g.voile);
+}
 
 void invalider() {
     if (g.voile != nullptr) {
+        placer();
         lv_obj_invalidate(g.voile);
     }
 }
@@ -270,7 +391,9 @@ void fermer_sans_action() {
         g.minuteur = nullptr;
     }
     if (g.voile != nullptr) {
-        lv_obj_add_flag(g.voile, LV_OBJ_FLAG_HIDDEN); // plus rien ne le dessine ni ne le touche avant sa suppression
+        // Le cacher invalide sa zone, celle de la roue (l'accueil y est repeint) ; plus rien ne le dessine ni ne le touche avant sa
+        // suppression, qui n'invalide plus rien (LVGL n'invalide pas un objet caché).
+        lv_obj_add_flag(g.voile, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(g.voile, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_delete_async(g.voile); // on peut être dans son propre rappel (le toucher qui ferme)
         g.voile = nullptr;
@@ -493,13 +616,20 @@ bool ui_roue_ouvrir(const ContexteRoue &ctx, const EntreeRoue *entrees, int n, i
     g.long_fait = false;
     g.sous = -1;
 
+    // L'objet naît à une place et une taille par défaut avant d'être posé : sans cette coupure LVGL invaliderait aussi ces zones-là.
+    // Il est créé, posé et mis en page sans rien invalider ; puis seule sa zone, celle de la roue, est invalidée.
+    lv_display_t *affichage = lv_obj_get_display(ctx.couche);
+    lv_display_enable_invalidation(affichage, false);
     g.voile = lv_obj_create(ctx.couche);
     lv_obj_remove_style_all(g.voile);
-    lv_obj_set_pos(g.voile, 0, 0);
-    lv_obj_set_size(g.voile, ctx.largeur, ctx.hauteur);
     lv_obj_add_flag(g.voile, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(g.voile, LV_OBJ_FLAG_SCROLLABLE);
+    // Un toucher n'importe où sur l'écran arrive à la roue, comme quand l'objet était plein écran : la marge part du bord de l'objet,
+    // qui est dans l'écran ; la plus grande dimension de l'écran couvre donc l'écran entier.
+    lv_obj_set_ext_click_area(g.voile, std::max(ctx.largeur, ctx.hauteur));
     lv_obj_add_event_cb(g.voile, sur_voile, LV_EVENT_ALL, nullptr);
+    placer();
+    lv_display_enable_invalidation(affichage, true);
     g.minuteur = lv_timer_create(sur_inactivite, static_cast<uint32_t>(roue::INACTIVITE_MS), nullptr);
     lv_timer_set_repeat_count(g.minuteur, 1);
     g.ouverte = true;

@@ -2,6 +2,7 @@
 // Rendu LVGL logiciel sur le PC : ce n'est pas la dalle (docs/outils.md, « Ce que le rendu ne couvre pas »).
 #include "banc.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -12,6 +13,7 @@
 #include "ecran/i18n.hpp"
 #include "lvgl.h"
 #include "meteo_zone.h"
+#include "src/draw/sw/lv_draw_sw.h" // compte des mélanges (BANC_CHRONO)
 
 namespace {
 
@@ -85,6 +87,41 @@ void choisir_carte_selon_taille() {
         g_carte.display_controller = "EK79007";
         g_carte.touch_controller = "GT911";
     }
+}
+
+// Compte des appels de mélange (`lv_draw_sw_blend`) : un aiguilleur RGB565 enregistré compte l'appel, se retire le temps de laisser
+// LVGL mélanger comme d'habitude, puis se remet. Seulement pendant le repeint compté (il coûte lui-même du temps).
+uint32_t g_melanges = 0;
+void compter_melange(lv_draw_task_t *tache, const lv_draw_sw_blend_dsc_t *dsc);
+lv_draw_sw_custom_blend_handler_t g_compteur = {LV_COLOR_FORMAT_RGB565, compter_melange};
+void compter_melange(lv_draw_task_t *tache, const lv_draw_sw_blend_dsc_t *dsc) {
+    ++g_melanges;
+    lv_draw_sw_unregister_blend_handler(LV_COLOR_FORMAT_RGB565);
+    lv_draw_sw_blend(tache, dsc);
+    lv_draw_sw_register_blend_handler(&g_compteur);
+}
+
+// BANC_CHRONO=1, après l'image : un repeint complet de l'écran tel qu'il est (sans changement de données : c'est ce que la carte
+// fait au retour d'une page), chronométré 15 fois (médiane), puis une fois de plus en comptant les mélanges.
+void mesurer_repeint_complet() {
+    using horloge_pc = std::chrono::steady_clock;
+    lv_obj_t *ecran = lv_display_get_screen_active(g_affichage);
+    std::vector<long long> durees;
+    for (int i = 0; i < 15; ++i) {
+        lv_obj_invalidate(ecran);
+        const auto a = horloge_pc::now();
+        lv_refr_now(g_affichage);
+        durees.push_back(static_cast<long long>(
+            std::chrono::duration_cast<std::chrono::microseconds>(horloge_pc::now() - a).count()));
+    }
+    std::sort(durees.begin(), durees.end());
+    g_melanges = 0;
+    lv_draw_sw_register_blend_handler(&g_compteur);
+    lv_obj_invalidate(ecran);
+    lv_refr_now(g_affichage);
+    lv_draw_sw_unregister_blend_handler(LV_COLOR_FORMAT_RGB565);
+    std::fprintf(stderr, "chrono PC : repeint complet %lld us (médiane de 15, min %lld), %u mélanges\n",
+                 durees[durees.size() / 2], durees.front(), static_cast<unsigned>(g_melanges));
 }
 
 bool lire_taille(const char *texte, int32_t &largeur, int32_t &hauteur) {
@@ -243,6 +280,9 @@ int main(int argc, char **argv) {
     if (!ecrire_ppm(sortie)) {
         std::fprintf(stderr, "banc : écriture impossible : %s\n", sortie);
         return 1;
+    }
+    if (chrono) { // après l'image : ces repeints ne la touchent pas
+        mesurer_repeint_complet();
     }
     return 0;
 }
