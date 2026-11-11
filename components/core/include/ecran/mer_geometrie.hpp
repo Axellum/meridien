@@ -234,6 +234,11 @@ struct Disposition {
     Rect legende;
     Rect maree;
     Rect soleil;
+    // Le pied : le crédit des données de mer (CC BY 4.0) et « pas pour la navigation » (ADR-0018). Une ligne en paysage (crédit à gauche,
+    // avertissement à droite), deux en portrait. Il descend dans la marge du bas (`marge_bas`, plus petite que `marge`) : c'est un texte
+    // sans cadre, il n'a pas besoin de la marge d'un panneau, et les cartes ne perdent que ce qui ne tenait pas dans cette marge.
+    Rect pied;
+    int marge_bas = 0;
 };
 
 constexpr Disposition disposer(int largeur, int hauteur) noexcept {
@@ -253,6 +258,8 @@ constexpr Disposition disposer(int largeur, int hauteur) noexcept {
     const int h_entete = mis(60, m);
     const int h_bandeau = mis(44, m);
     const int h_legende = mis(26, m);
+    const int h_ligne_pied = mis(22, m); // une ligne de la petite police (18 à l'échelle de 720)
+    const int ecart_pied = mis(2, m);
     const int largeur_utile = largeur - 2 * d.marge;
     int y = d.marge;
     d.entete = Rect{d.marge, y, largeur_utile, h_entete};
@@ -264,11 +271,15 @@ constexpr Disposition disposer(int largeur, int hauteur) noexcept {
     d.bandeau = Rect{d.marge, y, largeur_utile, h_bandeau};
     y += h_bandeau + d.ecart;
     const int y_cartes = y;
+    d.marge_bas = mis(4, m);
+    const int h_pied = d.portrait ? 2 * h_ligne_pied : h_ligne_pied;
+    d.pied = Rect{d.marge, hauteur - d.marge_bas - h_pied, largeur_utile, h_pied};
+    const int bas_panneaux = d.pied.y - ecart_pied; // le bas de la marée et du soleil
 
     if (!d.portrait) {
         // Paysage : quatre cartes côte à côte ; marée (deux tiers) et soleil (un tiers) en bas.
         const int h_bas = mis(170, m);
-        d.maree = Rect{d.marge, hauteur - d.marge - h_bas, (largeur_utile - d.ecart) * 2 / 3, h_bas};
+        d.maree = Rect{d.marge, bas_panneaux - h_bas, (largeur_utile - d.ecart) * 2 / 3, h_bas};
         d.soleil =
             Rect{d.maree.droite() + d.ecart, d.maree.y, largeur_utile - (d.maree.droite() + d.ecart - d.marge), h_bas};
         d.legende = Rect{d.marge, d.maree.y - d.ecart - h_legende, largeur_utile, h_legende};
@@ -285,13 +296,13 @@ constexpr Disposition disposer(int largeur, int hauteur) noexcept {
         const int h_panneau_max = mis(170, m);
         const int h_panneau_min = mis(150, m);
         const int pour_les_panneaux =
-            hauteur - d.marge - y_cartes - 2 * mesures_carte(m).hauteur_min - 4 * d.ecart - 2 * h_legende;
+            bas_panneaux - y_cartes - 2 * mesures_carte(m).hauteur_min - 4 * d.ecart - 2 * h_legende;
         int h_panneau = pour_les_panneaux / 2;
         if (h_panneau > h_panneau_max)
             h_panneau = h_panneau_max;
         if (h_panneau < h_panneau_min)
             return Disposition{}; // écran trop plat : pas de page plutôt qu'une page qui se recouvre
-        d.soleil = Rect{d.marge, hauteur - d.marge - h_panneau, largeur_utile, h_panneau};
+        d.soleil = Rect{d.marge, bas_panneaux - h_panneau, largeur_utile, h_panneau};
         d.maree = Rect{d.marge, d.soleil.y - d.ecart - h_panneau, largeur_utile, h_panneau};
         // Deux lignes : les pastilles de verdict, puis la phrase qui dit lire une barre (elle ne tient pas à côté sur 720 px).
         d.legende = Rect{d.marge, d.maree.y - d.ecart - 2 * h_legende, largeur_utile, 2 * h_legende};
