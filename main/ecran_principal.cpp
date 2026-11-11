@@ -309,10 +309,12 @@ void rafraichir(lv_timer_t *) {
 
     // La météo : d'abord la météo riche (contrat v2 : courant complet, 24 heures, 7 jours, pluie proche, tendance de pression),
     // sinon le relevé v1 (repli tant que la v2 n'est pas lue : cache absent ou première requête pas encore faite).
-    // `detail` pèse ≈ 2 Ko : static plutôt que la pile de la tâche LVGL, qui est seule à passer ici.
-    static MeteoDetail detail;
-    if (meteo_detail_lire(&detail) && detail.valide) {
-        entrees.meteo = visuel::vue_depuis_detail(detail, g_ville);
+    // `detail` pèse ≈ 2 Ko : alloué une fois en PSRAM plutôt que sur la pile de la tâche LVGL (seule à passer ici) ou en variable
+    // statique (RAM interne). Lu par cette tâche seule, jamais par une interruption ni le DMA. Sans place : le relevé v1 ci-dessous.
+    static MeteoDetail *const detail =
+        static_cast<MeteoDetail *>(heap_caps_calloc(1, sizeof(MeteoDetail), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (detail != nullptr && meteo_detail_lire(detail) && detail->valide) {
+        entrees.meteo = visuel::vue_depuis_detail(*detail, g_ville);
     } else {
         meteo::Releve releve = {};
         int echecs = 0;
