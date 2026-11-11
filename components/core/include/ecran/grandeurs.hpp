@@ -44,27 +44,10 @@ using visuel::VueMeteo;
 
 // ================================================================================================================ 1. textes
 
-// Les phrases propres à cette page. Les mots des grandeurs (« Vent », « Humidité », « Faible », « Il pleut », « En hausse »,
-// « Pleine lune »...) sont déjà traduits dans ecran/visuel_textes.hpp : `texte()` les y trouve. À migrer dans i18n/*.yaml avec eux
-// (ADR-0006, quand l'écran sera stabilisé). NON relus par un locuteur natif, comme le reste de la table.
-inline constexpr visuel::Texte TEXTES[] = {
-    {"Détails", {"Details", "Details", "Details", "Detalles", "Dettagli", "Ayrıntılar"}},
-    {"Fermer", {"Close", "Schließen", "Sluiten", "Cerrar", "Chiudi", "Kapat"}},
-};
-
-inline constexpr std::size_t NOMBRE_TEXTES = sizeof(TEXTES) / sizeof(TEXTES[0]);
-
-// Le texte dans la langue : cette table, puis celles de l'écran principal et la table commune (visuel::texte), enfin le français.
+// Les mots de la page (« Détails », « Fermer », « Vent », « Humidité », « Faible »...) sont dans la table commune (i18n/*.yaml,
+// ADR-0006). NON relus par un locuteur natif, comme le reste de la table.
 constexpr std::string_view texte(std::string_view francais, Langue langue) noexcept {
-    for (const visuel::Texte &x : TEXTES) {
-        if (x.fr == francais) {
-            if (langue == Langue::Fr)
-                return x.fr;
-            const std::string_view propre = x.t[i18n::indice(langue) - 1];
-            return propre.empty() ? x.t[0] : propre;
-        }
-    }
-    return visuel::texte(francais, langue);
+    return i18n::tr(francais, langue);
 }
 
 // ============================================================================================================ 2. les tuiles

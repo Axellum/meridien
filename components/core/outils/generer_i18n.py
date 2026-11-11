@@ -15,10 +15,14 @@ Usage :
                                                              une sortie n'est plus à jour
 
 Contrôles des sources (tous bloquants) : format strict ; ordre figé des langues (l'indice est enregistré en NVS) ;
-mêmes marqueurs dans le même ordre entre la clé et chaque traduction (%d %s %u…, {noms}) ; une langue marquée
+mêmes marqueurs entre la clé et chaque traduction (%d %s %u… dans le même ordre ; {noms} dans l'ordre que la langue veut) ; une langue marquée
 `_statut: complet` a toutes les clés, dans le même ordre que les autres ; aucun caractère de contrôle ; aucun doublon.
 Repli : une clé absente d'une langue partielle prend l'anglais, puis le français. Dans la table C++ la case reste vide
 (le repli est fait à l'exécution par ecran/i18n.hpp et testé) ; dans les fichiers JSON il est écrit à la génération.
+
+Contexte : un même mot français peut avoir deux sens (« faible » : un vent léger, une mer basse, un petit coefficient). La clé
+s'écrit alors « contexte|texte » (`"vent|faible": "light"`) : le texte français affiché est la partie après la première barre,
+le contexte n'est jamais affiché. Une clé sans barre n'a qu'un sens. Le contexte : lettres minuscules, chiffres, espaces.
 """
 import json
 import re
@@ -40,6 +44,7 @@ LIGNE_META = re.compile(r"^_([a-z]+): ([^#]*?)\s*(?:#.*)?$")
 LIGNE_SECTION = re.compile(r"^# --- (.+) ---$")
 # Marqueurs à conserver : %d %s %u %02d %lu… (jamais « % » suivi d'une espace) et {noms}.
 MARQUEUR = re.compile(r"%%|%[-+#0]*\d*(?:\.\d+)?(?:hh|h|ll|l|z)?[diuxXsc]|\{[a-z_][a-z0-9_]*\}")
+CONTEXTE = re.compile(r"[a-z0-9 ]+")
 INVISIBLES = re.compile("[ ­ -‏ -  -⁯﻿]")
 
 
@@ -47,9 +52,24 @@ class ErreurSource(Exception):
     pass
 
 
+def texte_francais(cle):
+    """Le texte français que montre une clé : la partie après « contexte| » s'il y en a un (voir CONTEXTE)."""
+    contexte, barre, texte = cle.partition("|")
+    return texte if barre else cle
+
+
 def marqueurs(texte):
     """Marqueurs du texte, dans l'ordre (« %% » n'est pas un marqueur)."""
     return [m for m in MARQUEUR.findall(texte) if m != "%%"]
+
+
+def memes_marqueurs(cle, valeur):
+    """Les « %d %s… » sont lus par printf dans l'ordre : même liste, même ordre. Les {noms} sont remplacés par leur nom
+    (ecran::texte::remplir, mer_textes.hpp, app.js) : les mêmes, mais une langue peut changer leur ordre (« {heure} saatine
+    kadar » en turc)."""
+    a, b = marqueurs(cle), marqueurs(valeur)
+    pourcents = [m for m in a if m.startswith("%")] == [m for m in b if m.startswith("%")]
+    return pourcents and sorted(m for m in a if m.startswith("{")) == sorted(m for m in b if m.startswith("{"))
 
 
 def lire_yaml(chemin):
@@ -124,9 +144,13 @@ def charger():
                 raise ErreurSource(f"{lg['code']}.yaml : traduction entourée d'espaces pour {cle!r}")
             if not valeur:
                 raise ErreurSource(f"{lg['code']}.yaml : traduction vide pour {cle!r} (supprimer la ligne plutôt)")
-            if marqueurs(cle) != marqueurs(valeur):
+            contexte, barre, texte = cle.partition("|")
+            if barre and (not CONTEXTE.fullmatch(contexte) or not texte.strip() or "|" in texte):
+                raise ErreurSource(f"{lg['code']}.yaml : clé à contexte mal formée {cle!r} (forme : « contexte|texte », "
+                                   "contexte en minuscules, une seule barre)")
+            if not memes_marqueurs(texte_francais(cle), valeur):
                 raise ErreurSource(f"{lg['code']}.yaml : marqueurs différents pour {cle!r} : {marqueurs(cle)} contre "
-                                   f"{marqueurs(valeur)} (même liste, même ordre)")
+                                   f"{marqueurs(valeur)} (%… : même liste, même ordre ; {{noms}} : les mêmes, ordre libre)")
         if lg["complet"]:
             absentes = [c for c, _ in cles if c not in lg["entrees"]]
             if absentes:
@@ -186,7 +210,8 @@ def produire_json(langues, page):
     for lg in langues:
         contenu = {}
         for ident, fr in page:
-            contenu[ident] = fr if lg["indice"] == 0 else lg["entrees"].get(fr) or repli.get(fr) or fr
+            francais = texte_francais(fr)
+            contenu[ident] = francais if lg["indice"] == 0 else lg["entrees"].get(fr) or repli.get(fr) or francais
         sorties[lg["code"]] = json.dumps(dict(sorted(contenu.items())), ensure_ascii=False, separators=(",", ":")) + "\n"
     return sorties
 

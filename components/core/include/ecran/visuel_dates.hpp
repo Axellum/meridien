@@ -165,21 +165,11 @@ constexpr std::size_t formater_date(i18n::Langue langue, const heure::HeureLocal
 
 // Jours abrégés de la bande de la semaine, ceux que chaque langue écrit dans ses calendriers (dimanche en premier, comme
 // jour_semaine). Une simple troncature donnerait « Paz » pour dimanche ET lundi en turc, et « Mit », « Mon » en allemand, que
-// personne n'écrit : d'où la table.
-inline constexpr const char *JOURS_COURTS[i18n::NOMBRE_LANGUES][7] = {
-    {"dim", "lun", "mar", "mer", "jeu", "ven", "sam"}, // fr
-    {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}, // en
-    {"So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"},        // de
-    {"zo", "ma", "di", "wo", "do", "vr", "za"},        // nl
-    {"dom", "lun", "mar", "mi\xC3\xA9", "jue", "vie",
-     "s\xC3\xA1"
-     "b"},                                             // es : mié, sáb
-    {"dom", "lun", "mar", "mer", "gio", "ven", "sab"}, // it
-    {"Paz", "Pzt", "Sal",
-     "\xC3\x87"
-     "ar",
-     "Per", "Cum", "Cmt"}, // tr : Çar
-};
+// personne n'écrit : d'où des mots à part, dans la table commune (i18n/*.yaml, section « Écran : jours courts »). La clé porte
+// le contexte « jour court » : « mer » (mercredi) n'est pas « Mer » (la page de la mer).
+inline constexpr std::string_view JOURS_COURTS[7] = {"jour court|dim", "jour court|lun", "jour court|mar",
+                                                     "jour court|mer", "jour court|jeu", "jour court|ven",
+                                                     "jour court|sam"};
 
 // Jour abrégé pour la bande de la semaine (« ven », « Fr », « Cmt »). Rend 0 si le jour est invalide ou si le tampon est trop petit.
 constexpr std::size_t jour_court(i18n::Langue langue, int jour_semaine, char *sortie, std::size_t capacite) noexcept {
@@ -189,7 +179,7 @@ constexpr std::size_t jour_court(i18n::Langue langue, int jour_semaine, char *so
         p.trop = true;
         return p.finir();
     }
-    p.texte(JOURS_COURTS[l][jour_semaine]);
+    p.texte(i18n::tr(JOURS_COURTS[jour_semaine], langue));
     return p.finir();
 }
 

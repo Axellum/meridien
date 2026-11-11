@@ -15,19 +15,52 @@ namespace {
 
 constexpr bool egal(const char *a, std::string_view b) { return std::string_view(a) == b; }
 
-constexpr bool est_une_cle(std::string_view cle) {
-    for (const Mot &m : MOTS) {
-        if (m.fr == cle)
-            return true;
-    }
-    return false;
-}
+using ecran::i18n::est_une_cle;
+
+// Les mots de l'écran des alertes : dans la table commune depuis le 11/11/2026 (i18n/*.yaml, section « Écran : la page des
+// alertes », plus « Vent », « Pluie », « Orage »… déjà présents). Copie des clés que l'écran demande.
+constexpr std::string_view MOTS[] = {
+    "Alerte météo",
+    "Vent",
+    "Pluie",
+    "Orage",
+    "Neige et verglas",
+    "Chaleur",
+    "Froid",
+    "Crue",
+    "Avalanche",
+    "Littoral",
+    "Incendie",
+    "Brouillard",
+    "Alerte",
+    "Jaune",
+    "Orange",
+    "Rouge",
+    "Alertes officielles",
+    "Niveau",
+    "Phénomène",
+    "Début",
+    "Fin",
+    "Zone",
+    "Émetteur",
+    "Que faire",
+    "Sources",
+    "Non communiquée",
+    "Reçu à",
+    "Fermer",
+    "Aucune alerte en vigueur",
+    "Alertes relayées par Vigie",
+    "Ceci n'est pas un service d'alerte officiel. Suivez les avis de vos autorités nationales.",
+    "Certains avertissements de ce lieu ne peuvent pas être rattachés à un point : la liste peut être incomplète.",
+    "Des données de cette source ne sont pas à jour.",
+};
+constexpr std::size_t NOMBRE_MOTS = sizeof(MOTS) / sizeof(MOTS[0]);
 
 constexpr int chaque_mot_a_ses_six_traductions() {
-    for (const Mot &m : MOTS) {
-        VERIFIER(!m.fr.empty());
-        for (std::string_view t : m.t)
-            VERIFIER(!t.empty());
+    for (std::string_view m : MOTS) {
+        VERIFIER(!m.empty() && est_une_cle(m));
+        for (int l = 1; l < static_cast<int>(ecran::i18n::NOMBRE_LANGUES); ++l)
+            VERIFIER(!ecran::i18n::propre(m, static_cast<Langue>(l)).empty());
     }
     return 0;
 }
@@ -35,7 +68,7 @@ constexpr int chaque_mot_a_ses_six_traductions() {
 constexpr int aucune_cle_n_est_en_double() {
     for (std::size_t i = 0; i < NOMBRE_MOTS; ++i) {
         for (std::size_t j = i + 1; j < NOMBRE_MOTS; ++j)
-            VERIFIER(MOTS[i].fr != MOTS[j].fr);
+            VERIFIER(MOTS[i] != MOTS[j]);
     }
     return 0;
 }
@@ -62,14 +95,20 @@ constexpr int une_cle_inconnue_est_rendue_telle_quelle() {
 }
 
 constexpr int une_traduction_vide_retombe_sur_l_anglais_puis_sur_le_francais() {
-    constexpr Mot sans_turc{"Brume", {"Mist", "Dunst", "Nevel", "Neblina", "Foschia", ""}};
-    VERIFIER(traduction(sans_turc, Langue::Tr) == "Mist");
-    VERIFIER(traduction(sans_turc, Langue::De) == "Dunst");
-    VERIFIER(traduction(sans_turc, Langue::Fr) == "Brume");
-    constexpr Mot sans_anglais{"Brume", {"", "Dunst", "Nevel", "Neblina", "Foschia", ""}};
-    VERIFIER(traduction(sans_anglais, Langue::Tr) == "Brume");
-    VERIFIER(traduction(sans_anglais, Langue::En) == "Brume");
-    VERIFIER(traduction(sans_anglais, Langue::Es) == "Neblina");
+    // Le repli est celui de la table commune (i18n::tr_dans) : essayé sur une table d'une ligne.
+    using ecran::i18n::Entree;
+    using ecran::i18n::tr_dans;
+    constexpr Entree sans_turc[] = {{"Brume", {"Mist", "Dunst", "Nevel", "Neblina", "Foschia", ""}}};
+    VERIFIER(tr_dans(sans_turc, 1, "Brume", Langue::Tr) == "Mist");
+    VERIFIER(tr_dans(sans_turc, 1, "Brume", Langue::De) == "Dunst");
+    VERIFIER(tr_dans(sans_turc, 1, "Brume", Langue::Fr) == "Brume");
+    constexpr Entree sans_anglais[] = {{"Brume", {"", "Dunst", "Nevel", "Neblina", "Foschia", ""}}};
+    VERIFIER(tr_dans(sans_anglais, 1, "Brume", Langue::Tr) == "Brume");
+    VERIFIER(tr_dans(sans_anglais, 1, "Brume", Langue::En) == "Brume");
+    VERIFIER(tr_dans(sans_anglais, 1, "Brume", Langue::Es) == "Neblina");
+    // `traduction` (ce que lit la page mer) passe par la table commune.
+    VERIFIER(traduction("Début", Langue::Tr) == "Başlangıç");
+    VERIFIER(traduction("Début", Langue::Fr) == "Début");
     return 0;
 }
 

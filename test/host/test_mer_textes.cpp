@@ -45,39 +45,35 @@ constexpr int nombre_de(std::string_view t, char c) {
 
 // ---- les tables ----------------------------------------------------------------------------------------------------------------
 
+// Les mots sont dans la table commune (i18n/*.yaml, section « Écran : la page mer ») depuis le 11/11/2026 : les tables de
+// mer_textes.hpp ne portent plus que la clé française, rangée dans l'ordre des énumérations.
+constexpr bool a_ses_six_traductions(std::string_view cle) {
+    if (cle.empty() || !ecran::i18n::est_une_cle(cle))
+        return false;
+    for (int l = 1; l < static_cast<int>(ecran::i18n::NOMBRE_LANGUES); ++l)
+        if (ecran::i18n::propre(cle, static_cast<Langue>(l)).empty())
+            return false;
+    return true;
+}
+
 constexpr int chaque_mot_a_ses_six_traductions() {
-    for (const Mot &m : TEXTES) {
-        VERIFIER(!m.fr.empty());
-        for (std::string_view t : m.t)
-            VERIFIER(!t.empty());
-    }
-    for (const Mot &m : ACTIVITES) {
-        VERIFIER(!m.fr.empty());
-        for (std::string_view t : m.t)
-            VERIFIER(!t.empty());
-    }
-    for (int v = 1; v < 4; ++v) {
-        VERIFIER(!VERDICTS[v].fr.empty());
-        for (std::string_view t : VERDICTS[v].t)
-            VERIFIER(!t.empty());
-    }
-    for (int c = 1; c < static_cast<int>(Critere::Nombre); ++c) {
-        VERIFIER(!CRITERES[c].fr.empty());
-        for (std::string_view t : CRITERES[c].t)
-            VERIFIER(!t.empty());
-    }
-    for (const TexteEtat &e : ETATS) {
-        VERIFIER(!e.mot.fr.empty());
-        for (std::string_view t : e.mot.t)
-            VERIFIER(!t.empty());
-    }
+    for (Mot m : TEXTES)
+        VERIFIER(a_ses_six_traductions(m));
+    for (Mot m : ACTIVITES)
+        VERIFIER(a_ses_six_traductions(m));
+    for (int v = 1; v < 4; ++v)
+        VERIFIER(a_ses_six_traductions(VERDICTS[v]));
+    for (int c = 1; c < static_cast<int>(Critere::Nombre); ++c)
+        VERIFIER(a_ses_six_traductions(CRITERES[c]));
+    for (const TexteEtat &e : ETATS)
+        VERIFIER(a_ses_six_traductions(e.mot));
     return 0;
 }
 
 constexpr int aucune_cle_n_est_en_double() {
     for (std::size_t i = 0; i < NOMBRE_TEXTES; ++i)
         for (std::size_t j = i + 1; j < NOMBRE_TEXTES; ++j)
-            VERIFIER(TEXTES[i].fr != TEXTES[j].fr);
+            VERIFIER(TEXTES[i] != TEXTES[j]);
     // Une paire (critère, état) ne se dit qu'une fois.
     for (std::size_t i = 0; i < NOMBRE_ETATS; ++i)
         for (std::size_t j = i + 1; j < NOMBRE_ETATS; ++j)
@@ -88,12 +84,13 @@ constexpr int aucune_cle_n_est_en_double() {
 constexpr int une_traduction_garde_les_marqueurs_de_la_cle_francaise() {
     constexpr std::string_view NOMS[] = {"{n}",   "{age}",      "{niveau}",  "{heure}", "{points}",
                                          "{sur}", "{activite}", "{critere}", "{etat}"};
-    for (const Mot &m : TEXTES) {
-        for (std::string_view t : m.t) {
-            VERIFIER(nombre_de(t, '{') == nombre_de(m.fr, '{'));
-            VERIFIER(nombre_de(t, '}') == nombre_de(m.fr, '}'));
+    for (Mot m : TEXTES) {
+        for (int l = 1; l < static_cast<int>(ecran::i18n::NOMBRE_LANGUES); ++l) {
+            const std::string_view t = ecran::i18n::propre(m, static_cast<Langue>(l));
+            VERIFIER(nombre_de(t, '{') == nombre_de(m, '{'));
+            VERIFIER(nombre_de(t, '}') == nombre_de(m, '}'));
             for (std::string_view nom : NOMS)
-                VERIFIER(contient(t, nom) == contient(m.fr, nom));
+                VERIFIER(contient(t, nom) == contient(m, nom));
         }
     }
     return 0;
