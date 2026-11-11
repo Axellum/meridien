@@ -10,9 +10,22 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 # memoire n'est plus balayee a chaque demarrage. Apres ce changement : supprimer sdkconfig.
 CONFIG_SPIRAM_MEMTEST=n
 
+# Memoire interne (budget du jalon 1b, docs/mesures/memoire-interne.md) : le tas interne du P4 fait ~455 Ko, dont les tampons
+# d'ecran. Tout ce qui n'est ni DMA ni pile de tache va en PSRAM. COMMUN a toutes les cartes (toutes ont une PSRAM, et la limite vient
+# du Wi-Fi par le C6, du TLS et de l'interface, pas de la carte) ; avant le 11/11/2026 ces deux lignes n'etaient que dans le fichier
+# du Tab5 et la 7B gardait les defauts d'IDF (16384, tampons TLS en interne).
+#  - malloc() ne prend l'interne que jusqu'a 256 octets (defaut d'IDF : 16384) : 66 Ko libres de plus avant la premiere requete
+#    TLS sur le Tab5 (177,6 Ko au lieu de 111,7 Ko) ;
+#  - mbedTLS (tampons d'entree et de sortie, certificats) en PSRAM : environ 29 Ko de moins en interne pendant une prise de contact
+#    TLS, de quoi en faire deux a la fois (meteo et geocodage). Prix mesure sur le Tab5 : prise de contact de 2,8 s au lieu de 1,5 s.
+# Apres un changement de ces defaults : supprimer sdkconfig.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+
 # LVGL 9 configure par Kconfig (pas de lv_conf.h). Chaines et formats : ceux de la libc d'IDF, comme le BSP d'Espressif
 # (m5stack_tab5/examples). Allocation : celle de main/lvgl_memoire.cpp (PSRAM d'abord) et non le malloc du systeme, qui range tout
-# bloc de moins de 256 octets en memoire interne, la seule ou le Wi-Fi et le TLS peuvent vivre (plantage du scan Wi-Fi, 07/11/2026).
+# bloc de moins de 256 octets en memoire interne (CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL ci-dessus), la seule ou le Wi-Fi et le TLS
+# peuvent vivre (plantage du scan Wi-Fi, 07/11/2026).
 # Apres un changement de ces defaults : supprimer sdkconfig (les defaults ne sont relus que sur un sdkconfig neuf).
 CONFIG_LV_CONF_SKIP=y
 CONFIG_LV_BUILD_EXAMPLES=n

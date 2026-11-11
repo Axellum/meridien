@@ -26,8 +26,12 @@ const NOYAU = path.join(ICI, '..', '..', 'components', 'core', 'include', 'ecran
 const I18N = path.join(ICI, '..', '..', 'i18n');
 const PORT = Number(process.env.PORT || 8080);
 const PORT_SERVICE = Number(process.env.PORT_SERVICE || PORT + 1);
-const CODE = process.env.CODE_APPAIRAGE || String(randomInt(100000, 1000000));
+let CODE = process.env.CODE_APPAIRAGE || String(randomInt(100000, 1000000));
 const VERROU_S = Number(process.env.VERROU_S || 60);
+// Comme l'appareil (appairage.hpp) : le verrou double à chaque série ratée de suite, plafonné à 60 fois le premier (1 h sur
+// l'appareil) ; la 3e série de suite et les suivantes tirent un nouveau code, écrit dans la console (l'« écran » du faux).
+const VERROU_MAX_S = VERROU_S * 60;
+const SERIES_AVANT_NOUVEAU_CODE = 3;
 const CLE_MOCK = process.env.CLE_MOCK || 'cle-de-test-123';
 const REBOOT_MS = Number(process.env.REBOOT_MS || 4000);
 const LIMITE_JSON = 4096, LIMITE_IMPORT = 16384, TAILLE_PARTITION = 4 * 1024 * 1024;
@@ -108,7 +112,7 @@ const etat = {
 const secrets = { stt: '', llm: '', tts: '', wifi: 'ok' }; // jamais renvoyés par l'API
 const tests = {};
 const sessions = new Map();
-let echecsCode = 0, verrouJusqua = 0;
+let echecsCode = 0, verrouJusqua = 0, seriesCode = 0;
 
 const THEMES = ['auto', 'clair', 'sombre'];
 const PROFILS = ['auto', 'meteo']; // seulement ce que l'appareil sait dessiner (ADR-0023)
@@ -449,12 +453,18 @@ async function api(req, res, url) {
     const c = await lireJson(req);
     if (typeof c.code !== 'string' || !egal(c.code, CODE)) {
       if (++echecsCode >= 5) {
-        echecsCode = 0; verrouJusqua = Date.now() + VERROU_S * 1000;
-        throw new Refus(429, 'verrouille', T('Trop d’essais. Réessayez dans {n} secondes.', { n: VERROU_S }), undefined, { reessayer_dans: VERROU_S });
+        echecsCode = 0; seriesCode = Math.min(seriesCode + 1, 64);
+        const n = Math.min(VERROU_S * 2 ** (seriesCode - 1), VERROU_MAX_S);
+        verrouJusqua = Date.now() + n * 1000;
+        if (seriesCode >= SERIES_AVANT_NOUVEAU_CODE) {
+          CODE = String(randomInt(0, 1000000)).padStart(6, '0'); // les sessions ouvertes restent
+          console.log(`Trop d'essais ratés : nouveau code d'appairage (affiché ici à la place de l'écran) : ${CODE}`);
+        }
+        throw new Refus(429, 'verrouille', T('Trop d’essais. Réessayez dans {n} secondes.', { n }), undefined, { reessayer_dans: n });
       }
       throw new Refus(403, 'code_faux', T('Ce code n’est pas le bon. Regardez l’écran de l’appareil.'), 'code');
     }
-    echecsCode = 0;
+    echecsCode = 0; seriesCode = 0;
     const jeton = randomBytes(32).toString('hex');
     sessions.set(jeton, Date.now());
     while (sessions.size > 4) sessions.delete(sessions.keys().next().value);

@@ -162,6 +162,19 @@ template <class Hote> class Api {
     constexpr appairage::Gestionnaire &appairage() noexcept { return appairage_; }
     constexpr const appairage::Gestionnaire &appairage() const noexcept { return appairage_; }
 
+    // Les deux routes ouvertes sans jeton : l'état de l'appareil et l'échange du code contre un jeton.
+    static constexpr bool route_publique(const Requete &rq) noexcept {
+        return est(rq, Methode::Get, "/api/status") || est(rq, Methode::Post, "/api/pair");
+    }
+
+    // Le serveur doit-il lire le corps de cette requête (méthode, chemin et jeton remplis, corps pas encore lu) ? Seulement pour une
+    // route publique ou un jeton de session valide. Sinon la réponse est 401 quel que soit le corps : le serveur la donne sans lire
+    // un octet (`traiter` avec un corps vide), puis ferme la connexion. Un client sans jeton ne peut donc pas tenir le fil du
+    // serveur en envoyant son corps au compte-gouttes.
+    constexpr bool corps_a_lire(const Requete &rq) const noexcept {
+        return route_publique(rq) || appairage_.jeton_valide(rq.jeton);
+    }
+
     // Traite une requête de /api/. La réponse est écrite dans `t.sortie`.
     constexpr Reponse traiter(const Requete &rq, const Tampons &t) noexcept {
         if (rq.corps.size() > CORPS_MAX)
@@ -173,8 +186,8 @@ template <class Hote> class Api {
         if (est(rq, Methode::Post, "/api/pair"))
             return appairer(rq, t);
 
-        // --- tout le reste exige un jeton de session ---
-        if (!appairage_.jeton_valide(rq.jeton))
+        // --- tout le reste exige un jeton de session (même règle que `corps_a_lire`) ---
+        if (!corps_a_lire(rq))
             return erreur(t, 401, "non_appaire", "Entrez le code affiché sur l’écran de l’appareil.");
 
         if (est(rq, Methode::Delete, "/api/pair")) {

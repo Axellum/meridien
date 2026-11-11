@@ -1271,6 +1271,12 @@ def main():
                 r = brut(CODE)
                 verifier("appairage verrouillé : même le bon code est refusé, avec une phrase", r.status == 429 and "Trop d" in r.json()["erreur"]["message"], r.text()[:120])
                 time.sleep(VERROU_S + 0.7)
+                if not REEL:  # sur l'appareil, 3 min d'attente de plus : le noyau le vérifie (test_appairage, test_api_reglages)
+                    statuts = [brut("111111").status for _ in range(5)]
+                    r = brut(CODE)
+                    verifier("appairage : la 2e série ratée de suite verrouille deux fois plus longtemps",
+                             statuts[-1] == 429 and r.status == 429 and r.json()["erreur"]["reessayer_dans"] == 2 * VERROU_S, r.text()[:120])
+                    time.sleep(2 * VERROU_S + 0.7)
                 verifier("appairage : le verrou se lève", brut(CODE).status == 200)
             etape("Appairage : verrou après 5 essais ratés", t_verrou, page)
 
