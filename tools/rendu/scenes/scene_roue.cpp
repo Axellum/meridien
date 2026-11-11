@@ -239,14 +239,16 @@ ecran::ContexteRoue contexte_roue(const banc::Contexte &c) {
     return ctx;
 }
 
-// Ouvre la roue au point (fx, fy) en millièmes de l'écran. `choix_demo` > 0 : ajoute la famille de démonstration et la déplie.
-void ouvrir_la_roue(const banc::Contexte &c, int fx, int fy, bool alertes, int choix_demo, bool mer_choisie = false) {
+// Ouvre la roue au point (fx, fy) en millièmes de l'écran. `choix_demo` > 0 : ajoute la famille de démonstration et, sauf `deplier`
+// faux, la déplie.
+void ouvrir_la_roue(const banc::Contexte &c, int fx, int fy, bool alertes, int choix_demo, bool mer_choisie = false,
+                    bool deplier = true) {
     EntreeRoue entrees_roue[ecran::ENTREES_ROUE_MAX] = {};
     const int n = composer(entrees_roue, alertes, choix_demo, mer_choisie);
     const int32_t x = c.largeur * fx / 1000;
     const int32_t y = c.hauteur * fy / 1000;
     exiger(ecran::ui_roue_ouvrir(contexte_roue(c), entrees_roue, n, x, y), "la roue n'a pas pu s'ouvrir");
-    if (choix_demo > 0) {
+    if (choix_demo > 0 && deplier) {
         int32_t bx = 0;
         int32_t by = 0;
         exiger(ecran::ui_roue_centre_bouton(n - 1, &bx, &by), "le bouton de la famille n'a pas de centre");
@@ -492,6 +494,130 @@ void parcours_famille(const banc::Contexte &c) {
     exiger(g_reglages == 1 && g_choix == 1 && ecran::ui_roue_cout().objets == 0, "la fermeture a lancé une action");
 }
 
+// ---- la zone repeinte : ouvrir, déplier, fermer la roue sur un accueil déjà peint ------------------------------------------------------
+//
+// L'accueil (et la roue) sont d'abord peints en entier (lv_refr_now) ; puis le geste est fait et le banc ne repeint que ce que LVGL a
+// invalidé. Le compte court jusqu'à la fin du rendu qui suit le geste : LVGL invalide aussi en calculant la mise en page, juste avant. Deux constats : (1) chiffré, ce que le geste invalide (LV_EVENT_INVALIDATE_AREA de l'affichage : réunion des zones, leur
+// nombre, part de l'écran) tient dans la zone de la roue, pas dans tout l'écran ; (2) au pixel, le rendu obtenu doit être IDENTIQUE au
+// rendu complet du même état (`zone-ouverture` = `centre`, `zone-famille` = `famille-centre`, `zone-fermeture` = `accueil-seul`) :
+// sinon un morceau de roue manque ou reste à l'écran. Le second constat se fait hors du banc, en comparant les PNG.
+
+lv_area_t g_zone_inv = {0, 0, -1, -1};
+int g_nb_inv = 0;
+
+void sur_invalidation(lv_event_t *e) {
+    const auto *a = static_cast<const lv_area_t *>(lv_event_get_param(e));
+    // LVGL envoie aussi cet événement pendant un rendu, avec une zone fictive (0, 0)-(0, n) qui sert à arrondir la hauteur des bandes
+    // (lv_refr.c) : ce n'est pas une invalidation.
+    if (a == nullptr || (a->x1 == 0 && a->x2 == 0 && a->y1 == 0)) {
+        return;
+    }
+    if (g_nb_inv == 0) {
+        g_zone_inv = *a;
+    } else {
+        g_zone_inv.x1 = LV_MIN(g_zone_inv.x1, a->x1);
+        g_zone_inv.y1 = LV_MIN(g_zone_inv.y1, a->y1);
+        g_zone_inv.x2 = LV_MAX(g_zone_inv.x2, a->x2);
+        g_zone_inv.y2 = LV_MAX(g_zone_inv.y2, a->y2);
+    }
+    ++g_nb_inv;
+}
+
+void compter_les_invalidations(const banc::Contexte &c) {
+    lv_display_add_event_cb(c.affichage, sur_invalidation, LV_EVENT_INVALIDATE_AREA, nullptr);
+    g_nb_inv = 0;
+}
+
+// Part de l'écran (en millièmes) que couvre la réunion des zones invalidées depuis le dernier compte ; la journalise.
+int part_invalidee(const banc::Contexte &c, const char *geste) {
+    const int part = g_nb_inv == 0 ? 0
+                                   : static_cast<int>(static_cast<int64_t>(lv_area_get_size(&g_zone_inv)) * 1000 /
+                                                      (static_cast<int64_t>(c.largeur) * c.hauteur));
+    std::fprintf(stderr,
+                 "zone « %s » %dx%d : %s invalide %d zone(s), réunion (%d, %d)-(%d, %d), %d x %d px, %d pour mille de "
+                 "l'écran\n",
+                 g_variante, static_cast<int>(c.largeur), static_cast<int>(c.hauteur), geste, g_nb_inv,
+                 static_cast<int>(g_zone_inv.x1), static_cast<int>(g_zone_inv.y1), static_cast<int>(g_zone_inv.x2),
+                 static_cast<int>(g_zone_inv.y2), g_nb_inv == 0 ? 0 : static_cast<int>(lv_area_get_width(&g_zone_inv)),
+                 g_nb_inv == 0 ? 0 : static_cast<int>(lv_area_get_height(&g_zone_inv)), part);
+    return part;
+}
+
+bool dans_la_zone(int32_t x, int32_t y) {
+    return g_nb_inv > 0 && x >= g_zone_inv.x1 && x <= g_zone_inv.x2 && y >= g_zone_inv.y1 && y <= g_zone_inv.y2;
+}
+
+// La roue ouverte : le moyeu et chaque bouton du premier anneau sont dans la zone invalidée.
+void exiger_roue_dans_la_zone() {
+    ecran::PositionRoue position = {};
+    exiger(ecran::ui_roue_position(&position), "la roue ouverte n'a pas de position");
+    exiger(dans_la_zone(position.x, position.y), "le moyeu est hors de la zone invalidée");
+    int32_t x = 0;
+    int32_t y = 0;
+    for (int rang = 0; ecran::ui_roue_centre_bouton(rang, &x, &y); ++rang) {
+        exiger(dans_la_zone(x, y), "un bouton du premier anneau est hors de la zone invalidée");
+    }
+}
+
+// Seuil : la roue tient dans environ un sixième de l'écran (≈ 400 x 365 px à 1280 x 720, docs/mesures/roue.md) ; l'objet plein écran
+// d'avant le 11/11/2026 en invalidait 1000 pour mille.
+constexpr int PART_MAX = 400;
+
+void accueil_seul(const banc::Contexte &c) {
+    g_variante = "accueil-seul";
+    afficher_principal(c);
+}
+
+void zone_ouverture(const banc::Contexte &c) {
+    g_variante = "zone-ouverture";
+    afficher_principal(c);
+    lv_refr_now(c.affichage);
+    compter_les_invalidations(c);
+    ouvrir_la_roue(c, 500, 500, true, 0);
+    lv_refr_now(c.affichage);
+    const int part = part_invalidee(c, "ouvrir la roue");
+    exiger(g_nb_inv > 0, "ouvrir la roue n'invalide rien : elle ne serait pas dessinée");
+    exiger_roue_dans_la_zone();
+    exiger(part <= PART_MAX, "ouvrir la roue fait repeindre plus de 40 % de l'écran");
+}
+
+void zone_famille(const banc::Contexte &c) {
+    g_variante = "zone-famille";
+    afficher_principal(c);
+    ouvrir_la_roue(c, 500, 500, true, 8, false, false);
+    lv_refr_now(c.affichage);
+    compter_les_invalidations(c);
+    int32_t bx = 0;
+    int32_t by = 0;
+    exiger(ecran::ui_roue_centre_bouton(3, &bx, &by), "le bouton de la famille (le quatrième) n'a pas de centre");
+    exiger(ecran::ui_roue_simuler_toucher(bx, by), "toucher la famille ferme la roue au lieu de la déplier");
+    lv_refr_now(c.affichage);
+    part_invalidee(c, "déplier la famille");
+    exiger(g_nb_inv > 0, "déplier la famille n'invalide rien");
+    exiger_roue_dans_la_zone();
+}
+
+void zone_fermeture(const banc::Contexte &c) {
+    g_variante = "zone-fermeture";
+    afficher_principal(c);
+    ouvrir_la_roue(c, 500, 500, true, 0);
+    lv_refr_now(c.affichage);
+    compter_les_invalidations(c);
+    exiger(!ecran::ui_roue_simuler_toucher(c.largeur - 4, c.hauteur - 4),
+           "un toucher dans le vide laisse la roue ouverte");
+    lv_refr_now(c.affichage);
+    const int part = part_invalidee(c, "fermer la roue");
+    exiger(g_nb_inv > 0, "fermer la roue n'invalide rien : elle resterait à l'écran");
+    exiger(part <= PART_MAX, "fermer la roue fait repeindre plus de 40 % de l'écran");
+    // La suppression différée de l'objet (lv_obj_delete_async) ne doit rien invalider de plus : il est caché.
+    g_nb_inv = 0;
+    lv_timer_handler();
+    lv_refr_now(c.affichage);
+    part_invalidee(c, "supprimer l'objet");
+    exiger(g_nb_inv == 0, "la suppression de l'objet de la roue invalide encore une zone");
+    exiger(ecran::ui_roue_cout().objets == 0, "la roue fermée garde un objet LVGL");
+}
+
 } // namespace
 
 namespace banc {
@@ -519,6 +645,10 @@ const Scene kScenes[] = {
     {"parcours-mer", "Parcours : appui long, Mer (seulement avec un spot), Fermer, Réglages encore atteignable",
      parcours_mer},
     {"parcours-famille", "Parcours : famille dépliée, Réglages encore atteignable", parcours_famille},
+    {"accueil-seul", "L'accueil sans la roue (référence de zone-fermeture)", accueil_seul},
+    {"zone-ouverture", "Zone repeinte : la roue ouverte sur l'accueil déjà peint (= centre)", zone_ouverture},
+    {"zone-famille", "Zone repeinte : la famille dépliée sur la roue déjà peinte (= famille-centre)", zone_famille},
+    {"zone-fermeture", "Zone repeinte : la roue fermée sur l'accueil déjà peint (= accueil-seul)", zone_fermeture},
 };
 const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
 
