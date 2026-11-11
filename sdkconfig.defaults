@@ -33,6 +33,49 @@ CONFIG_LV_USE_CUSTOM_MALLOC=y
 CONFIG_LV_USE_CLIB_SPRINTF=y
 CONFIG_LV_USE_CLIB_STRING=y
 
+# Binaire plus leger (lot L11, 11/11/2026) : LVGL compile ce que l'ecran n'utilise pas, desactive ici. Verifie par grep dans main/,
+# components/ et les composants geres (esp_lvgl_port, BSP), puis au banc de rendu : toutes les scenes identiques au pixel.
+#  - Formats de destination du melange logiciel : l'ecran dessine en RGB565 (tampons d'ecran, PPA), les icones et TinyTTF en A8,
+#    les couches de LVGL en ARGB8888 / XRGB8888 / RGB565A8. RGB888 RESTE : LVGL pose les degrades (barres de temperature de
+#    l'horloge, triangles) comme une source RGB888 (lv_draw_sw_fill.c, lv_draw_sw_triangle.c) ; sans lui ils disparaissent (vu au
+#    banc). Aucun tampon ni image dans les autres formats (L8 ne sert qu'aux images AL88).
+CONFIG_LV_DRAW_SW_SUPPORT_RGB565_SWAPPED=n
+CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED=n
+CONFIG_LV_DRAW_SW_SUPPORT_L8=n
+CONFIG_LV_DRAW_SW_SUPPORT_AL88=n
+CONFIG_LV_DRAW_SW_SUPPORT_I1=n
+#  - Widgets : l'ecran ne cree que obj, label, button, textarea, keyboard (-> buttonmatrix), slider (-> bar) et dessine le reste
+#    lui-meme (lv_draw_*). L'image reste (cheap, et esp_lvgl_port s'en sert pour le curseur USB).
+CONFIG_LV_USE_ANIMIMG=n
+CONFIG_LV_USE_ARC=n
+CONFIG_LV_USE_ARCLABEL=n
+CONFIG_LV_USE_CALENDAR=n
+CONFIG_LV_USE_CANVAS=n
+CONFIG_LV_USE_CHART=n
+CONFIG_LV_USE_CHECKBOX=n
+CONFIG_LV_USE_DROPDOWN=n
+CONFIG_LV_USE_IMAGEBUTTON=n
+CONFIG_LV_USE_LED=n
+CONFIG_LV_USE_LINE=n
+CONFIG_LV_USE_LIST=n
+CONFIG_LV_USE_MENU=n
+CONFIG_LV_USE_MSGBOX=n
+CONFIG_LV_USE_ROLLER=n
+CONFIG_LV_USE_SCALE=n
+CONFIG_LV_USE_SPAN=n
+CONFIG_LV_USE_SPINBOX=n
+CONFIG_LV_USE_SPINNER=n
+CONFIG_LV_USE_SWITCH=n
+CONFIG_LV_USE_TABLE=n
+CONFIG_LV_USE_TABVIEW=n
+CONFIG_LV_USE_TILEVIEW=n
+CONFIG_LV_USE_WIN=n
+CONFIG_LV_USE_THEME_SIMPLE=n
+#  - Police par defaut du theme : tous les textes ont leur police TinyTTF (Roboto), Montserrat 14 (13,6 Ko) n'est jamais dessinee.
+#    UNSCII 8 (quelques Ko) la remplace comme police de repli exigee par LVGL.
+CONFIG_LV_FONT_MONTSERRAT_14=n
+CONFIG_LV_FONT_DEFAULT_UNSCII_8=y
+
 # Polices TrueType rendues a la volee (Latin-1 complet : accents et degre). Les polices integrees de LVGL
 # s'arretent a l'ASCII ; une police sans le "e accent aigu" afficherait un rectangle vide.
 CONFIG_LV_USE_TINY_TTF=y
