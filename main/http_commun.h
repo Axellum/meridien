@@ -1,12 +1,18 @@
 // Client HTTPS commun : un aller-retour GET qui rend le corps de la réponse, décompressé s'il est en gzip.
 //
-// Le client météo (main/meteo_client.cpp) l'appelle ; les autres fournisseurs de données sur Internet le feront aussi. Ce module ne
-// connaît ni Open-Meteo ni aucun autre serveur : l'appelant donne l'adresse, le User-Agent et l'en-tête Accept, et reçoit le texte.
+// C'est le SEUL chemin HTTPS du firmware vers Internet : la météo (main/meteo_client.cpp), les alertes de Vigie
+// (main/vigie_client.cpp), la mer (main/mer_client.cpp), la liste des spots (main/mer_liste_client.cpp) et la recherche de ville
+// (main/geocodage.cpp) l'appellent ; aucun autre fichier n'appelle `esp_http_client_init`. Ce module ne connaît aucun serveur :
+// l'appelant donne l'adresse, le User-Agent et l'en-tête Accept, et reçoit le texte.
 // Ce qu'il fait pour l'appelant :
 //   - envoie `Accept-Encoding: gzip` et, si le serveur répond en gzip, rend le texte DÉCOMPRESSÉ (la réponse d'Open-Meteo passe de
 //     4,4 Ko à 1,5 Ko sur le fil) ; une réponse non compressée reste acceptée telle quelle ;
 //   - décompresse avec `tinfl_decompress` de la ROM de l'ESP32-P4 (aucun code de décompression de plus dans la flash) et vérifie le
 //     CRC32 et la taille écrits dans le pied du fichier gzip (noyau pur : components/core/include/ecran/gzip.hpp, testé sur le PC) ;
+//   - refuse toute redirection (HTTP 301, 302, 303, 307, 308 : issue `Http`, statut au journal). ESP-IDF 5.5.5 les suit par défaut
+//     (dix au plus, vers n'importe quel hôte https dont le certificat est valide) ; aucune adresse que construit l'appareil n'est
+//     redirigée (relevé du 11/11/2026 : Open-Meteo, MET Norway, NWS à quatre décimales, Vigie, géocodage), et une redirection
+//     emmènerait la position de l'appareil chez un hôte que personne n'a choisi ;
 //   - prend le verrou TLS commun (verrou_tls.h) autour de la connexion : de `esp_http_client_init` à `esp_http_client_cleanup`, et
 //     pas pendant la décompression ;
 //   - garde les tampons (réponse reçue, texte décompressé, décompresseur de 11 Ko) en PSRAM, jamais sur la pile de 12 Ko de la
@@ -45,7 +51,7 @@ enum class Issue : uint8_t {
     Memoire,        // pas de place en PSRAM pour un tampon
     Requete,        // adresse, User-Agent ou Accept absents (ou fonction de lecture absente) : rien n'est envoyé
     Reseau,         // DNS, connexion, TLS, délai dépassé ou verrou TLS occupé trop longtemps
-    Http,           // le serveur a répondu autre chose que 200
+    Http,           // le serveur a répondu autre chose que 200 (redirection comprise : jamais suivie)
     TropDeRequetes, // HTTP 429
     TropGrand,      // réponse (ou texte décompressé) au-delà du tampon
     Illisible, // 200, mais la réponse n'est pas celle qu'on attend : gzip faux, Content-Encoding inconnu, lecture refusée
@@ -74,16 +80,20 @@ struct Requete {
     // en PSRAM le temps de la requête. 0 ou au-delà de `kTailleMaxAbsolue` : la requête n'est pas envoyée (`Issue::Requete`).
     size_t taille_max = kTailleTampon;
     uint32_t attente_verrou_tls_ms = 40000; // une recherche de ville tient le verrou 8 s au plus (geocodage.cpp)
+    // Tampon d'envoi d'esp_http_client (`buffer_size_tx`) : la ligne de requête et le premier en-tête doivent y tenir. 1024 suffit à
+    // la plus longue adresse d'Open-Meteo (885 octets) ; la recherche de ville en demande 1536 (80 caractères accentués encodés).
+    int taille_envoi = 1024;
 };
 
 struct Reponse {
     Issue issue = Issue::Reseau;
     int statut_http = 0;
-    size_t octets_fil = 0;  // octets reçus sur le fil (compressés ou non)
-    size_t octets = 0;      // octets du texte rendu à l'appelant (décompressé)
-    bool gzip = false;      // la réponse était compressée
-    int duree_ms = 0;       // l'aller-retour réseau seulement (la décompression n'y est pas)
-    bool connecte = false;  // la connexion TLS a été établie
+    size_t octets_fil = 0;          // octets reçus sur le fil (compressés ou non)
+    size_t octets = 0;              // octets du texte rendu à l'appelant (décompressé)
+    bool gzip = false;              // la réponse était compressée
+    int duree_ms = 0;               // l'aller-retour réseau seulement (la décompression n'y est pas)
+    int duree_decompression_us = 0; // décompression gzip (0 : réponse non compressée)
+    bool connecte = false;          // la connexion TLS a été établie
     int64_t expires_s = 0;  // en-tête `Expires` de la réponse finale, en secondes UNIX ; 0 : absent ou illisible
     int64_t modifiee_s = 0; // en-tête `Last-Modified`, en secondes UNIX ; 0 : absent ou illisible
     Memoire

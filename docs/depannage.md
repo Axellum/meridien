@@ -378,7 +378,7 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 **Cause.** The public instance compresses only bodies of about 500 bytes or more (the 9 other real answers are gzip, chunked, 365 to 1 976 bytes on the wire).
 
-**Solution.** `main/vigie_client.cpp` decides from the first two bytes (`gzip_flux::est_gzip`), never from the length or from the header alone; a plain body is read as it is. A body that is neither JSON nor valid gzip is refused and counted as a failure (back-off), never half-read.
+**Solution.** The client decides from the first two bytes, never from the length or from the header alone; a plain body is read as it is. Since 11/11/2026 Vigie goes through the common HTTPS client (`main/http_commun.cpp`, `gzip::decider`: no `Content-Encoding` and no `1f 8b` → read as it is), which also checks the CRC-32 of the inflated text (before, only its size). A body that is neither JSON nor valid gzip is refused and counted as a failure (back-off), never half-read.
 
 **Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Evidence**: `test/host/donnees/vigie_hambourg.json` (426 bytes, read by the core tests) and `vigie_captures.json` (`content_encoding: null`). **Status**: handled on the PC; the board has not received any answer yet.
 
@@ -453,6 +453,17 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 **Solution.** `reconnexion_utile()` in `main/reseau.cpp`: retry only if there is a network in service or a trial in progress (`06b7afe`). The trial's own retries are unchanged.
 
 **Seen on** Tab5 ST7121, local binary that ignores the compiled network (not committed), 07/11/2026. **Evidence**: before, 11 disconnects in 45 s after the scan; after, none between the scan and the next trial, a failed trial reported at +30.01 s with no retry afterwards, a good network adopted in 6.1 s. The normal path (with a known network) was replayed on the final binary `a244af0`. **Status**: resolved.
+
+#### After the Wi-Fi comes back, the time can arrive late or not be asked again
+
+**Symptom.** The time may arrive late or irregularly (reported since 06/11/2026, cause not found on the board). At start-up the direct request `sntp_rapide` sets the clock within 0.3 s of the IP address (20 boots out of 20 on `2a05811`, [mesures/1b.md](mesures/1b.md)); outside that case nothing was measured.
+
+**Cause, read in the code (not observed on a board).** `sntp_rapide_demarrer()` ran **once per boot** (`g_demarre`): after a Wi-Fi loss and a new IP address (box restarted at night, network changed), or after its 8 rounds (12 s) without an answer, only lwIP's SNTP was left, the one whose first request goes unanswered in about one boot out of three and that retries in steps of 15 s ([mesures/1b.md](mesures/1b.md)); lwIP is also told not to renew its servers after a new IP (`renew_servers_after_new_IP = false`, `reseau.cpp`). The Waveshare 7B firmware reads no battery clock (no RTC driver in `bsp_waveshare_7b`): there, the screen shows no time until one of the two answers.
+
+**Solution.** `sntp_rapide_sur_ip()` is called at **every** IP address: one request, never two at once; a failed request is retried after 10 s, 20 s, 40 s… up to 10 min; a new IP resets that count. The decisions and the packet check are in the pure core (`components/core/include/ecran/sntp.hpp`, 20 tests in `test_sntp.cpp`, 41 mutations, two real server answers). New log line: `heure reçue N ms après l'IP (demande n° …)`. The NTP servers are unchanged.
+
+**Seen on** the PC only (core tests, Tab5 and 7B builds), 11/11/2026. **Status**: fixed in the code, **not verified on a board** (protocol: [mesures/1b.md](mesures/1b.md), section “Relance à chaque IP”).
+
 ### Audio, expanders and power
 
 #### Reading the microphones alone on the I2S port times out
@@ -1089,7 +1100,7 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 **Cause.** L'instance publique ne compresse que les corps d'environ 500 octets ou plus (les 9 autres réponses réelles sont en gzip, chunked, de 365 à 1 976 octets sur le fil).
 
-**Solution.** `main/vigie_client.cpp` décide d'après les deux premiers octets (`gzip_flux::est_gzip`), jamais d'après la longueur ni l'en-tête seul ; un corps en clair est lu tel quel. Un corps qui n'est ni du JSON ni du gzip valide est refusé et compté comme un échec (éloignement), jamais lu à moitié.
+**Solution.** Le client décide d'après les deux premiers octets, jamais d'après la longueur ni l'en-tête seul ; un corps en clair est lu tel quel. Depuis le 11/11/2026, Vigie passe par le client HTTPS commun (`main/http_commun.cpp`, `gzip::decider` : ni `Content-Encoding` ni `1f 8b` → lu tel quel), qui vérifie aussi le CRC-32 du texte décompressé (avant : sa taille seulement). Un corps qui n'est ni du JSON ni du gzip valide est refusé et compté comme un échec (éloignement), jamais lu à moitié.
 
 **Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Preuve** : `test/host/donnees/vigie_hambourg.json` (426 octets, lu par les tests du noyau) et `vigie_captures.json` (`content_encoding: null`). **Statut** : géré sur le PC ; la carte n'a pas encore reçu de réponse.
 
@@ -1164,6 +1175,17 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 **Solution.** `reconnexion_utile()` dans `main/reseau.cpp` : réessayer seulement s'il y a un réseau en service ou un essai en cours (`06b7afe`). Les tentatives de l'essai lui-même ne changent pas.
 
 **Vu sur** Tab5 ST7121, binaire local qui ignore le réseau de la compilation (non commité), 07/11/2026. **Preuve** : avant, 11 coupures en 45 s après la recherche ; après, aucune entre la recherche et l'essai suivant, un essai raté signalé à +30,01 s sans réessai ensuite, un bon réseau adopté en 6,1 s. Le chemin normal (avec un réseau connu) a été rejoué sur le binaire final `a244af0`. **Statut** : résolu.
+
+#### Après un retour du Wi-Fi, l'heure peut arriver tard ou n'être jamais redemandée
+
+**Symptôme.** L'heure arrive parfois tard ou irrégulièrement (signalé depuis le 06/11/2026, cause jamais trouvée sur la carte). Au démarrage, la demande directe `sntp_rapide` règle l'horloge moins de 0,3 s après l'adresse IP (20 démarrages sur 20 avec `2a05811`, [mesures/1b.md](mesures/1b.md)) ; hors de ce cas, rien n'a été mesuré.
+
+**Cause, lue dans le code (non observée sur une carte).** `sntp_rapide_demarrer()` ne tournait **qu'une fois par démarrage** (`g_demarre`) : après une perte du Wi-Fi et une nouvelle adresse IP (box redémarrée la nuit, changement de réseau), ou après ses 8 manches (12 s) sans réponse, il ne restait que le SNTP de lwIP, celui dont la première requête reste sans réponse dans environ un démarrage sur trois et qui relance par paliers de 15 s ([mesures/1b.md](mesures/1b.md)) ; lwIP ne renouvelle pas non plus ses serveurs après une nouvelle IP (`renew_servers_after_new_IP = false`, `reseau.cpp`). Le firmware de la 7B ne lit aucune horloge à pile (pas de pilote RTC dans `bsp_waveshare_7b`) : l'écran y reste sans heure jusqu'à l'une des deux réponses.
+
+**Solution.** `sntp_rapide_sur_ip()` est appelée à **chaque** adresse IP : une demande, jamais deux à la fois ; une demande échouée est relancée après 10 s, 20 s, 40 s… jusqu'à 10 min ; une nouvelle IP remet ce compte à zéro. Les décisions et la vérification du paquet sont dans le noyau pur (`components/core/include/ecran/sntp.hpp`, 20 tests dans `test_sntp.cpp`, 41 mutations, deux vraies réponses de serveurs). Nouvelle ligne de journal : `heure reçue N ms après l'IP (demande n° …)`. Les serveurs NTP ne changent pas.
+
+**Vu sur** le PC seulement (tests du noyau, compilations Tab5 et 7B), 11/11/2026. **Statut** : corrigé dans le code, **non vérifié sur carte** (protocole : [mesures/1b.md](mesures/1b.md), section « Relance à chaque IP »).
+
 ### Audio, expandeurs et alimentation
 
 #### La lecture des microphones seuls sur le port I2S expire

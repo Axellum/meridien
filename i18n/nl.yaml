@@ -154,6 +154,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Aucun lieu trouvé pour « {q} ».": "Geen plaats gevonden voor “{q}”."
 "Tapez au moins 3 lettres.": "Typ minstens 3 letters."
 "Ville enregistrée : {ville}": "Stad opgeslagen: {ville}"
+"Lieux : {lien} (licence CC BY 4.0)": "Plaatsen: {lien} (licentie CC BY 4.0)"
 "Données météo : {lien} (licence CC BY 4.0)": "Weergegevens: {lien} (licentie CC BY 4.0)"
 
 # --- Écran : source de la météo (07/11/2026) ---

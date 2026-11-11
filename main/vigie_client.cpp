@@ -8,30 +8,25 @@
 #include <new>
 #include <string_view>
 
-#include "esp_crt_bundle.h"
-#include "esp_heap_caps.h"
-#include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "miniz.h" // tinfl_decompress : ROM de l'ESP32-P4 (esp32p4.rom.ld), aucun code de décompression dans la flash
 
-#include "ecran/gzip_flux.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/reglages_alertes.hpp"
 #include "ecran/vigie_alertes.hpp"
 #include "ecran/vigie_planning.hpp"
 #include "ecran/vigie_requete.hpp"
+#include "http_commun.h"
 #include "meteo_zone.h"
 #include "reglages_alertes.h"
 #include "reseau.h"
-#include "verrou_tls.h"
 #include "vigie_etat.h"
 
-// Client des alertes officielles de Vigie. Même schéma que le client météo (main/meteo_client.cpp), écrit à part : tampons en PSRAM,
-// un seul TLS à la fois (verrou_tls.h), priorité d'arrière-plan, délai de 15 s. Il ne dépend pas du client météo.
+// Client des alertes officielles de Vigie. L'aller-retour HTTPS passe par le client commun (main/http_commun.h : tampons en PSRAM,
+// gzip avec CRC-32 vérifié, verrou TLS, redirections refusées, taille maximale d'une réponse). Priorité d'arrière-plan, délai de 15 s.
 
 namespace ecran {
 
@@ -41,13 +36,12 @@ const char *TAG = "vigie";
 // Ligne de résultat que le banc de test cherche : « VIGIE … » à chaque réponse lue.
 const char *TAG_RESULTAT = "VIGIE";
 
-// Tampons de réception et de texte : 64 Ko chacun, en PSRAM, rendus après chaque essai. Pourquoi 64 Ko : les réponses réelles du
-// 07/11/2026 font 426 à 19 238 octets décompressés (test/host/donnees/vigie_*.json ; La Palma, neuf avertissements, est la plus
-// grande ; 26 190 octets quand l'adresse ne filtre pas les langues) et 426 à 1 883 octets sur le fil. Une réponse plus grande est
-// REFUSÉE (`Issue::TropGrand`), jamais lue à moitié. Pourquoi en PSRAM : un tampon de plusieurs Ko en RAM interne mangerait le budget
-// de la prise de contact TLS (jalon 1b).
-constexpr size_t kTailleRecu = 64 * 1024;
-constexpr size_t kTailleTexte = 64 * 1024;
+// Plus grande réponse acceptée, sur le fil comme décompressée : 64 Ko (deux tampons en PSRAM pris par le client commun et rendus
+// après chaque essai). Pourquoi 64 Ko : les réponses réelles du 07/11/2026 font 426 à 19 238 octets décompressés
+// (test/host/donnees/vigie_*.json ; La Palma, neuf avertissements, est la plus grande ; 26 190 octets quand l'adresse ne filtre pas
+// les langues) et 426 à 1 883 octets sur le fil. Une réponse plus grande est REFUSÉE (`Issue::TropGrand`), jamais lue à moitié.
+constexpr size_t kTailleMax = 64 * 1024;
+constexpr const char *kAgentUtilisateur = "Meridien/ESP32-P4 (alertes)";
 constexpr uint32_t kAttenteVerrouTlsMs = 40000; // une recherche de ville tient le verrou 8 s au plus (geocodage.cpp)
 constexpr int kDelaiHttpMs = 15000;             // connexion, TLS et lecture : au-delà, l'essai est un échec
 constexpr uint32_t kPasAttenteMs = 2000;        // contrôle de l'IP et de l'heure avant le premier essai
@@ -63,25 +57,7 @@ TaskHandle_t g_tache = nullptr;
 
 // ---- mémoire -------------------------------------------------------------------------------------------------------
 
-struct Memoire {
-    size_t interne;      // octets libres en RAM interne
-    size_t interne_bloc; // plus grand bloc libre en RAM interne
-    size_t interne_min;  // minimum de RAM interne libre depuis le démarrage
-    size_t psram;        // octets libres en PSRAM
-    size_t psram_bloc;   // plus grand bloc libre en PSRAM
-};
-
-Memoire mesurer_memoire() {
-    Memoire m;
-    m.interne = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    m.interne_bloc = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-    m.interne_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
-    m.psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-    m.psram_bloc = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
-    return m;
-}
-
-void journaliser_memoire(const char *quand, const Memoire &m) {
+void journaliser_memoire(const char *quand, const client_http::Memoire &m) {
     ESP_LOGI(TAG,
              "mémoire libre %s : interne %u o (plus grand bloc %u o, minimum depuis le démarrage %u o), PSRAM %u o "
              "(plus grand bloc %u o)",
@@ -128,43 +104,6 @@ Reglage lire_reglage() {
 
 // ---- une requête ---------------------------------------------------------------------------------------------------
 
-struct Reception {
-    uint8_t *donnees;
-    size_t capacite;
-    size_t n;
-    bool trop;
-    bool connecte;
-    Memoire
-        apres_connexion; // mesurée une fois la connexion TLS établie : c'est là que la RAM interne est la plus sollicitée
-};
-
-esp_err_t sur_evenement_http(esp_http_client_event_t *evt) {
-    auto *rec = static_cast<Reception *>(evt->user_data);
-    if (rec == nullptr) {
-        return ESP_OK;
-    }
-    switch (evt->event_id) {
-    case HTTP_EVENT_ON_CONNECTED:
-        rec->connecte = true;
-        rec->apres_connexion = mesurer_memoire();
-        break;
-    case HTTP_EVENT_ON_DATA:
-        if (evt->data_len > 0 && evt->data != nullptr) {
-            const size_t len = static_cast<size_t>(evt->data_len);
-            if (rec->n + len > rec->capacite) {
-                rec->trop = true; // réponse plus grande que prévu : on ne la lit pas à moitié
-            } else {
-                std::memcpy(rec->donnees + rec->n, evt->data, len);
-                rec->n += len;
-            }
-        }
-        break;
-    default:
-        break;
-    }
-    return ESP_OK;
-}
-
 enum class Issue : uint8_t {
     Ok,
     Memoire,        // pas de place en PSRAM pour les tampons
@@ -186,52 +125,6 @@ struct Essai {
     int duree_inflate_us = 0; // décompression
     int duree_lecture_us = 0; // lecture du JSON par le noyau
 };
-
-// Décompresse le gzip reçu dans `texte`. Jamais « en ligne » : le décompresseur de la ROM pèse ≈ 11 Ko, pris en PSRAM, et ses
-// variables restent hors de la fonction qui tient les tampons. Rend l'issue ; `texte_n` reçoit la taille du texte.
-__attribute__((noinline)) Issue decompresser(const uint8_t *fil, size_t n, uint8_t *texte, size_t capacite,
-                                             size_t &texte_n, int &duree_us) {
-    const size_t debut = gzip_flux::longueur_entete(fil, n);
-    if (debut == 0) {
-        ESP_LOGW(TAG, "réponse gzip refusée : en-tête invalide ou coupé (%u octets reçus)", static_cast<unsigned>(n));
-        return Issue::Illisible;
-    }
-    auto *tinfl = static_cast<tinfl_decompressor *>(
-        heap_caps_malloc(sizeof(tinfl_decompressor), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    if (tinfl == nullptr) {
-        ESP_LOGE(TAG, "pas de place en PSRAM pour le décompresseur (%u octets)",
-                 static_cast<unsigned>(sizeof(tinfl_decompressor)));
-        return Issue::Memoire;
-    }
-    tinfl_init(tinfl);
-    // Flux DEFLATE BRUT : pas d'en-tête zlib (TINFL_FLAG_PARSE_ZLIB_HEADER absent), toute l'entrée d'un coup (HAS_MORE_INPUT absent),
-    // sortie d'un seul tenant assez grande pour tout le flux (NON_WRAPPING). Le pied gzip (8 octets) n'est pas dans l'entrée.
-    size_t entree = n - debut - gzip_flux::FIN;
-    size_t ecrit = capacite;
-    const int64_t t0 = esp_timer_get_time();
-    const tinfl_status etat =
-        tinfl_decompress(tinfl, fil + debut, &entree, texte, texte, &ecrit, TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
-    duree_us = static_cast<int>(esp_timer_get_time() - t0);
-    heap_caps_free(tinfl);
-    texte_n = ecrit;
-    if (etat == TINFL_STATUS_HAS_MORE_OUTPUT) {
-        ESP_LOGW(TAG, "réponse gzip refusée : le texte dépasse le tampon de %u octets",
-                 static_cast<unsigned>(capacite));
-        return Issue::TropGrand;
-    }
-    if (etat != TINFL_STATUS_DONE) {
-        ESP_LOGW(TAG, "réponse gzip refusée : flux DEFLATE invalide ou incomplet (statut tinfl %d)",
-                 static_cast<int>(etat));
-        return Issue::Illisible;
-    }
-    // Le pied annonce la taille du texte (modulo 2^32) : elle doit être celle que `tinfl` a rendue.
-    if (gzip_flux::taille_annoncee(fil, n) != static_cast<int64_t>(static_cast<uint32_t>(ecrit))) {
-        ESP_LOGW(TAG, "réponse gzip refusée : taille annoncée %lld, taille obtenue %u",
-                 static_cast<long long>(gzip_flux::taille_annoncee(fil, n)), static_cast<unsigned>(ecrit));
-        return Issue::Illisible;
-    }
-    return Issue::Ok;
-}
 
 const char *nom_statut(vigie::Statut s) {
     switch (s) {
@@ -261,8 +154,43 @@ __attribute__((noinline)) bool lire_reponse(std::string_view texte, std::string_
     return true;
 }
 
-// Un aller-retour complet. Les deux tampons sont pris en PSRAM et rendus avant de sortir. La réponse lue est écrite dans le tampon
-// de travail de vigie_etat.h (seulement si l'issue est `Ok`) : le publier est l'affaire de l'appelant.
+// Ce que la lecture du corps reçoit et rend (client_http::LireCorps).
+struct Lecture {
+    std::string_view langue;
+    vigie::Alertes *sortie = nullptr;
+    int duree_us = 0;
+};
+
+bool lire_corps(std::string_view corps, void *utilisateur) {
+    auto *l = static_cast<Lecture *>(utilisateur);
+    return lire_reponse(corps, l->langue, *l->sortie, l->duree_us);
+}
+
+// Les issues du client commun, avec une seule différence : Vigie demande aussi de ralentir par un 503 (comme un 429).
+Issue issue_de(const client_http::Reponse &rep) {
+    switch (rep.issue) {
+    case client_http::Issue::Ok:
+        return Issue::Ok;
+    case client_http::Issue::Memoire:
+        return Issue::Memoire;
+    case client_http::Issue::Requete:
+        return Issue::Requete;
+    case client_http::Issue::Reseau:
+        return Issue::Reseau;
+    case client_http::Issue::Http:
+        return rep.statut_http == 503 ? Issue::TropDeRequetes : Issue::Http;
+    case client_http::Issue::TropDeRequetes:
+        return Issue::TropDeRequetes;
+    case client_http::Issue::TropGrand:
+        return Issue::TropGrand;
+    case client_http::Issue::Illisible:
+        break;
+    }
+    return Issue::Illisible;
+}
+
+// Un aller-retour complet par le client commun (main/http_commun.h). La réponse lue est écrite dans le tampon de travail de
+// vigie_etat.h (seulement si l'issue est `Ok`) : le publier est l'affaire de l'appelant.
 Essai interroger(const Reglage &r, vigie::Alertes &sortie) {
     Essai e;
     char url[vigie::TAILLE_REQUETE_MAX];
@@ -271,103 +199,33 @@ Essai interroger(const Reglage &r, vigie::Alertes &sortie) {
         return e;
     }
 
-    const Memoire avant = mesurer_memoire();
+    const client_http::Memoire avant = client_http::mesurer_memoire();
     journaliser_memoire("avant la requête", avant);
 
-    auto *recu = static_cast<uint8_t *>(heap_caps_malloc(kTailleRecu, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    auto *texte = static_cast<uint8_t *>(heap_caps_malloc(kTailleTexte, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    if (recu == nullptr || texte == nullptr) {
-        heap_caps_free(recu);
-        heap_caps_free(texte);
-        e.issue = Issue::Memoire;
-        return e;
+    Lecture lecture;
+    lecture.langue = r.langue;
+    lecture.sortie = &sortie;
+    client_http::Requete requete;
+    requete.adresse = url;
+    requete.user_agent = kAgentUtilisateur;
+    requete.accept = "application/json";
+    requete.delai_ms = kDelaiHttpMs;
+    requete.attente_verrou_tls_ms = kAttenteVerrouTlsMs;
+    requete.taille_max = kTailleMax;
+    const client_http::Reponse rep = client_http::obtenir(requete, lire_corps, &lecture);
+    if (rep.connecte) {
+        journaliser_memoire("une fois la connexion TLS établie", rep.apres_connexion);
     }
-    Reception rec = {};
-    rec.donnees = recu;
-    rec.capacite = kTailleRecu;
+    e.issue = issue_de(rep);
+    e.statut_http = rep.statut_http;
+    e.octets_fil = rep.octets_fil;
+    e.octets_texte = rep.octets;
+    e.gzip = rep.gzip;
+    e.duree_ms = rep.duree_ms;
+    e.duree_inflate_us = rep.duree_decompression_us;
+    e.duree_lecture_us = lecture.duree_us;
 
-    esp_http_client_config_t config = {};
-    config.url = url;
-    config.method = HTTP_METHOD_GET;
-    config.timeout_ms = kDelaiHttpMs;
-    config.event_handler = sur_evenement_http;
-    config.user_data = &rec;
-    config.crt_bundle_attach =
-        esp_crt_bundle_attach;    // certificats racine du paquet d'ESP-IDF (Mozilla) : le serveur est vérifié
-    config.buffer_size = 2048;    // en-têtes de réponse
-    config.buffer_size_tx = 1024; // ligne de requête : 512 par défaut ne suffit pas pour une adresse longue
-    config.keep_alive_enable = false;
-
-    // Un seul TLS à la fois dans tout le firmware (verrou_tls.h) : la poignée de main demande ≈ 65 Ko de RAM interne, et la carte
-    // n'en a pas assez pour deux. Le verrou couvre exactement esp_http_client_init -> esp_http_client_cleanup ; il n'est pas tenu
-    // pendant la décompression ni la lecture du JSON.
-    if (!verrou_tls_prendre(kAttenteVerrouTlsMs)) {
-        ESP_LOGW(TAG, "verrou TLS occupé depuis plus de %u ms : essai reporté",
-                 static_cast<unsigned>(kAttenteVerrouTlsMs));
-        heap_caps_free(recu);
-        heap_caps_free(texte);
-        e.issue = Issue::Reseau;
-        return e;
-    }
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == nullptr) {
-        verrou_tls_rendre();
-        heap_caps_free(recu);
-        heap_caps_free(texte);
-        e.issue = Issue::Reseau;
-        return e;
-    }
-    esp_http_client_set_header(client, "Accept", "application/json");
-    // Le serveur ne compresse que si on le demande (corps de plus de ≈ 500 octets) : dix fois moins d'octets pour neuf avertissements.
-    esp_http_client_set_header(client, "Accept-Encoding", "gzip");
-    esp_http_client_set_header(client, "User-Agent", "Meridien/ESP32-P4 (alertes)");
-
-    const int64_t debut_us = esp_timer_get_time();
-    const esp_err_t err = esp_http_client_perform(client);
-    e.duree_ms = static_cast<int>((esp_timer_get_time() - debut_us) / 1000);
-    e.statut_http = esp_http_client_get_status_code(client);
-    const int erreur_socket = esp_http_client_get_errno(client);
-    esp_http_client_cleanup(client);
-    verrou_tls_rendre();
-    e.octets_fil = rec.n;
-
-    if (rec.connecte) {
-        journaliser_memoire("une fois la connexion TLS établie", rec.apres_connexion);
-    }
-
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "requête échouée : %s (errno %d) après %d ms", esp_err_to_name(err), erreur_socket, e.duree_ms);
-        e.issue = Issue::Reseau;
-    } else if (e.statut_http == 429 || e.statut_http == 503) {
-        e.issue = Issue::TropDeRequetes;
-    } else if (e.statut_http != 200) {
-        e.issue = Issue::Http;
-    } else if (rec.trop) {
-        e.issue = Issue::TropGrand;
-    } else {
-        const uint8_t *corps = recu;
-        size_t corps_n = rec.n;
-        Issue lu = Issue::Ok;
-        if (gzip_flux::est_gzip(recu, rec.n)) {
-            e.gzip = true;
-            size_t texte_n = 0;
-            lu = decompresser(recu, rec.n, texte, kTailleTexte, texte_n, e.duree_inflate_us);
-            corps = texte;
-            corps_n = texte_n;
-        }
-        if (lu != Issue::Ok) {
-            e.issue = lu;
-        } else {
-            e.octets_texte = corps_n;
-            const bool ok = lire_reponse(std::string_view(reinterpret_cast<const char *>(corps), corps_n), r.langue,
-                                         sortie, e.duree_lecture_us);
-            e.issue = ok ? Issue::Ok : Issue::Illisible;
-        }
-    }
-    heap_caps_free(recu);
-    heap_caps_free(texte);
-
-    const Memoire apres = mesurer_memoire();
+    const client_http::Memoire apres = client_http::mesurer_memoire();
     journaliser_memoire("après la requête", apres);
     ESP_LOGI(TAG, "écart de mémoire libre sur la requête : interne %+d o, PSRAM %+d o",
              static_cast<int>(apres.interne) - static_cast<int>(avant.interne),
@@ -578,10 +436,9 @@ void vigie_client_demarrer() {
     reglages_alertes_demarrer(); // la NVS est ouverte à ce stade (après reglages_demarrer())
     // Les tailles réelles sur le RISC-V (le PC en annonce d'autres : alignement des entiers 64 bits).
     ESP_LOGI(TAG,
-             "tailles : réponse lue %u o (2 tampons en PSRAM), tampons de réception %u o + texte %u o (PSRAM, rendus "
-             "après chaque essai)",
-             static_cast<unsigned>(sizeof(vigie::Alertes)), static_cast<unsigned>(kTailleRecu),
-             static_cast<unsigned>(kTailleTexte));
+             "tailles : réponse lue %u o (2 tampons en PSRAM), réponse HTTP %u o au plus (client commun : tampons en "
+             "PSRAM, rendus après chaque essai)",
+             static_cast<unsigned>(sizeof(vigie::Alertes)), static_cast<unsigned>(kTailleMax));
     if (xTaskCreate(tache_vigie, "vigie", kPileOctets, nullptr, kPrioriteVigie, &g_tache) != pdPASS) {
         ESP_LOGE(TAG, "tâche Vigie non créée");
     }
