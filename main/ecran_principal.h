@@ -9,6 +9,8 @@ namespace ecran {
 // Construit l'écran de diagnostic (ui_bonjour) et l'écran principal, charge le principal et lance le minuteur de mise à jour.
 // À appeler après board_init(), verrou de LVGL pris.
 void ecran_principal_creer(const BootInfo &boot);
+// Après la première lumière : ce que ecran_principal_creer() a laissé pour plus tard (la cuisson du verre). Verrou d'affichage pris.
+void ecran_principal_finir_demarrage();
 
 // Charge l'écran de diagnostic (cause du dernier redémarrage, Wi-Fi, point tactile, Redémarrer). Appelé par la ligne « Diagnostic » de
 // Réglages > Appareil ; un appui long sur le diagnostic rend l'écran d'où l'on venait. Sans effet si le diagnostic est déjà affiché.

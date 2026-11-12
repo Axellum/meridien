@@ -15,6 +15,7 @@
 //   clair    « jour » : fond clair, texte sombre, pour une pièce très éclairée. Même composition que « ciel ».
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 
 #include "banc.h"
 #include "ecran/visuel_themes.hpp"
@@ -36,6 +37,7 @@ void afficher(const banc::Contexte &contexte, const ThemePrincipal &theme, const
     lv_obj_t *ecran_lvgl = lv_obj_create(nullptr);
     const ecran::RessourcesPrincipal ressources = {roboto_700_start,
                                                    static_cast<std::size_t>(roboto_700_end - roboto_700_start)};
+    ecran::ui_principal_differer_verre(std::getenv("BANC_VERRE_DIFFERE") != nullptr); // voir scene_principal.cpp
     if (!ecran::ui_principal_creer(ecran_lvgl, ressources, contexte.largeur, contexte.hauteur, theme)) {
         return;
     }

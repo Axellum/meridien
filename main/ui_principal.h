@@ -97,4 +97,12 @@ CoutEcran ui_principal_cout();
 // voile réutilise ou rend son image quand il est recuit, et ui_principal_creer les rend toutes.
 int ui_principal_images_voile();
 
+// Démarrage : le verre des grandes cartes n'est pas cuit dans l'image du ciel avant la première image (≈ 70 ms de moins avant la
+// lumière, docs/mesures/accueil-cache-verre.md) ; il est dessiné en direct, au même pixel (vérifié au banc, BANC_VERRE_DIFFERE).
+// `ui_principal_differer_verre(true)` AVANT ui_principal_creer ; `ui_principal_cuire_verre_differe()` une fois la lumière allumée :
+// il cuit le verre et fait repeindre l'écran (même image). Sans cet appel, le verre reste dessiné en direct, juste plus lent à
+// repeindre. À appeler dans la tâche LVGL, verrou pris.
+void ui_principal_differer_verre(bool differer);
+void ui_principal_cuire_verre_differe();
+
 } // namespace ecran

@@ -41,6 +41,9 @@ void afficher(const banc::Contexte &contexte, const ecran::EntreesPrincipal &e) 
     lv_obj_t *ecran_lvgl = lv_obj_create(nullptr);
     const ecran::RessourcesPrincipal ressources = {roboto_700_start,
                                                    static_cast<std::size_t>(roboto_700_end - roboto_700_start)};
+    // BANC_VERRE_DIFFERE=1 : l'écran comme à la première image du démarrage (verre dessiné en direct, pas cuit) ; les PNG doivent être
+    // identiques à ceux d'un rendu normal (docs/mesures/demarrage-attentes.md).
+    ecran::ui_principal_differer_verre(std::getenv("BANC_VERRE_DIFFERE") != nullptr);
     if (!ecran::ui_principal_creer(ecran_lvgl, ressources, contexte.largeur, contexte.hauteur)) {
         return; // police non créée : l'écran reste vide, le PNG le montrera
     }
