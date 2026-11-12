@@ -7,7 +7,7 @@
 // pas celui attendu : c'est ainsi que « les réglages sont toujours atteignables » est vérifié sur le PC (pas sur la carte).
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp main/ui_details.cpp main/ui_mer.cpp
+// rendu-sources: main/ui_principal.cpp main/ui_principal_outils.cpp main/ui_principal_donnees.cpp main/ui_principal_disposition.cpp main/ui_principal_barre.cpp main/ui_principal_horloge.cpp main/ui_principal_voiles.cpp main/ui_principal_carte_heure.cpp main/ui_principal_heures.cpp main/ui_principal_bandeau.cpp main/ui_principal_mode_auto.cpp main/ui_principal_jours.cpp main/ui_principal_dessin.cpp main/ui_principal_toucher.cpp main/ui_principal_ciel.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp main/ui_details.cpp main/ui_mer.cpp
 // rendu-langues: fr en de nl es it tr
 // rendu-langues-defaut: fr
 // rendu-tailles: 1280x720 1024x600

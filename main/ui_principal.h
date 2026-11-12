@@ -2,7 +2,7 @@
 // heure par heure et sur sept jours, alertes. Fond en dégradé qui suit l'heure du jour et le temps. Les réglages s'ouvrent par la roue
 // d'appui long (ui_roue.h).
 //
-// LVGL PUR (contrat d'interface n° 3) : ce fichier et ses voisins (ui_principal.cpp, ui_meteo_*.cpp) n'incluent AUCUN en-tête
+// LVGL PUR (contrat d'interface n° 3) : ce fichier et ses voisins (ui_principal*.cpp, ui_meteo_*.cpp) n'incluent AUCUN en-tête
 // ESP-IDF, ni FreeRTOS, ni journal. Ils reçoivent leurs données par paramètre, la police et les icônes par leurs octets, afin que
 // le rendu sur le PC (tools/rendu/) les compile tels quels. Le branchement sur l'appareil (minuteur, heure du réseau, lecture de la
 // météo) est dans ecran_principal.cpp.
