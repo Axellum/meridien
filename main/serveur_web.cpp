@@ -279,11 +279,46 @@ bool lire_corps(httpd_req_t *req, size_t longueur) {
     return true;
 }
 
+// En-têtes communs à toutes les réponses (docs/api-reglages.md §1 et §12) : le navigateur ne devine jamais un autre type que
+// celui annoncé, et n'envoie l'adresse de la page à personne.
+void entetes_communs(httpd_req_t *req) {
+    httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
+    httpd_resp_set_hdr(req, "Referrer-Policy", http::POLITIQUE_REFERENT.data());
+}
+
+// L'en-tête « Host » désigne-t-il cet appareil (son adresse IP, son nom mDNS) ? Sinon la requête vient d'une page d'Internet
+// dont le nom a été redirigé vers l'appareil (rebinding DNS) : refusée avant toute autre lecture. La décision est dans le noyau
+// (http::hote_autorise, testée sur le PC). Pas encore de point d'accès d'installation sur ce firmware : aucune troisième adresse.
+bool hote_accepte(httpd_req_t *req) {
+    char hote[http::HOTE_MAX + 1] = {};
+    const size_t n = httpd_req_get_hdr_value_len(req, "Host");
+    if (n == 0 || n > http::HOTE_MAX || httpd_req_get_hdr_value_str(req, "Host", hote, sizeof(hote)) != ESP_OK) {
+        return false;
+    }
+    char ip[sizeof(EtatReseau::ip)] = {};
+    std::memcpy(ip, reseau_etat().ip, sizeof(ip));
+    ip[sizeof(ip) - 1] = '\0';
+    return http::hote_autorise(hote, ip, g_nom);
+}
+
+// Réponse sobre à un « Host » étranger : 403, une ligne de texte, rien sur l'appareil ; la connexion est fermée (le corps éventuel
+// n'est pas lu). Le nom reçu n'est pas écrit au journal (il vient du réseau).
+esp_err_t refuser_hote(httpd_req_t *req) {
+    ESP_LOGW(TAG, "requête refusée : en-tête Host qui ne désigne pas cet appareil");
+    entetes_communs(req);
+    httpd_resp_set_status(req, http::ligne_statut(403));
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    const esp_err_t err = httpd_resp_send(req, "Forbidden", HTTPD_RESP_USE_STRLEN);
+    httpd_sess_trigger_close(req->handle, httpd_req_to_sockfd(req));
+    return err;
+}
+
 esp_err_t repondre_api(httpd_req_t *req, const api::Reponse &rep) {
     httpd_resp_set_status(req, http::ligne_statut(rep.statut));
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
+    entetes_communs(req);
     char attente[12] = {};
     if (rep.statut == 429 && rep.reessayer_dans > 0) {
         std::snprintf(attente, sizeof(attente), "%d", rep.reessayer_dans);
@@ -293,6 +328,9 @@ esp_err_t repondre_api(httpd_req_t *req, const api::Reponse &rep) {
 }
 
 esp_err_t sur_api(httpd_req_t *req) {
+    if (!hote_accepte(req)) {
+        return refuser_hote(req);
+    }
     const http::Uri uri = http::separer_uri(req->uri);
     char entete[160];
     const std::string_view jeton = lire_jeton(req, entete, sizeof(entete));
@@ -344,6 +382,9 @@ esp_err_t sur_api(httpd_req_t *req) {
 }
 
 esp_err_t sur_fichier(httpd_req_t *req) {
+    if (!hote_accepte(req)) {
+        return refuser_hote(req);
+    }
     const http::Uri uri = http::separer_uri(req->uri);
     const std::string_view chemin = uri.chemin == "/" ? std::string_view("/index.html") : uri.chemin;
     const FichierWeb *fichier = nullptr;
@@ -353,19 +394,20 @@ esp_err_t sur_fichier(httpd_req_t *req) {
             break;
         }
     }
-    httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
-    httpd_resp_set_hdr(req, "Referrer-Policy", "no-referrer");
+    entetes_communs(req);
     if (fichier == nullptr) {
         ESP_LOGI(TAG, "GET %.*s -> 404", static_cast<int>(chemin.size()), chemin.data());
         httpd_resp_set_status(req, http::ligne_statut(404));
         httpd_resp_set_type(req, "text/plain; charset=utf-8");
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
         return httpd_resp_send(req, "Introuvable", HTTPD_RESP_USE_STRLEN);
     }
     httpd_resp_set_type(req, fichier->type);
     httpd_resp_set_hdr(req, "ETag", fichier->etag);
     httpd_resp_set_hdr(req, "Cache-Control",
                        "no-cache"); // revalider à chaque fois : l'étiquette rend la réponse minuscule
-    httpd_resp_set_hdr(req, "Content-Security-Policy", "frame-ancestors 'none'");
+    // Politique de contenu complète (noyau : http::POLITIQUE_CONTENU) : scripts et styles de l'appareil seulement, aucun cadre.
+    httpd_resp_set_hdr(req, "Content-Security-Policy", http::POLITIQUE_CONTENU.data());
 
     char deja[96] = {};
     if (httpd_req_get_hdr_value_str(req, "If-None-Match", deja, sizeof(deja)) == ESP_OK &&

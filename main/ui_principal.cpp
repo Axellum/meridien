@@ -21,6 +21,7 @@
 #include "textes_principal.h"
 #include "ui_meteo_dessin.h"
 #include "ui_meteo_icones.h"
+#include "ui_ressources.h"
 
 #include "src/draw/sw/lv_draw_sw_grad.h" // lv_draw_sw_grad_color_calculate : les couleurs mêmes du remplissage (voile_entre)
 
@@ -2711,10 +2712,12 @@ void appliquer_ciel() {
     cuire_verre();
 }
 
+// Une police de l'accueil : celle du registre partagé (ui_ressources.h), la même instance que les pages de même taille (Détails,
+// Alertes, Réglages), créée une seule fois pour tout l'appareil ; une reconstruction de l'accueil ne la recrée pas.
 Police creer_police(const std::uint8_t *ttf, std::size_t taille, int reference) {
     Police p;
     p.px = px(reference);
-    p.f = lv_tiny_ttf_create_data(ttf, taille, p.px);
+    p.f = ressources::police(ttf, taille, p.px);
     return p;
 }
 

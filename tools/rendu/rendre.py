@@ -44,7 +44,8 @@ SORTIE_DEFAUT = RACINE / "docs" / "captures" / "ecran"
 POLICE = RACINE / "main" / "assets" / "roboto_700.ttf"
 ICONES = RACINE / "main" / "assets" / "icones_meteo.bin"
 ICONES_ROUE = RACINE / "main" / "assets" / "mdi_roue.ttf"  # sous-ensemble de Material Design Icons pour la roue (ADR-0021)
-FICHIERS_COMMUNS = ["tools/rendu/banc.cpp"]
+# main/ui_ressources.cpp : le registre des polices partagées (LVGL pur), utilisé par toutes les pages.
+FICHIERS_COMMUNS = ["tools/rendu/banc.cpp", "main/ui_ressources.cpp"]
 
 # Les sept langues de l'écran (ADR-0006) : code -> nom dans sa langue, dans l'ordre des indices du noyau pur.
 LANGUES = {
