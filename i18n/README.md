@@ -48,9 +48,21 @@ _statut: complet
   sont contrôlées contre la police embarquée par `components/core/outils/verifier_glyphes.py`, voir plus bas) ; les
   autres (« Page de réglages », « Appareil ») ne passent que par la page web ou l'API.
 - Mêmes clés, même ordre, mêmes sections dans tous les fichiers de langue complets.
-- **Marqueurs** (`%d`, `%s`, `%u`, `%02d`… et `{noms}`) : identiques à la clé et dans le même ordre. Une traduction qui
+- **Marqueurs** (`%d`, `%s`, `%u`, `%02d`… et `{noms}`) : identiques à la clé ; les `%…` dans le même ordre (printf les lit
+  dans l'ordre), les `{noms}` dans l'ordre que la langue veut (ils sont remplacés par leur nom : « {sur} üzerinden {points}
+  puan » en turc). Une traduction qui
   les change ferait afficher n'importe quoi (ou planter un `printf`) : le générateur et les tests le refusent.
-- Tutoiement partout, comme sur le Tab5.
+- **Registre** (décidé le 11/11/2026) : le **français vouvoie** (ses textes l'ont toujours fait : « Choisissez »), les **six
+  autres langues tutoient**, comme sur le Tab5 et comme l'écrasante majorité de leurs phrases (« Wähle », « Kies », « Elige »,
+  « Scegli », « Seç »). `test/host/controle_i18n.py` refuse une forme de politesse dans une traduction (« Sie », « uw »,
+  « usted », « Lei », « -ınız ») et un tutoiement en français.
+- **Contexte** : un même mot français peut avoir deux sens. La clé s'écrit alors `"contexte|texte"` : `"vent|faible": "light"`,
+  `"mer|faible": "low"`, `"coefficient|faible": "small"` ; `"jour court|mer": "Wed"` (mercredi) n'est pas `"Mer": "Sea"` (la
+  page de la mer). Le contexte (minuscules, chiffres, espaces) ne s'affiche jamais : en français, `tr("vent|faible")` rend
+  « faible ». Une clé sans barre n'a qu'un sens.
+- **Un seul chemin** : tout texte de l'écran est une clé de ces fichiers et passe par `i18n::tr` (`T()`, `visuel::texte`,
+  `vigie::mot`, `mer::texte`… n'en sont que des noms). Les tables locales de `visuel_textes.hpp`, `grandeurs.hpp`,
+  `vigie_textes.hpp`, `mer_textes.hpp`, `visuel_dates.hpp` et `main/textes_1b.h` y ont été ramenées le 11/11/2026.
 - Repli : langue demandée, puis anglais, puis le texte français lui-même. Un fichier de langue peut donc être incomplet
   (`_statut: partiel`) sans casser l'écran ; il n'y en a aucun aujourd'hui.
 

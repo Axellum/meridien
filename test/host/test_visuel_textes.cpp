@@ -1,4 +1,8 @@
-// Tests du noyau pur : les textes de l'écran principal hors table commune (visuel_textes.hpp).
+// Tests du noyau pur : les textes de l'écran principal (visuel_textes.hpp). Depuis le 11/11/2026 ils sont dans la table commune
+// (i18n/*.yaml, sections « Écran : accueil, grandeurs et roue ») et `visuel::texte` n'est plus qu'un nom de `i18n::tr` : ces
+// listes sont la copie des clés que l'écran principal, la page Détails et la roue demandent, et les tests vérifient que chacune a
+// ses six traductions, ses marques et sa longueur.
+#include <cstddef>
 #include <string_view>
 
 #include "ecran/visuel_textes.hpp"
@@ -8,6 +12,95 @@ using ecran::i18n::Langue;
 using namespace ecran::visuel;
 
 namespace {
+
+constexpr Langue TRADUITES[] = {Langue::En, Langue::De, Langue::Nl, Langue::Es, Langue::It, Langue::Tr};
+
+// Les étiquettes (petites cartes, tuiles, roue, pastille du mode automatique, alertes, directions, lune).
+constexpr std::string_view ETIQUETTES[] = {
+    "Ressenti",
+    "Vent",
+    "Rafales",
+    "Pluie",
+    "Humidité",
+    "Pression",
+    "UV",
+    "Soleil",
+    "Lune",
+    "Lever",
+    "Coucher",
+    "Aujourd'hui",
+    "Maintenant",
+    "dans %d min",
+    "Il pleut",
+    "Sec 2 h",
+    "En hausse",
+    "En baisse",
+    "Stable",
+    "Données périmées",
+    "Météo indisponible",
+    "Heure du réseau en attente",
+    "Exemple",
+    "Réglages",
+    "Aller à",
+    "Détails",
+    "Mer",
+    "Diagnostic",
+    "Auto · Météo",
+    "Auto · alerte orange",
+    "Auto · alerte rouge",
+    "Auto · pluie proche",
+    "Auto · Surf",
+    "Auto · Vent·Bateau",
+    "Auto · Côte",
+    "Auto · données périmées",
+    "Météo · épinglé",
+    "Épinglé",
+    "Auto · changement différé",
+    "Auto en pause",
+    "Pluie faible",
+    "Pluie modérée",
+    "Alerte orange",
+    "Alerte rouge",
+    "Faible",
+    "Modéré",
+    "Élevé",
+    "Très élevé",
+    "Extrême",
+    "Gel",
+    "Forte chaleur",
+    "Vent fort",
+    "Pluie forte",
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SO",
+    "O",
+    "NO",
+    "Nouvelle lune",
+    "Premier croissant",
+    "Premier quartier",
+    "Gibbeuse croissante",
+    "Pleine lune",
+    "Gibbeuse décroissante",
+    "Dernier quartier",
+    "Dernier croissant",
+};
+
+// Les phrases de l'accueil (bandeau, carte pluie) : plus longues que les étiquettes.
+constexpr std::string_view PHRASES[] = {
+    "Pluie dès %s",
+    "Pluie dans %d min",
+    "Pluie en cours",
+    "fin dans %d min",
+    "ressenti %s",
+    "Données de %s · périmées",
+    "Rien à signaler dans les prochaines heures",
+    "puis plus forte vers %s",
+    "environ %d h",
+    "%s mm en tout",
+};
 
 constexpr int compter_marques(std::string_view s) {
     int n = 0;
@@ -19,29 +112,31 @@ constexpr int compter_marques(std::string_view s) {
 }
 
 constexpr int chaque_texte_a_ses_six_traductions() {
-    for (const Texte &x : TEXTES) {
-        VERIFIER(!x.fr.empty());
-        for (std::string_view t : x.t) {
-            VERIFIER(!t.empty());
+    for (std::string_view fr : ETIQUETTES) {
+        VERIFIER(!fr.empty());
+        VERIFIER(ecran::i18n::est_une_cle(fr));
+        for (Langue l : TRADUITES) {
+            VERIFIER(!ecran::i18n::propre(fr, l).empty());
         }
     }
     return 0;
 }
 
 constexpr int aucune_cle_n_est_en_double() {
-    for (std::size_t i = 0; i < NOMBRE_TEXTES; ++i) {
-        for (std::size_t j = i + 1; j < NOMBRE_TEXTES; ++j) {
-            VERIFIER(TEXTES[i].fr != TEXTES[j].fr);
+    constexpr std::size_t N = sizeof(ETIQUETTES) / sizeof(ETIQUETTES[0]);
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t j = i + 1; j < N; ++j) {
+            VERIFIER(ETIQUETTES[i] != ETIQUETTES[j]);
         }
     }
     return 0;
 }
 
 constexpr int les_marques_de_format_sont_les_memes_dans_toutes_les_langues() {
-    for (const Texte &x : TEXTES) {
-        const int attendu = compter_marques(x.fr);
-        for (std::string_view t : x.t) {
-            VERIFIER(compter_marques(t) == attendu);
+    for (std::string_view fr : ETIQUETTES) {
+        const int attendu = compter_marques(fr);
+        for (Langue l : TRADUITES) {
+            VERIFIER(compter_marques(ecran::i18n::propre(fr, l)) == attendu);
         }
     }
     return 0;
@@ -49,10 +144,10 @@ constexpr int les_marques_de_format_sont_les_memes_dans_toutes_les_langues() {
 
 constexpr int une_etiquette_reste_courte() {
     // Ce sont des étiquettes de petites cartes : 28 octets (accents compris) au plus, la plus longue étant une phase de lune.
-    for (const Texte &x : TEXTES) {
-        VERIFIER(x.fr.size() <= 28);
-        for (std::string_view t : x.t) {
-            VERIFIER(t.size() <= 28);
+    for (std::string_view fr : ETIQUETTES) {
+        VERIFIER(fr.size() <= 28);
+        for (Langue l : TRADUITES) {
+            VERIFIER(ecran::i18n::propre(fr, l).size() <= 28);
         }
     }
     return 0;
@@ -96,13 +191,15 @@ constexpr int les_huit_phases_de_lune_et_les_huit_directions_sont_la() {
 }
 
 constexpr int les_phrases_de_l_accueil_ont_six_traductions_les_memes_marques_et_une_longueur_bornee() {
-    for (const Texte &x : PHRASES) {
-        VERIFIER(!x.fr.empty() && x.fr.size() <= 64);
-        const int attendu = compter_marques(x.fr);
+    for (std::string_view fr : PHRASES) {
+        VERIFIER(!fr.empty() && fr.size() <= 64);
+        VERIFIER(ecran::i18n::est_une_cle(fr));
+        const int attendu = compter_marques(fr);
         VERIFIER(attendu <= 1); // une seule marque : `%s` ou `%d`
-        for (std::string_view t : x.t) {
+        for (Langue l : TRADUITES) {
+            const std::string_view t = ecran::i18n::propre(fr, l);
             VERIFIER(!t.empty() && t.size() <= 64);
-            VERIFIER(t != x.fr); // une vraie traduction
+            VERIFIER(t != fr); // une vraie traduction
             VERIFIER(compter_marques(t) == attendu);
         }
     }
@@ -110,14 +207,15 @@ constexpr int les_phrases_de_l_accueil_ont_six_traductions_les_memes_marques_et_
 }
 
 constexpr int aucune_phrase_n_a_la_cle_d_une_etiquette() {
-    for (const Texte &p : PHRASES) {
-        for (const Texte &x : TEXTES) {
-            VERIFIER(p.fr != x.fr);
+    for (std::string_view p : PHRASES) {
+        for (std::string_view x : ETIQUETTES) {
+            VERIFIER(p != x);
         }
     }
-    for (std::size_t i = 0; i < NOMBRE_PHRASES; ++i) {
-        for (std::size_t j = i + 1; j < NOMBRE_PHRASES; ++j) {
-            VERIFIER(PHRASES[i].fr != PHRASES[j].fr);
+    constexpr std::size_t N = sizeof(PHRASES) / sizeof(PHRASES[0]);
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t j = i + 1; j < N; ++j) {
+            VERIFIER(PHRASES[i] != PHRASES[j]);
         }
     }
     return 0;

@@ -14,10 +14,10 @@ T = "test_grandeurs.cpp"
 
 MUTATIONS_GRANDEURS = [
     # --- textes ---
-    (G, '"Close", "Schließen"', '"Close", ""', T, "les_deux_phrases_de_la_page_ont_leurs_six_traductions",
-     "« Fermer » n'a plus de traduction allemande"),
-    (G, "x.t[i18n::indice(langue) - 1]", "x.t[i18n::indice(langue) - 2]", T, "les_phrases_de_la_page_dans_chaque_langue",
-     "la page parle la langue d'à côté"),
+    ("i18n_donnees.inc", '{"Fermer", {"Close", "Schließen"', '{"Fermer", {"Close", ""', T,
+     "les_deux_phrases_de_la_page_ont_leurs_six_traductions", "« Fermer » n'a plus de traduction allemande"),
+    (G, "noexcept {\n    return i18n::tr(francais, langue);\n}", "noexcept {\n    return i18n::tr(francais, Langue::En);\n}",
+     T, "les_phrases_de_la_page_dans_chaque_langue", "la page parle anglais quelle que soit la langue"),
     (G, 'inline constexpr std::string_view TIRET = "—";', 'inline constexpr std::string_view TIRET = "0";', T,
      "sans_meteo_toutes_les_grandeurs_meteo_sont_des_tirets_et_la_lune_reste", "une grandeur inconnue s'écrit 0"),
     (G, "inline constexpr std::size_t CAP_LIGNE = 40;", "inline constexpr std::size_t CAP_LIGNE = 12;", T,

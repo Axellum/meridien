@@ -7,6 +7,10 @@
 // quelle. L'INDICE d'une langue ne change jamais (il est enregistré en NVS) : fr 0, en 1, de 2, nl 3, es 4, it 5, tr 6,
 // comme le sélecteur « Langue » du Tab5 ; une langue nouvelle prend le numéro suivant, à la fin.
 //
+// Contexte : quand un même mot français a deux sens (« faible » : un vent léger, une mer basse, un petit coefficient), la clé
+// s'écrit « contexte|texte » (« vent|faible ») : le français affiché est la partie après la première barre, le contexte ne
+// s'affiche jamais (`texte_francais`). Une clé sans barre n'a qu'un sens. Voir i18n/README.md.
+//
 // Les textes sont en UTF-8 : sous MSVC, compiler avec /utf-8. Les `string_view` rendus pointent soit dans la table
 // (littéraux, terminés par un zéro), soit dans le texte reçu : `tr_c` rend un `const char*` pour printf/LVGL.
 #pragma once
@@ -84,6 +88,13 @@ constexpr const Entree *chercher(const Entree *table, std::size_t n, std::string
 
 // Traduction propre à `langue`, sans repli : vide si la clé est inconnue, si la case est vide, ou si la langue est le
 // français (le français n'a pas de traduction, il EST la clé).
+// Le texte français d'une clé : « faible » pour « vent|faible », la clé elle-même sans contexte. Terminé par un zéro quand la
+// clé l'est (la fin d'un littéral).
+constexpr std::string_view texte_francais(std::string_view cle) noexcept {
+    const std::size_t barre = cle.find('|');
+    return barre == std::string_view::npos ? cle : cle.substr(barre + 1);
+}
+
 constexpr std::string_view propre_dans(const Entree *table, std::size_t n, std::string_view francais,
                                        Langue langue) noexcept {
     if (langue == Langue::Fr)
@@ -92,19 +103,19 @@ constexpr std::string_view propre_dans(const Entree *table, std::size_t n, std::
     return e != nullptr ? e->t[indice(langue) - 1] : std::string_view{};
 }
 
-// Traduction avec repli : langue demandée, sinon anglais, sinon le texte français reçu.
+// Traduction avec repli : langue demandée, sinon anglais, sinon le texte français reçu (sans son contexte).
 constexpr std::string_view tr_dans(const Entree *table, std::size_t n, std::string_view francais,
                                    Langue langue) noexcept {
     if (langue == Langue::Fr)
-        return francais;
+        return texte_francais(francais);
     const Entree *e = detail::chercher(table, n, francais);
     if (e == nullptr)
-        return francais;
+        return texte_francais(francais);
     if (!e->t[indice(langue) - 1].empty())
         return e->t[indice(langue) - 1];
     if (!e->t[indice(Langue::En) - 1].empty())
         return e->t[indice(Langue::En) - 1];
-    return francais;
+    return texte_francais(francais);
 }
 
 constexpr std::string_view propre(std::string_view francais, Langue langue) noexcept {

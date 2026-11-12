@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "board.h"
@@ -36,6 +38,77 @@ board_info_t g_carte = {"M5Stack Tab5", "ST7121", "Sitronix (version 1)", 0, 0};
 board_boot_timeline_t g_jalons = {0, 0, 0, 0, 612};
 
 uint32_t lire_tick() { return g_ms; }
+
+// ---- contrôle de place des textes (G-15) ----
+// Chaque texte dessiné passe par lv_draw_label : l'édition de liens la remplace par __wrap_lv_draw_label (rendre.py passe
+// -Wl,--wrap=lv_draw_label), qui note ici ce qui ne tient pas, puis dessine comme avant. Le rendu n'est pas changé.
+std::set<std::string> g_debordements;
+
+void noter(const char *raison, std::string t) {
+    for (char &c : t) {
+        if (c == '\n' || c == '\t')
+            c = ' ';
+    }
+    g_debordements.insert(std::string(raison) + "\t" + t);
+}
+
+// Vrai si le texte a été abrégé avant d'être dessiné (« … » de l'interface, « ... » d'un libellé LV_LABEL_LONG_DOT).
+bool abrege(const std::string &t) {
+    return t.find("\xE2\x80\xA6") != std::string::npos || (t.size() >= 3 && t.compare(t.size() - 3, 3, "...") == 0);
+}
+
+void controler_texte(const lv_draw_label_dsc_t *dsc, const lv_area_t *zone) {
+    if (dsc == nullptr || zone == nullptr || dsc->text == nullptr || dsc->font == nullptr || dsc->text[0] == '\0')
+        return;
+    // text_length vaut LV_TEXT_LEN_MAX par défaut (lv_draw_label_dsc_init) : le texte s'arrête alors à son zéro final.
+    const std::size_t fin = std::strlen(dsc->text);
+    const std::string texte(dsc->text, dsc->text_length < fin ? dsc->text_length : fin);
+    const int32_t largeur = lv_area_get_width(zone);
+    const int32_t hauteur = lv_area_get_height(zone);
+    lv_point_t taille = {};
+    lv_text_get_size(&taille, texte.c_str(), dsc->font, dsc->letter_space, dsc->line_space,
+                     (dsc->flag & LV_TEXT_FLAG_EXPAND) ? LV_COORD_MAX : largeur, dsc->flag);
+    const int32_t tolerance = 2;
+    if (abrege(texte))
+        noter("abrégé", texte);
+    if ((dsc->flag & LV_TEXT_FLAG_EXPAND) && taille.x > largeur + tolerance)
+        noter("trop large pour sa zone", texte);
+    // Une seule ligne prévue (hauteur d'une ligne) mais le texte en demande plusieurs : il est coupé en bas.
+    if (taille.y > hauteur + tolerance && hauteur > 0)
+        noter("coupé en bas (plus de lignes que la place)", texte);
+    // Le texte réellement occupé (aligné à gauche, au centre ou à droite dans la zone) sort de l'écran.
+    const int32_t utile = taille.x < largeur ? taille.x : largeur;
+    int32_t x1 = zone->x1;
+    if (dsc->align == LV_TEXT_ALIGN_CENTER)
+        x1 = zone->x1 + (largeur - utile) / 2;
+    else if (dsc->align == LV_TEXT_ALIGN_RIGHT)
+        x1 = zone->x2 + 1 - utile;
+    const int32_t x2 = x1 + utile - 1;
+    const int32_t y2 = zone->y1 + (taille.y < hauteur ? taille.y : hauteur) - 1;
+    if (x1 < -tolerance || x2 >= g_largeur + tolerance || zone->y1 < -tolerance || y2 >= g_hauteur + tolerance) {
+        // Un texte entièrement hors de l'écran (page suivante d'un défilement) n'est pas un débordement.
+        const bool visible = x2 >= 0 && x1 < g_largeur && y2 >= 0 && zone->y1 < g_hauteur;
+        if (visible)
+            noter("sort de l'écran", texte);
+    }
+    // Le texte sort du cadre d'un de ses parents qui le rogne (une carte, un bouton) : on ne le voit qu'en partie.
+    for (lv_obj_t *parent = dsc->base.obj != nullptr ? lv_obj_get_parent(dsc->base.obj) : nullptr; parent != nullptr;
+         parent = lv_obj_get_parent(parent)) {
+        if (lv_obj_has_flag(parent, LV_OBJ_FLAG_OVERFLOW_VISIBLE))
+            continue;
+        lv_area_t cadre;
+        lv_obj_get_coords(parent, &cadre);
+        if (lv_obj_has_flag(parent, LV_OBJ_FLAG_SCROLLABLE) &&
+            (lv_obj_get_scroll_top(parent) != 0 || lv_obj_get_scroll_bottom(parent) > 0))
+            break; // une liste qui défile : la suite est plus bas, ce n'est pas un débordement
+        if (x1 < cadre.x1 - tolerance || x2 > cadre.x2 + tolerance || y2 > cadre.y2 + tolerance) {
+            const bool visible = x2 >= cadre.x1 && x1 <= cadre.x2 && y2 >= cadre.y1 && zone->y1 <= cadre.y2;
+            if (visible)
+                noter("dépasse le cadre qui le contient", texte);
+        }
+        break; // le premier parent suffit : il rogne déjà
+    }
+}
 
 // Recopie la zone dessinée par LVGL dans l'image complète (le rôle de la copie DMA2D vers le tampon de la dalle).
 void sur_flush(lv_display_t *affichage, const lv_area_t *zone, uint8_t *pixels) {
@@ -160,6 +233,13 @@ long long _time64(long long *sortie) {
     }
     return g_instant;
 }
+
+// Tout texte dessiné (libellés LVGL et textes peints par l'interface) : contrôle de place, puis le vrai dessin.
+void __real_lv_draw_label(lv_layer_t *layer, const lv_draw_label_dsc_t *dsc, const lv_area_t *coords);
+void __wrap_lv_draw_label(lv_layer_t *layer, const lv_draw_label_dsc_t *dsc, const lv_area_t *coords) {
+    controler_texte(dsc, coords);
+    __real_lv_draw_label(layer, dsc, coords);
+}
 }
 
 namespace banc {
@@ -277,6 +357,9 @@ int main(int argc, char **argv) {
                          us(t1, t2));
         }
     }
+    // Contrôle de place : une ligne par texte qui ne tient pas, lue par rendre.py (« DEBORDE<tab>raison<tab>texte »).
+    for (const std::string &d : g_debordements)
+        std::fprintf(stderr, "DEBORDE\t%s\n", d.c_str());
     if (!ecrire_ppm(sortie)) {
         std::fprintf(stderr, "banc : écriture impossible : %s\n", sortie);
         return 1;

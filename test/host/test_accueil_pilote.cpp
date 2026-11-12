@@ -132,20 +132,17 @@ constexpr int toutes_les_phrases_sont_differentes_et_une_raison_inconnue_se_lit_
 }
 
 constexpr bool a_ses_six_traductions(std::string_view cle) {
-    for (const ecran::visuel::Texte &x : ecran::visuel::TEXTES) {
-        if (x.fr == cle) {
-            for (const std::string_view t : x.t) {
-                if (t.empty())
-                    return false;
-            }
-            return true;
-        }
+    if (!ecran::i18n::est_une_cle(cle))
+        return false;
+    for (int l = 1; l < static_cast<int>(ecran::i18n::NOMBRE_LANGUES); ++l) {
+        if (ecran::i18n::propre(cle, ecran::i18n::langue_depuis_indice(l)).empty())
+            return false;
     }
-    return false;
+    return true;
 }
 
 constexpr int chaque_phrase_de_la_pastille_a_ses_six_traductions() {
-    // La table des sept langues (visuel_textes.hpp) porte une entrée pour chacune des phrases que le pilote peut demander.
+    // La table commune des sept langues (i18n/*.yaml) porte une entrée pour chacune des phrases que le pilote peut demander.
     for (std::size_t i = 0; i < NOMBRE_RAISONS; ++i)
         VERIFIER(a_ses_six_traductions(phrase_pastille(static_cast<Raison>(i), Profil::Meteo)));
     VERIFIER(a_ses_six_traductions(phrase_pastille(Raison::Epingle, Profil::Surf)));

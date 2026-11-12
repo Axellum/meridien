@@ -2,14 +2,17 @@
 
 1. `generer_i18n.py --verifier` : les fichiers i18n/*.yaml sont cohérents (mêmes clés, mêmes marqueurs, indices figés) et
    les sorties versionnées (i18n_donnees.inc, web/app/lang/*.json) sont à jour.
-2. Les textes français que l'écran « Bonjour » affiche (main/ui_bonjour.cpp, main/boot_info.cpp) sont exactement la section
-   « Écran : « Bonjour » » de i18n/en.yaml, et la copie de cette liste dans test_i18n.cpp (BONJOUR[]) est la même. Si
-   quelqu'un change un texte de ces deux fichiers sans toucher la table, le contrôle échoue ici (main/ n'est pas modifié).
+2. Les textes français que l'écran de diagnostic (« Bonjour ») affiche (main/ui_bonjour.cpp, main/boot_info.cpp) sont tous des
+   clés de la table, les sections « Écran : « Bonjour » » et « Écran : diagnostic » de i18n/en.yaml n'ont pas de texte qu'il
+   n'affiche plus, et la copie de cette liste dans test_i18n.cpp (BONJOUR[]) est la même. Si quelqu'un change un texte de ces
+   deux fichiers sans toucher la table, le contrôle échoue ici (main/ n'est pas modifié).
 3. `web/tests/controle_langues.py` : web/app/app.js n'écrit aucun texte français (tout passe par un identifiant de
    i18n/page.yaml) et chaque texte que le faux appareil (web/faux-serveur/serveur.mjs) passe à T() est une clé des
    fichiers de langue.
 
-4. Chaque texte français que main/*.cpp passe à `T("…")` ou à `remplir("…", …)` est une clé de la table. Une espace insécable avant « : », ou une
+4. Chaque texte français que main/*.cpp et main/*.h passent à une fonction de traduction (`T("…")`, `remplir("…", …)`,
+   `texte_c`, `t`, `M`, `mot`, `mot_c`, `tr`, `tr_c` : toutes finissent dans `i18n::tr`, le seul chemin de traduction depuis
+   le 11/11/2026) est une clé de la table. Une espace insécable avant « : », ou une
    apostrophe droite au lieu de « ’ », suffit à ne pas trouver la clé : le texte reste alors en français dans les six autres
    langues, sans erreur nulle part (vu le 08/11/2026 sur deux phrases de la page « La mer »).
 
@@ -37,7 +40,9 @@ RETOURS_BOOT = re.compile(r"\breturn\s+" + LITTERAL + r"\s*;")
 LISTE_TEST = re.compile(r"BONJOUR\[\]\s*=\s*\{(.*?)\};", re.DOTALL)
 LISTE_PHRASES = re.compile(r"PHRASES\[\]\s*=\s*\{(.*?)\};", re.DOTALL)
 LITTERAUX = re.compile(LITTERAL)
-TEXTE_PASSE_A_T = re.compile(r"\b(?:T|remplir)\(\s*" + LITTERAL + r"\s*[,)]")
+TEXTE_PASSE_A_T = re.compile(r"\b(?:T|remplir|texte_c|t|M|mot|mot_c|tr|tr_c)\(\s*" + LITTERAL + r"\s*[,)]")
+# Sections propres à l'écran de diagnostic : les constantes de ui_bonjour.cpp et les causes de boot_info.cpp en sont la liste exacte.
+SECTIONS_DIAGNOSTIC = ("Écran : « Bonjour »", "Écran : diagnostic")
 
 
 def _generateur():
@@ -112,8 +117,8 @@ def controle_phrases_de_l_api():
 
 
 def controle_textes_passes_a_t():
-    """Chaque littéral passé à T("…") ou à remplir("…", …) dans main/*.cpp est une clé de la table de traduction. Retourne le
-    nombre d'échecs."""
+    """Chaque littéral passé à une fonction de traduction dans main/*.cpp et main/*.h est une clé de la table de traduction.
+    Retourne le nombre d'échecs."""
     dossier = RACINE / "main"
     if not dossier.exists():
         print("  saute   main/ absent : textes passés à T() non comparés")
@@ -122,16 +127,44 @@ def controle_textes_passes_a_t():
     table = {c for c, _section in cles}
     total = 0
     inconnus = []
-    for chemin in sorted(dossier.glob("*.cpp")):
+    for chemin in sorted([*dossier.glob("*.cpp"), *dossier.glob("*.h")]):
         for m in TEXTE_PASSE_A_T.findall(chemin.read_text(encoding="utf-8")):
             total += 1
             texte = _sans_echappements(m)
             if texte not in table:
                 inconnus.append(f"{chemin.name} : {texte!r}")
     if inconnus:
-        print(f"  ECHEC   main/ passe à T() un texte absent de la table de traduction ({len(inconnus)}) : {inconnus[:3]}")
+        print(f"  ECHEC   main/ fait traduire un texte absent de la table de traduction ({len(inconnus)}) : {inconnus[:3]}")
         return 1
-    print(f"  ok      {total} textes passés à T() ou remplir() dans main/*.cpp : tous sont une clé de la table de traduction")
+    print(f"  ok      {total} textes passés à une fonction de traduction dans main/ : tous sont une clé de la table de traduction")
+    return 0
+
+
+# Registre (décidé le 11/11/2026, i18n/README.md) : le français vouvoie, les six langues traduites tutoient, comme le Tab5.
+# Formes de politesse repérables sans ambiguïté (« u » néerlandais après un nombre est l'heure : « 2 u », « {n} u geleden »).
+VOUVOIEMENT = {
+    "de": re.compile(r"\b(Sie|Ihnen|Ihre[nmrs]?|Ihr)\b"),
+    "nl": re.compile(r"\buw\b|(?<![\d}d] )(?<!%)\bu\b"),
+    "es": re.compile(r"\b(usted|ustedes|Siga|Elija|Introduzca|Pulse|Compruebe|Vuelva|Intente|Escriba|Seleccione)\b"),
+    "it": re.compile(r"\b(Lei|Scelga|Inserisca|Prema|Tocchi|Attenda|Controlli|Riprovi|Segua)\b"),
+    "tr": re.compile(r"\w+(ınız|iniz|unuz|ünüz)\w*"),
+}
+TUTOIEMENT_FR = re.compile(r"\b(tu|toi|ton|ta|tes|te)\b|\b(Choisis|Touche|Vérifie|Réessaie|Ouvre|Attends|Entre)\b")
+
+
+def controle_registre():
+    """Le français ne tutoie nulle part, les six autres langues ne vouvoient nulle part. Retourne le nombre d'échecs."""
+    langues, cles, _ = _generateur().sorties_attendues()[1:]
+    ecarts = [f"fr : {c[:50]!r}" for c, _ in cles if TUTOIEMENT_FR.search(_generateur().texte_francais(c))]
+    for lg in langues[1:]:
+        motif = VOUVOIEMENT.get(lg["code"])
+        if motif is None:
+            continue
+        ecarts += [f"{lg['code']} : {v[:50]!r}" for v in lg["entrees"].values() if motif.search(v)]
+    if ecarts:
+        print(f"  ECHEC   registre (le français vouvoie, les autres langues tutoient) : {len(ecarts)} écart(s) : {ecarts[:3]}")
+        return 1
+    print("  ok      registre : le français vouvoie, l'allemand, le néerlandais, l'espagnol, l'italien et le turc tutoient")
     return 0
 
 
@@ -156,18 +189,20 @@ def controle_i18n():
 
     echecs += controle_phrases_de_l_api()
     echecs += controle_textes_passes_a_t()
+    echecs += controle_registre()
 
     if not UI_BONJOUR.exists() or not BOOT_INFO.exists():
         print("  saute   main/ui_bonjour.cpp ou main/boot_info.cpp absent : textes de l'écran « Bonjour » non comparés")
         return echecs
 
     _, _, cles, _ = _generateur().sorties_attendues()
-    table = {c for c, section in cles if section.startswith("Écran : « Bonjour »")}
+    toutes = {c for c, _section in cles}
+    table = {c for c, section in cles if section.startswith(SECTIONS_DIAGNOSTIC)}
     firmware = textes_du_firmware()
     copie = textes_du_test()
 
     for libelle, a, b in (
-        ("le firmware (main/) affiche un texte absent de la table", firmware, table),
+        ("le firmware (main/) affiche un texte absent de la table", firmware, toutes),
         ("la table a un texte que main/ n'affiche plus", table, firmware),
         ("test_i18n.cpp BONJOUR[] n'est plus la liste de main/", copie, firmware),
         ("main/ affiche un texte absent de test_i18n.cpp BONJOUR[]", firmware, copie),
@@ -177,7 +212,7 @@ def controle_i18n():
             print(f"  ECHEC   {libelle} : {ecart[:3]}")
             echecs += 1
     if echecs == 0:
-        print(f"  ok      {len(firmware)} textes de l'écran « Bonjour » : main/, table et test_i18n.cpp identiques")
+        print(f"  ok      {len(firmware)} textes de l'écran de diagnostic : main/, table et test_i18n.cpp identiques")
     return echecs
 
 

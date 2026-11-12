@@ -24,6 +24,7 @@ using ecran::i18n::NOMBRE_LANGUES;
 using ecran::i18n::propre;
 using ecran::i18n::propre_dans;
 using ecran::i18n::TABLE;
+using ecran::i18n::texte_francais;
 using ecran::i18n::tr;
 using ecran::i18n::tr_dans;
 
@@ -69,19 +70,51 @@ constexpr Marqueur marqueur_suivant(std::string_view s, std::size_t pos) {
     return {0, 0};
 }
 
+// Nombre de fois où le marqueur `m` (« {nom} ») apparaît dans `s`.
+constexpr std::size_t occurrences(std::string_view s, std::string_view m) {
+    std::size_t n = 0;
+    std::size_t pos = 0;
+    for (;;) {
+        const Marqueur x = marqueur_suivant(s, pos);
+        if (x.longueur == 0)
+            return n;
+        if (s.substr(x.debut, x.longueur) == m)
+            ++n;
+        pos = x.debut + x.longueur;
+    }
+}
+
+// Les « %d %s… » (lus par printf dans l'ordre) : même liste, même ordre. Les {noms} (remplacés par leur nom) : les mêmes, dans
+// l'ordre que la langue veut (« {sur} üzerinden {points} puan » en turc).
 constexpr bool memes_marqueurs(std::string_view a, std::string_view b) {
     std::size_t pa = 0;
     std::size_t pb = 0;
     for (;;) {
-        const Marqueur ma = marqueur_suivant(a, pa);
-        const Marqueur mb = marqueur_suivant(b, pb);
-        if (ma.longueur == 0 || mb.longueur == 0)
-            return ma.longueur == mb.longueur;
+        Marqueur ma = marqueur_suivant(a, pa);
+        while (ma.longueur != 0 && a[ma.debut] == '{')
+            ma = marqueur_suivant(a, ma.debut + ma.longueur);
+        Marqueur mb = marqueur_suivant(b, pb);
+        while (mb.longueur != 0 && b[mb.debut] == '{')
+            mb = marqueur_suivant(b, mb.debut + mb.longueur);
+        if (ma.longueur == 0 || mb.longueur == 0) {
+            if (ma.longueur != mb.longueur)
+                return false;
+            break;
+        }
         if (a.substr(ma.debut, ma.longueur) != b.substr(mb.debut, mb.longueur))
             return false;
         pa = ma.debut + ma.longueur;
         pb = mb.debut + mb.longueur;
     }
+    for (const std::string_view s : {a, b}) {
+        std::size_t pos = 0;
+        for (Marqueur m = marqueur_suivant(s, pos); m.longueur != 0; m = marqueur_suivant(s, m.debut + m.longueur)) {
+            const std::string_view nom = s.substr(m.debut, m.longueur);
+            if (nom[0] == '{' && occurrences(a, nom) != occurrences(b, nom))
+                return false;
+        }
+    }
+    return true;
 }
 
 constexpr std::size_t nombre_de_marqueurs(std::string_view s) {
@@ -244,7 +277,7 @@ constexpr int toute_cle_existe_dans_chaque_langue() {
             VERIFIER(tr(TABLE[i].cle, TOUTES[l]) == propre(TABLE[i].cle, TOUTES[l]));
         }
         VERIFIER(propre(TABLE[i].cle, Langue::Fr).empty()); // le français est la clé, il n'a pas de case
-        VERIFIER(tr(TABLE[i].cle, Langue::Fr) == TABLE[i].cle);
+        VERIFIER(tr(TABLE[i].cle, Langue::Fr) == texte_francais(TABLE[i].cle)); // sans son contexte
     }
     return 0;
 }
@@ -267,11 +300,14 @@ constexpr int le_comparateur_de_marqueurs_voit_les_differences() {
     VERIFIER(memes_marqueurs("%02d", "%02d"));
     VERIFIER(!memes_marqueurs("%02d", "%d"));
     VERIFIER(memes_marqueurs("{nom} · {ssid}", "{nom} - {ssid}"));
-    VERIFIER(!memes_marqueurs("{nom} · {ssid}", "{ssid} · {nom}")); // ordre des noms
-    VERIFIER(!memes_marqueurs("{nom}", "{ville}"));                 // autre nom
-    VERIFIER(!memes_marqueurs("{nom}", "nom"));                     // accolades perdues
-    VERIFIER(memes_marqueurs("100 %", "100%"));                     // « % » seul n'est pas un marqueur
-    VERIFIER(memes_marqueurs("100 %% sûr", "100 %% safe"));         // « %% » non plus
+    VERIFIER(memes_marqueurs("{nom} · {ssid}", "{ssid} · {nom}"));   // les noms changent d'ordre : permis
+    VERIFIER(!memes_marqueurs("{nom} · {ssid}", "{ssid} · {ssid}")); // un nom remplacé par un autre déjà là
+    VERIFIER(!memes_marqueurs("{nom} · {nom}", "{nom}"));            // un nom de moins
+    VERIFIER(!memes_marqueurs("%s {nom} %d", "%d {nom} %s"));        // les « % » gardent leur ordre
+    VERIFIER(!memes_marqueurs("{nom}", "{ville}"));                  // autre nom
+    VERIFIER(!memes_marqueurs("{nom}", "nom"));                      // accolades perdues
+    VERIFIER(memes_marqueurs("100 %", "100%"));                      // « % » seul n'est pas un marqueur
+    VERIFIER(memes_marqueurs("100 %% sûr", "100 %% safe"));          // « %% » non plus
     VERIFIER(memes_marqueurs("Pas de marqueur", "Kein Marker"));
     VERIFIER(nombre_de_marqueurs("Carte : %s, %d × %d") == 3);
     VERIFIER(nombre_de_marqueurs("{h}:{m}") == 2);
@@ -283,13 +319,13 @@ constexpr int le_comparateur_de_marqueurs_voit_les_differences() {
 // -------------------------------------------------------------------------------------------
 
 constexpr int vocabulaire_du_tab5_repris_tel_quel() {
-    // Dates et « Redémarrer » viennent de Tab5/lang/*.yaml (lu le 06/11/2026) : mêmes mots.
+    // Noms des jours et des mois et « Redémarrer » viennent de Tab5/lang/*.yaml (lu le 06/11/2026) : mêmes mots. Les formes
+    // courtes du Tab5 (« Dim », « Janv »…) ont été retirées le 11/11/2026 : l'écran ne s'en servait pas.
     struct Attendu {
         std::string_view cle;
         std::string_view t[6]; // en, de, nl, es, it, tr
     };
     constexpr Attendu ATTENDUS[] = {
-        {"Dim", {"Sun", "So", "Zo", "Dom", "Dom", "Paz"}},
         {"dimanche", {"Sunday", "Sonntag", "zondag", "domingo", "domenica", "Pazar"}},
         {"août", {"August", "August", "augustus", "agosto", "agosto", "Ağustos"}},
         {"Redémarrer", {"Restart", "Neu starten", "Herstarten", "Reiniciar", "Riavvia", "Yeniden başlat"}},
@@ -344,12 +380,12 @@ constexpr int cle_inconnue_rendue_telle_quelle() {
     for (Langue l : TOUTES) {
         VERIFIER(tr("Ce texte n'est dans aucune table", l) == "Ce texte n'est dans aucune table");
         VERIFIER(tr("", l).empty());
-        VERIFIER(tr("dim", l) == "dim");   // la casse compte : « Dim » est une clé, pas « dim »
-        VERIFIER(tr("Dim ", l) == "Dim "); // ni une espace de plus
+        VERIFIER(tr("Dimanche", l) == "Dimanche");   // la casse compte : « dimanche » est une clé, pas « Dimanche »
+        VERIFIER(tr("dimanche ", l) == "dimanche "); // ni une espace de plus
     }
-    VERIFIER(est_une_cle("Dim"));
-    VERIFIER(!est_une_cle("dim"));
-    VERIFIER(!est_une_cle("Dim "));
+    VERIFIER(est_une_cle("dimanche"));
+    VERIFIER(!est_une_cle("Dimanche"));
+    VERIFIER(!est_une_cle("dimanche "));
     VERIFIER(!est_une_cle(""));
     return 0;
 }
@@ -390,23 +426,44 @@ constexpr int jours_et_mois_de_heure_fr_traduits() {
         for (std::size_t l = 1; l < NOMBRE_LANGUES; ++l)
             VERIFIER(!propre(ecran::heure::nom_mois(m), TOUTES[l]).empty());
     }
-    // Formes courtes (clés du Tab5 : « Mar » est mardi, « Mars » est mars) : toutes présentes, sept jours et douze
-    // mois.
-    constexpr std::string_view COURTS[] = {"Dim", "Lun", "Mar",  "Mer",  "Jeu",  "Ven",  "Sam", "Janv", "Févr", "Mars",
-                                           "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov",  "Déc"};
-    for (std::string_view c : COURTS)
-        VERIFIER(est_une_cle(c));
-    // Mardi et mars ont la même forme courte en français comme en anglais, mais pas la même clé.
-    VERIFIER(tr("Mar", Langue::En) == "Tue");
-    VERIFIER(tr("Mars", Langue::En) == "Mar");
-    VERIFIER(tr("Mar", Langue::Tr) == "Sal");
-    VERIFIER(tr("Mars", Langue::Tr) == "Mar");
+    // Les formes courtes du Tab5 (« Dim »… « Déc ») ne sont plus des clés : aucun écran ne les lisait, et « Mer » (mercredi)
+    // prenait la place de la page « Mer ».
+    constexpr std::string_view MORTES[] = {"Dim", "Lun",  "Jeu",  "Ven",  "Sam",  "Janv", "Févr", "Avr",
+                                           "Mai", "Juin", "Juil", "Août", "Sept", "Oct",  "Nov",  "Déc"};
+    for (std::string_view c : MORTES)
+        VERIFIER(!est_une_cle(c));
+    return 0;
+}
+
+constexpr int une_cle_a_contexte_garde_un_seul_sens() {
+    // Le même texte français, deux sens : la page « Mer » (la mer) et « mer » (mercredi, bande de la semaine).
+    VERIFIER(tr("Mer", Langue::En) == "Sea");
+    VERIFIER(tr("jour court|mer", Langue::En) == "Wed");
+    VERIFIER(tr("jour court|mer", Langue::Tr) == "Çar");
+    VERIFIER(!est_une_cle("mer")); // sans contexte, « mer » n'a pas de sens
+    // En français, le contexte ne s'affiche jamais.
+    VERIFIER(tr("jour court|mer", Langue::Fr) == "mer");
+    VERIFIER(tr("vent|faible", Langue::Fr) == "faible");
+    // Trois sens de « faible » sur la page mer : un vent léger, une mer basse, un petit coefficient.
+    VERIFIER(tr("vent|faible", Langue::En) == "light");
+    VERIFIER(tr("mer|faible", Langue::En) == "low");
+    VERIFIER(tr("coefficient|faible", Langue::En) == "small");
+    // Une clé à contexte inconnue rend son texte, pas le contexte.
+    VERIFIER(tr("inconnu|texte", Langue::De) == "texte");
+    VERIFIER(ecran::i18n::texte_francais("a|b|c") == "b|c");
+    VERIFIER(ecran::i18n::texte_francais("sans contexte") == "sans contexte");
+    // Chaque clé de la table a un texte français non vide, qui finit là où finit la clé (donc terminé par un zéro).
+    for (std::size_t i = 0; i < NOMBRE_CLES; ++i) {
+        const std::string_view f = ecran::i18n::texte_francais(TABLE[i].cle);
+        VERIFIER(!f.empty());
+        VERIFIER(f.data() + f.size() == TABLE[i].cle.data() + TABLE[i].cle.size());
+    }
     return 0;
 }
 
 constexpr int textes_de_l_ecran_bonjour_traduits() {
-    // Copie des textes de main/ui_bonjour.cpp (espace de noms `texte`) et de la table des causes de redémarrage de
-    // main/boot_info.cpp, au 06/11/2026. test/host/controle_i18n.py vérifie que ces fichiers n'ont pas changé sans la
+    // Copie des textes de main/ui_bonjour.cpp (espace de noms `texte`, l'écran de diagnostic) et de la table des causes de
+    // redémarrage de main/boot_info.cpp, au 11/11/2026. test/host/controle_i18n.py vérifie que ces fichiers n'ont pas changé sans la
     // table.
     constexpr std::string_view BONJOUR[] = {
         "Bonjour",
@@ -421,6 +478,16 @@ constexpr int textes_de_l_ecran_bonjour_traduits() {
         "Toucher : aucun",
         "Toucher : x = %d, y = %d",
         "Redémarrer",
+        "-- h --",
+        "Heure du réseau en attente",
+        "Wi-Fi : réglages absents du firmware",
+        "Wi-Fi : coprocesseur absent",
+        "Wi-Fi : coprocesseur en démarrage",
+        "Wi-Fi : connexion en cours",
+        "Wi-Fi : connecté, adresse en cours",
+        "Wi-Fi : connecté",
+        "Heure : en attente du réseau",
+        "Heure : reçue du réseau",
         "mise sous tension",
         "redémarrage logiciel",
         "plantage (exception)",
@@ -482,6 +549,7 @@ constexpr int messages_de_l_api_traduits_avec_leurs_marqueurs() {
     X(cle_inconnue_rendue_telle_quelle)                                                                                \
     X(libelles_meteo_traduits_dans_chaque_langue)                                                                      \
     X(jours_et_mois_de_heure_fr_traduits)                                                                              \
+    X(une_cle_a_contexte_garde_un_seul_sens)                                                                           \
     X(textes_de_l_ecran_bonjour_traduits)                                                                              \
     X(messages_de_l_api_traduits_avec_leurs_marqueurs)
 
@@ -492,14 +560,14 @@ static int langue_courante_a_l_execution() {
     using namespace ecran::i18n;
     if (langue_courante() != Langue::Fr)
         return __LINE__; // français tant que rien n'est réglé
-    if (tr("Dim") != "Dim")
+    if (tr("dimanche") != "dimanche")
         return __LINE__;
     definir_langue(Langue::De);
     if (langue_courante() != Langue::De)
         return __LINE__;
-    if (tr("Dim") != "So")
+    if (tr("dimanche") != "Sonntag")
         return __LINE__;
-    if (std::string_view(tr_c("Dim")) != "So")
+    if (std::string_view(tr_c("dimanche")) != "Sonntag")
         return __LINE__; // terminé par un zéro
     definir_langue(Langue::Tr);
     if (tr("dimanche") != "Pazar")

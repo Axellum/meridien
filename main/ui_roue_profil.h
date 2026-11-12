@@ -25,7 +25,7 @@ struct ActionsProfil {
 inline const char *mot_du_profil(reglages::ProfilAccueil p) noexcept {
     switch (p) {
     case reglages::ProfilAccueil::Meteo:
-        return visuel::texte_c("Météo");
+        return visuel::texte_c("roue|Météo");
     case reglages::ProfilAccueil::Auto:
         break;
     }

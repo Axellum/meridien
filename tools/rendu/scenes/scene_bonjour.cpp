@@ -1,13 +1,15 @@
-// Scène « bonjour » : l'écran du jalon 1b (main/ui_bonjour.cpp), compilé tel quel. Données fixées à la place du temps réel.
+// Scène « bonjour » : l'écran de diagnostic (main/ui_bonjour.cpp ; Réglages > Appareil > Diagnostic), compilé tel quel.
+// Données fixées à la place du temps réel.
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
 // rendu-sources: main/ui_bonjour.cpp main/horloge.cpp
-// rendu-langues: fr
-// rendu-tailles: 720x1280 1280x720
+// rendu-langues: toutes
+// rendu-langues-defaut: fr de tr
+// rendu-tailles: 720x1280 1280x720 1024x600
 // rendu-sequence: bonjour
 //
 // Fixtures (inventées, pas des mesures) : démarrage n° 42, cause « mise sous tension », carte prête après 612 ms. L'heure vient
-// de l'instant fixé par le banc ; l'état du réseau est celui de la variante. Cet écran n'est pas traduit (français seulement).
+// de l'instant fixé par le banc ; l'état du réseau est celui de la variante. Traduit dans les sept langues depuis le 11/11/2026.
 #include "banc.h"
 #include "boot_info.h"
 #include "reseau.h"

@@ -48,8 +48,8 @@ MUTATIONS_VISUEL = [
     ("visuel_astres.hpp", "if (lever_s <= 0 || coucher_s <= lever_s) {", "if (lever_s <= 0) {", ASTRES,
      "sans_lever_ni_coucher_on_se_fie_a_is_day", "nuit polaire (lever = coucher) prise pour un jour normal"),
     # --- visuel_textes.hpp : les phrases de l'accueil ---
-    ("visuel_textes.hpp", "for (const Texte &x : PHRASES) {\n        if (x.fr == francais) {", "for (const Texte &x : TEXTES) {\n        if (x.fr == francais) {", TEXTES,
-     "les_phrases_de_l_accueil_se_traduisent_par_texte", "les phrases de l'accueil ne sont plus cherchées : l'écran les dit en français partout"),
+    ("visuel_textes.hpp", "    return i18n::tr(francais, langue);\n}", "    return francais;\n}", TEXTES,
+     "les_phrases_de_l_accueil_se_traduisent_par_texte", "visuel::texte ne traduit plus : l'écran dit tout en français"),
     # --- visuel_echelles.hpp ---
     ("visuel_echelles.hpp",
      "    case meteo::Icone::Orage:\n    case meteo::Icone::OrageGrele:\n        return Ambiance::ORAGE;",
@@ -93,7 +93,8 @@ MUTATIONS_VISUEL = [
     ("visuel_echelles.hpp", "return dixiemes >= 0 ? (dixiemes + 5) / 10 : -((-dixiemes + 5) / 10);", "return dixiemes / 10;",
      ECHELLES, "les_formats_de_nombres_utilisent_le_vrai_signe_moins", "la température est tronquée au lieu d'être arrondie"),
     # --- visuel_dates.hpp ---
-    ("visuel_dates.hpp", '{"Paz", "Pzt", "Sal"', '{"Paz", "Paz", "Sal"', DATES,
+    ("i18n_donnees.inc", '{"jour court|lun", {"Mon", "Mo", "ma", "lun", "lun", "Pzt"}}',
+     '{"jour court|lun", {"Mon", "Mo", "ma", "lun", "lun", "Paz"}}', DATES,
      "les_sept_jours_courts_de_chaque_langue_sont_distincts_et_courts", "dimanche et lundi s'abrègent pareil en turc"),
     ("visuel_dates.hpp", 'p.texte(" de ");\n        p.nom(m);', 'p.texte(" ");\n        p.nom(m);', DATES,
      "la_date_suit_la_tournure_de_chaque_langue", "la date espagnole perd le « de » avant le mois"),
@@ -108,9 +109,9 @@ MUTATIONS_VISUEL = [
     ("visuel_dates.hpp", 'p.texte("1er");', 'p.texte("1");', DATES,
      "le_premier_du_mois_est_ecrit_1er_en_francais_seulement", "le premier du mois s'écrit « 1 » en français"),
     # --- visuel_textes.hpp ---
-    ("visuel_textes.hpp", '"over %d min"', '"over min"', TEXTES, "les_marques_de_format_sont_les_memes_dans_toutes_les_langues",
+    ("i18n_donnees.inc", '"over %d min"', '"over min"', TEXTES, "les_marques_de_format_sont_les_memes_dans_toutes_les_langues",
      "la traduction néerlandaise de « dans %d min » perd son nombre"),
-    ("visuel_textes.hpp", '"Sabit"', '""', TEXTES, "chaque_texte_a_ses_six_traductions", "« Stable » n'a pas de traduction turque"),
+    ("i18n_donnees.inc", '"Sabit"', '""', TEXTES, "chaque_texte_a_ses_six_traductions", "« Stable » n'a pas de traduction turque"),
     # --- visuel_themes.hpp ---
     ("visuel_themes.hpp", "{0x050A1A, 0x14244A}, // nuit", "{0x050A1A, 0xA0B4FF}, // nuit", THEMES_T, None,
      "le bas du ciel de nuit est clair : l'heure blanche ne s'y lit plus"),

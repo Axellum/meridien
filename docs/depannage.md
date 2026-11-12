@@ -140,7 +140,7 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 #### The translation guard does not see the texts added in 1b
 
-`test/host/controle_i18n.py` reads only the `kXxx = "…";` constants of `main/ui_bonjour.cpp` and `main/boot_info.cpp`, checked against the “Bonjour screen” section of the translation table. The new texts of 1b (clock, network state) therefore live in `main/textes_1b.h`, **not covered** by the table and not through `tr()`; they will go through `tr()` with the settings page. **Status**: worked around, to be redone in phase 2.
+`test/host/controle_i18n.py` reads only the `kXxx = "…";` constants of `main/ui_bonjour.cpp` and `main/boot_info.cpp`, checked against the “Bonjour screen” section of the translation table. The new texts of 1b (clock, network state) therefore live in `main/textes_1b.h`, **not covered** by the table and not through `tr()`; they will go through `tr()` with the settings page. **Status**: resolved on 11/11/2026: the texts of `main/textes_1b.h` are keys of the table (section “Écran : diagnostic”), `textes_1b.h` is gone, the diagnostic screen translates every text with `tr()`, and `controle_i18n.py` reads them as `kXxx` constants of `ui_bonjour.cpp`. Not checked on a board.
 
 #### `verrous.py` fails with “No module named 'filelock'” after a build
 
@@ -872,7 +872,7 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 
 #### Le garde de traduction ne voit pas les textes ajoutés en 1b
 
-`test/host/controle_i18n.py` ne lit que les constantes `kXxx = "…";` de `main/ui_bonjour.cpp` et `main/boot_info.cpp`, confrontées à la section « Écran Bonjour » de la table de traduction. Les textes nouveaux de 1b (horloge, état du réseau) vivent donc dans `main/textes_1b.h`, **hors table** et sans passer par `tr()` ; ils passeront par `tr()` avec la page de réglages. **Statut** : contourné, à refaire en phase 2.
+`test/host/controle_i18n.py` ne lit que les constantes `kXxx = "…";` de `main/ui_bonjour.cpp` et `main/boot_info.cpp`, confrontées à la section « Écran Bonjour » de la table de traduction. Les textes nouveaux de 1b (horloge, état du réseau) vivent donc dans `main/textes_1b.h`, **hors table** et sans passer par `tr()` ; ils passeront par `tr()` avec la page de réglages. **Statut** : résolu le 11/11/2026 : les textes de `main/textes_1b.h` sont des clés de la table (section « Écran : diagnostic »), `textes_1b.h` a disparu, l'écran de diagnostic traduit chaque texte par `tr()`, et `controle_i18n.py` les lit comme constantes `kXxx` de `ui_bonjour.cpp`. Non vérifié sur carte.
 
 #### `verrous.py` échoue avec « No module named 'filelock' » après une compilation
 

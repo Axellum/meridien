@@ -51,13 +51,13 @@ constexpr bool egal(const char *a, const char *b) { return sv(a) == sv(b); }
 // ---- textes ----
 
 constexpr int les_deux_phrases_de_la_page_ont_leurs_six_traductions() {
-    for (const ecran::visuel::Texte &x : TEXTES) {
-        VERIFIER(!x.fr.empty());
-        for (std::string_view t : x.t) {
-            VERIFIER(!t.empty());
+    // « Détails » et « Fermer » : dans la table commune (i18n/*.yaml) depuis le 11/11/2026.
+    for (std::string_view fr : {std::string_view("Détails"), std::string_view("Fermer")}) {
+        VERIFIER(ecran::i18n::est_une_cle(fr));
+        for (int l = 1; l < static_cast<int>(ecran::i18n::NOMBRE_LANGUES); ++l) {
+            VERIFIER(!ecran::i18n::propre(fr, ecran::i18n::langue_depuis_indice(l)).empty());
         }
     }
-    VERIFIER(NOMBRE_TEXTES == 2);
     return 0;
 }
 

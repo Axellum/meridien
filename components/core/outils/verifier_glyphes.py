@@ -73,7 +73,8 @@ def main(argv):
 
     print(f"\n1. Textes de l'écran ({len(ecran)} textes par langue, sections « Écran : … »)")
     for lg in langues:
-        textes = ecran if lg["code"] == "fr" else [lg["entrees"].get(c) or en.get(c) or c for c in ecran]
+        textes = ([generer_i18n.texte_francais(c) for c in ecran] if lg["code"] == "fr" else
+                  [lg["entrees"].get(c) or en.get(c) or generer_i18n.texte_francais(c) for c in ecran])
         utilises = caracteres(textes)
         manquants = [c for c in utilises if ord(c) not in cmap]
         print(f"  {lg['code']} : {len(utilises)} caractères distincts, manquants : "
@@ -92,7 +93,8 @@ def main(argv):
 
     print("\n3. Pour information : textes de la page de réglages et de l'API (rendus par le navigateur, pas par la police)")
     for lg in langues:
-        textes = autres if lg["code"] == "fr" else [lg["entrees"].get(c) or en.get(c) or c for c in autres]
+        textes = ([generer_i18n.texte_francais(c) for c in autres] if lg["code"] == "fr" else
+                  [lg["entrees"].get(c) or en.get(c) or generer_i18n.texte_francais(c) for c in autres])
         manquants = [c for c in caracteres(textes) if ord(c) not in cmap]
         print(f"  {lg['code']} : hors police : {', '.join(nom(c) for c in manquants) if manquants else 'aucun'}")
 

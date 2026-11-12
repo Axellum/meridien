@@ -356,15 +356,13 @@ MUTATIONS_VIGIE = [
     ("vigie_vue.hpp", "        octet(0);\n", "", ALERTES, "l_empreinte_voit_chaque_champ_montre",
      "deux champs collés (« AB » + « C » et « A » + « BC ») ont la même empreinte"),
     # --- vigie_textes.hpp : les mots de l'écran en sept langues, et la date ---
-    ("vigie_textes.hpp", "m.t[i18n::indice(langue) - 1];", "m.t[i18n::indice(langue)];", TEXTES, "la_langue_choisit_la_bonne_colonne",
-     "chaque langue lit la colonne de la suivante"),
-    ("vigie_textes.hpp", "return anglais.empty() ? m.fr : anglais;", "return anglais;", TEXTES,
-     "une_traduction_vide_retombe_sur_l_anglais_puis_sur_le_francais", "sans anglais, le mot est vide (une bande sans texte)"),
-    ("vigie_textes.hpp", "if (!propre.empty())\n        return propre;", "", TEXTES, "une_traduction_vide_retombe_sur_l_anglais_puis_sur_le_francais",
-     "la traduction propre à la langue n'est jamais utilisée"),
-    ("vigie_textes.hpp", "if (langue == i18n::Langue::Fr)\n        return m.fr;", "", TEXTES, "la_langue_choisit_la_bonne_colonne",
-     "le français lit une colonne qui n'existe pas"),
-    ("vigie_textes.hpp", "if (m.fr == francais)", "if (!m.fr.empty())", TEXTES, "la_langue_choisit_la_bonne_colonne", "le premier mot de la table est rendu pour toute clé"),
+    # Depuis le 11/11/2026 les mots sont dans la table commune : la recherche et le repli sont mutés dans mutations_i18n.py ;
+    # ici, que les deux noms de l'écran des alertes passent bien par elle.
+    ("vigie_textes.hpp", "noexcept {\n    return i18n::tr(francais, langue);\n}", "noexcept {\n    return francais;\n}", TEXTES,
+     "la_langue_choisit_la_bonne_colonne", "l'écran des alertes ne traduit plus : tout reste en français"),
+    ("vigie_textes.hpp", "constexpr std::string_view traduction(Mot m, i18n::Langue langue) noexcept { return i18n::tr(m, langue); }",
+     "constexpr std::string_view traduction(Mot m, i18n::Langue langue) noexcept { return i18n::tr(m, i18n::Langue::En); }", TEXTES,
+     "une_traduction_vide_retombe_sur_l_anglais_puis_sur_le_francais", "la page mer parle anglais quelle que soit la langue"),
     ("vigie_textes.hpp", 'case Phenomene::Cotier:\n        return "Littoral";', 'case Phenomene::Cotier:\n        return "Crue";', TEXTES,
      "chaque_phenomene_et_chaque_niveau_a_son_mot_dans_la_table", "le littoral se dit « crue »"),
     ("vigie_textes.hpp", 'return "Alerte météo";\n}', 'return "Alerte";\n}', TEXTES, "chaque_phenomene_et_chaque_niveau_a_son_mot_dans_la_table",
