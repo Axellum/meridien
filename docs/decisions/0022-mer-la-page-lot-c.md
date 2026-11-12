@@ -3,7 +3,7 @@
 > **English summary.** Lot C of the "sea" page: **the page itself**, its seven-language texts and its layout, **with nothing that opens
 > it** (the long-press wheel is lot D, on the ground of the long-press wheel ADR of pull request #11). Three pure-core files
 > decide everything a test can decide without a screen: `mer_textes.hpp` (every word and phrase, in the seven languages of
-> [ADR-0006](0006-i18n-francais-cle.md); French is the key), `mer_page.hpp` (what to show: a verdict is **never** shown for a sea that is
+> [ADR-0006](0006-ecran-en-sept-langues.md); French is the key), `mer_page.hpp` (what to show: a verdict is **never** shown for a sea that is
 > absent or too old, an activity that cannot be judged here never gets a default "Good", unreadable coastal warnings are **never** painted
 > as a calm banner, no clock means no age, no next tide, no coefficient and no "now" marker), `mer_geometrie.hpp` (the layout in pixels
 > for 1280x720, 1024x600 and 720x1280, scaled on the short side; the cards keep a minimum height and the page refuses to exist rather than
@@ -18,6 +18,7 @@
 > Status: proposed.
 
 - **Statut** : **proposée**, écrite le 08/11/2026 ; à valider par Axel. Constaté : le noyau (textes, composition, mise en page) testé sur le PC ; la page rendue sur le PC (rendu logiciel de LVGL, regardé) ; le firmware compilé pour le Tab5 et pour la 7B sans avertissement (rien n'appelle la page : l'éditeur de liens la jette et les binaires gardent la taille du lot B ; un essai à lien forcé, jeté ensuite, la lie sur les deux cartes pour environ 45 Ko de plus, mesures dans [docs/mesures/mer.md](../mesures/mer.md) § 8). **Non constaté** : tout ce qui tourne sur une carte (voir « À prouver »).
+- **Note du 12/11/2026** (la décision ne change pas) : la page s'ouvre depuis par le bouton « Mer » de la roue ([ADR-0024](0024-mer-l-entree-de-la-roue-lot-d.md)) ; dans le firmware de la 7B depuis le 08/11/2026 (`30a7f92`), jamais regardé sur la dalle ni touché au doigt.
 - **Contexte** : suite des [ADR-0018](0018-mer-trame-vigie-et-vues.md) (lot A : le noyau qui lit la trame de Vigie) et [ADR-0019](0019-mer-client-et-registre-de-spots.md) (lot B : le client qui la demande). Ce lot C est la **page « Décision en 2 secondes »** de l'esquisse choisie par Axel : quatre activités, un verdict chacune, la marée, le soleil. Axel a décidé le 08/11/2026 que cet écran est Meridien, qui lit l'API de Vigie (Vigie ne reçoit ici que l'API et le site).
 - **Décision** (`components/core/include/ecran/mer_textes.hpp`, `mer_page.hpp`, `mer_geometrie.hpp` ; `main/ui_mer.cpp`, `ui_mer_ouvrir.cpp`) :
   1. **Le noyau décide, la page dessine.** Trois en-têtes purs (C++17, sans ESP-IDF ni LVGL, sans flottant, évalués à la compilation) portent tout ce qu'un test peut dire sans écran. `ui_mer.cpp` ne fait que dessiner ce qu'ils décident.

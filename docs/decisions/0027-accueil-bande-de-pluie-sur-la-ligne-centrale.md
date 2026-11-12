@@ -19,6 +19,7 @@
 > flashed, never run on a board**. Which weather providers fill the quarters is **not verified** (only Open-Meteo's rich read was read).
 
 - **Statut** : **proposée**, écrite le 09/11/2026 ; à valider par Axel sur une carte. Constaté (PC et compilation, aucune carte) : voir
+- **Note du 12/11/2026** (la décision ne change pas) : dans le firmware de la 7B depuis le 10/11/2026 (`59b5fab`), jamais regardé sur la dalle ni touché au doigt.
   [docs/mesures/bande-pluie.md](../mesures/bande-pluie.md). **Non constaté** : le dessin sur les vraies dalles (lisibilité à un mètre,
   hauteur des barres sur la 7B), la durée de dessin, le comportement sur une vraie journée de pluie.
 - **Contexte** : le 09/11/2026 il pleuvait et Axel n'a rien vu changer sur ses écrans. La cause : la carte pluie du mode automatique

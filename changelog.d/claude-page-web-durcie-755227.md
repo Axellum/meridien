@@ -3,7 +3,7 @@
 - **Settings page: requests whose `Host` header does not name the device are refused** (protection against DNS rebinding).
   Accepted: the device's IP address and its `ecran-xxxx.local` name, with or without `:80`; anything else gets a bare `403`
   and the connection is closed. A name given by a home router (`ecran-xxxx.home`…) is refused too: use the address or the
-  `.local` name shown on the screen. See rule 9 of [docs/api-reglages.md](docs/api-reglages.md). Tested on: PC only
+  `.local` name shown on the screen. See rule 9 of [docs/api-reglages.md](../docs/api-reglages.md). Tested on: PC only
   (core tests with mutations, Playwright run-through against the fake device), not tested on board.
 - **Settings page: full content security policy** (`default-src 'none'`, only the device's own script and style, no inline
   code, no framing, requests to the device and to `https:` for the sea spots), plus `nosniff` and `Referrer-Policy:

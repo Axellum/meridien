@@ -18,8 +18,10 @@ un fichier à elle, ici, pour que deux PR ouvertes en même temps n'entrent pas 
    ```
 
    Allowed headings, in this order (Keep a Changelog): `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
-   Several headings in one fragment are fine if the PR does several things. Links are relative to the **root** of the
-   repository, not to this folder.
+   Several headings in one fragment are fine if the PR does several things. Links are relative to **this folder**
+   (`../docs/outils.md`), so that they work where the fragment is read on GitHub and `tools/controle_liens.py` can check
+   them; whoever gathers the fragments into `CHANGELOG.md` removes the leading `../`. *Les liens partent de ce dossier
+   (`../docs/outils.md`) ; qui rassemble les fragments dans `CHANGELOG.md` retire le `../` de tête.*
 3. **What counts**: anything a user of the screen or of the settings page can notice. Internal chores, typo fixes and
    test-only changes need no fragment.
 4. The same rule as everywhere in this repository: never write "tested" without a board, a commit and a date.

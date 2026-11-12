@@ -26,6 +26,7 @@
 > **Mise à jour du 09/11/2026 (ADR-0027).** La grande carte « Pluie en cours / Pluie dans N min » qui recouvrait les cinq jours **n'est plus choisie** : la composition `CartePluie` retombe sur `Normale`, et la pluie est dite par la **bande de la ligne centrale** (une barre par quart d'heure, moitié gauche du bandeau). Le bandeau d'alerte agrandi et sa petite tuile de pluie ne changent pas. Le code de la carte est encore dans l'arbre.
 
 - **Statut** : **proposée**, écrite le 08/11/2026 ; à valider par Axel. Constaté (PC et compilation, aucune carte) : 1 694 tests du noyau avec AddressSanitizer et UBSan, 104 mutations toutes détectées,
+- **Note du 12/11/2026** (la décision ne change pas) : la carte pluie est remplacée par la bande de l'[ADR-0027](0027-accueil-bande-de-pluie-sur-la-ligne-centrale.md) ; dans le firmware de la 7B depuis le 09/11/2026 (`1069571`), jamais regardé sur la dalle ni touché au doigt.
   117 rendus LVGL regardés (13 états, 3 tailles, français, allemand et turc), compilations du Tab5 et de la 7B depuis un arbre propre
   (+17,6 Ko d'image, +512 octets de RAM statique, le code lié aux deux binaires)
   ([docs/mesures/accueil-auto-ecran.md](../mesures/accueil-auto-ecran.md)). **Non constaté** : tout ce qui se juge sur l'écran réel

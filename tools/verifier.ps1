@@ -1,14 +1,17 @@
 # Verifications du depot en une commande (PowerShell 5.1 ou 7 ; ASCII seulement a dessein : pas de BOM).
 #
-#   .\tools\verifier.ps1             verification complete : secrets, tests du noyau (executes, avec detecteurs),
-#                                    mutations, ruff, mise en forme C/C++ (clang-format)
-#   .\tools\verifier.ps1 -Web        + parcours Playwright de la page de reglages (demande le reseau)
+#   .\tools\verifier.ps1             tout le depot : secrets, tests du noyau (executes, avec detecteurs), controles
+#                                    independants (attendus Python, icones, polices, liens), ruff, mise en forme C/C++
+#   .\tools\verifier.ps1 -Mutations  + la campagne COMPLETE des mutations du noyau (des heures : jamais exigee, a la main ;
+#                                    avant un push : lancer.py --mutations --seulement <tests touches>)
+#   .\tools\verifier.ps1 -Web       + parcours Playwright de la page de reglages (demande le reseau)
 #   .\tools\verifier.ps1 -Rapide     seulement ce qui est dans l'index git (appele par .githooks/pre-commit)
 #
 # Code de sortie non nul = au moins un controle a ECHOUE, la mise en forme comprise (bloquante depuis le reformatage
 # d'un seul coup du code). Dossier des outils : tools\trouver_outils.ps1 (voir docs/outils.md).
 param(
     [switch]$Rapide,
+    [switch]$Mutations,
     [switch]$Web
 )
 
@@ -41,6 +44,13 @@ $fichiers = $fichiers | Where-Object { $_ -and (Test-Path $_) }
 $cpp = @($fichiers | Where-Object { $_ -match '\.(c|cc|cpp|h|hpp|inc)$' -and $_ -notmatch '(^|/)(managed_components|build|\.cache)/' -and $_ -notmatch 'fuseaux_donnees\.inc$' -and $_ -notmatch 'test/host/donnees/' })
 $py = @($fichiers | Where-Object { $_ -match '\.py$' })
 $noyauTouche = (-not $Rapide) -or @($fichiers | Where-Object { $_ -match '^(components/core/|test/host/)' }).Count -gt 0
+# Un fichier hors du noyau peut etre lu par un test (main/horloge.cpp, un dossier d'inclusion des cartes) : meme calcul
+# que la CI (lancer.py --concerne, par le preprocesseur du compilateur). Tout doute repond oui.
+$concerne = ''
+if ($Rapide -and -not $noyauTouche -and @($fichiers).Count -gt 0) {
+    $concerne = ((@($fichiers) | & python test/host/lancer.py --concerne - 2>&1) -join ' ').Trim()
+    if ($concerne -notmatch '^non') { $noyauTouche = $true }
+}
 
 # --- 1. secrets ---------------------------------------------------------------------------------------------------
 if ($Rapide) {
@@ -61,21 +71,35 @@ if ($noyauTouche) {
     $texte = $sortie -join "`n"
     if ($code -ne 0) {
         Ajouter 'tests du noyau' 'ECHEC' (($sortie | Select-Object -Last 12) -join "`n")
-    } elseif ($texte -notmatch 'complet') {
-        Ajouter 'tests du noyau' 'ECHEC' "le lanceur n'est pas en mode complet (compile + execute) : rien n'a ete execute"
     } else {
-        $total = ([regex]::Matches($texte, '(\d+) test\(s\)') | ForEach-Object { [int]$_.Groups[1].Value } | Measure-Object -Sum).Sum
-        Ajouter 'tests du noyau' 'OK' "$total test(s) executes avec AddressSanitizer + UBSan"
+        # Meme preuve que la CI : la ligne exacte du mode complet ET au moins un test execute (le mot "complet" seul
+        # figure aussi dans les messages du mode "syntaxe", ou rien n'est execute).
+        $total = ([regex]::Matches($texte, '(?m)^(\d+) test\(s\)') | ForEach-Object { [int]$_.Groups[1].Value } | Measure-Object -Sum).Sum
+        if (($texte -notmatch 'mode        : complet') -or -not ($total -gt 0)) {
+            Ajouter 'tests du noyau' 'ECHEC' "le lanceur n'est pas en mode complet (compile + execute) ou n'a execute aucun test"
+        } else {
+            Ajouter 'tests du noyau' 'OK' "$total test(s) executes avec AddressSanitizer + UBSan"
+        }
     }
-    if (-not $Rapide) {
+    if ($Mutations) {
         $sortie = & python test/host/lancer.py --mutations 2>&1
         $derniere = ($sortie | Select-Object -Last 1)
         if ($LASTEXITCODE -eq 0) { Ajouter 'mutations du noyau' 'OK' "$derniere" }
         else { Ajouter 'mutations du noyau' 'ECHEC' (($sortie | Select-Object -Last 8) -join "`n") }
     }
 } else {
-    Ajouter 'tests du noyau' 'SAUTE' 'rien du noyau dans l''index'
+    # Aucun test C++ concerne : les controles croises Python (traduction, contrat de l'API, cartes, mer) tournent quand
+    # meme, comme dans la CI.
+    $sortie = & python test/host/lancer.py --controles-seuls 2>&1
+    if ($LASTEXITCODE -eq 0) { Ajouter 'tests du noyau' 'SAUTE' "aucun test C++ concerne ($concerne) ; controles croises OK" }
+    else { Ajouter 'controles croises' 'ECHEC' (($sortie | Select-Object -Last 12) -join "`n") }
 }
+
+# --- 2 bis. controles independants (attendus recalcules par Python, icones, polices, liens Markdown) ----------------
+$sortie = & python test/host/controles_independants.py 2>&1
+$derniere = ($sortie | Select-Object -Last 1)
+if ($LASTEXITCODE -eq 0) { Ajouter 'controles independants' 'OK' "$derniere" }
+else { Ajouter 'controles independants' 'ECHEC' ((($sortie | Select-Object -Last 20) -join "`n")) }
 
 # --- 3. Python (ruff) ---------------------------------------------------------------------------------------------
 if ($py.Count -gt 0) {

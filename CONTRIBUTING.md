@@ -15,15 +15,21 @@ because they do not fit (home automation, Home Assistant and ESPHome are out of 
    Windows, `.\tools\idf.ps1 build` needs `tools\local.ps1`: copy [`tools/local.example.ps1`](tools/local.example.ps1) and
    adapt it.
 3. Run the core tests on your PC: `python test/host/lancer.py`. It must report the mode « complet (compilé + exécuté) »;
-   the mode « syntaxe » runs nothing. Tools and set-up: [`docs/outils.md`](docs/outils.md).
+   the mode « syntaxe » runs nothing. If you changed the core or its tests, also run the mutations of the test files you
+   touched: `python test/host/lancer.py --mutations --seulement <test_a,test_b>` (every mutation must be detected; paste
+   the last line in the pull request). The complete mutation campaign (`.\tools\verifier.ps1 -Mutations`) takes hours
+   and is never required. Tools and set-up: [`docs/outils.md`](docs/outils.md).
 4. Enable the pre-commit hook once: `git config core.hooksPath .githooks`. It runs `tools/verifier.ps1 -Rapide` (secrets,
-   core tests, ruff). Please do not bypass it with `--no-verify`: fix the cause.
+   core tests, independent checks, ruff, C/C++ formatting). Please do not bypass it with `--no-verify`: fix the cause.
 5. One subject per commit. Commits that touch firmware or a board end with two lines, `Carte:` and `Teste-sur:`
    (see « Git » in `AGENTS.md`). Never write "tested" without a board, a commit and a date: a green build is not "done".
 6. Add a changelog fragment `changelog.d/<branch>.md` for a user-visible change (format:
    [`changelog.d/README.md`](changelog.d/README.md)). A new architecture decision gets an ADR in `docs/decisions/`.
 7. A new third-party component or asset goes into [`THIRD_PARTY.md`](THIRD_PARTY.md), with its licence read from the source.
-8. Use the [pull request template](.github/PULL_REQUEST_TEMPLATE.md).
+8. Use the [pull request template](.github/PULL_REQUEST_TEMPLATE.md). Work on a branch, merge `main` into it before
+   pushing, open a pull request towards `main`: it is merged (merge commit, no squash) once the required checks of
+   `main`'s protection are green. Nobody pushes to `main` directly. The jobs and what each proves:
+   [`docs/outils.md`](docs/outils.md#continuous-integration-github-actions).
 
 ### Please keep out of the repository
 
@@ -57,9 +63,13 @@ refusées parce qu'elles ne cadrent pas (la domotique, Home Assistant et ESPHome
    Sous Windows, `.\tools\idf.ps1 build` demande `tools\local.ps1` : copier
    [`tools/local.example.ps1`](tools/local.example.ps1) et l'adapter.
 3. Lancer les tests du noyau sur le PC : `python test/host/lancer.py`. Il doit afficher le mode « complet (compilé +
-   exécuté) » ; le mode « syntaxe » n'exécute rien. Outils et installation : [`docs/outils.md`](docs/outils.md).
+   exécuté) » ; le mode « syntaxe » n'exécute rien. Si le noyau ou ses tests changent, lancer aussi les mutations des
+   fichiers de test touchés : `python test/host/lancer.py --mutations --seulement <test_a,test_b>` (chaque mutation doit
+   être détectée ; coller la dernière ligne dans la pull request). La campagne complète des mutations
+   (`.\tools\verifier.ps1 -Mutations`) dure des heures et n'est jamais exigée. Outils et installation :
+   [`docs/outils.md`](docs/outils.md).
 4. Activer le crochet de commit une fois : `git config core.hooksPath .githooks`. Il lance `tools/verifier.ps1 -Rapide`
-   (secrets, tests du noyau, ruff). Merci de ne pas le contourner avec `--no-verify` : corriger la cause.
+   (secrets, tests du noyau, contrôles indépendants, ruff, mise en forme C/C++). Merci de ne pas le contourner avec `--no-verify` : corriger la cause.
 5. Un sujet par commit. Les commits qui touchent le firmware ou une carte se terminent par deux lignes, `Carte:` et
    `Teste-sur:` (voir « Git » dans `AGENTS.md`). Ne jamais écrire « testé » sans carte, commit et date : un build qui passe
    n'est pas « fait ».
@@ -67,7 +77,10 @@ refusées parce qu'elles ne cadrent pas (la domotique, Home Assistant et ESPHome
    [`changelog.d/README.md`](changelog.d/README.md)). Une nouvelle décision d'architecture a son ADR dans `docs/decisions/`.
 7. Un nouveau composant ou une nouvelle ressource tierce va dans [`THIRD_PARTY.md`](THIRD_PARTY.md), avec sa licence lue à
    la source.
-8. Utiliser le [gabarit de pull request](.github/PULL_REQUEST_TEMPLATE.md).
+8. Utiliser le [gabarit de pull request](.github/PULL_REQUEST_TEMPLATE.md). Travailler sur une branche, y fusionner
+   `main` avant de pousser, ouvrir une pull request vers `main` : elle est fusionnée (merge commit, pas de squash) quand
+   les contrôles requis par la protection de `main` sont verts. Personne ne pousse directement sur `main`. Les jobs et ce
+   que chacun prouve : [`docs/outils.md`](docs/outils.md#intégration-continue-github-actions).
 
 ### À ne pas mettre dans le dépôt
 

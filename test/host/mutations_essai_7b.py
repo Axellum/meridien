@@ -14,7 +14,9 @@ SOURCE = Path(__file__).resolve().parents[2] / "tools" / "essai_7b.py"
 MUTATIONS = [
     ("pas de restauration", "        if ecrit:\n            print(\"[essai] RESTAURATION\")", "        if False:\n            print(\"[essai] RESTAURATION\")"),
     ("restauration au mauvais decalage", '"keep", "0x0", str(flash)', '"keep", "0x10000", str(flash)'),
-    ("restauration sans verify-flash", "    if not verifier_puce(port, flash):\n        return False\n    if relire:", "    if relire:"),
+    # Texte suivi depuis 014f608 (sauvegarde à portée limitée : la ligne qui suit le contrôle a changé, pas le contrôle).
+    ("restauration sans verify-flash", "    if not verifier_puce(port, flash):\n        return False\n    if relire and marque.get(\"portee\"):",
+     "    if relire and marque.get(\"portee\"):"),
     ("lectures differentes acceptees", "    if not identiques:\n        raise Refus", "    if False:\n        raise Refus"),
     ("MAC non comparee", "    if lue != attendue:", "    if False:"),
     ("pas de verify-flash de la sauvegarde", "    if not verifier_puce(port, f1):\n        raise Refus", "    if False:\n        raise Refus"),
