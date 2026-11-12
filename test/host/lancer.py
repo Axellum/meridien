@@ -126,6 +126,9 @@ def controles_croises():
     from controle_reglages import controle_reglages  # noqa: PLC0415  (contrat de l'API, pages et clavier contre leurs sources)
 
     echecs += controle_reglages()
+    from controle_contrat_web import controle_contrat_web  # noqa: PLC0415  (faux serveur de la page contre le noyau : routes, erreurs, champs)
+
+    echecs += controle_contrat_web()
     from controle_python_vigie import controle_vigie  # noqa: PLC0415  (alertes : fichiers générés à jour, table de caractères dans la police)
 
     echecs += controle_vigie()
@@ -289,6 +292,7 @@ from mutations_nvs_securite import MUTATIONS_NVS_SECURITE  # noqa: E402  (sécur
 from mutations_reglages import MUTATIONS_REGLAGES  # noqa: E402  (page de réglages : JSON, valeurs, appairage, API)
 from mutations_wifi import MUTATIONS_WIFI  # noqa: E402  (Wi-Fi : essai avec retour arrière, classement des réseaux)
 from mutations_sntp import MUTATIONS_SNTP  # noqa: E402  (demande d'heure SNTP : lecture du paquet, relance après une IP ou un échec)
+from mutations_ordonnanceur import MUTATIONS_ORDONNANCEUR  # noqa: E402  (tâche réseau unique : qui passe et quand)
 from mutations_vigie import MUTATIONS_VIGIE  # noqa: E402  (alertes officielles de Vigie : requête, planning, gzip, lecture, vue, textes)
 from mutations_visuel import MUTATIONS_VISUEL  # noqa: E402  (écran principal : icônes, lune et soleil, échelles)
 from mutations_accueil import MUTATIONS_ACCUEIL  # noqa: E402  (accueil : pluie annoncée, courbe monotone, gélules, bandeau, mise en page)
@@ -319,6 +323,7 @@ MUTATIONS += MUTATIONS_I18N
 MUTATIONS += MUTATIONS_REGLAGES
 MUTATIONS += MUTATIONS_WIFI
 MUTATIONS += MUTATIONS_SNTP
+MUTATIONS += MUTATIONS_ORDONNANCEUR
 MUTATIONS += MUTATIONS_VISUEL
 MUTATIONS += MUTATIONS_ACCUEIL
 MUTATIONS += MUTATIONS_GEOCODAGE

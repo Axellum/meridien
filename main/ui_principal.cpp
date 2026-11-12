@@ -21,6 +21,9 @@
 #include "textes_principal.h"
 #include "ui_meteo_dessin.h"
 #include "ui_meteo_icones.h"
+#include "ui_ressources.h"
+
+#include "src/draw/sw/lv_draw_sw_grad.h" // lv_draw_sw_grad_color_calculate : les couleurs mêmes du remplissage (voile_entre)
 
 // Écran principal. Chaque ZONE est un seul objet LVGL qui dessine tout son contenu dans l'événement LV_EVENT_DRAW_MAIN : six zones, la
 // pastille de l'alerte officielle et l'anneau tactile, au lieu d'une centaine d'étiquettes. Un objet LVGL coûte de la RAM interne (le
@@ -74,6 +77,15 @@ struct PlaceOfficielle {
     char fenetre[24] = {};
 };
 
+// Un voile sous une courbe, cuit en image (voir voile_entre) : l'image, l'empreinte de ce qu'elle montre, sa place à l'écran.
+struct VoileCuit {
+    lv_draw_buf_t *image = nullptr;
+    std::uint32_t cle = 0;
+    int x = 0, y = 0;
+    std::uint32_t teinte = 0; // image A8 (une seule couleur) : la couleur à lui donner
+};
+enum : std::uint8_t { VOILE_HEURES, VOILE_JOURS, VOILE_NOMBRE };
+
 struct Vue {
     const ThemePrincipal *theme = &kThemeCiel;
     int largeur = 0, hauteur = 0;
@@ -99,6 +111,7 @@ struct Vue {
     int nb_verre = 0;
     std::uint32_t cle_verre = 0;
     std::uint32_t ciel_haut = 0, ciel_bas = 0; // les couleurs avec lesquelles l'image du ciel a été remplie
+    VoileCuit voile[VOILE_NOMBRE];             // les voiles des heures et des cinq jours, cuits (voir voile_entre)
     bool est_accueil = false;                  // la composition de l'accueil ; faux : celle de l'horloge en vedette
     int extra_h = 0; // hauteur de référence gagnée au-delà de 720 (la 7B) : elle va à la carte des jours
     ThemePrincipal theme_gris = kThemeCiel; // le thème de la météo périmée (accueil::theme_grise)
@@ -127,6 +140,17 @@ struct Vue {
 };
 
 Vue g;
+int images_voile = 0; // images de voile allouées et pas encore rendues (ui_principal_images_voile) : 2 au plus
+
+void rendre_voiles() {
+    for (VoileCuit &v : g.voile) {
+        if (v.image != nullptr) {
+            lv_draw_buf_destroy(v.image);
+            --images_voile;
+        }
+        v = VoileCuit{};
+    }
+}
 
 int px(int reference) { return std::max(1, static_cast<int>(std::lround(static_cast<float>(reference) * g.echelle))); }
 
@@ -823,24 +847,154 @@ struct DegradeGlobal {
     }
 };
 
-// Le voile entre deux courbes (`haut` au-dessus de `bas`), de `x_debut` à `x_fin`, en bandes de `pas` pixels dont chaque bout reprend le
-// dégradé global : le même résultat qu'un seul dégradé sous toute la courbe, sans polygone.
-void voile_entre(const dz::Pinceau &pc, const accueil::CourbeMonotone &haut, const accueil::CourbeMonotone &bas,
-                 int x_debut, int x_fin, int pas, const DegradeGlobal &d) {
+// Une bande verticale d'un voile : sa place et son dégradé (couleur et opacité en haut et en bas).
+struct BandeVoile {
+    int x = 0, y = 0, w = 0, h = 0;
+    std::uint32_t c_haut = 0, c_bas = 0;
+    std::uint8_t a_haut = 0, a_bas = 0;
+};
+
+// Les bandes du voile entre deux courbes (`haut` au-dessus de `bas`), de `x_debut` à `x_fin`, de `pas` pixels chacune ; chaque bout
+// reprend le dégradé global : le même résultat qu'un seul dégradé sous toute la courbe, sans polygone.
+template <typename F>
+void bandes_du_voile(const accueil::CourbeMonotone &haut, const accueil::CourbeMonotone &bas, int x_debut, int x_fin,
+                     int pas, const DegradeGlobal &d, F &&f) {
     for (int x = x_debut; x < x_fin; x += pas) {
-        const int w = std::min(pas, x_fin - x);
-        const int xm = x + w / 2;
+        BandeVoile b;
+        b.x = x;
+        b.w = std::min(pas, x_fin - x);
+        const int xm = x + b.w / 2;
         const int y_haut = haut.y_en(xm);
         const int y_bas = bas.y_en(xm);
         if (y_bas <= y_haut) {
             continue;
         }
-        std::uint32_t c_haut, c_bas;
-        std::uint8_t a_haut, a_bas;
-        d.en(y_haut, &c_haut, &a_haut);
-        d.en(y_bas, &c_bas, &a_bas);
-        dz::rect_degrade_v(pc, x, y_haut, w, y_bas - y_haut, c_haut, a_haut, c_bas, a_bas);
+        b.y = y_haut;
+        b.h = y_bas - y_haut;
+        d.en(y_haut, &b.c_haut, &b.a_haut);
+        d.en(y_bas, &b.c_bas, &b.a_bas);
+        f(b);
     }
+}
+
+// Cuit les bandes du voile dans l'image de `v` (boîte x1, y1, w, h ; A8 si `une_teinte`, sinon RGB565A8), réutilisée si sa taille et
+// son format conviennent. Faux si l'image ne peut pas être allouée.
+template <typename Parcours>
+bool cuire_voile(VoileCuit &v, int x1, int y1, int w, int h, bool une_teinte, Parcours &&parcourir) {
+    const lv_color_format_t cf = une_teinte ? LV_COLOR_FORMAT_A8 : LV_COLOR_FORMAT_RGB565A8;
+    if (v.image != nullptr && (static_cast<int>(v.image->header.w) != w || static_cast<int>(v.image->header.h) != h ||
+                               v.image->header.cf != cf)) {
+        lv_draw_buf_destroy(v.image);
+        --images_voile;
+        v.image = nullptr;
+    }
+    if (v.image == nullptr) {
+        v.image = lv_draw_buf_create(static_cast<std::uint32_t>(w), static_cast<std::uint32_t>(h), cf, LV_STRIDE_AUTO);
+        if (v.image == nullptr) {
+            return false;
+        }
+        ++images_voile;
+    }
+    std::memset(v.image->data, 0, v.image->data_size); // masque nul : hors des bandes, l'image ne touche à rien
+    const std::uint32_t stride = v.image->header.stride;
+    std::uint8_t *couleurs = v.image->data;
+    // RGB565A8 : les pixels RGB565, puis le masque A8 dont chaque ligne fait la moitié du pas des pixels (lv_draw_sw_img.c).
+    std::uint8_t *masque = une_teinte ? couleurs : couleurs + static_cast<std::size_t>(stride) * h;
+    const std::uint32_t pas_masque = une_teinte ? stride : stride / 2;
+    parcourir([&](const BandeVoile &b) {
+        const lv_grad_dsc_t grad = dz::degrade_v(b.c_haut, b.a_haut, b.c_bas, b.a_bas);
+        for (int r = 0; r < b.h; ++r) {
+            lv_color_t c;
+            lv_opa_t a;
+            lv_draw_sw_grad_color_calculate(&grad, b.h, r, &c, &a); // la ligne r d'un rectangle de b.h lignes
+            if (a <= LV_OPA_MIN) {
+                continue; // le remplissage saute une ligne aussi transparente (lv_draw_sw_blend)
+            }
+            const int y = b.y - y1 + r;
+            std::memset(masque + static_cast<std::size_t>(y) * pas_masque + (b.x - x1), a,
+                        static_cast<std::size_t>(b.w));
+            if (!une_teinte) {
+                const std::uint16_t c16 = lv_color_to_u16(c);
+                auto *ligne =
+                    reinterpret_cast<std::uint16_t *>(couleurs + static_cast<std::size_t>(y) * stride) + (b.x - x1);
+                for (int i = 0; i < b.w; ++i) {
+                    ligne[i] = c16;
+                }
+            }
+        }
+    });
+    return true;
+}
+
+// Le voile entre deux courbes, sous la courbe des heures ou entre les températures maximales et minimales des cinq jours.
+//
+// Dessinée telle quelle, chaque bande est un rectangle à dégradé vertical que LVGL remplit LIGNE PAR LIGNE : ≈ 144 bandes × 28 lignes
+// ≈ 4 000 mélanges par bande d'écran repeinte, ≈ 13 900 des ≈ 15 900 mélanges d'un repeint de l'accueil (profil du 08/11/2026 sur le
+// Tab5). Le voile est donc CUIT une fois dans une image (PSRAM), refaite seulement quand ce qu'il montre change (son empreinte :
+// données, disposition, thème, taille), puis posé d'un seul `lv_draw_image` par bande d'écran. Au pixel près le même dessin :
+// chaque pixel de l'image porte la couleur et l'opacité que le remplissage aurait données à sa ligne (lv_draw_sw_grad_color_calculate,
+// la fonction même du remplissage, sur la même hauteur) ; LVGL fond une image RGB565 + masque, ou A8 + couleur, avec le même
+// `lv_color_16_16_mix` qu'un remplissage translucide (lv_draw_sw_blend_to_rgb565.c), et une ligne qu'il aurait sautée (opacité
+// ≤ LV_OPA_MIN) a un masque nul. A8 quand le voile n'a qu'une couleur (les heures : un tiers de la mémoire), RGB565A8 sinon (les
+// jours : deux couleurs). Si l'image ne peut pas être allouée, le voile est dessiné en bandes comme avant.
+void voile_entre(const dz::Pinceau &pc, const accueil::CourbeMonotone &haut, const accueil::CourbeMonotone &bas,
+                 int x_debut, int x_fin, int pas, const DegradeGlobal &d, VoileCuit &v) {
+    const auto parcourir = [&](auto &&f) { bandes_du_voile(haut, bas, x_debut, x_fin, pas, d, f); };
+    Empreinte e;
+    int x1 = 0, y1 = 0, x2 = -1, y2 = -1;
+    bool une_teinte = true;
+    std::uint32_t teinte = 0;
+    parcourir([&](const BandeVoile &b) {
+        if (x2 < x1) { // la première bande
+            x1 = b.x;
+            y1 = b.y;
+            x2 = b.x + b.w - 1;
+            y2 = b.y + b.h - 1;
+            teinte = b.c_haut;
+        }
+        x1 = std::min(x1, b.x);
+        y1 = std::min(y1, b.y);
+        x2 = std::max(x2, b.x + b.w - 1);
+        y2 = std::max(y2, b.y + b.h - 1);
+        une_teinte = une_teinte && b.c_haut == teinte && b.c_bas == teinte;
+        e.u(static_cast<std::uint32_t>(b.x));
+        e.u(static_cast<std::uint32_t>(b.y));
+        e.u(static_cast<std::uint32_t>(b.w));
+        e.u(static_cast<std::uint32_t>(b.h));
+        e.u(b.c_haut);
+        e.u(b.c_bas);
+        e.u(static_cast<std::uint32_t>(b.a_haut) | (static_cast<std::uint32_t>(b.a_bas) << 8));
+    });
+    if (x2 < x1) {
+        return; // aucune bande
+    }
+    const int w = x2 - x1 + 1;
+    const int h = y2 - y1 + 1;
+    if (v.image == nullptr || e.h != v.cle) {
+        v.cle = 0;
+        if (!cuire_voile(v, x1, y1, w, h, une_teinte, parcourir)) {
+            parcourir([&](const BandeVoile &b) {
+                dz::rect_degrade_v(pc, b.x, b.y, b.w, b.h, b.c_haut, b.a_haut, b.c_bas, b.a_bas);
+            });
+            return;
+        }
+        v.cle = e.h;
+        v.x = x1;
+        v.y = y1;
+        v.teinte = teinte;
+    }
+    if (dz::hors_zone(pc, x1, y1, x2, y2)) {
+        return;
+    }
+    lv_draw_image_dsc_t dsc;
+    lv_draw_image_dsc_init(&dsc);
+    dsc.src = v.image;
+    if (v.image->header.cf == LV_COLOR_FORMAT_A8) {
+        dsc.recolor = dz::couleur(v.teinte);
+        dsc.recolor_opa = LV_OPA_COVER;
+    }
+    const lv_area_t zone = {x1, y1, x2, y2};
+    lv_draw_image(pc.couche, &dsc, &zone);
 }
 
 // ---- zone : lieu ----
@@ -1032,7 +1186,8 @@ void dessiner_heures_accueil(const Ctx &c) {
         const DegradeGlobal d = {moyenne, moyenne, 87, 0, y_min, y_pied};
         // Le « bas » du voile est une droite au pied : une courbe à deux points à la même ordonnée.
         const accueil::Pt droite[2] = {{pts[0].x, y_pied}, {pts[k - 1].x, y_pied}};
-        voile_entre(c.pc, courbe, accueil::courbe_monotone(droite, 2), pts[0].x, pts[k - 1].x, std::max(3, px(8)), d);
+        voile_entre(c.pc, courbe, accueil::courbe_monotone(droite, 2), pts[0].x, pts[k - 1].x, std::max(3, px(8)), d,
+                    g.voile[VOILE_HEURES]);
     }
 
     // Les barres de pluie : arrondies, de hauteur en racine carrée de la pluie, teintées selon l'intensité.
@@ -1955,7 +2110,7 @@ void dessiner_jours(const Ctx &c) {
                                  31,
                                  y_ruban_haut,
                                  y_ruban_bas};
-        voile_entre(c.pc, c_haut, c_bas, p_haut[0].x, p_haut[nb - 1].x, std::max(3, px(8)), d);
+        voile_entre(c.pc, c_haut, c_bas, p_haut[0].x, p_haut[nb - 1].x, std::max(3, px(8)), d, g.voile[VOILE_JOURS]);
         tracer_courbe(c.pc, c_haut, t_haut, std::max(2, px(5)), std::max(3, px(8)));
         tracer_courbe(c.pc, c_bas, t_bas, std::max(2, px(5)), std::max(3, px(8)));
     }
@@ -2545,6 +2700,9 @@ void appliquer_ciel() {
     g.ciel_bas = d.bas;
     lv_obj_set_style_bg_image_src(g.ecran, neuf, 0);
     lv_obj_set_style_bg_image_opa(g.ecran, LV_OPA_COVER, 0);
+    // L'image, opaque et de la taille de l'écran, couvre tout le fond : le dégradé de repli dessous n'est plus qu'une couleur unie
+    // (un remplissage simple par bande d'écran au lieu d'un mélange par ligne, 720 lignes de 1 280 pixels écrites pour rien).
+    lv_obj_set_style_bg_grad_dir(g.ecran, LV_GRAD_DIR_NONE, 0);
     if (g.ciel_image != nullptr) { // l'ancienne image n'est plus référencée par le style : on peut la rendre
         lv_draw_buf_destroy(g.ciel_image);
     }
@@ -2554,10 +2712,12 @@ void appliquer_ciel() {
     cuire_verre();
 }
 
+// Une police de l'accueil : celle du registre partagé (ui_ressources.h), la même instance que les pages de même taille (Détails,
+// Alertes, Réglages), créée une seule fois pour tout l'appareil ; une reconstruction de l'accueil ne la recrée pas.
 Police creer_police(const std::uint8_t *ttf, std::size_t taille, int reference) {
     Police p;
     p.px = px(reference);
-    p.f = lv_tiny_ttf_create_data(ttf, taille, p.px);
+    p.f = ressources::police(ttf, taille, p.px);
     return p;
 }
 
@@ -2571,6 +2731,7 @@ bool ui_principal_creer(lv_obj_t *ecran, const RessourcesPrincipal &ressources, 
     if (g.ciel_image != nullptr) { // une construction précédente (l'écran qui la montrait est supprimé par l'appelant)
         lv_draw_buf_destroy(g.ciel_image);
     }
+    rendre_voiles();
     g = Vue{};
     g.theme = &theme;
     g.largeur = largeur;
@@ -2876,5 +3037,7 @@ void ui_principal_sur_appui_long(void (*rappel)(int32_t x, int32_t y)) { g.appui
 void ui_principal_sur_alertes(void (*rappel)()) { g.ouvrir_alertes = rappel; }
 
 CoutEcran ui_principal_cout() { return {g.objets, 6}; }
+
+int ui_principal_images_voile() { return images_voile; }
 
 } // namespace ecran

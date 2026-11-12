@@ -109,6 +109,76 @@ constexpr int etiquette_de_cache() {
     return 0;
 }
 
+// L'adresse de l'appareil, son nom mDNS et l'adresse du point d'accès d'installation : acceptés, avec ou sans « :80 ».
+constexpr int hote_de_l_appareil_accepte() {
+    constexpr sv ip = "192.168.1.52", nom = "ecran-1a2b", ap = "192.168.4.1";
+    VERIFIER(http::hote_autorise("192.168.1.52", ip, nom, ap));
+    VERIFIER(http::hote_autorise("192.168.1.52:80", ip, nom, ap));
+    VERIFIER(http::hote_autorise("ecran-1a2b.local", ip, nom, ap));
+    VERIFIER(http::hote_autorise("ecran-1a2b.local:80", ip, nom, ap));
+    VERIFIER(http::hote_autorise("ECRAN-1A2B.Local", ip, nom, ap));  // un nom ne tient pas compte de la casse
+    VERIFIER(http::hote_autorise("ecran-1a2b.local.", ip, nom, ap)); // point final : nom absolu
+    VERIFIER(http::hote_autorise("192.168.4.1", ip, nom, ap));
+    VERIFIER(http::hote_autorise("192.168.4.1:80", ip, nom, ap));
+    VERIFIER(http::hote_autorise("192.168.4.1", {}, {}, ap)); // installation : ni adresse sur la maison, ni mDNS
+    VERIFIER(http::hote_autorise("ecran-1a2b.local", {}, nom));
+    return 0;
+}
+
+// Rebinding DNS et le reste : un autre nom, un autre port, un en-tête vide ou mal formé sont refusés.
+constexpr int hote_etranger_refuse() {
+    constexpr sv ip = "192.168.1.52", nom = "ecran-1a2b", ap = "192.168.4.1";
+    VERIFIER(!http::hote_autorise("", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("attaquant.example", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("192.168.1.52.attaquant.example", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("ecran-1a2b.local.attaquant.example", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("ecran-1a2b", ip, nom, ap));      // sans « .local »
+    VERIFIER(!http::hote_autorise("ecran", ip, nom, ap));           // plus court que le nom
+    VERIFIER(!http::hote_autorise("ecran-1a2.local", ip, nom, ap)); // un autre appareil
+    VERIFIER(!http::hote_autorise("xecran-1a2b.local", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("ecran-1a2b.locals", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("ecran-1a2b.lan.fr", ip, nom, ap)); // même longueur, autre domaine
+    VERIFIER(!http::hote_autorise("ecran-1a2bxlocal", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("192.168.1.5", ip, nom, ap)); // préfixe de l'adresse
+    VERIFIER(!http::hote_autorise("192.168.1.520", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("192.168.1.52:8080", ip, nom, ap)); // autre port
+    VERIFIER(!http::hote_autorise("192.168.1.52:", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("192.168.1.52:80:80", ip, nom, ap));
+    VERIFIER(!http::hote_autorise(":80", ip, nom, ap));
+    VERIFIER(!http::hote_autorise(".", ip, nom, ap));
+    VERIFIER(!http::hote_autorise(" 192.168.1.52", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("[::1]", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("localhost", ip, nom, ap));
+    VERIFIER(!http::hote_autorise("127.0.0.1", ip, nom, ap));
+    VERIFIER(!http::hote_autorise(".local", ip, {}, ap));        // nom vide : aucun nom n'est accepté
+    VERIFIER(!http::hote_autorise("192.168.4.1", ip, nom, {}));  // pas de point d'accès : son adresse ne passe pas
+    VERIFIER(!http::hote_autorise("192.168.1.52", {}, nom, {})); // pas encore d'adresse : elle ne passe pas
+    // un nom trop long n'est jamais comparé (et ne peut pas l'être : au-delà de HOTE_MAX)
+    VERIFIER(
+        !http::hote_autorise("ecran-1a2b.local                                                        ", ip, nom, ap));
+    return 0;
+}
+
+// La politique de contenu interdit tout code et tout style écrits dans le HTML, et tout cadre ; elle garde ce dont la page a besoin.
+constexpr int politique_de_contenu_stricte() {
+    constexpr sv p = http::POLITIQUE_CONTENU;
+    VERIFIER(p.find("unsafe-inline") == sv::npos);
+    VERIFIER(p.find("unsafe-eval") == sv::npos);
+    VERIFIER(p.find("default-src 'none'") != sv::npos);
+    VERIFIER(p.find("script-src 'self';") != sv::npos);
+    VERIFIER(p.find("style-src 'self';") != sv::npos);
+    VERIFIER(p.find("frame-ancestors 'none'") != sv::npos);
+    VERIFIER(p.find("connect-src 'self' https:;") !=
+             sv::npos); // la liste des spots est lue sur l'adresse Vigie (https)
+    VERIFIER(p.find("base-uri 'none'") != sv::npos);
+    VERIFIER(p.find("form-action 'none'") != sv::npos);
+    VERIFIER(p.find("object-src 'none'") != sv::npos);
+    VERIFIER(p.find('"') == sv::npos &&
+             p.find('\n') == sv::npos); // un en-tête HTTP, recopié tel quel par le faux serveur
+    VERIFIER(http::POLITIQUE_REFERENT == "no-referrer");
+    return 0;
+}
+
 } // namespace
 
 #define LISTE(X)                                                                                                       \
@@ -117,7 +187,10 @@ constexpr int etiquette_de_cache() {
     X(jeton_bearer_refuse_le_reste)                                                                                    \
     X(jeton_bearer_longueur_limitee)                                                                                   \
     X(lignes_d_etat)                                                                                                   \
-    X(etiquette_de_cache)
+    X(etiquette_de_cache)                                                                                              \
+    X(hote_de_l_appareil_accepte)                                                                                      \
+    X(hote_etranger_refuse)                                                                                            \
+    X(politique_de_contenu_stricte)
 
 TESTS_A_LA_COMPILATION(LISTE)
 

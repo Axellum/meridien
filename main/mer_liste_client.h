@@ -5,8 +5,8 @@
 // Les noms suivent l'interface des réglages de l'écran (hote_reglages.hpp) :
 //   mer_liste_demander() -> mer_liste_lecture_lancer     mer_liste_etat() -> mer_liste_lecture_etat    mer_liste_copier() -> mer_liste_lecture_copier
 //
-// UNE tâche, créée à la demande et supprimée dès la fin (pas de pile de 12 Ko gardée : la RAM interne manque, docs/mesures/memoire-interne.md),
-// priorité d'arrière-plan (la prise de contact TLS calcule plusieurs secondes sans dormir). L'aller-retour passe par le client commun
+// La lecture est un pas de LA tâche réseau des données (tache_donnees.h : pas de pile à elle, la RAM interne manque,
+// docs/mesures/memoire-interne.md), qui la fait passer avant la météo, les alertes et la mer dès la fin du pas en cours. L'aller-retour passe par le client commun
 // (http_commun.h : gzip, tampons en PSRAM, verrou TLS), l'adresse est celle des réglages des alertes (reglages_alertes.h, instance publique
 // par défaut) : un seul serveur pour les alertes, la mer et cette liste. La lecture et les règles sont dans le noyau pur
 // (ecran/mer_liste.hpp, testé sur le PC) ; ici : la tâche, le réseau, le verrou.

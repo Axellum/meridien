@@ -23,6 +23,7 @@
 #include "meteo_zone.h"
 #include "reglages_alertes.h"
 #include "reseau.h"
+#include "tache_donnees.h"
 #include "vigie_etat.h"
 
 // Client des alertes officielles de Vigie. L'aller-retour HTTPS passe par le client commun (main/http_commun.h : tampons en PSRAM,
@@ -48,12 +49,7 @@ constexpr uint32_t kPasAttenteMs = 2000;        // contrôle de l'IP et de l'heu
 constexpr int64_t kAntiRebondS = 3;             // plusieurs changements de réglage d'affilée = une seule requête
 constexpr int64_t kPasSondageS = 5;             // les réglages sont relus au moins toutes les 5 s pendant l'attente
 constexpr int64_t kInstantMin = 946684800;      // 1er janvier 2000 : en dessous, l'horloge n'est pas réglée
-constexpr uint32_t kPileOctets = 12288;         // la prise de contact TLS demande plusieurs Ko de pile
-// Priorité d'ARRIÈRE-PLAN (voir meteo_client.cpp : la prise de contact TLS calcule plusieurs secondes sans jamais s'endormir ; au
-// dessus de la priorité de la tâche d'inactivité, le chien de garde des tâches se déclenche).
-constexpr UBaseType_t kPrioriteVigie = tskIDLE_PRIORITY;
-
-TaskHandle_t g_tache = nullptr;
+// Les requêtes passent par LA tâche réseau des données (tache_donnees.h : pile de 12 Ko, priorité d'arrière-plan), un pas à la fois.
 
 // ---- mémoire -------------------------------------------------------------------------------------------------------
 
@@ -305,15 +301,11 @@ int64_t maintenant_s() { return esp_timer_get_time() / 1000000; }
 
 uint8_t alea() { return static_cast<uint8_t>(esp_random() & 0xFFU); }
 
-// Dort au plus `secondes` secondes ; un réveil anticipé (vigie_client_a_change) rend la main tout de suite.
-void dormir(int64_t secondes) {
-    if (secondes < 1) {
-        secondes = 1;
-    }
-    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(static_cast<uint32_t>(secondes) * 1000U));
-}
+// Le sommeil d'un pas, au moins 1 s ; un réveil anticipé (vigie_client_a_change) le raccourcit.
+int64_t dormir_ms(int64_t secondes) { return (secondes < 1 ? 1 : secondes) * 1000; }
 
-void tache_vigie(void *) {
+// Ce que l'ancienne boucle de la tâche « vigie » gardait entre deux tours. Lu et écrit par la seule tâche réseau des données.
+struct Rythme {
     int echecs = 0;                // essais ratés de suite depuis la dernière réponse lue
     bool trop_de_requetes = false; // le dernier échec était un 429 ou un 503
     Reglage derniere; // la requête à laquelle correspondent la réponse publiée et la date du prochain essai
@@ -322,115 +314,116 @@ void tache_vigie(void *) {
     int64_t dernier_essai_s = -1000000; // début du dernier essai (secondes depuis le démarrage)
     int64_t prochain_s = 0;
     bool premier = true;
-    for (;;) {
-        while (!reseau_et_heure_pretes()) {
-            dormir(kPasAttenteMs / 1000);
-        }
-        if (premier) {
-            // Pas de rafale au démarrage : le Wi-Fi, l'heure et la météo passent d'abord (60 à 120 s d'attente).
-            premier = false;
-            prochain_s = maintenant_s() + vigie::delai_premier_essai_s(alea());
-            ESP_LOGI(TAG, "premier essai dans %lld s", static_cast<long long>(prochain_s - maintenant_s()));
-        }
+};
 
-        // Les réglages sont relus à chaque tour : un changement de lieu, de langue, d'adresse ou de période se voit dans les
-        // 5 secondes, sans que les modules qui les écrivent aient à connaître ce client (vigie_client_a_change() l'accélère).
-        const Reglage r = lire_reglage();
-        if (!r.actif) {
-            if (publiee) {
-                ESP_LOGI(TAG, "alertes désactivées : plus de requête, plus de bandeau");
-                vigie_etat_oublier();
-                publiee = false;
-            }
-            derniere = r;
-            a_une_derniere = true;
-            dormir(kPasSondageS);
-            continue;
-        }
-        if (!a_une_derniere) {
-            derniere = r; // premier tour : le premier essai est déjà planifié
-            a_une_derniere = true;
-        } else if (!r.meme_requete(derniere)) {
-            // Lieu, adresse, langue ou activation changés : l'ancienne réponse ne vaut plus. Une seule requête, après un court
-            // délai (plusieurs changements de suite = une seule requête) et une minute au moins après la précédente.
-            if (publiee) {
-                vigie_etat_oublier();
-                publiee = false;
-            }
-            echecs = 0;
-            trop_de_requetes = false;
-            const int64_t au_plus_tot = dernier_essai_s + vigie::ESPACEMENT_MIN_S;
-            const int64_t apres_rebond = maintenant_s() + kAntiRebondS;
-            prochain_s = au_plus_tot > apres_rebond ? au_plus_tot : apres_rebond;
-            derniere = r;
-            ESP_LOGI(TAG, "requête changée (lieu, langue, adresse ou activation) : nouvel essai dans %lld s",
-                     static_cast<long long>(prochain_s - maintenant_s()));
-        } else if (r.periode_min != derniere.periode_min) {
-            // Seule la période a changé : on replanifie depuis le dernier essai, sans redemander plus tôt qu'une minute après.
-            const int64_t delai_s =
-                vigie::delai_avant_essai_s(echecs, trop_de_requetes, vigie::periode_s(r.periode_min), alea());
-            const int64_t depuis_dernier = dernier_essai_s + delai_s;
-            const int64_t au_plus_tot = maintenant_s() + kAntiRebondS;
-            prochain_s = depuis_dernier > au_plus_tot ? depuis_dernier : au_plus_tot;
-            derniere = r;
-            ESP_LOGI(TAG, "période changée (%d min) : prochain essai dans %lld s", r.periode_min,
-                     static_cast<long long>(prochain_s - maintenant_s()));
-        }
+Rythme *g_rythme = nullptr; // créé par vigie_client_demarrer() (tache_donnees.h : creer_etat_de_pas)
 
-        const int64_t reste_s = prochain_s - maintenant_s();
-        if (reste_s > 0) {
-            dormir(reste_s < kPasSondageS ? reste_s : kPasSondageS);
-            continue;
-        }
-
-        // ---- un essai ----
-        dernier_essai_s = maintenant_s();
-        ESP_LOGI(TAG, "requête Vigie %s (lat %ld e5, lon %ld e5, langue %s ; %d échec(s) de suite jusqu'ici)",
-                 r.adresse, static_cast<long>(r.latitude_e5), static_cast<long>(r.longitude_e5), r.langue, echecs);
-        vigie::Alertes *travail = vigie_etat_travail();
-        const Essai e = travail != nullptr ? interroger(r, *travail) : Essai{Issue::Memoire};
-        ESP_LOGI(TAG, "pile de la tâche : %u octets jamais utilisés sur %u",
-                 static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)), static_cast<unsigned>(kPileOctets));
-
-        bool ecartee = false;
-        if (e.issue == Issue::Ok) {
-            if (!lire_reglage().meme_requete(r)) {
-                // Le lieu, l'adresse ou la langue a changé pendant la requête : la réponse est celle de l'ancien lieu. Écartée ;
-                // le tour suivant voit le changement et planifie la bonne requête.
-                ESP_LOGI(TAG, "le lieu, l'adresse ou la langue a changé pendant la requête : réponse écartée");
-                ecartee = true;
-            } else {
-                journaliser_reponse(*travail, e, r); // avant la publication : elle échange les deux tampons
-                vigie_etat_publier(static_cast<int64_t>(std::time(nullptr)));
-                publiee = true;
-                echecs = 0;
-                trop_de_requetes = false;
-            }
-        } else {
-            ++echecs;
-            trop_de_requetes = (e.issue == Issue::TropDeRequetes);
-            ESP_LOGW(TAG,
-                     "essai raté : %s (HTTP %d) ; %d échec(s) de suite ; la réponse précédente, s'il y en a une, reste "
-                     "en place",
-                     nom_issue(e.issue), e.statut_http, echecs);
-        }
-        if (!ecartee) {
-            const int64_t delai_s =
-                vigie::delai_avant_essai_s(echecs, trop_de_requetes, vigie::periode_s(r.periode_min), alea());
-            prochain_s = maintenant_s() + delai_s;
-            ESP_LOGI(TAG, "prochain essai dans %lld s (plus tôt si le lieu, la langue ou l'adresse change)",
-                     static_cast<long long>(delai_s));
-        }
+// Un pas de la tâche réseau des données (tache_donnees.h) : un tour de l'ancienne boucle de la tâche « vigie », à l'identique. Là où
+// elle dormait, le pas rend la durée du sommeil ; après un essai, il rend 0 (le tour suivant tout de suite, comme avant). Un réveil
+// (vigie_client_a_change) fait passer le tour suivant tout de suite : les réglages sont relus à chaque tour.
+int64_t pas_vigie(bool) {
+    Rythme &v = *g_rythme;
+    if (!reseau_et_heure_pretes()) {
+        return dormir_ms(kPasAttenteMs / 1000);
     }
+    if (v.premier) {
+        // Pas de rafale au démarrage : le Wi-Fi, l'heure et la météo passent d'abord (60 à 120 s d'attente).
+        v.premier = false;
+        v.prochain_s = maintenant_s() + vigie::delai_premier_essai_s(alea());
+        ESP_LOGI(TAG, "premier essai dans %lld s", static_cast<long long>(v.prochain_s - maintenant_s()));
+    }
+
+    // Les réglages sont relus à chaque tour : un changement de lieu, de langue, d'adresse ou de période se voit dans les
+    // 5 secondes, sans que les modules qui les écrivent aient à connaître ce client (vigie_client_a_change() l'accélère).
+    const Reglage r = lire_reglage();
+    if (!r.actif) {
+        if (v.publiee) {
+            ESP_LOGI(TAG, "alertes désactivées : plus de requête, plus de bandeau");
+            vigie_etat_oublier();
+            v.publiee = false;
+        }
+        v.derniere = r;
+        v.a_une_derniere = true;
+        return dormir_ms(kPasSondageS);
+    }
+    if (!v.a_une_derniere) {
+        v.derniere = r; // premier tour : le premier essai est déjà planifié
+        v.a_une_derniere = true;
+    } else if (!r.meme_requete(v.derniere)) {
+        // Lieu, adresse, langue ou activation changés : l'ancienne réponse ne vaut plus. Une seule requête, après un court
+        // délai (plusieurs changements de suite = une seule requête) et une minute au moins après la précédente.
+        if (v.publiee) {
+            vigie_etat_oublier();
+            v.publiee = false;
+        }
+        v.echecs = 0;
+        v.trop_de_requetes = false;
+        const int64_t au_plus_tot = v.dernier_essai_s + vigie::ESPACEMENT_MIN_S;
+        const int64_t apres_rebond = maintenant_s() + kAntiRebondS;
+        v.prochain_s = au_plus_tot > apres_rebond ? au_plus_tot : apres_rebond;
+        v.derniere = r;
+        ESP_LOGI(TAG, "requête changée (lieu, langue, adresse ou activation) : nouvel essai dans %lld s",
+                 static_cast<long long>(v.prochain_s - maintenant_s()));
+    } else if (r.periode_min != v.derniere.periode_min) {
+        // Seule la période a changé : on replanifie depuis le dernier essai, sans redemander plus tôt qu'une minute après.
+        const int64_t delai_s =
+            vigie::delai_avant_essai_s(v.echecs, v.trop_de_requetes, vigie::periode_s(r.periode_min), alea());
+        const int64_t depuis_dernier = v.dernier_essai_s + delai_s;
+        const int64_t au_plus_tot = maintenant_s() + kAntiRebondS;
+        v.prochain_s = depuis_dernier > au_plus_tot ? depuis_dernier : au_plus_tot;
+        v.derniere = r;
+        ESP_LOGI(TAG, "période changée (%d min) : prochain essai dans %lld s", r.periode_min,
+                 static_cast<long long>(v.prochain_s - maintenant_s()));
+    }
+
+    const int64_t reste_s = v.prochain_s - maintenant_s();
+    if (reste_s > 0) {
+        return dormir_ms(reste_s < kPasSondageS ? reste_s : kPasSondageS);
+    }
+
+    // ---- un essai ----
+    v.dernier_essai_s = maintenant_s();
+    ESP_LOGI(TAG, "requête Vigie %s (lat %ld e5, lon %ld e5, langue %s ; %d échec(s) de suite jusqu'ici)", r.adresse,
+             static_cast<long>(r.latitude_e5), static_cast<long>(r.longitude_e5), r.langue, v.echecs);
+    vigie::Alertes *travail = vigie_etat_travail();
+    const Essai e = travail != nullptr ? interroger(r, *travail) : Essai{Issue::Memoire};
+    tache_donnees_journaliser_pile(TAG);
+
+    bool ecartee = false;
+    if (e.issue == Issue::Ok) {
+        if (!lire_reglage().meme_requete(r)) {
+            // Le lieu, l'adresse ou la langue a changé pendant la requête : la réponse est celle de l'ancien lieu. Écartée ;
+            // le tour suivant voit le changement et planifie la bonne requête.
+            ESP_LOGI(TAG, "le lieu, l'adresse ou la langue a changé pendant la requête : réponse écartée");
+            ecartee = true;
+        } else {
+            journaliser_reponse(*travail, e, r); // avant la publication : elle échange les deux tampons
+            vigie_etat_publier(static_cast<int64_t>(std::time(nullptr)));
+            v.publiee = true;
+            v.echecs = 0;
+            v.trop_de_requetes = false;
+        }
+    } else {
+        ++v.echecs;
+        v.trop_de_requetes = (e.issue == Issue::TropDeRequetes);
+        ESP_LOGW(TAG,
+                 "essai raté : %s (HTTP %d) ; %d échec(s) de suite ; la réponse précédente, s'il y en a une, reste "
+                 "en place",
+                 nom_issue(e.issue), e.statut_http, v.echecs);
+    }
+    if (!ecartee) {
+        const int64_t delai_s =
+            vigie::delai_avant_essai_s(v.echecs, v.trop_de_requetes, vigie::periode_s(r.periode_min), alea());
+        v.prochain_s = maintenant_s() + delai_s;
+        ESP_LOGI(TAG, "prochain essai dans %lld s (plus tôt si le lieu, la langue ou l'adresse change)",
+                 static_cast<long long>(delai_s));
+    }
+    return 0;
 }
 
 } // namespace
 
-void vigie_client_a_change() {
-    if (g_tache != nullptr) {
-        xTaskNotifyGive(g_tache);
-    }
-}
+void vigie_client_a_change() { tache_donnees_reveiller(ordonnanceur::Source::Vigie); }
 
 void vigie_client_demarrer() {
     reglages_alertes_demarrer(); // la NVS est ouverte à ce stade (après reglages_demarrer())
@@ -439,9 +432,14 @@ void vigie_client_demarrer() {
              "tailles : réponse lue %u o (2 tampons en PSRAM), réponse HTTP %u o au plus (client commun : tampons en "
              "PSRAM, rendus après chaque essai)",
              static_cast<unsigned>(sizeof(vigie::Alertes)), static_cast<unsigned>(kTailleMax));
-    if (xTaskCreate(tache_vigie, "vigie", kPileOctets, nullptr, kPrioriteVigie, &g_tache) != pdPASS) {
-        ESP_LOGE(TAG, "tâche Vigie non créée");
+    g_rythme = creer_etat_de_pas<Rythme>();
+    if (g_rythme == nullptr) {
+        ESP_LOGE(TAG, "pas de place pour l'état du client (%u octets) : pas d'alertes",
+                 static_cast<unsigned>(sizeof(Rythme)));
+        return;
     }
+    tache_donnees_inscrire(ordonnanceur::Source::Vigie, pas_vigie);
+    tache_donnees_reveiller(ordonnanceur::Source::Vigie);
 }
 
 } // namespace ecran
