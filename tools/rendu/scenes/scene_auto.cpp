@@ -12,7 +12,7 @@
 // À rendre avec -Instant 2026-11-08T07:45:00Z (dimanche 08 h 45 en France), l'heure de l'esquisse. Fixtures inventées, pas des mesures.
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp
+// rendu-sources: main/ui_principal.cpp main/ui_principal_outils.cpp main/ui_principal_donnees.cpp main/ui_principal_disposition.cpp main/ui_principal_barre.cpp main/ui_principal_horloge.cpp main/ui_principal_voiles.cpp main/ui_principal_carte_heure.cpp main/ui_principal_heures.cpp main/ui_principal_bandeau.cpp main/ui_principal_mode_auto.cpp main/ui_principal_jours.cpp main/ui_principal_dessin.cpp main/ui_principal_toucher.cpp main/ui_principal_ciel.cpp main/ui_meteo_icones.cpp main/horloge.cpp main/ui_roue.cpp
 // rendu-langues: fr en de nl es it tr
 // rendu-langues-defaut: fr de tr
 // rendu-tailles: 1280x720 1024x600 720x1280

@@ -33,6 +33,21 @@ idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp
 # Ecran principal (session ecran-principal). Ajoute par target_sources() apres l'enregistrement, et non dans la liste SRCS
 # ci-dessus, pour ne pas toucher a la ligne que les autres sessions (meteo, reglages) modifient aussi : un merge sans conflit.
 target_sources(${COMPONENT_LIB} PRIVATE "ecran_principal.cpp" "ui_principal.cpp" "ui_meteo_icones.cpp")
+# L'ecran principal est reparti par zone (lot L18) : ui_principal.cpp orchestre, ui_principal_interne.h porte l'etat partage.
+target_sources(${COMPONENT_LIB} PRIVATE "ui_principal_outils.cpp" "ui_principal_donnees.cpp" "ui_principal_disposition.cpp"
+               "ui_principal_barre.cpp" "ui_principal_horloge.cpp" "ui_principal_voiles.cpp" "ui_principal_carte_heure.cpp"
+               "ui_principal_heures.cpp" "ui_principal_bandeau.cpp" "ui_principal_mode_auto.cpp" "ui_principal_jours.cpp"
+               "ui_principal_dessin.cpp" "ui_principal_toucher.cpp" "ui_principal_ciel.cpp")
+# Les fichiers de l'ecran principal sont compiles ensemble, en un seul fichier genere (UNITY_BUILD, mode GROUP : seuls ceux du
+# groupe ; les autres sources du composant restent compilees une par une). Separes, -O2 garde un exemplaire hors ligne de chaque
+# fonction partagee en plus de ses copies recopiees dans les appelants : environ 18 Ko de plus (CI de la PR #52). Ensemble, le
+# compilateur voit tout comme avant le decoupage. Le banc de rendu (tools/rendu/) les compile un par un : chacun reste autonome.
+set(ui_principal_groupe "ui_principal.cpp" "ui_principal_outils.cpp" "ui_principal_donnees.cpp" "ui_principal_disposition.cpp"
+    "ui_principal_barre.cpp" "ui_principal_horloge.cpp" "ui_principal_voiles.cpp" "ui_principal_carte_heure.cpp"
+    "ui_principal_heures.cpp" "ui_principal_bandeau.cpp" "ui_principal_mode_auto.cpp" "ui_principal_jours.cpp"
+    "ui_principal_dessin.cpp" "ui_principal_toucher.cpp" "ui_principal_ciel.cpp")
+set_source_files_properties(${ui_principal_groupe} TARGET_DIRECTORY ${COMPONENT_LIB} PROPERTIES UNITY_GROUP "ui_principal")
+set_target_properties(${COMPONENT_LIB} PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
 # Registre des polices partagees par toutes les pages (une instance TinyTTF par taille) : LVGL pur, compile aussi par le banc de rendu.
 target_sources(${COMPONENT_LIB} PRIVATE "ui_ressources.cpp")
 # Page "Details" (session page-details, ADR-0020) : les sept grandeurs retirees de l'accueil, sur une page plein ecran. ui_details.cpp est

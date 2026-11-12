@@ -4,7 +4,7 @@
 // zone enregistrée : c'est main/horloge.cpp, inchangé, qui donne l'heure, la date et le fuseau.
 //
 // Directives lues par tools/rendu/rendre.py (une scène = ce seul fichier ; voir docs/outils.md) :
-// rendu-sources: main/ui_principal.cpp main/ui_meteo_icones.cpp main/horloge.cpp
+// rendu-sources: main/ui_principal.cpp main/ui_principal_outils.cpp main/ui_principal_donnees.cpp main/ui_principal_disposition.cpp main/ui_principal_barre.cpp main/ui_principal_horloge.cpp main/ui_principal_voiles.cpp main/ui_principal_carte_heure.cpp main/ui_principal_heures.cpp main/ui_principal_bandeau.cpp main/ui_principal_mode_auto.cpp main/ui_principal_jours.cpp main/ui_principal_dessin.cpp main/ui_principal_toucher.cpp main/ui_principal_ciel.cpp main/ui_meteo_icones.cpp main/horloge.cpp
 // rendu-langues: fr en
 // rendu-langues-defaut: fr
 // rendu-tailles: 1024x600 1280x720
