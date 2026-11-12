@@ -17,6 +17,7 @@
 #include "horloge.h"
 #include "palette.h"
 #include "reseau.h"
+#include "ui_ressources.h"
 
 // Police Roboto Bold embarquée (main/assets/roboto_700.ttf, EMBED_FILES de main/CMakeLists.txt).
 extern const uint8_t roboto_700_start[] asm("_binary_roboto_700_ttf_start");
@@ -245,11 +246,11 @@ void ui_bonjour_creer(const BootInfo &boot) {
     const board_boot_timeline_t *jalons = board_get_boot_timeline();
 
     // « Bonjour » passe de 128 à 72 px en 1b pour faire de la place à l'heure (128 px) : sinon l'écran déborde de 1280 px.
-    lv_font_t *police_titre = lv_tiny_ttf_create_data(roboto_700_start, roboto_700_end - roboto_700_start, 72);
-    lv_font_t *police_heure = lv_tiny_ttf_create_data(roboto_700_start, roboto_700_end - roboto_700_start, 128);
-    lv_font_t *police_date = lv_tiny_ttf_create_data(roboto_700_start, roboto_700_end - roboto_700_start, 44);
-    lv_font_t *police_texte = lv_tiny_ttf_create_data(roboto_700_start, roboto_700_end - roboto_700_start, 38);
-    lv_font_t *police_petite = lv_tiny_ttf_create_data(roboto_700_start, roboto_700_end - roboto_700_start, 30);
+    lv_font_t *police_titre = ecran::ressources::police(roboto_700_start, roboto_700_end - roboto_700_start, 72);
+    lv_font_t *police_heure = ecran::ressources::police(roboto_700_start, roboto_700_end - roboto_700_start, 128);
+    lv_font_t *police_date = ecran::ressources::police(roboto_700_start, roboto_700_end - roboto_700_start, 44);
+    lv_font_t *police_texte = ecran::ressources::police(roboto_700_start, roboto_700_end - roboto_700_start, 38);
+    lv_font_t *police_petite = ecran::ressources::police(roboto_700_start, roboto_700_end - roboto_700_start, 30);
     if (police_titre == nullptr || police_heure == nullptr || police_date == nullptr || police_texte == nullptr ||
         police_petite == nullptr) {
         ESP_LOGE(TAG, "police TrueType non créée (TinyTTF)");

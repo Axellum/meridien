@@ -60,6 +60,10 @@ static esp_err_t create_st7121(esp_lcd_dsi_bus_handle_t dsi_bus, esp_lcd_panel_i
     panel_cfg.vendor_config = &vendor;
 
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7121(io, &panel_cfg, panel), TAG, "esp_lcd_new_panel_st7121");
+    // Premiere commande DSI (SWRESET) : pas avant 120 ms apres le relachement du reset materiel (voir tab5_lcd_reset_pulse).
+    const int32_t reste_ms = tab5_lcd_wait_reset_recovery();
+    ESP_LOGI(TAG, "reset matériel de la dalle : %d ms attendues avant la première commande (le reste était recouvert)",
+             (int)reste_ms);
     ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(*panel), TAG, "reset de la dalle");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_init(*panel), TAG, "initialisation de la dalle");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_invert_color(*panel, false), TAG, "inversion");

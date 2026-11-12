@@ -126,6 +126,9 @@ def controles_croises():
     from controle_reglages import controle_reglages  # noqa: PLC0415  (contrat de l'API, pages et clavier contre leurs sources)
 
     echecs += controle_reglages()
+    from controle_contrat_web import controle_contrat_web  # noqa: PLC0415  (faux serveur de la page contre le noyau : routes, erreurs, champs)
+
+    echecs += controle_contrat_web()
     from controle_python_vigie import controle_vigie  # noqa: PLC0415  (alertes : fichiers générés à jour, table de caractères dans la police)
 
     echecs += controle_vigie()

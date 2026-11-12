@@ -380,6 +380,8 @@ void ecran_principal_ouvrir_diagnostic() {
     lv_screen_load(g_ecran_diagnostic);
 }
 
+void ecran_principal_finir_demarrage() { ui_principal_cuire_verre_differe(); }
+
 void ecran_principal_creer(const BootInfo &boot) {
     const board_info_t *carte = board_get_info();
     lv_display_t *affichage = board_get_display();
@@ -394,6 +396,8 @@ void ecran_principal_creer(const BootInfo &boot) {
     g_ecran_principal = lv_obj_create(nullptr);
     const size_t libre_interne_avant = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     const RessourcesPrincipal ressources = {roboto_700_start, static_cast<size_t>(roboto_700_end - roboto_700_start)};
+    ui_principal_differer_verre(
+        true); // cuit après la lumière (ecran_principal_finir_demarrage) : même image, allumée plus tôt
     if (!ui_principal_creer(g_ecran_principal, ressources, carte->width, carte->height, theme_du_reglage())) {
         ESP_LOGE(TAG, "écran principal non créé (police TrueType) : l'écran de diagnostic reste affiché");
         lv_obj_delete(g_ecran_principal);

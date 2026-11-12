@@ -11,6 +11,7 @@
 #include "ecran/visuel_echelles.hpp"
 #include "ui_meteo_dessin.h"
 #include "ui_meteo_icones.h"
+#include "ui_ressources.h"
 
 // Page « Détails » : sept tuiles (vent, pluie, humidité, pression, UV, soleil, lune) sur le verre et le ciel de l'accueil. Tout ce qui se
 // décide (valeurs, unités, « — » d'une grandeur inconnue, grisé d'une météo périmée, tailles, places) est dans le noyau pur
@@ -34,10 +35,8 @@ struct Cadre {
     int x = 0, y = 0, w = 0, h = 0;
 };
 
-// Gardées entre deux ouvertures. Seul état qui reste en RAM interne quand la page est fermée.
+// Les polices de la page : celles du registre partagé (ui_ressources.h), reprises à chaque ouverture.
 struct Polices {
-    const std::uint8_t *ttf = nullptr;
-    int echelle_pm = 0; // l'échelle (en millièmes) pour laquelle elles ont été créées
     Police valeur, titre, texte;
 };
 Polices polices;
@@ -582,26 +581,19 @@ lv_obj_t *creer_zone(lv_obj_t *parent, const Cadre &c) {
     return o;
 }
 
-// Les trois polices, à la taille de la première ouverture (ou d'une autre échelle d'écran : les anciennes sont alors perdues, TinyTTF
-// se libère mal). Rend faux si l'une n'a pas pu être créée.
+// Les trois polices, prises au registre partagé (ui_ressources.h) : la même instance que les autres pages de même taille, créée une
+// seule fois pour tout l'appareil. Rend faux si l'une n'a pas pu être créée.
 bool preparer_polices(const ContexteDetails &ctx, const Etat &E) {
-    const int echelle_pm = static_cast<int>(std::lround(E.echelle * 1000.0F));
-    if (polices.valeur.f != nullptr && polices.titre.f != nullptr && polices.texte.f != nullptr &&
-        polices.ttf == ctx.ttf && polices.echelle_pm == echelle_pm) {
-        return true;
-    }
-    const auto creer = [&](int reference) {
+    const auto prendre = [&](int reference) {
         Police p;
         p.px = E.px(reference);
-        p.f = lv_tiny_ttf_create_data(ctx.ttf, ctx.ttf_taille, p.px);
+        p.f = ressources::police(ctx.ttf, ctx.ttf_taille, p.px);
         return p;
     };
     Polices neuves;
-    neuves.ttf = ctx.ttf;
-    neuves.echelle_pm = echelle_pm;
-    neuves.valeur = creer(gr::POLICE_VALEUR);
-    neuves.titre = creer(gr::POLICE_TITRE);
-    neuves.texte = creer(gr::POLICE_TEXTE);
+    neuves.valeur = prendre(gr::POLICE_VALEUR);
+    neuves.titre = prendre(gr::POLICE_TITRE);
+    neuves.texte = prendre(gr::POLICE_TEXTE);
     if (neuves.valeur.f == nullptr || neuves.titre.f == nullptr || neuves.texte.f == nullptr) {
         return false;
     }
