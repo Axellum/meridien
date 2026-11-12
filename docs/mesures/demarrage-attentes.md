@@ -1,6 +1,6 @@
 # Démarrage : revue des attentes fixes et recouvrement (12/11/2026)
 
-> **Summary (EN)** — Review of every fixed wait between the start of the application and the first light, on the Tab5 and the Waveshare 7B. None was shortened: two were made to **overlap** other work, with the same minimum delay. Tab5: the 120 ms the panel needs after its hardware reset now run while the clock, the power monitor, the controller detection and the DSI bus are set up. 7B: the 60 ms settle time of the GT911 touch reset now runs during the panel set-up. The 1 s wait for the Tab5 I/O expander stays: no readable state replaces it. A new `DEMARRAGE ms` log line gives every step up to the light. **Not measured on a board**: expected gain up to ~120 ms on the Tab5 and ~70 ms on the 7B, to be read in that log line.
+> **Summary (EN)** — Review of every fixed wait between the start of the application and the first light, on the Tab5 and the Waveshare 7B. None was shortened: two were made to **overlap** other work, with the same minimum delay. Tab5: the 120 ms the panel needs after its hardware reset now run while the clock, the power monitor, the controller detection and the DSI bus are set up. 7B: the 60 ms settle time of the GT911 touch reset now runs during the panel set-up. The 1 s wait for the Tab5 I/O expander stays: no readable state replaces it. The glass of the home-screen cards is now baked into the sky image after the first light instead of before (165 of 165 bench images byte-identical). A new `DEMARRAGE ms` log line gives every step up to the light. **Not measured on a board**: expected gain up to ~190 ms on the Tab5 and ~70 ms on the 7B, to be read in that log line.
 
 Règle de lecture : « source » = d'où vient la valeur (lu, pas de mémoire) ; tout gain écrit ici est **estimé**, rien n'a été mesuré sur une carte.
 
@@ -23,18 +23,26 @@ Règle de lecture : « source » = d'où vient la valeur (lu, pas de mémoire) ;
 
 `reglages_demarrer` → `board_init` → `meteo_client_relire_cache` → `ecran_principal_creer` → première image → lumière → réseau et données. Le réseau, les données, le serveur web et la console viennent déjà après la lumière. La relecture du cache coûte 5 ms (mesuré sur la 7B, `demarrage-7b.md` §6), pas les 150 à 200 ms que l'audit supposait : la loger dans l'attente de 1 s du Tab5 demanderait une nouvelle fonction de la couche carte pour 5 ms au mieux ; non fait. Ce qui coûte, c'est le premier rendu (glyphes à froid, météo) : hors de ce lot.
 
-## 3. Gain attendu (estimé, non mesuré)
+## 3. Le verre des cartes cuit après la lumière (deuxième PR du lot)
+
+`cuire_verre` (le verre des cartes des heures et des cinq jours peint dans l'image du ciel, ≈ 70 ms sur le Tab5 : `accueil-cache-verre.md`) passait avant la première image. Au démarrage, `ecran_principal_creer` appelle maintenant `ui_principal_differer_verre(true)` : la première image dessine le verre en direct, comme avant la cuisson ; `main.cpp` appelle `ecran_principal_finir_demarrage()` une fois la lumière allumée, qui cuit le verre et fait repeindre l'accueil.
+
+- **Banc (constaté sur le PC)** : `BANC_VERRE_DIFFERE=1`, scènes `principal` et `principal-themes`, 3 tailles, fr : **165 PNG sur 165 identiques à l'octet** au rendu normal. Contre-épreuve : en différé, chaque repeint compte 373 mélanges de plus (les 18 variantes de `principal` en 1280x720) : le verre est bien dessiné en direct, et le résultat ne change pas d'un pixel.
+- **Coût** : juste après la lumière, la cuisson puis un repeint complet de l'accueil (≈ 330 ms, `accueil-cache-verre.md`) ; un appui pendant ce temps attend. Le premier rendu, verre en direct, est un peu plus lent que le rendu verre cuit : c'est déjà dans les 70 ms mesurés en 11/2026 (lumière 2 288 ms sans cuisson, 2 358 avec).
+
+## 4. Gain attendu (estimé, non mesuré)
 
 - **Tab5** : jusqu'à ~120 ms de moins entre « contrôleur détecté » et « dalle prête », selon le temps que mettent l'horloge, l'alimentation, la détection et le DSI (tout ce qui se faisait après les 120 ms se fait maintenant pendant). Si la puce tactile ne répond qu'au bout de ~120 ms après le relâchement (le ST7121 intègre le tactile et la dalle), la détection absorbe le délai et le gain se réduit à la durée de l'horloge, de l'alimentation et du DSI.
 - **7B** : ~70 ms de moins entre « dalle prête » et « LVGL prêt », donc sur la première lumière.
+- **Verre cuit après la lumière** : ≈ 70 ms de moins sur la lumière du Tab5 avec le thème « ciel » à l'accueil (rien avec un thème sans ciel ou l'horloge en vedette, qui ne cuisent rien).
 
-## 4. Protocole de mesure sur carte (non fait)
+## 5. Protocole de mesure sur carte (non fait)
 
 Pour chaque carte, binaire `main` avant ce lot puis binaire de ce lot, application seule, 10 redémarrages logiciels par la commande série `redemarrer`, un seul `open` du port (DTR et RTS à zéro) :
 
 1. relever la ligne `DEMARRAGE ms : …` (une par démarrage) et, sur le Tab5, la ligne `reset matériel de la dalle : N ms attendues` ; comparer « carte », « lumière » et les jalons de la carte, moyenne et extrêmes ;
 2. vérifier à chaque démarrage : contrôleur détecté, tactile trouvé (7B : « Tactile : Goodix GT911 »), aucune ligne `essai` de l'expandeur, aucun second reset du tactile ;
-3. l'image : Axel regarde la dalle à quelques redémarrages (image complète à l'allumage, pas d'écran noir) ;
+3. l'image : Axel regarde la dalle à quelques redémarrages (image complète à l'allumage, pas d'écran noir, pas de saut visible quand le verre est cuit juste après) ;
 4. un démarrage après **coupure de courant complète** sur le Tab5 (USB débranché, appui long, rebranchement) avec le journal ouvert : la réserve de `1a.md` (« image seulement après un second geste ») ne doit pas empirer.
 
 Vu sur : aucune carte. Commits du lot sur la branche `claude/demarrage-plus-rapide-deed9d`, le 12/11/2026, compilés sur le PC (Tab5 et 7B).
