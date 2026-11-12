@@ -2,8 +2,9 @@
 
 Compile tools/rendu/endurance_principal.cpp avec les mêmes fichiers du firmware que la scène « principal » du banc de rendu
 (main/ui_principal.cpp et ses voisins, compilés tels quels) et la même bibliothèque LVGL (tools/rendu/rendre.py, cache .cache/rendu),
-puis le lance sur la taille du Tab5 (1280x720) et celle de la 7B (1024x600) : trois jours simulés, minute par minute, une météo
-neuve tous les quarts d'heure. Réussit si la mémoire de LVGL ne bouge plus les jours 2 et 3 (détail et limites : en tête de
+puis le lance sur la taille du Tab5 (1280x720) et celle de la 7B (1024x600) : la même journée simulée jouée trois fois, minute par
+minute, une météo neuve tous les quarts d'heure. Réussit si la troisième tient exactement la mémoire de LVGL de la deuxième, minute
+par minute (détail et limites : en tête de
 endurance_principal.cpp, docs/depannage.md « La PSRAM libre baisse d'environ 200 o par minute »).
 
 Le contrôle se vérifie lui-même : il est relancé avec --injecter-fuite (108 o par minute jamais rendus) et DOIT alors échouer ;
@@ -59,6 +60,8 @@ def construire() -> Path:
             clangxx,
             "-static",
             str(objet),
+            # les fichiers communs du banc (le registre des polices partagées...), sauf banc.cpp et son main
+            *(str(rendre.objet_de(f)) for f in rendre.FICHIERS_COMMUNS if not f.endswith("banc.cpp")),
             *(str(rendre.objet_de(s)) for s in scene.sources),
             str(rendre.CACHE / "scenes" / "police.o"),
             str(archive),

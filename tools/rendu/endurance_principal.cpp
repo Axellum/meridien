@@ -8,13 +8,15 @@
 // et ses voisines, comme main/lvgl_memoire.cpp sur l'appareil, de sorte que le membre de la bibliothèque qui les définit
 // (stdlib/clib/lv_mem_core_clib.c) n'est pas lié.
 //
-// Ce que la mesure a montré (11/11/2026, docs/depannage.md) : la mémoire de LVGL grandit pendant le premier jour puis ne bouge
-// plus. C'est le remplissage des caches de TinyTTF (une paire de chiffres « HH:MM » encore jamais mesurée = une entrée de plus
-// dans le cache de crénage de la police de l'heure : trois blocs à chaque minute pendant la première heure, puis à chaque heure
-// nouvelle), bornés par CONFIG_LV_TINY_TTF_CACHE_GLYPH_CNT et CONFIG_LV_TINY_TTF_CACHE_KERNING_CNT. Le contrôle : sur les jours
-// 2 et 3 (hors de la minute de minuit, où la nouvelle date est mesurée une fois), AUCUN octet de plus. Une vraie fuite, même de
-// quelques octets par minute, le fait échouer : --injecter-fuite en simule une pour le prouver (endurance.py le vérifie à chaque
-// passage).
+// Ce que la mesure a montré (12/11/2026, docs/depannage.md) : la mémoire de LVGL grandit pendant le premier jour, c'est le
+// remplissage des caches de TinyTTF (une paire de chiffres « HH:MM » encore jamais mesurée = une entrée de plus dans le cache de
+// crénage de la police de l'heure : trois blocs à chaque minute pendant la première heure, puis à chaque heure nouvelle), bornés
+// par CONFIG_LV_TINY_TTF_CACHE_GLYPH_CNT et CONFIG_LV_TINY_TTF_CACHE_KERNING_CNT. Une date jamais vue ajoute encore quelques
+// entrées à minuit (≈ 3 Ko par jour sur le PC, de moins en moins, jusqu'à ce que l'année soit vue). Le contrôle rejoue donc LA
+// MÊME journée trois fois : la première remplit les caches, la troisième doit tenir EXACTEMENT les mêmes octets et les mêmes blocs
+// que la deuxième à chaque minute (les images refaites selon l'heure, le ciel et la météo changent de taille dans la journée, pas
+// d'une journée rejouée à l'autre). Une vraie fuite, même de quelques octets par minute, le fait échouer : --injecter-fuite en
+// simule une pour le prouver (endurance.py le vérifie à chaque passage).
 //
 // Ce que ce contrôle ne couvre pas : ce qui n'est pas LVGL (clients réseau, TLS, esp_hosted, lwIP), les autres pages, la taille
 // des blocs sur la puce (32 bits, en-têtes du tas d'ESP-IDF) : sur le PC (64 bits) une entrée du cache de crénage pèse 108 o.
@@ -133,11 +135,11 @@ bool zone_lire(ZoneMeteo *sortie) {
 namespace {
 
 constexpr int kMinutesParJour = 24 * 60;
-constexpr int kJours = 3;
+constexpr int kJours = 3; // la même journée, rejouée : remplissage, puis deux journées comparées minute par minute
 constexpr int kPassagesParMinute =
     2; // ui_principal_mettre_a_jour : deux passages de 500 ms au moins tombent dans une minute
 constexpr int kRendusParPassage = 10; // 10 x 50 ms de LVGL : le rendu de ce qui a été invalidé
-// 12/11/2026 00:00 à Lyon (UTC+1 en novembre) : chaque jour simulé commence à minuit local.
+// 12/11/2026 00:00 à Lyon (UTC+1 en novembre) : la journée simulée commence à minuit local.
 constexpr int64_t kDebut = 1794438000;
 
 const donnees::Cas *const kTemps[] = {&donnees::SOLEIL, &donnees::PLUIE, &donnees::BROUILLARD, &donnees::NEIGE};
@@ -147,7 +149,7 @@ struct Releve {
     long long blocs;
 };
 
-Releve releve() { return {g_octets, g_blocs}; }
+Releve g_journee[kJours][kMinutesParJour];
 
 } // namespace
 
@@ -200,63 +202,68 @@ int main(int argc, char **argv) {
     lv_screen_load(ecran_lvgl);
 
     const banc::Contexte contexte = {largeur, hauteur, kDebut, g_affichage, ecran::i18n::Langue::Fr};
-    Releve debut_jour[kJours + 1] = {};
-    Releve apres_minuit[kJours] = {};
-    Releve a_5_min = {};
-    Releve a_116_min = {};
-    for (int minute = 0; minute < kJours * kMinutesParJour; ++minute) {
-        const int64_t decalage = static_cast<int64_t>(minute) * 60;
-        g_instant = kDebut + decalage;
-        const int quart = minute / 15;
-        const donnees::VueMeteo meteo = donnees::vue(
-            *kTemps[quart % 4], kDebut + static_cast<int64_t>(quart) * 900); // nouvelle météo au quart d'heure
-        const ecran::EntreesPrincipal entrees = donnees::entrees(contexte, decalage, meteo);
-        for (int passage = 0; passage < kPassagesParMinute; ++passage) {
-            ecran::ui_principal_mettre_a_jour(entrees);
-            for (int r = 0; r < kRendusParPassage; ++r) {
-                g_ms += 50;
-                lv_timer_handler();
+    for (int jour = 0; jour < kJours; ++jour) {
+        for (int minute = 0; minute < kMinutesParJour; ++minute) {
+            const int64_t decalage = static_cast<int64_t>(minute) * 60;
+            g_instant = kDebut + decalage;
+            const int quart = minute / 15;
+            // une météo neuve au quart d'heure, la même d'une journée rejouée à l'autre
+            const donnees::VueMeteo meteo =
+                donnees::vue(*kTemps[quart % 4], kDebut + static_cast<int64_t>(quart) * 900);
+            const ecran::EntreesPrincipal entrees = donnees::entrees(contexte, decalage, meteo);
+            for (int passage = 0; passage < kPassagesParMinute; ++passage) {
+                ecran::ui_principal_mettre_a_jour(entrees);
+                for (int r = 0; r < kRendusParPassage; ++r) {
+                    g_ms += 50;
+                    lv_timer_handler();
+                }
             }
-        }
-        if (injecter) {
-            (void)lv_malloc(108); // une fuite de 108 o par minute, jamais rendue : le contrôle doit échouer
-        }
-        const int jour = minute / kMinutesParJour;
-        const int dans_le_jour = minute % kMinutesParJour;
-        if (dans_le_jour == 0) {
-            apres_minuit[jour] = releve(); // la date du jour vient d'être mesurée et dessinée
-        }
-        if (dans_le_jour == kMinutesParJour - 1) {
-            debut_jour[jour + 1] = releve();
-        }
-        if (minute == 5) {
-            a_5_min = releve();
-        }
-        if (minute == 116) {
-            a_116_min = releve();
+            if (injecter) {
+                (void)lv_malloc(108); // une fuite de 108 o par minute, jamais rendue : le contrôle doit échouer
+            }
+            g_journee[jour][minute] = {g_octets, g_blocs};
         }
     }
 
-    std::printf("endurance %dx%d : LVGL après construction et premier jour : %lld o, %lld blocs\n",
-                static_cast<int>(largeur), static_cast<int>(hauteur), debut_jour[1].octets, debut_jour[1].blocs);
-    std::printf(
-        "  minutes 5 à 116 du premier jour (fenêtre de la mesure de la 7B) : %+lld o, soit %.0f o/min (caches qui se "
-        "remplissent)\n",
-        a_116_min.octets - a_5_min.octets, static_cast<double>(a_116_min.octets - a_5_min.octets) / 111.0);
+    const Releve *premier = g_journee[0];
+    std::printf("endurance %dx%d : LVGL à la fin de la première journée : %lld o, %lld blocs\n",
+                static_cast<int>(largeur), static_cast<int>(hauteur), premier[kMinutesParJour - 1].octets,
+                premier[kMinutesParJour - 1].blocs);
+    std::printf("  minutes 5 à 116 de la première journée (fenêtre de la mesure de la 7B) : %+lld o, soit %.0f o/min "
+                "(caches qui "
+                "se remplissent)\n",
+                premier[116].octets - premier[5].octets,
+                static_cast<double>(premier[116].octets - premier[5].octets) / 111.0);
     bool fuite = false;
     for (int jour = 1; jour < kJours; ++jour) {
-        const long long d_octets = debut_jour[jour + 1].octets - apres_minuit[jour].octets;
-        const long long d_blocs = debut_jour[jour + 1].blocs - apres_minuit[jour].blocs;
-        std::printf("  jour %d : la nouvelle date à minuit %+lld o ; de 00 h 01 à 23 h 59 : %+lld o, %+lld blocs\n",
-                    jour + 1, apres_minuit[jour].octets - debut_jour[jour].octets, d_octets, d_blocs);
-        if (d_octets != 0 || d_blocs != 0) {
+        int ecarts = 0;
+        int premier_ecart = -1;
+        for (int minute = 0; minute < kMinutesParJour; ++minute) {
+            const Releve &avant = g_journee[jour - 1][minute];
+            const Releve &maintenant = g_journee[jour][minute];
+            if (avant.octets != maintenant.octets || avant.blocs != maintenant.blocs) {
+                if (premier_ecart < 0) {
+                    premier_ecart = minute;
+                }
+                ++ecarts;
+            }
+        }
+        const Releve &fin_avant = g_journee[jour - 1][kMinutesParJour - 1];
+        const Releve &fin = g_journee[jour][kMinutesParJour - 1];
+        std::printf("  journée rejouée %d contre %d : %d minute(s) différente(s) sur %d ; fin de journée %+lld o, "
+                    "%+lld blocs\n",
+                    jour + 1, jour, ecarts, kMinutesParJour, fin.octets - fin_avant.octets,
+                    fin.blocs - fin_avant.blocs);
+        // La journée 2 finit de remplir ce que la première n'a pas vu (le retour de 23 h 59 à minuit) : seule la 3e est jugée.
+        if (jour >= 2 && ecarts > 0) {
+            std::printf("    première différence à %02d:%02d\n", premier_ecart / 60, premier_ecart % 60);
             fuite = true;
         }
     }
     if (fuite) {
-        std::printf("ECHEC : la mémoire de LVGL grandit un jour déjà vu (fuite)\n");
+        std::printf("ECHEC : la mémoire de LVGL change d'une journée rejouée à l'autre (fuite)\n");
         return 1;
     }
-    std::printf("OK : aucune croissance les jours 2 et 3\n");
+    std::printf("OK : la troisième journée rejouée tient exactement la mémoire de la deuxième, minute par minute\n");
     return 0;
 }
