@@ -16,7 +16,6 @@
 #include <new>
 
 #include "board.h"
-#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "lvgl.h"
 #include "src/draw/lv_draw_buf_private.h" // la structure des gestionnaires de tampons (LVGL ne l'ouvre qu'avec LV_USE_PRIVATE_API)
@@ -72,8 +71,9 @@ const visuel::ThemePrincipal &theme_du_reglage() {
 // Même gestionnaire que celui de ui_reglages_ouvrir.cpp (global : toutes les polices TinyTTF de l'appareil) ; copié, à factorer.
 void *glyphe_en_psram(size_t octets, lv_color_format_t) {
     const size_t avec_marge = octets + LV_DRAW_BUF_ALIGN - 1;
-    void *p = heap_caps_malloc(avec_marge, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    return p != nullptr ? p : lv_malloc(avec_marge); // PSRAM pleine : la mémoire interne, comme avant
+    // lv_malloc va en PSRAM d'abord, la mémoire interne si elle est pleine (main/lvgl_memoire.cpp) : la même place qu'un
+    // heap_caps_malloc en PSRAM, mais le bloc est compté avec ceux de LVGL (commande « memoire »), qui le rend par lv_free().
+    return lv_malloc(avec_marge);
 }
 
 void glyphes_en_psram() {

@@ -12,6 +12,9 @@
 //
 // Ce que cela ne change pas : les tampons d'écran (DMA, internes), les piles de tâches, tout ce qui est demandé avec
 // MALLOC_CAP_INTERNAL ou MALLOC_CAP_DMA. Les gros blocs (≥ 256 o) allaient déjà en PSRAM.
+#include "lvgl_memoire.h"
+
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -23,7 +26,29 @@ namespace {
 constexpr uint32_t kPsram = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
 constexpr uint32_t kInterne = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
 
+// Compteurs de ce que LVGL tient (commande série « memoire ») : LVGL n'alloue que dans sa tâche, la commande lit depuis la sienne.
+std::atomic<std::uint32_t> g_octets{0};
+std::atomic<std::uint32_t> g_blocs{0};
+
+void compter_ajout(void *p) {
+    if (p != nullptr) {
+        g_octets.fetch_add(static_cast<std::uint32_t>(heap_caps_get_allocated_size(p)), std::memory_order_relaxed);
+        g_blocs.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+void compter_retrait(void *p) {
+    if (p != nullptr) {
+        g_octets.fetch_sub(static_cast<std::uint32_t>(heap_caps_get_allocated_size(p)), std::memory_order_relaxed);
+        g_blocs.fetch_sub(1, std::memory_order_relaxed);
+    }
+}
+
 } // namespace
+
+LvglMemoire lvgl_memoire() {
+    return {g_octets.load(std::memory_order_relaxed), g_blocs.load(std::memory_order_relaxed)};
+}
 
 // LVGL est du C : ces fonctions doivent garder leur nom C (sans décoration C++) pour que l'édition de liens les trouve.
 extern "C" {
@@ -41,11 +66,31 @@ lv_mem_pool_t lv_mem_add_pool(void *mem, size_t bytes) {
 void lv_mem_remove_pool(lv_mem_pool_t pool) { (void)pool; }
 
 // PSRAM d'abord, mémoire interne en dernier recours : jamais d'écran sans objets parce que la PSRAM est pleine.
-void *lv_malloc_core(size_t size) { return heap_caps_malloc_prefer(size, 2, kPsram, kInterne); }
+void *lv_malloc_core(size_t size) {
+    void *p = heap_caps_malloc_prefer(size, 2, kPsram, kInterne);
+    compter_ajout(p);
+    return p;
+}
 
-void *lv_realloc_core(void *p, size_t new_size) { return heap_caps_realloc_prefer(p, new_size, 2, kPsram, kInterne); }
+void *lv_realloc_core(void *p, size_t new_size) {
+    // Un realloc qui échoue garde l'ancien bloc : on ne le décompte qu'une fois le nouveau obtenu. new_size 0 : LVGL appelle
+    // lv_free (lv_realloc, src/stdlib/lv_mem.c), jamais ce chemin.
+    const std::uint32_t avant = p != nullptr ? static_cast<std::uint32_t>(heap_caps_get_allocated_size(p)) : 0U;
+    void *neuf = heap_caps_realloc_prefer(p, new_size, 2, kPsram, kInterne);
+    if (neuf != nullptr) {
+        if (p != nullptr) {
+            g_octets.fetch_sub(avant, std::memory_order_relaxed);
+            g_blocs.fetch_sub(1, std::memory_order_relaxed);
+        }
+        compter_ajout(neuf);
+    }
+    return neuf;
+}
 
-void lv_free_core(void *p) { heap_caps_free(p); }
+void lv_free_core(void *p) {
+    compter_retrait(p);
+    heap_caps_free(p);
+}
 
 void lv_mem_monitor_core(lv_mem_monitor_t *mon_p) {
     (void)mon_p; // non pris en charge : la mesure se fait avec la commande série « memoire »
