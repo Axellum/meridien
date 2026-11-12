@@ -2,7 +2,9 @@
 # `main` doit rendre obligatoires (liste et explications dans docs/outils.md).
 #
 # Chaque action est épinglée par le SHA du commit de son tag (lu dans son dépôt, tag en commentaire), les outils
-# installés par pip ou téléchargés le sont à la version exacte utilisée sur le PC d'Axel.
+# installés par pip ou téléchargés le sont à la version exacte utilisée sur le PC d'Axel. Ceux de pip (ruff, clang-format,
+# playwright) le sont en plus par l'empreinte SHA-256 de chaque fichier, dépendances comprises : .github/exigences/*.txt, installés
+# avec « pip install --require-hashes » (un paquet changé sur PyPI, ou une dépendance non listée, fait échouer l'installation).
 #
 # Dépôt public depuis le 08/11/2026 (privé avant : minutes facturables). Les jobs lourds ne tournent que quand il le faut :
 #   - pull_request : tests-noyau (verdict de changements + noyau-clang + noyau-gpp), ruff, clang-format, gitleaks, firmware-tab5,
@@ -26,9 +28,6 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.13"
-  CLANG_FORMAT_VERSION: "23.1.5"
-  RUFF_VERSION: "0.16.10"
-  PLAYWRIGHT_VERSION: "1.63.0"
   GITLEAKS_VERSION: "8.30.1"
   GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb" # gitleaks_8.30.1_linux_x64.tar.gz
 
@@ -235,7 +234,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: ruff (configuration dans ruff.toml)
         run: |
-          python -m pip install "ruff==${RUFF_VERSION}"
+          python -m pip install --require-hashes -r .github/exigences/ruff.txt
           ruff --version
           git ls-files '*.py' | xargs ruff check --no-cache
 
@@ -252,7 +251,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: clang-format (règle dans .clang-format, exclusions dans .clang-format-ignore)
         run: |
-          python -m pip install "clang-format==${CLANG_FORMAT_VERSION}"
+          python -m pip install --require-hashes -r .github/exigences/clang-format.txt
           clang-format --version
           git ls-files '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' '*.inc' > fichiers.txt
           echo "$(wc -l < fichiers.txt) fichier(s) C/C++ suivis (les fichiers générés sont ignorés par clang-format)"
@@ -302,7 +301,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Parcours Playwright
         run: |
-          python -m pip install "playwright==${PLAYWRIGHT_VERSION}"
+          python -m pip install --require-hashes -r .github/exigences/playwright.txt
           python -m playwright install --with-deps chromium
           node --version
           python web/tests/parcours.py
