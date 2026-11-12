@@ -87,7 +87,11 @@ const char *tab5_display_controller_name(tab5_display_controller_t controller);
 // tab5_io.c
 esp_err_t tab5_io_init(void); // bus I2C, retroeclairage a 0 %, expandeur 0x43
 i2c_master_bus_handle_t tab5_i2c_bus(void);
-esp_err_t tab5_lcd_reset_pulse(void);   // reset de la dalle (bit 4) : bas en push-pull, puis entree a pull-up
+esp_err_t
+tab5_lcd_reset_pulse(void); // reset de la dalle (bit 4) : bas en push-pull, puis entree a pull-up ; note le relachement
+// Attend ce qui reste des 120 ms qui suivent le relachement du reset de la dalle (rien si elles sont deja ecoulees) ; a appeler
+// juste avant la premiere commande DSI. Rend le nombre de millisecondes attendues, pour le journal.
+int32_t tab5_lcd_wait_reset_recovery(void);
 esp_err_t tab5_touch_reset_pulse(void); // reset du tactile (bit 5) : bas puis haut, en push-pull
 esp_err_t tab5_touch_enable(void);      // tactile hors reset (bit 5 haut)
 // Retroeclairage : registre brut du PWM (resolution TAB5_BACKLIGHT_BITS). La courbe de luminosite PERCUE (niveau 0..100 -> registre)

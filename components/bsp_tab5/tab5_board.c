@@ -16,7 +16,9 @@ static const char *TAG = "tab5";
 // Le PI4IOE5V6408 (0x43) a besoin d'environ 1 s apres le demarrage avant que son reset de l'ecran soit fiable : sans cette
 // attente l'ecran reste noir apres un redemarrage logiciel alors que tout le reste marche (cause confirmee le 06/07/2026 par
 // une preuve par elimination, voir tab5-hardware.yaml du depot Tab5 ; ADR-0005 du depot Tab5). Delai a mesurer et a reduire
-// plus tard seulement si un essai le permet, jamais a l'oeil.
+// plus tard seulement si un essai le permet, jamais a l'oeil. Aucun etat lisible ne remplace cette attente : l'expandeur repond
+// deja sur l'I2C quand son reset reste sans effet sur la dalle, et l'ADR-0005 du depot Tab5 note qu'un sondage n'a jamais ete
+// valide. Elle reste donc fixe (revue du 12/11/2026, lot « demarrage plus rapide »).
 #define EXPANDER_SETTLE_MS 1000
 
 // Tampon de dessin LVGL : 50 lignes de la LARGEUR NATIVE de la dalle, soit 36 000 pixels (72 Ko), en RAM interne (DMA) et en double
@@ -115,18 +117,20 @@ esp_err_t board_init(void) {
     vTaskDelay(pdMS_TO_TICKS(EXPANDER_SETTLE_MS));
     ESP_RETURN_ON_ERROR(tab5_io_init(), TAG, "E/S");
     s_timeline.expander_ready_ms = now_ms();
-    // Horloge materielle (reprend l'heure du systeme si elle n'en a pas) et alimentation (chargeur a l'arret) : une erreur est
-    // journalisee mais n'empeche jamais l'ecran de demarrer.
+
+    // 2. Tactile hors reset, puis reset de la dalle, puis detection du controleur : AVANT de toucher au DSI. La dalle ne doit recevoir
+    // sa premiere commande que 120 ms apres le relachement de son reset ; ce delai court pendant l'horloge, l'alimentation, la
+    // detection et la creation du bus DSI, et tab5_display_create() n'attend que le reste (tab5_lcd_wait_reset_recovery).
+    ESP_RETURN_ON_ERROR(tab5_touch_enable(), TAG, "activation du tactile");
+    ESP_RETURN_ON_ERROR(tab5_lcd_reset_pulse(), TAG, "reset de la dalle");
+    // Horloge materielle (reprend l'heure du systeme si elle n'en a pas, AVANT la premiere image) et alimentation (chargeur a
+    // l'arret) : une erreur est journalisee mais n'empeche jamais l'ecran de demarrer. Ni l'une ni l'autre ne parle a la dalle.
     if (tab5_rtc_init() != ESP_OK) {
         ESP_LOGW(TAG, "horloge matérielle indisponible");
     }
     if (tab5_alim_init() != ESP_OK) {
         ESP_LOGW(TAG, "moniteur d'alimentation indisponible");
     }
-
-    // 2. Tactile hors reset, puis reset de la dalle, puis detection du controleur : AVANT de toucher au DSI.
-    ESP_RETURN_ON_ERROR(tab5_touch_enable(), TAG, "activation du tactile");
-    ESP_RETURN_ON_ERROR(tab5_lcd_reset_pulse(), TAG, "reset de la dalle");
     tab5_display_controller_t controller = TAB5_DISPLAY_UNKNOWN;
     uint8_t touch_version = 0;
     int32_t detect_ms = 0;

@@ -68,6 +68,9 @@ esp_err_t ws7b_display_create(esp_lcd_panel_handle_t *panel, esp_lcd_panel_io_ha
 // ws7b_touch.c ---------------------------------------------------------------------------------------------------------------
 // Reset du GT911 (GPIO23), recherche de son adresse (0x5D puis 0x14), lecture de l'identifiant produit, creation du pilote.
 // `product_id` : texte lu ("911") ; `address` : adresse I2C trouvee.
+// Lance le reset du GT911 (bas 10 ms, puis remontee) sans attendre son delai de reprise : ws7b_touch_create() n'attend ensuite que ce
+// qui reste. Facultatif : sans lui, ws7b_touch_create() fait l'impulsion complete.
+esp_err_t ws7b_touch_reset_start(void);
 esp_err_t ws7b_touch_create(esp_lcd_touch_handle_t *touch, uint8_t *address, char product_id[8]);
 // Trace d'une ligne par appui (point brut -> point logique) et, si WS7B_AUTOTEST_TACTILE, cinq appuis simules.
 // Verrou de LVGL pris par l'appelant, une fois l'indev cree.
