@@ -1,7 +1,9 @@
-# Outils du job controles-independants (pillow==12.3.0 pour generer_icones.py, fonttools==4.66.1 pour les polices), installés
-# par « pip install --require-hashes --no-deps -r » : chaque paquet est épinglé à sa version ET à l'empreinte SHA-256 de ses
-# fichiers publiés sur PyPI (toutes plateformes), dépendances comprises. Mêmes versions que sur le PC d'Axel. Régénérer :
-#   uv pip compile <(printf 'pillow==12.3.0\nfonttools==4.66.1\n') --generate-hashes --no-annotate --no-header --python-version 3.13 --python-platform x86_64-manylinux_2_28
+# Outils du job controles-independants (pillow==12.3.0 pour generer_icones.py, fonttools==4.66.1 pour les polices,
+# tzdata==2026.3 : la base des fuseaux avec laquelle les attendus de controle_python*.py ont été calculés ; le job la fait lire
+# à zoneinfo à la place de celle du système, PYTHONTZPATH vide), installés par « pip install --require-hashes --no-deps -r » :
+# chaque paquet est épinglé à sa version ET à l'empreinte SHA-256 de ses fichiers publiés sur PyPI (toutes plateformes),
+# dépendances comprises. Mêmes versions que sur le PC d'Axel. Régénérer :
+#   uv pip compile <(printf 'pillow==12.3.0\nfonttools==4.66.1\ntzdata==2026.3\n') --generate-hashes --no-annotate --no-header --python-version 3.13 --python-platform x86_64-manylinux_2_28
 fonttools==4.66.1 \
     --hash=sha256:058cd823b80bac59e64dfad9e3b6fcd677852f9a3804971bbf6b48cc611e785c \
     --hash=sha256:05aeb146451f37289f782c3c861f3d0f4b86c2dd2e4620b46683544c7406640e \
@@ -149,3 +151,6 @@ pillow==12.3.0 \
     --hash=sha256:fdafc9cce40277e0f7a0feabce0ee50dd2fa1800f3b38015e51296b5e814048d \
     --hash=sha256:fe3cca2e4e8a592be0f269a1ca4835c25199d9f3ce815c8491048f785b0a0198 \
     --hash=sha256:ffd0c5368496f41b0944be820fcb7a838aa6e623d250b01acf2643939c3f99d7
+tzdata==2026.3 \
+    --hash=sha256:4a1518b8993086a7982523e071643f3c0e5f213e75b21318e78bcabfff9d1415 \
+    --hash=sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931

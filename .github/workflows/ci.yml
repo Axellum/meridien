@@ -261,12 +261,16 @@ jobs:
   # Les contrôles indépendants (test/host/controles_independants.py) : données de test régénérées et comparées
   # (--verifier des controle_python_*, capturer_*, icônes et polices), liens relatifs de la doc (tools/controle_liens.py),
   # autotest de tools/essai_7b.py et ses mutations. Ni réseau, ni compilateur, ni carte ; moins d'une minute chacun.
-  # --exiger-tout : en CI aucun saut n'est accepté (Pillow et fontTools épinglés dans .github/exigences/controles.txt).
+  # --exiger-tout : en CI aucun saut n'est accepté (Pillow, fontTools et tzdata épinglés dans .github/exigences/controles.txt).
   # Pas requis par la protection de `main` (décision d'Axel).
   controles-independants:
     name: controles-independants
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      # zoneinfo lit le paquet tzdata épinglé (celui des attendus), pas la base du système du runner : sinon
+      # attendu_heure.inc ne correspond plus dès que les deux bases diffèrent (vu le 12/11/2026, run 43133078632).
+      PYTHONTZPATH: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
