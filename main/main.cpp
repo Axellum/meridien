@@ -84,6 +84,11 @@ extern "C" void app_main(void) {
     const int luminosite = ecran::reglages_affichage().luminosite;
     board_set_backlight_percent(luminosite);
     const int t_lumiere = maintenant_ms();
+    // Le verre des cartes est cuit maintenant, la lumière allumée : un repeint de l'accueil au même pixel (rien ne change à l'écran).
+    if (board_display_lock(0)) {
+        ecran::ecran_principal_finir_demarrage();
+        board_display_unlock();
+    }
     ESP_LOGI(TAG, "rétroéclairage allumé à %d %% à %d ms ; première image affichée (dernier transfert attendu %d ms)",
              luminosite, t_lumiere, attente_ms);
     // Une ligne par démarrage avec chaque étape jusqu'à la lumière (ms depuis le début de l'application, esp_timer) : de quoi comparer
