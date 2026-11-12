@@ -209,7 +209,7 @@ Deux requêtes météo ont eu lieu dans la fenêtre (à 930 s et 1 867 s de la c
 
 Une prise de contact en service, avec mbedTLS en PSRAM, ne tient donc presque rien de plus en interne une fois établie (−1,7 Ko) et n'a pas fait descendre le minimum sous celui du démarrage (95,9 Ko) : le pic est au plus de 28,9 Ko. Chaque requête laisse −368 à −384 o de libre en moins ; les deux paliers de −404 o du tableau (00 h 21 et 00 h 36) suivent chacun une requête.
 
-**Source des −152 o par minute : non résolue.** Ce qui est établi :
+**Source des −152 o par minute : non résolue.** *Mise à jour du 12/11/2026 : expliquée sur le PC, pas sur la carte* : une entrée de plus dans le cache de crénage de TinyTTF de la police de l'heure à chaque paire de chiffres encore jamais dessinée, bornée, qui cesse après le premier jour ([depannage.md](../depannage.md), « La PSRAM libre baisse d'environ 200 o par minute »). Ce qui est établi :
 
 1. **Elle ne vient pas de la commande `memoire`.** Trois relevés espacés de 5 min sans aucune autre commande : 121 875 o (carte à 2 019 s), 120 963 o (2 319 s, −912), 120 203 o (2 619 s, −760), soit −152 à −182 o/min, comme avec un relevé par minute. Si c'était la commande, on aurait −152 o par relevé, soit −152 o sur 5 min.
 2. **Elle tombe sur le changement de minute de l'horloge.** Deux paires de relevés à 10 s d'intervalle : 23 h 38 min 10 s → 20 s (même minute) : 121 875 → 121 875 (0 o) ; 23 h 48 min 56 s → 49 min 06 s (à cheval sur le changement de minute) : 120 203 → 120 051 (**−152 o**), heure UTC du PC.
