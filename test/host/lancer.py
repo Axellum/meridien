@@ -18,6 +18,7 @@ régression fait échouer la compilation. Le mode utilisé est affiché ; aucun 
 quand il ne l'est pas.
 """
 import argparse
+import collections
 import concurrent.futures
 import functools
 import os
@@ -402,6 +403,26 @@ def mutations(cxx, mode):
     return 1 if mauvais else 0
 
 
+def tranche_des_tests(numero, total):
+    """Noms des fichiers de test de la tranche `numero` (1..total) : chaque fichier qui porte des mutations va, du plus coûteux
+    au moins coûteux, dans la tranche la moins chargée (à égalité, la première). Le coût estimé d'un fichier est son nombre de
+    mutations multiplié par sa taille (la compilation du test domine le temps d'une mutation) : une estimation, pas une mesure.
+    Calcul déterministe : les N appels rendent une partition des fichiers, donc de toutes les mutations."""
+    from mutations_carte_7b import MUTATIONS_CARTE_7B  # noqa: PLC0415
+
+    nombre = collections.Counter(m[3] for m in MUTATIONS)
+    if any(t.name == "test_carte_7b.cpp" for t in TESTS):
+        nombre["test_carte_7b.cpp"] += len(MUTATIONS_CARTE_7B)
+    cout = {nom: n * (RACINE / "test" / "host" / nom).stat().st_size for nom, n in nombre.items()}
+    charges = [0] * total
+    tranches = [set() for _ in range(total)]
+    for nom in sorted(cout, key=lambda k: (-cout[k], k)):
+        j = min(range(total), key=lambda k: (charges[k], k))
+        charges[j] += cout[nom]
+        tranches[j].add(nom)
+    return tranches[numero - 1]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--mutations", action="store_true", help="prouve que les tests échouent sans le code")
@@ -417,12 +438,29 @@ def main():
                     "en-tête inclus, dossier d'inclusion), sinon « non : … » ; tout doute répond oui")
     ap.add_argument("--seulement", help="fichiers de test à traiter, séparés par des virgules (un morceau du nom suffit) : "
                     "ne compile et ne mute que ceux-là (pour travailler sur un sujet sans relancer les 30 minutes de tout)")
+    ap.add_argument("--tranche", metavar="I/N", help="avec --mutations : ne garde que la tranche I sur N (de 1 à N). Les "
+                    "fichiers de test sont répartis entre les N tranches par un calcul fixe (coût estimé = nombre de mutations x "
+                    "taille du fichier de test), aucune liste écrite à la main : les N tranches couvrent toutes les mutations, "
+                    "chacune une seule fois, et un nouveau test entre de lui-même dans l'une d'elles")
     a = ap.parse_args()
     if a.seulement:
         morceaux = [m.strip() for m in a.seulement.split(",") if m.strip()]
         TESTS[:] = [t for t in TESTS if any(m in t.name for m in morceaux)]
         MUTATIONS[:] = [m for m in MUTATIONS if any(x in m[3] for x in morceaux)]
         print(f"--seulement : {len(TESTS)} fichier(s) de test, {len(MUTATIONS)} mutation(s) retenus")
+    if a.tranche:
+        try:
+            numero, total = (int(x) for x in a.tranche.split("/"))
+        except ValueError:
+            numero = total = 0
+        if not 1 <= numero <= total:
+            print(f"--tranche « {a.tranche} » : attendu I/N avec 1 <= I <= N", file=sys.stderr)
+            return 2
+        gardes = tranche_des_tests(numero, total)
+        TESTS[:] = [t for t in TESTS if t.name in gardes]
+        MUTATIONS[:] = [m for m in MUTATIONS if m[3] in gardes]
+        print(f"--tranche {numero}/{total} : {len(TESTS)} fichier(s) de test, {len(MUTATIONS)} mutation(s) du noyau retenus"
+              + (" (+ les mutations de la couche carte 7B)" if "test_carte_7b.cpp" in gardes else ""))
     cxx, mode = trouver_compilateur(a.cxx)
     if not cxx:
         print("Aucun compilateur C++ trouvé (ni g++, ni clang++, ni le g++ croisé d'ESP-IDF).", file=sys.stderr)

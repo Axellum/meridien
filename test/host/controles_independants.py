@@ -7,10 +7,11 @@
 Chaque script a un mode `--verifier` qui recalcule ses fichiers générés (attendu_*.inc, captures relues, icônes, polices)
 et sort en erreur si ceux du dépôt ne sont plus à jour : un attendu retouché à la main pour faire passer un test, ou une
 capture changée sans régénérer son littéral, est alors vu. S'y ajoute le contrôle des liens Markdown (tools/controle_liens.py).
-Aucun ne demande le réseau ni un compilateur ; chacun dure moins d'une minute.
+S'y ajoutent l'autotest de tools/essai_7b.py (carte simulée, aucun port) et ses mutations (mutations_essai_7b.py). Aucun ne
+demande le réseau, un compilateur ni une carte ; chacun dure moins d'une minute.
 
 Hors de cette liste, exprès : controle_json.py (g++ croisé d'ESP-IDF), les mutations (compilation, voir lancer.py
---mutations, mutations_horloge.py, mutations_essai_7b.py) et les capturer_* sans --verifier (ils vont sur le réseau).
+--mutations et mutations_horloge.py) et les capturer_* sans --verifier (ils vont sur le réseau).
 
 Sauts possibles sur un PC (jamais en CI) : `zoneinfo` sans base des fuseaux (Python de Windows sans le paquet tzdata) pour
 controle_python.py et controle_python_fuseaux.py ; Pillow absent pour generer_icones.py ; fontTools absent pour les polices
@@ -43,6 +44,9 @@ CONTROLES = [
     ("tools/icones/generer_police_texte.py", ["--verifier"], ["fontTools"], None),
     ("tools/icones/generer_police_roue.py", ["--verifier"], ["fontTools"], None),
     ("tools/controle_liens.py", [], [], None),
+    # Le script d'essai physique de la 7B, rejoué contre une carte simulée (aucun port), et ses onze mutations.
+    ("tools/essai_7b.py", ["autotest"], [], None),
+    ("test/host/mutations_essai_7b.py", [], [], None),
 ]
 
 
