@@ -12,6 +12,7 @@
 #include "ecran/mer_vue.hpp"
 #include "ui_meteo_dessin.h"
 #include "ui_meteo_icones.h"
+#include "ui_ressources.h"
 
 // Page « mer » : un seul objet LVGL qui se dessine tout entier (comme les zones de l'écran principal), pour ne coûter ni objet ni RAM
 // interne par carte, barre ou étiquette. Ce fichier ne DÉCIDE rien : quoi montrer vient de ecran/mer_page.hpp (verdict montré ou non,
@@ -36,11 +37,9 @@ constexpr int CIBLE_FERMER = 4; // le bouton « Fermer » de la page
 constexpr int CIBLE_CROIX = 5;  // la croix du détail
 constexpr int CIBLE_VOILE = 6;  // hors du panneau du détail : ferme le détail aussi
 
-// Les polices sont créées une fois par taille d'écran et gardées (TinyTTF se libère mal : même choix que ui_alertes.cpp). Un changement
-// de taille d'écran (rotation) en crée de nouvelles et abandonne les anciennes : quelques dizaines de Ko, une fois par changement.
+// Les polices de la page : celles du registre partagé (ui_ressources.h), reprises à chaque ouverture (une instance par taille pour tout
+// l'appareil, jamais détruite).
 struct Polices {
-    const std::uint8_t *ttf = nullptr;
-    int petit_cote = 0;
     dz::Police verdict;
     dz::Police titre;
     dz::Police texte;
@@ -758,17 +757,12 @@ void sur_toucher(lv_event_t *evenement) {
 dz::Police creer_police(const ContexteMer &ctx, int px) {
     dz::Police p;
     p.px = px;
-    p.f = lv_tiny_ttf_create_data(ctx.ttf, ctx.ttf_taille, px);
+    p.f = ressources::police(ctx.ttf, ctx.ttf_taille, px);
     return p;
 }
 
 bool preparer_polices(const ContexteMer &ctx, const geo::Disposition &d) {
-    if (gp.ttf == ctx.ttf && gp.petit_cote == d.petit_cote && gp.petit.f != nullptr) {
-        return true;
-    }
     Polices neuves;
-    neuves.ttf = ctx.ttf;
-    neuves.petit_cote = d.petit_cote;
     neuves.verdict = creer_police(ctx, d.polices.verdict);
     neuves.titre = creer_police(ctx, d.polices.titre);
     neuves.texte = creer_police(ctx, d.polices.texte);
