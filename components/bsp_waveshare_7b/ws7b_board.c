@@ -134,7 +134,13 @@ esp_err_t board_init(void) {
     s_timeline.expander_ready_ms = now_ms();
 
     // 2. DSI + dalle (le reset materiel de la dalle, GPIO33, est fait par la creation). Le controleur n'est pas detecte : jalon
-    // confondu avec « dalle prete ».
+    // confondu avec « dalle prete ». Le reset du tactile est lance juste avant : ses 60 ms de reprise courent pendant la creation de
+    // la dalle (plus de 120 ms d'attentes propres) au lieu de s'ajouter apres elle. L'adresse du GT911 est toujours cherchee APRES
+    // la dalle, donc apres le dernier reset qui a pu toucher la puce (voir l'en-tete de ws7b_touch.c). Un echec n'arrete rien :
+    // ws7b_touch_create() refait alors l'impulsion complete.
+    if (ws7b_touch_reset_start() != ESP_OK) {
+        ESP_LOGW(TAG, "reset anticipé du tactile refusé : impulsion complète plus loin");
+    }
     esp_lcd_panel_handle_t panel = NULL;
     esp_lcd_panel_io_handle_t io = NULL;
     ESP_RETURN_ON_ERROR(ws7b_display_create(&panel, &io), TAG, "dalle");
