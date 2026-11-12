@@ -51,6 +51,10 @@ namespace ecran {
 
 namespace {
 
+// Cuisson du verre différée (démarrage) : tant que c'est vrai, cuire_verre() ne fait rien et le verre se dessine en direct, au même
+// pixel. Hors de Vue : ui_principal_creer() remet Vue à zéro, ce réglage doit survivre à la construction.
+bool s_verre_differe = false;
+
 using namespace visuel;
 namespace dz = dessin;
 using dz::Police;
@@ -2600,6 +2604,9 @@ void remplir_ciel_trame(lv_draw_buf_t *buf, std::uint32_t haut, std::uint32_t ba
 // Refait quand une carte change de place, de taille ou de teinte (disposition, thème) ; l'image est alors remplie à neuf d'abord, le
 // verre ne s'empile jamais. Si l'image manque, rien n'est cuit et le dessin direct reste en service.
 void cuire_verre() {
+    if (s_verre_differe) {
+        return; // première image : verre dessiné en direct ; ui_principal_cuire_verre_differe() le cuira juste après
+    }
     Rect voulu[2];
     int n = 0;
     const ThemePrincipal &t = *g.theme;
@@ -3039,5 +3046,17 @@ void ui_principal_sur_alertes(void (*rappel)()) { g.ouvrir_alertes = rappel; }
 CoutEcran ui_principal_cout() { return {g.objets, 6}; }
 
 int ui_principal_images_voile() { return images_voile; }
+
+void ui_principal_differer_verre(bool differer) { s_verre_differe = differer; }
+
+void ui_principal_cuire_verre_differe() {
+    if (!s_verre_differe) {
+        return;
+    }
+    s_verre_differe = false;
+    if (g.ecran != nullptr) {
+        cuire_verre(); // invalide l'écran s'il cuit quelque chose : un repeint, au même pixel que l'image affichée
+    }
+}
 
 } // namespace ecran
