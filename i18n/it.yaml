@@ -656,3 +656,8 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "jour court|jeu": "gio"
 "jour court|ven": "ven"
 "jour court|sam": "sab"
+
+# --- Écran : les mots de la roue (contexte « roue » : place d'un mot sous un bouton, 12/11/2026) ---
+"roue|Réglages": "Opzioni"
+"roue|Alertes": "Allerte"
+"roue|Météo": "Meteo"

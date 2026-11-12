@@ -193,13 +193,14 @@ int composer(EntreeRoue *sortie, bool alertes, int choix_demo, bool mer_choisie 
     for (int i = 0; i < liste.n; ++i) {
         switch (liste.entree[i]) {
         case ecran::roue::Entree::Reglages:
-            sortie[n++] = {ecran::visuel::texte_c("Réglages"), ecran::ICONE_REGLAGES, compter_reglages, nullptr, 0};
+            sortie[n++] = {ecran::visuel::texte_c("roue|Réglages"), ecran::ICONE_REGLAGES, compter_reglages, nullptr,
+                           0};
             break;
         case ecran::roue::Entree::Details:
             sortie[n++] = {ecran::visuel::texte_c("Détails"), ecran::ICONE_DETAILS, ouvrir_details, nullptr, 0};
             break;
         case ecran::roue::Entree::Alertes:
-            sortie[n++] = {ecran::visuel::texte_c("Alertes"), ecran::ICONE_ALERTES, compter_alertes, nullptr, 0};
+            sortie[n++] = {ecran::visuel::texte_c("roue|Alertes"), ecran::ICONE_ALERTES, compter_alertes, nullptr, 0};
             break;
         case ecran::roue::Entree::Mer:
             sortie[n++] = {ecran::visuel::texte_c("Mer"), ecran::ICONE_MER, ouvrir_mer, nullptr, 0};

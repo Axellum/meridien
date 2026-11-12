@@ -224,14 +224,13 @@ int composer_entrees(EntreeRoue *sortie, ChoixRoue *choix_profil) {
     for (int i = 0; i < liste.n; i++) {
         switch (liste.entree[i]) {
         case roue::Entree::Reglages:
-            sortie[n++] = {texte_principal::t(texte_principal::kReglages), ICONE_REGLAGES, ui_reglages_ouvrir, nullptr,
-                           0};
+            sortie[n++] = {visuel::texte_c("roue|Réglages"), ICONE_REGLAGES, ui_reglages_ouvrir, nullptr, 0};
             break;
         case roue::Entree::Details:
             sortie[n++] = {visuel::texte_c("Détails"), ICONE_DETAILS, ui_details_ouvrir, nullptr, 0};
             break;
         case roue::Entree::Alertes:
-            sortie[n++] = {visuel::texte_c("Alertes"), ICONE_ALERTES, ouvrir_alertes, nullptr, 0};
+            sortie[n++] = {visuel::texte_c("roue|Alertes"), ICONE_ALERTES, ouvrir_alertes, nullptr, 0};
             break;
         case roue::Entree::Mer:
             sortie[n++] = {visuel::texte_c("Mer"), ICONE_MER, ouvrir_mer, nullptr, 0};

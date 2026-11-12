@@ -15,6 +15,11 @@
   German, Dutch, Spanish and Turkish); `controle_i18n.py` now checks it. *Registre : vous en français, tu ailleurs.*
 - **Render bench**: every text drawn is checked for room (cut, shortened, off screen, outside its frame) and listed in
   `debordements.tsv` next to the PNG files. *Contrôle de place au banc de rendu.*
+- **Texts that did not fit**, found at the render bench: the words under the wheel buttons have their own keys
+  (`"roue|Réglages"`, `"roue|Alertes"`, `"roue|Météo"`) with shorter words where the page title was cut (German
+  “Optionen”, “Warnung”; Dutch “Opties”, “Alarmen”; Italian “Opzioni”; Turkish “Hava”); three shorter sentences (Dutch
+  “Data van %s · verouderd”, Turkish “Yağmur yağıyor” and “%s sonrası yağış”). French unchanged. *Textes qui ne tenaient
+  pas.* Not tested on board.
 
 ### Removed
 

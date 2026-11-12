@@ -522,7 +522,7 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Pluie en cours": "Het regent"
 "fin dans %d min": "stopt over %d min"
 "ressenti %s": "voelt als %s"
-"Données de %s · périmées": "Gegevens van %s · verouderd"
+"Données de %s · périmées": "Data van %s · verouderd"
 "Rien à signaler dans les prochaines heures": "Niets te melden de komende uren"
 "puis plus forte vers %s": "daarna zwaarder rond %s"
 "environ %d h": "ongeveer %d u"
@@ -656,3 +656,8 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "jour court|jeu": "do"
 "jour court|ven": "vr"
 "jour court|sam": "za"
+
+# --- Écran : les mots de la roue (contexte « roue » : place d'un mot sous un bouton, 12/11/2026) ---
+"roue|Réglages": "Opties"
+"roue|Alertes": "Alarmen"
+"roue|Météo": "Weer"

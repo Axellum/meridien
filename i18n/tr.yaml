@@ -517,9 +517,9 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "Gibbeuse décroissante": "Küçülen şişkin ay"
 "Dernier quartier": "Son dördün"
 "Dernier croissant": "Küçülen hilal"
-"Pluie dès %s": "%s sonrası yağmur"
+"Pluie dès %s": "%s sonrası yağış"
 "Pluie dans %d min": "%d dk sonra yağmur"
-"Pluie en cours": "Şu an yağmur yağıyor"
+"Pluie en cours": "Yağmur yağıyor"
 "fin dans %d min": "%d dk sonra biter"
 "ressenti %s": "hissedilen %s"
 "Données de %s · périmées": "%s verileri · eski"
@@ -656,3 +656,8 @@ _statut: complet   # toutes les clés sont traduites (vérifié par components/c
 "jour court|jeu": "Per"
 "jour court|ven": "Cum"
 "jour court|sam": "Cmt"
+
+# --- Écran : les mots de la roue (contexte « roue » : place d'un mot sous un bouton, 12/11/2026) ---
+"roue|Réglages": "Ayarlar"
+"roue|Alertes": "Uyarılar"
+"roue|Météo": "Hava"
