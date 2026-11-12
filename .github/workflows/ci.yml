@@ -10,7 +10,8 @@
 #   - pull_request : tests-noyau (verdict de changements + noyau-clang + noyau-gpp), ruff, clang-format, gitleaks, firmware-tab5,
 #     firmware-waveshare-7b ;
 #   - push sur main et lancement manuel : en plus parcours-web (réseau) ;
-#   - lancement manuel seulement : mutations-noyau (très longue, voir plus bas).
+#   - toujours, non requis : controles-independants (quelques minutes, sans compilateur) ;
+#   - lancement manuel seulement : mutations-noyau (20 tranches, voir plus bas) et mutations-horloge.
 name: CI
 
 on:
@@ -201,14 +202,21 @@ jobs:
           fi
 
   # Chaque mutation du noyau doit faire échouer le test qui la vise. Compilation seule : pas besoin des détecteurs.
-  # clang++-18 comme sur le PC d'Axel, où toutes les mutations sont détectées. Attention : la liste en compte 1 530
-  # (206 le 06/11/2026) et le lancement du 08/11/2026 a atteint la limite de 150 minutes sans finir (docs/outils.md).
-  # Retiré des push le 08/11/2026 sur la parole d'Axel : il ne part plus qu'à la main (workflow_dispatch).
+  # clang++-18 comme sur le PC d'Axel. La liste compte 2 487 mutations du noyau et 33 de la couche carte 7B (12/11/2026) :
+  # un seul runner ne finit pas (08/11/2026 : coupé par la limite de 150 min à environ 32 s par mutation, docs/outils.md).
+  # Découpée en 20 tranches calculées par lancer.py --tranche (coût estimé par fichier de test, aucune liste à la main : les
+  # 20 tranches couvrent toutes les mutations, chacune une fois), 8 à la fois pour laisser des runners aux pull requests.
+  # Manuel seulement (workflow_dispatch), sur la parole d'Axel du 08/11/2026 ; jamais requis.
   mutations-noyau:
-    name: mutations-noyau
+    name: mutations-noyau (${{ matrix.tranche }}/20)
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        tranche: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -216,10 +224,60 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Mutations du noyau
+      - name: Mutations du noyau, tranche ${{ matrix.tranche }} sur 20
+        env:
+          TRANCHE: ${{ matrix.tranche }}
         run: |
+          set -o pipefail
           clang++-18 --version | head -n 1
-          python test/host/lancer.py --mutations --cxx "$(command -v clang++-18)"
+          # -u : sortie sans tampon, un job coupé montre où il en était.
+          python -u test/host/lancer.py --mutations --tranche "${TRANCHE}/20" --cxx "$(command -v clang++-18)" | tee mutations.log
+          grep -E '^[0-9]+ mutations, 0 problème\(s\)$' mutations.log
+
+  # Les mutations de main/horloge.cpp (hors du noyau, donc hors de lancer.py --mutations), compilées avec les détecteurs.
+  mutations-horloge:
+    name: mutations-horloge
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Mutations de main/horloge.cpp, clang++-18 avec ASan et UBSan
+        run: |
+          sudo tee /usr/local/bin/clang++-san > /dev/null <<'EOT'
+          #!/bin/sh
+          exec clang++-18 -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer "$@"
+          EOT
+          sudo chmod +x /usr/local/bin/clang++-san
+          CXX=/usr/local/bin/clang++-san python -u test/host/mutations_horloge.py
+
+  # Les contrôles indépendants (test/host/controles_independants.py) : données de test régénérées et comparées
+  # (--verifier des controle_python_*, capturer_*, icônes et polices), liens relatifs de la doc (tools/controle_liens.py),
+  # autotest de tools/essai_7b.py et ses mutations. Ni réseau, ni compilateur, ni carte ; moins d'une minute chacun.
+  # --exiger-tout : en CI aucun saut n'est accepté (Pillow et fontTools épinglés dans .github/exigences/controles.txt).
+  # Pas requis par la protection de `main` (décision d'Axel).
+  controles-independants:
+    name: controles-independants
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Contrôles indépendants
+        run: |
+          python -m pip install --require-hashes -r .github/exigences/controles.txt
+          python -u test/host/controles_independants.py --exiger-tout
 
   ruff:
     name: ruff

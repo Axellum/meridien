@@ -18,4 +18,8 @@
 - **Checks that nothing ran any more now run on every commit and in the CI**: the `--verifier` mode of the scripts that
   compute expected values in Python, the icons and fonts, the Markdown links (13 broken links repaired) and the 7B trial
   script's self-test and mutations (`test/host/controles_independants.py`); one of those mutations had silently become
-  inapplicable and is fixed. The test captures are checked out with LF line endings on Windows too.
+  inapplicable and is fixed. The test captures are checked out with LF line endings on Windows too. In the CI they run in
+  the new job `controles-independants` (not required).
+- **The CI mutation run can finish**: the manual job `mutations-noyau` is split into 20 slices computed by
+  `lancer.py --tranche I/20` (2,487 mutations of the core and 33 of the 7B layer), with an unbuffered log; a new manual job
+  `mutations-horloge` runs the mutations of `main/horloge.cpp` ([docs/outils.md](../docs/outils.md)).
