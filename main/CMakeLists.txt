@@ -33,6 +33,8 @@ idf_component_register(SRCS "main.cpp" "boot_info.cpp" "horloge.cpp" "reseau.cpp
 # Ecran principal (session ecran-principal). Ajoute par target_sources() apres l'enregistrement, et non dans la liste SRCS
 # ci-dessus, pour ne pas toucher a la ligne que les autres sessions (meteo, reglages) modifient aussi : un merge sans conflit.
 target_sources(${COMPONENT_LIB} PRIVATE "ecran_principal.cpp" "ui_principal.cpp" "ui_meteo_icones.cpp")
+# Registre des polices partagees par toutes les pages (une instance TinyTTF par taille) : LVGL pur, compile aussi par le banc de rendu.
+target_sources(${COMPONENT_LIB} PRIVATE "ui_ressources.cpp")
 # Page "Details" (session page-details, ADR-0020) : les sept grandeurs retirees de l'accueil, sur une page plein ecran. ui_details.cpp est
 # du LVGL pur (rendu aussi sur le PC) ; ui_details_ouvrir.cpp est la colle de l'appareil. La roue d'appui long l'ouvre (ecran_principal.cpp).
 target_sources(${COMPONENT_LIB} PRIVATE "ui_details.cpp" "ui_details_ouvrir.cpp")
@@ -42,6 +44,9 @@ target_sources(${COMPONENT_LIB} PRIVATE "vigie_etat.cpp" "vigie_client.cpp" "reg
 # Mer d'un spot (ADR-0018 et ADR-0019) : client reseau (trame de Vigie), etat partage, registre des spots. Meme raison : target_sources() et
 # non la liste SRCS. Le client passe par le client HTTPS commun (http_commun.cpp).
 target_sources(${COMPONENT_LIB} PRIVATE "mer_etat.cpp" "mer_client.cpp" "mer_liste_client.cpp" "reglages_mer.cpp")
+# La tache reseau unique des donnees (meteo, alertes, mer, liste des spots) : une pile de 12 Ko au lieu de quatre. Meme raison :
+# target_sources() et non la liste SRCS. L'ordonnancement est dans le noyau (ecran/ordonnanceur_reseau.hpp).
+target_sources(${COMPONENT_LIB} PRIVATE "tache_donnees.cpp")
 # Page mer (ADR-0022) : la page (LVGL pur, rendue aussi sur le PC) et sa colle (ecran de la carte, horloge, registre des spots). Elle s'ouvre
 # par l'entree « Mer » de la roue d'appui long (ecran_principal.cpp, ADR-0024).
 target_sources(${COMPONENT_LIB} PRIVATE "ui_mer.cpp" "ui_mer_ouvrir.cpp")
