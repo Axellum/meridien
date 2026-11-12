@@ -44,8 +44,7 @@ uint32_t lire_tick() { return g_ms; }
 // -Wl,--wrap=lv_draw_label), qui note ici ce qui ne tient pas, puis dessine comme avant. Le rendu n'est pas changé.
 std::set<std::string> g_debordements;
 
-void noter(const char *raison, const char *texte, uint32_t longueur) {
-    std::string t = longueur > 0 ? std::string(texte, longueur) : std::string(texte);
+void noter(const char *raison, std::string t) {
     for (char &c : t) {
         if (c == '\n' || c == '\t')
             c = ' ';
@@ -61,7 +60,9 @@ bool abrege(const std::string &t) {
 void controler_texte(const lv_draw_label_dsc_t *dsc, const lv_area_t *zone) {
     if (dsc == nullptr || zone == nullptr || dsc->text == nullptr || dsc->font == nullptr || dsc->text[0] == '\0')
         return;
-    const std::string texte = dsc->text_length > 0 ? std::string(dsc->text, dsc->text_length) : std::string(dsc->text);
+    // text_length vaut LV_TEXT_LEN_MAX par défaut (lv_draw_label_dsc_init) : le texte s'arrête alors à son zéro final.
+    const std::size_t fin = std::strlen(dsc->text);
+    const std::string texte(dsc->text, dsc->text_length < fin ? dsc->text_length : fin);
     const int32_t largeur = lv_area_get_width(zone);
     const int32_t hauteur = lv_area_get_height(zone);
     lv_point_t taille = {};
@@ -69,12 +70,12 @@ void controler_texte(const lv_draw_label_dsc_t *dsc, const lv_area_t *zone) {
                      (dsc->flag & LV_TEXT_FLAG_EXPAND) ? LV_COORD_MAX : largeur, dsc->flag);
     const int32_t tolerance = 2;
     if (abrege(texte))
-        noter("abrégé", dsc->text, dsc->text_length);
+        noter("abrégé", texte);
     if ((dsc->flag & LV_TEXT_FLAG_EXPAND) && taille.x > largeur + tolerance)
-        noter("trop large pour sa zone", dsc->text, dsc->text_length);
+        noter("trop large pour sa zone", texte);
     // Une seule ligne prévue (hauteur d'une ligne) mais le texte en demande plusieurs : il est coupé en bas.
     if (taille.y > hauteur + tolerance && hauteur > 0)
-        noter("coupé en bas (plus de lignes que la place)", dsc->text, dsc->text_length);
+        noter("coupé en bas (plus de lignes que la place)", texte);
     // Le texte réellement occupé (aligné à gauche, au centre ou à droite dans la zone) sort de l'écran.
     const int32_t utile = taille.x < largeur ? taille.x : largeur;
     int32_t x1 = zone->x1;
@@ -88,7 +89,7 @@ void controler_texte(const lv_draw_label_dsc_t *dsc, const lv_area_t *zone) {
         // Un texte entièrement hors de l'écran (page suivante d'un défilement) n'est pas un débordement.
         const bool visible = x2 >= 0 && x1 < g_largeur && y2 >= 0 && zone->y1 < g_hauteur;
         if (visible)
-            noter("sort de l'écran", dsc->text, dsc->text_length);
+            noter("sort de l'écran", texte);
     }
     // Le texte sort du cadre d'un de ses parents qui le rogne (une carte, un bouton) : on ne le voit qu'en partie.
     for (lv_obj_t *parent = dsc->base.obj != nullptr ? lv_obj_get_parent(dsc->base.obj) : nullptr; parent != nullptr;
@@ -103,7 +104,7 @@ void controler_texte(const lv_draw_label_dsc_t *dsc, const lv_area_t *zone) {
         if (x1 < cadre.x1 - tolerance || x2 > cadre.x2 + tolerance || y2 > cadre.y2 + tolerance) {
             const bool visible = x2 >= cadre.x1 && x1 <= cadre.x2 && y2 >= cadre.y1 && zone->y1 <= cadre.y2;
             if (visible)
-                noter("dépasse le cadre qui le contient", dsc->text, dsc->text_length);
+                noter("dépasse le cadre qui le contient", texte);
         }
         break; // le premier parent suffit : il rogne déjà
     }
