@@ -119,6 +119,7 @@ Options (CMake cache variables): `-DWS7B_ROTATION=0|180`, `-DWS7B_DRAW_BUFFER_LI
 - **Do not use `esp_restart()` on the P4**: it resets the cores only (C6 link loop seen on this board); `board_restart()` calls `esp_rom_software_reset_system()`.
 - **QIO flash was abandoned on this board**; DIO 80 MHz is what ESPHome uses and what is configured here `[M]`.
 - **PSRAM at 200 MHz is needed**: without it about 30 “dsi underrun” per second `[S]`.
+- **Code runs from PSRAM with a 256 KB L2 cache**, as under ESPHome: with the code in flash the panel flashed white at rest, several times an hour ([ADR-0028](decisions/0028-7b-code-en-psram-et-cache-l2-256-ko.md), measured on the board; about 142 KB less free internal RAM).
 - **The backlight output is inverted**; forgetting it gives a full-light screen at 0 %.
 - **`esptool read-flash` with the stub fails at fixed sectors** on the P4: read in 2 MB pieces, split by 8 on failure, 4 KB sectors with `--no-stub` as a last resort; the chip-side `verify-flash` MD5 is the independent proof. `tools/essai_7b.py` does all of this.
 - **The serial port number changes with the USB plug**: find the board by its MAC, read from the chip and compared before any write. The MAC is never written in the repository.
@@ -270,6 +271,7 @@ Options (variables de cache CMake) : `-DWS7B_ROTATION=0|180`, `-DWS7B_DRAW_BUFFE
 - **Pas d'`esp_restart()` sur le P4** : il ne remet à zéro que les cœurs (boucle du lien C6 vue sur cette carte) ; `board_restart()` appelle `esp_rom_software_reset_system()`.
 - **Le QIO de la flash a été abandonné sur cette carte** ; le DIO 80 MHz est ce qu'utilise ESPHome et ce qui est réglé ici `[M]`.
 - **La PSRAM à 200 MHz est nécessaire** : sans elle environ 30 « dsi underrun » par seconde `[S]`.
+- **Le code s'exécute depuis la PSRAM avec un cache L2 de 256 Ko**, comme sous ESPHome : avec le code en flash, la dalle faisait un flash blanc au repos, plusieurs fois par heure ([ADR-0028](decisions/0028-7b-code-en-psram-et-cache-l2-256-ko.md), mesuré sur la carte ; environ 142 Ko de RAM interne libre en moins).
 - **La sortie du rétroéclairage est inversée** ; l'oublier donne un écran à pleine lumière à 0 %.
 - **`esptool read-flash` avec le stub échoue à des secteurs fixes** sur le P4 : lire par morceaux de 2 Mo, couper en 8 en cas d'échec, secteurs de 4 Ko en `--no-stub` en dernier recours ; le MD5 de `verify-flash` calculé par la puce est la preuve indépendante. `tools/essai_7b.py` fait tout cela.
 - **Le numéro de port série change avec la prise USB** : retrouver la carte par sa MAC, lue sur la puce et comparée avant toute écriture. La MAC n'est jamais écrite dans le dépôt.

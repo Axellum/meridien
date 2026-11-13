@@ -53,3 +53,10 @@ CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
 # CONFIG_ESP_HOSTED_CLI_ENABLED is not set
 # Tic FreeRTOS a 1 kHz : esp_hosted le recommande et ESPHome le pose pour tous ses firmwares ESP-IDF (comme sur le Tab5).
 CONFIG_FREERTOS_HZ=1000
+
+# Code et donnees constantes executes depuis la PSRAM, cache L2 de 256 Ko : les reglages memoire du firmware ESPHome de cette carte
+# (execute_from_psram: true) et ceux que conseille la FAQ LCD d'Espressif pour un ecran DSI. Avec le code en flash et 128 Ko de
+# cache, la dalle faisait un bref flash blanc au repos, plusieurs fois par heure (jamais vu sous ESPHome) ; pas revu avec ces deux
+# reglages. Cout mesure : environ 142 Ko de RAM interne libre en moins. ADR-0028 ; ne pas les retirer sans refaire son essai.
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
+CONFIG_CACHE_L2_CACHE_256KB=y
