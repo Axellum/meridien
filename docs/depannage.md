@@ -283,6 +283,10 @@ The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if
 
 **Symptom.** None seen yet. **Cause.** The schematic and the ESPHome firmware (`reset_pin: GPIO23`) put the GT911 reset on GPIO23; Waveshare's BSP declares it not connected / shared with the display reset. The layer pulses GPIO23 and gives the driver no reset pin. **Solution.** None applied. At the first trial, check in the log that the product ID “911” is read at 0x5D (or 0x14) after the pulse; if not, try without the pulse (display reset only). **Seen on** no board. **Status**: **open**, not verified.
 
+#### Waveshare 7B: a brief white flash at rest, several times an hour
+
+**Symptom.** Without touching anything, the panel flashes white for an instant, several times an hour; never seen with the ESPHome firmware on the same board. **Cause.** Not proven. Ruled out by measurement (log and a diagnostic probe that logs every LVGL render pass and reads the DSI host's `INT_ST0`/`INT_ST1` every millisecond): a restart, an underrun of the DSI bridge, an error of the DSI host, a full-screen repaint at rest, an HTTPS request. The one difference found with ESPHome is memory: ESPHome runs the code from PSRAM with a 256 KB L2 cache, this firmware ran it from flash with 128 KB. **Solution.** `CONFIG_SPIRAM_XIP_FROM_PSRAM=y` and `CONFIG_CACHE_L2_CACHE_256KB=y` in `boards/waveshare-7b/sdkconfig.defaults.board` ([ADR-0028](decisions/0028-7b-code-en-psram-et-cache-l2-256-ko.md)); cost about 142 KB of free internal RAM. **Seen on** Waveshare 7B (EK79007), trial binary `b9aa06e` + both settings + the probe, 13/11/2026: no flash seen by the author during the first 30 minutes. **Status**: worked around; to be confirmed over a longer observation; which of the two settings matters is not known.
+
 ---
 
 ### Flash, serial port and backup
@@ -1014,6 +1018,10 @@ Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement,
 #### Waveshare 7B : câblage du reset tactile, deux sources se contredisent
 
 **Symptôme.** Aucun vu pour l'instant. **Cause.** Le schéma et le firmware ESPHome (`reset_pin: GPIO23`) mettent le reset du GT911 sur GPIO23 ; le BSP de Waveshare le déclare non relié / partagé avec le reset de l'écran. La couche envoie l'impulsion sur GPIO23 et ne donne aucune broche de reset au pilote. **Solution.** Aucune appliquée. Au premier essai, vérifier au journal que l'identifiant produit « 911 » est lu en 0x5D (ou 0x14) après l'impulsion ; sinon essayer sans l'impulsion (reset de l'écran seul). **Vu sur** aucune carte. **Statut** : **ouvert**, non vérifié.
+
+#### Waveshare 7B : un bref flash blanc au repos, plusieurs fois par heure
+
+**Symptôme.** Sans rien toucher, la dalle devient blanche un instant, plusieurs fois par heure ; jamais vu avec le firmware ESPHome sur la même carte. **Cause.** Non prouvée. Exclu par mesure (journal et une sonde de diagnostic qui journalise chaque passage de rendu de LVGL et lit `INT_ST0`/`INT_ST1` de l'hôte DSI toutes les millisecondes) : un redémarrage, un underrun du pont DSI, une erreur de l'hôte DSI, un repeint plein écran au repos, une requête HTTPS. La seule différence trouvée avec ESPHome est la mémoire : ESPHome exécute le code depuis la PSRAM avec un cache L2 de 256 Ko, ce firmware l'exécutait depuis la flash avec 128 Ko. **Solution.** `CONFIG_SPIRAM_XIP_FROM_PSRAM=y` et `CONFIG_CACHE_L2_CACHE_256KB=y` dans `boards/waveshare-7b/sdkconfig.defaults.board` ([ADR-0028](decisions/0028-7b-code-en-psram-et-cache-l2-256-ko.md)) ; coût : environ 142 Ko de RAM interne libre. **Vu sur** Waveshare 7B (EK79007), binaire d'essai `b9aa06e` + les deux réglages + la sonde, 13/11/2026 : aucun flash vu par l'auteur pendant les 30 premières minutes. **Statut** : contourné ; à confirmer sur une observation plus longue ; laquelle des deux options compte n'est pas connu.
 
 ---
 
