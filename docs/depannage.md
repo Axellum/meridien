@@ -13,6 +13,8 @@ Format of each entry: **Symptom → Cause → Solution**, then three lines:
 
 An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its troubleshooting](https://github.com/Axellum/M5-Tab5-ESPHome-LVGL/blob/main/docs/troubleshooting.md)): the hardware cause is the same, but it has not yet been looked at again with this native firmware.
 
+**Who it concerns.** Under each title, one line in italics says how far the entry reaches, for a reader who builds another screen: *any ESP32 / ESP-IDF project* (ESP-IDF, esptool, LVGL, the build on Windows: 34 entries), *the ESP32-P4 only* (5), *this board only* (Tab5 or Waveshare 7B: 14) or *this project only* (its own code, tools or web services: 31). Count of 19/11/2026, 84 entries. The label is a reading of the entry, not a test on another chip: an entry marked “any ESP32” was seen on the P4.
+
 ### Contents
 
 - [Open](#open)
@@ -32,6 +34,8 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 
 #### After a power cut, the image only appears after a second gesture
 
+*Applies to: this board only (Tab5).*
+
 **Symptom.** Power cut on the Tab5, then power back: the first start-up shows no image; the “Bonjour” image and the test pattern appear after a second gesture by the author (clean start-up no. 9, ST7121 detected). The first start-up “without a screen” **is not in the serial log**: the start counter goes from 8 to 9.
 
 **Cause.** **Not found** as of 06/11/2026. The log holds only one start-up after the cut (no. 9), complete and clean: ST7121 detected at the 1st probe, first image, backlight at 75% at 1598 ms. So either the first start-up did not run this firmware, or it was not captured (tablet on battery, without serial port). Hypotheses, **not verified**: the Tab5's USB power perhaps does not turn the tablet on without a press on the button; the display reset through the expander (which needs one second, by analogy with ESPHome) does not seem to be the cause, since no. 9 is clean. The reset cause read at power-up is “watchdog” (`HP_SYS_HP_WDT_RESET`) at **both** observed power-ups: perhaps the normal cause of a power-up of this board, not verified; no crash (`Guru`, `abort`, `Backtrace`) seen.
@@ -44,9 +48,13 @@ An entry “known elsewhere” comes from the ESPHome firmware of the Tab5 ([its
 
 #### Return to ESPHome never tried
 
+*Applies to: this board only (Tab5).*
+
 The restore recipe (three writes: start of the flash, application, NVS) is in the `LISEZMOI.md` file of the author's local backup, which is outside this repository. It has **never been played**: as long as it has not been, the return is “not verified”. **Status**: open.
 
 #### The battery connector reads 8.2 V although the unit “has no battery”
+
+*Applies to: this board only (Tab5).*
 
 **Symptom.** On 07/11/2026 the INA226 reads **8206 mV and +2 mA** at the battery connector, with the charger forced off, stable over the whole bench. The notes inherited from the ESPHome firmware say “the author's unit has no battery” (1.83–1.94 V charger off).
 **Cause.** **Not found.** Compatible with a two-cell lithium pack nearly full and idle (a battery connected since), not with an empty connector. Nothing in the software can tell the two apart.
@@ -59,6 +67,8 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 #### ESP-IDF's `export.ps1` fails, then “python_env doesn't exist”
 
+*Applies to: this project only (its code, tools or services) (the ESP-IDF installed by ESPHome on the author's PC).*
+
 **Symptom.** The `export.ps1` of the ESP-IDF installed by ESPHome stops (it looks for `python_env\idf5.5_py3.13_env`); then `idf.py set-target` answers “python_env doesn't exist”.
 
 **Cause.** That ESP-IDF is installed and owned by ESPHome, with a different organisation of the Python environment (`penvs\5.5.5`) from the one Espressif's scripts expect.
@@ -69,10 +79,14 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 #### Warnings and dead paths without effect
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 - “Error while generating esp_rom gdbinit” at the start of a build: harmless, the build succeeds. *Status: observed on the skeleton.*
 - The `idf-env.json` of the ESPHome-owned ESP-IDF still cites a path on another drive (dead path, ESPHome's file not corrected): no effect on our builds so far. *Status: not verified beyond that.*
 
 #### The PC crashes during a build
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Cause.** Too many parallel tasks (the PC has already crashed at 6) or two builds at once.
 
@@ -82,11 +96,15 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 #### A change in `sdkconfig.defaults*` has no effect
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 **Cause.** The defaults are only read again when `sdkconfig` does not exist.
 
 **Solution.** Delete `sdkconfig`, run `.\tools\idf.ps1 set-target esp32p4` again, then check the value in the generated `sdkconfig` (not in the defaults file). **Seen on** Tab5 ST7121, 06/11/2026. **Status**: resolved.
 
 #### In a git worktree, CMake fails: `grabRef.cmake` “file failed to open head-ref”
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** In a worktree created by `git worktree add` (one per session), `idf.py set-target` or the first build stops in `grabRef.cmake` (`file failed to open head-ref`), while the main checkout builds.
 
@@ -98,11 +116,15 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 #### The build stops on `-Werror=format-truncation` in the interface
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 **Cause.** The ESP-IDF build compiles with `-Werror=all`: an `snprintf` into a buffer the compiler cannot prove large enough (here 40 bytes for “min %s · max %s” with two 15-byte texts) is an error, not a warning.
 
 **Solution.** A buffer sized for the worst case of the format (48 bytes there). **Seen on** ESP-IDF 5.5.5, 06/11/2026. **Status**: resolved.
 
 #### Building with `-O2` (`CONFIG_COMPILER_OPTIMIZATION_PERF=y`) stops on three warnings that `-Og` does not show
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** With `-Og` (ESP-IDF's default) the build is clean; with `-O2` it stops on `-Werror=stringop-truncation` in `main/meteo_zone.cpp` (`strncpy` of the zone name and time zone), on `-Werror=format-truncation` in `main/ui_principal.cpp` (`snprintf` of the official-alert chip text, title + separator + window) and in `components/bsp_tab5/tab5_rtc.cpp` (`snprintf` of the date `%04d-%02d-…`).
 
@@ -114,9 +136,13 @@ The restore recipe (three writes: start of the flash, application, NVS) is in th
 
 #### A PowerShell script is refused: a deletion aimed at the ESP-IDF folder
 
+*Applies to: this project only (its code, tools or services).*
+
 The safeguard of the author's AI session tool refuses any command containing a `Remove-Item` aimed at the ESP-IDF folder owned by ESPHome, even inside a script written elsewhere. Do not delete in scripts; move or ignore. **Status**: worked around.
 
 #### `idf.py` stops on “macro expanded to blank string” as soon as `esp_hosted` is a dependency
+
+*Applies to: the ESP32-P4 only (esp_hosted, the link to the ESP32-C6 radio).*
 
 **Symptom.** After adding `espressif/esp_hosted` 2.12.12, the configuration (`kconfgen`) stops on the Kconfig of that component with “macro expanded to blank string”.
 
@@ -128,11 +154,15 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 #### `ninja`: “reglages_locaux.cmake is defined as an output multiple times”
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 **Cause.** A `set_property(DIRECTORY … CMAKE_CONFIGURE_DEPENDS …)` on a file that CMake already tracks because `main/CMakeLists.txt` reads it with `include()`.
 
 **Solution.** Remove the `set_property`: CMake re-runs the configuration by itself when an included file changes. **Seen on** the author's PC, 06/11/2026. **Status**: resolved.
 
 #### A new script is missing from `git status`: the secrets safeguard ignored it
+
+*Applies to: this project only (its code, tools or services).*
 
 **Cause.** The pattern `reglages_locaux*` of `.gitignore` (meant for the generated `reglages_locaux.cmake`, which holds the Wi-Fi credentials) also matched `tools/reglages_locaux.ps1`. Nothing warns: the file just never appears (`git check-ignore -v <file>` shows the pattern).
 
@@ -140,15 +170,21 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 #### The translation guard does not see the texts added in 1b
 
+*Applies to: this project only (its code, tools or services).*
+
 `test/host/controle_i18n.py` reads only the `kXxx = "…";` constants of `main/ui_bonjour.cpp` and `main/boot_info.cpp`, checked against the “Bonjour screen” section of the translation table. The new texts of 1b (clock, network state) therefore live in `main/textes_1b.h`, **not covered** by the table and not through `tr()`; they will go through `tr()` with the settings page. **Status**: resolved on 11/11/2026: the texts of `main/textes_1b.h` are keys of the table (section “Écran : diagnostic”), `textes_1b.h` is gone, the diagnostic screen translates every text with `tr()`, and `controle_i18n.py` reads them as `kXxx` constants of `ui_bonjour.cpp`. Not checked on a board.
 
 #### `verrous.py` fails with “No module named 'filelock'” after a build
+
+*Applies to: this project only (its code, tools or services).*
 
 **Cause.** `tools/idf.ps1` puts the Python of the ESP-IDF environment first on the `PATH` for the rest of the PowerShell session (read in the script). The lock script that tells the sessions who builds or flashes (it lives outside the repository) needs `filelock`, which that Python does not have. Taking the lock before the build works; giving it back after the build, in the same session, fails and leaves the lock held.
 
 **Solution.** Give the lock back from another PowerShell call (or with the PC's own Python, not the ESP-IDF one) and check with the `etat` command that it is free. **Seen on** the author's PC, 06/11/2026, commit `793bdfc`. **Evidence**: the traceback at the `rendre` call after `.\tools\idf.ps1 build`; the same call from a fresh call worked. Seen again on 07/11/2026 (branch `claude/source-meteo-client-reseau-29c0af`): a build script took the `build` lock, ran `tools\idf.ps1` twice, and its final `rendre` failed the same way, leaving the lock held after both builds had passed; checked in a clean call that `python` was the PC's before `idf.ps1` and `<ESP-IDF folder>\penvs\5.5.5\Scripts\python.exe` after, and released the lock with the PC's Python. **Status**: worked around.
 
 #### The shared `clang++-san.cmd` wrapper fails: “'clang++' is not recognised as an internal or external command”
+
+*Applies to: this project only (its code, tools or services).*
 
 **Symptom.** After `. <the PC's tools folder>\env_hote.ps1 -Sanitizers`, every test of `python test/host/lancer.py` fails to build and the output says `'clang++' n’est pas reconnu en tant que commande interne ou externe, un programme exécutable ou un fichier de commandes` (French Windows), although `clang++.exe` is in `_outils\llvm-mingw\bin`.
 
@@ -159,6 +195,8 @@ The safeguard of the author's AI session tool refuses any command containing a `
 **Seen on** the author's PC (Windows 11), branch `claude/source-meteo-client-reseau-29c0af`, 07/11/2026; no board involved. **Evidence**: the shared wrapper run by hand on an empty program prints the message above; the file has 265 bytes, 0 CR, 3 LF, 6 bytes above 127; with the local copy `python test/host/lancer.py` reports “complet (compilé + exécuté)”.
 
 #### `idf.py set-target` fails while downloading components: “No such file or directory” on a very long path
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** In a new git worktree, `.\tools\idf.ps1 set-target esp32p4` stops during the component download with a Python `FileNotFoundError: [Errno 2] No such file or directory: '…\.cache\composants\service_…\espressif__esp_hosted_2.12.12_…\examples\host_network_split__power_save\…\host_wakeup_demo_using_udp_packet.c'`. A half-written `build/` is then left behind, and the next `set-target` stops on “doesn't seem to be a CMake build directory”.
 
@@ -171,6 +209,8 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 #### A failed `set-target` followed by `build` quietly compiles the default board (Tab5)
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 **Symptom.** After a `set-target` that stopped (a half-written `build/`: “doesn't seem to be a CMake build directory”), a `.\tools\idf.ps1 build` run right after still ends with exit code 0, but the binary is for the **Tab5**, whatever board the `set-target` was meant for. A script that runs `set-target -DBOARD=waveshare-7b` then `build` in a row labels a Tab5 binary “7B”. The tell: two boards, binaries of exactly the same size (3 011 952 bytes) and the same memory figures.
 
 **Cause.** `set-target` first runs `fullclean`, which refuses to delete a directory that is not a CMake build directory: `set-target` stops with code 2 and `-DBOARD=…` is never given to CMake. `build` then configures from scratch without it, and `CMakeLists.txt` gives `BOARD` the default value `tab5`.
@@ -180,6 +220,8 @@ The safeguard of the author's AI session tool refuses any command containing a `
 **Seen on** the build PC (Windows 11, ESP-IDF 5.5.5), worktree `claude/mode-auto-accueil-1bf706`, 08/11/2026; no board involved. **Evidence**: the log of the “7B” build shows `set-target code 2` then a CMake line without `-DBOARD`; its ELF holds `bsp_tab5` and no `bsp_waveshare_7b`, and both binaries weighed 3 011 952 bytes. The next run, with `build/` valid, gave `set-target` code 0, `BOARD:STRING=waveshare-7b` in the cache, an ELF with `bsp_waveshare_7b` and no `bsp_tab5`, and a binary of 2 992 528 bytes. **Status**: worked around (cause read in the log and in `CMakeLists.txt`); `tools/idf.ps1` is not changed.
 
 #### Switching boards: stale settings, or the dependency lock rewritten
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** After changing `BOARD`, the build keeps the previous board's flash size, partition table or PSRAM mode; or a build of one board downloads the other board's drivers and rewrites `dependencies.lock`.
 
@@ -195,6 +237,8 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 #### ESP-IDF refuses to start on the Tab5's chip
 
+*Applies to: the ESP32-P4 only (early chip revisions such as v1.3).*
+
 **Cause.** The Tab5's chip is an ESP32-P4 **revision 1.3**; ESP-IDF 5.5.5 requires by default a revision ≥ 3.1.
 
 **Solution.** In `boards/tab5/sdkconfig.defaults.board`: `CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y` and `CONFIG_ESP32P4_REV_MIN_100=y` (checked in the generated `sdkconfig`: `CONFIG_ESP32P4_REV_MIN_FULL=100`). Chip settings belong to each board: the 7B (revision 3.x) has its own.
@@ -202,6 +246,8 @@ The safeguard of the author's AI session tool refuses any command containing a `
 **Seen on** Tab5 ST7121, 06/11/2026 (reported by the hardware track). **Status**: resolved.
 
 #### Which DSI line rate for the ST7121? Four sources contradict each other
+
+*Applies to: this board only (Tab5).*
 
 | Source | Value |
 |---|---|
@@ -214,15 +260,21 @@ The safeguard of the author's AI session tool refuses any command containing a `
 
 #### The `esp_lcd_st7123` 1.0.2 component does not suit the Tab5 as it is
 
+*Applies to: this board only (Tab5).*
+
 Its macros describe a 720 × 1560 panel, not the Tab5's. The init table of the Tab5 ST7123 is in esp-bsp (`disp_init_data_1.h`), to be ported when the unit is back from repair. The ST7123 and the ILI9881C are **detected** (log + `ESP_ERR_NOT_SUPPORTED`), not initialised. **Status**: known, not addressed.
 
 #### Accents appear as squares or are missing
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Cause.** LVGL's built-in fonts stop at ASCII.
 
 **Solution.** Embedded TinyTTF font (Roboto Bold, OFL licence, `main/assets/`). Every icon or glyph displayed must exist in the loaded font: an MDI icon is never an empty rectangle. **Status**: resolved (accents); icons: to be checked when they arrive.
 
 #### The touch point is shifted to the left
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** First trial on the Tab5: the point follows the finger but shifted to the left; a swipe could scroll the screen.
 
@@ -234,6 +286,8 @@ Its macros describe a 720 × 1560 panel, not the Tab5's. The init table of the T
 
 #### Landscape: the touch ring is “completely shifted from the finger”
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 **Symptom.** First landscape trial on the Tab5: the image is upright (“Yes, it's straight”), but the green ring does not appear under the finger (“not at the right place, completely shifted”).
 
 **Cause.** The touch point was rotated **twice**: once by `esp_lcd_touch` (mirror Y + swap X/Y requested in `tab5_touch.c`), once by LVGL itself (`lv_indev.c`, `indev_pointer_proc` → `lv_display_rotate_point`, which for a 90° rotation gives `x = ver_res − Y − 1`, `y = X`). The original comment wrongly claimed that LVGL does not rotate the touch. A finger at logical `(x, y)` gave a ring at `(1279 − y, x)`, off-screen as soon as `x > 719`.
@@ -243,9 +297,13 @@ Its macros describe a 720 × 1560 panel, not the Tab5's. The init table of the T
 **Seen on** Tab5 ST7121, symptom on the binary of commit `102077b`, fix checked on `3b68f42` (test build with the touch self-test) and `9f82623`, 06/11/2026. **Evidence**: the self-test injects six presses in raw panel coordinates (four corners, centre, Settings button) and the log gives “AUTOTEST appui n/6 … OK” six times; 27 real presses are logged and the formula `x = 1279 − Y`, `y = X` holds on every line; the author: “the fingers were right”. **Status**: resolved (details in [mesures/orientation.md](mesures/orientation.md) § 5).
 
 #### Every press on the screen restarted the board
+
+*Applies to: any ESP32 / ESP-IDF project.*
 **Symptom.** With the binary of commit `557eb44`, “as soon as I touch the screen it restarts” (the author, ~22:29). **Cause.** The per-press log callback called `lv_event_get_indev(e)`, but for the events of an input device LVGL passes the **device as the target** and the touched object as the parameter (`lv_indev_send_event`): the callback read an object as if it were a device. It had been compiled but never executed before the author was asked to press. **Solution.** `lv_event_get_target(e)` (commit `c1fa7f6`), then a self-test build injects six synthetic presses at start-up so that the event code runs on the board **before** anyone is asked to touch it. **Seen on** Tab5 ST7121, `557eb44` then `c1fa7f6`, 06/11/2026. **Evidence**: self-test 6/6 OK with no restart, then 27 real presses without a restart. **Status**: resolved.
 
 #### No log over USB, or a build error on a `|` between two LVGL flags
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 - **No log**: it needs `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y` (the default UART console is not wired to the Tab5's USB). Set in `boards/tab5/sdkconfig.defaults.board`.
 - **`A | B` on two LVGL flags**: in C++ the result is an `int` that LVGL refuses; one call per flag. Likewise for Espressif's configuration macros (designated initialisers in an order that C++ refuses): the board layer (`components/bsp_tab5/`) is therefore written in **C**, the application in C++.
@@ -254,9 +312,13 @@ Its macros describe a 720 × 1560 panel, not the Tab5's. The init table of the T
 
 #### Log `swap_xy is not supported by this panel` at start-up
 
+*Applies to: any ESP32 / ESP-IDF project (esp_lvgl_port; seen with a MIPI-DSI panel).*
+
 Emitted by `esp_lvgl_port` at initialisation; no observed effect on the image (fixed native portrait orientation, no software rotation). Cause not explored. **Seen on** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Status**: known, no observed effect.
 
 #### Low bootloader margin and PSRAM test
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if options are added. Start-up takes about 2.9 s from the reset to the first image, of which ~0.95 s of PSRAM test (`CONFIG_SPIRAM_MEMTEST=y`) and 1 s of waiting for the expander: two possible gains, **to be measured before sacrificing anything**, one change at a time. On the 7B build (commit `c48c418`, 07/11/2026, PC): bootloader 0x5d10 bytes, **0x2f0 bytes (3 %) free**, even tighter. **Seen on** Tab5 ST7121, 06/11/2026. **Status**: known, not addressed.
 
@@ -264,26 +326,38 @@ The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if
 
 #### Black screen after a software restart
 
+*Applies to: this board only (Tab5); the `esp_rom_software_reset_system()` rule holds for every ESP32-P4.*
+
 *Known elsewhere; here, only one software restart tried and it succeeded (no. 2 of 06/11/2026, `SW_SYS_RESET`, image came back, Tab5 ST7121), no series of 20.* On the ESPHome firmware, the display's reset pin goes through the PI4IOE5V6408 expander, which needs about a second to be reliable: reset too early = black screen. The native firmware takes over the 1 s wait before the reset (specific to the board: the 7B has none, its reset is a P4 pin). On the P4, `esp_restart()` only resets the cores: finish with `esp_rom_software_reset_system()`. To be verified at milestone 1b with 20 restarts.
 
 
 #### Waveshare 7B: the backlight never goes fully black
 
+*Applies to: this board only (Waveshare 7B).*
+
 *Known elsewhere (the author's ESPHome firmware on this board, 16–17/10/2026); the native fix is written and **not verified on the board**.* The backlight is analog (BL_CTRL → RC filter → AP3032): at 0 % the panel stays dimly lit, and the “display off” command (0x28) alone changed nothing visible. What worked under ESPHome: black veil, then 0x28, then “sleep in” 0x10, and the reverse on wake (0x11, 120 ms, 0x29). The board layer does the same in `board_set_backlight_percent(0)` (`ws7b_panel_plan()`, tested on the PC). **Seen on** Waveshare 7B under ESPHome, 17/10/2026 (the author's observation); native firmware: PC only, commit `52f6372`. **Status**: worked around under ESPHome; the native version is not tested on a board.
 
 #### Waveshare 7B: the C6 does not answer the version request
+
+*Applies to: this board only (Waveshare 7B); its ESP32-C6's factory firmware.*
 
 *Known elsewhere (the author's measurements, 16–19/10/2026).* The factory ESP32-C6 firmware does not answer esp_hosted's “version” request, which can look like a link failure. The board layer does not ask (`WS7B_READ_C6_VERSION=0`) and never updates the C6 (decision of the author, 16/10/2026). **Seen on** Waveshare 7B under ESPHome. **Status**: worked around; not yet seen with this firmware.
 
 #### Waveshare 7B: the speaker saturates above 0 dB
 
+*Applies to: this board only (Waveshare 7B).*
+
 *Known elsewhere (the author's trial by ear, 17–18/10/2026, ESPHome).* ES8311 volume register 0x32: 0xBF = 0 dB (75 % of the register scale), above it the speaker saturates (+32 dB at 0xFF); below 40 % of the scale (0x66) “nothing is heard”. The layer caps at 0xBF and floors a non-zero volume at 0x66; the curve is tested on the PC. **Status**: worked around; not tested on a board.
 
 #### Waveshare 7B: touch reset wiring, two sources disagree
 
+*Applies to: this board only (Waveshare 7B).*
+
 **Symptom.** None seen yet. **Cause.** The schematic and the ESPHome firmware (`reset_pin: GPIO23`) put the GT911 reset on GPIO23; Waveshare's BSP declares it not connected / shared with the display reset. The layer pulses GPIO23 and gives the driver no reset pin. **Solution.** None applied. At the first trial, check in the log that the product ID “911” is read at 0x5D (or 0x14) after the pulse; if not, try without the pulse (display reset only). **Seen on** no board. **Status**: **open**, not verified.
 
 #### Waveshare 7B: a brief white flash at rest, several times an hour
+
+*Applies to: this board only (Waveshare 7B); cause not proven; the fix follows Espressif's advice for P4 DSI panels.*
 
 **Symptom.** Without touching anything, the panel flashes white for an instant, several times an hour; never seen with the ESPHome firmware on the same board. **Cause.** Not proven. Ruled out by measurement (log and a diagnostic probe that logs every LVGL render pass and reads the DSI host's `INT_ST0`/`INT_ST1` every millisecond): a restart, an underrun of the DSI bridge, an error of the DSI host, a full-screen repaint at rest, an HTTPS request. The one difference found with ESPHome is memory: ESPHome runs the code from PSRAM with a 256 KB L2 cache, this firmware ran it from flash with 128 KB. **Solution.** `CONFIG_SPIRAM_XIP_FROM_PSRAM=y` and `CONFIG_CACHE_L2_CACHE_256KB=y` in `boards/waveshare-7b/sdkconfig.defaults.board` ([ADR-0028](decisions/0028-7b-code-en-psram-et-cache-l2-256-ko.md)); cost about 142 KB of free internal RAM. **Seen on** Waveshare 7B (EK79007), trial binary `b9aa06e` + both settings + the probe, 13/11/2026: no flash seen by the author during the first 30 minutes. **Status**: worked around; to be confirmed over a longer observation; which of the two settings matters is not known.
 
@@ -292,6 +366,8 @@ The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if
 ### Flash, serial port and backup
 
 #### Black screen after `write-flash --after no-reset`: the application never starts
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** `esptool write-flash … --after no-reset` succeeds (“Hash of data verified”); a capture script that then “resets” the board with an RTS pulse only reads nothing for 35 s, and the screen stays black.
 
@@ -303,11 +379,15 @@ The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if
 
 #### `read-flash` fails: “Packet content transfer stopped”
 
+*Applies to: the ESP32-P4 only (esptool's stub on the P4; reading at the partition table's offsets holds for every ESP32).*
+
 **Cause.** Reading the whole flash with esptool's stub on a zone that does not answer; here also, an offset error (the NVS is not at the start of the flash).
 
 **Solution.** Read the useful partitions at the offsets read from the **board's partition table** (here ESPHome's NVS is at `0xf90000`), twice, and compare the SHA-256; fall back to `--no-stub` if the stub fails; `verify-flash` (MD5 sum computed by the chip) to prove that a stored file is identical to the flash. **Seen on** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Status**: resolved (partial backup made, wanted by the author: the code is in git, the NVS is not).
 
 #### The COM port is not the one you think
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Cause.** The number changes with the USB socket; on 06/11/2026 the Tab5 was on COM11, and COM14 was an **ESP32-S3 from another project**.
 
@@ -315,9 +395,13 @@ The bootloader takes 0x5a30 bytes of its 24 KiB: only **6% margin**, to watch if
 
 #### Opening the serial port restarts the board
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 Opening or closing the USB port can reset the chip. Side effect observed on 06/11: the USB restart brought the volume of the ESPHome firmware back from 85 to 100 (the ESPHome firmware apparently does not keep it; not fixed). Open the port with `dtr=False, rts=False` set before `open()` when you want to listen without resetting.
 
 #### Serial capture on Windows: nothing is displayed, or the start counter goes up by itself
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 - An RTS pulse is only transmitted if DTR is also updated (esptool does it); a read started without delay after opening blocks.
 - `esptool flash-id` and `read-mac` **reset the chip at every call**: the start counter of the log goes up (no. 3 of 06/11 is probably that one). Do not run them during a restart trial.
@@ -328,9 +412,13 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### Waveshare 7B: backing up the 32 MB flash
 
+*Applies to: the ESP32-P4 only (seen on the 7B's 32 MB flash).*
+
 *Known elsewhere (the author's backups of this board on 20/10/2026, esptool 5.3.1).* On the ESP32-P4 the stub `read-flash` fails at fixed sectors: read in 2 MB pieces (about 21 s each), split by 8 on failure, 4 KB sectors with `--no-stub` as a last resort, use `--before default-reset` after a dropped stub, and prove the copy with `verify-flash` (MD5 computed in the chip). The real flash is **32 MB** (the first plan assumed 16 MB). The otadata (0x9000 and 0xa000) must be decoded before choosing what to keep: sequence number, CRC `crc32_le(0xFFFFFFFF, seq)`, slot `(seq − 1) % 2`. `tools/essai_7b.py` does all of this; its decoder was checked against the real otadata of the backup of 20/10/2026 (sequences 5 and 4, both CRC valid, slot 0 chosen). The part of the script that talks to the board has **not been run**. **Status**: worked around; script written, board part not run.
 
 #### `essai_7b.py flasher` refuses to write: « partition ota_1 du build … depasse la fin de l'emplacement sauvegarde »
+
+*Applies to: this project only (its code, tools or services).*
 
 **Symptom.** With a limited-scope backup (`sauvegarde --reference`), `essai_7b.py flasher` (and so `essai`) stops with `[REFUS] partition ota_1 du build (0x410000-0x810000) depasse la fin de l'emplacement sauvegarde (0x410000) : aucune ecriture`; nothing is written.
 
@@ -344,6 +432,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### Tapping “Wi-Fi” in the settings restarts the board: `sem create failed`, then `assert … port_esp_hosted_host_os.c:589`
 
+*Applies to: the ESP32-P4 only (esp_hosted, the link to the ESP32-C6 radio).*
+
 **Symptom.** Settings open, tap on “Wi-Fi” (network scan): the board restarts. Log: `sem create failed`, `assert failed: hosted_destroy_semaphore port_esp_hosted_host_os.c:589`, reboot. Twice on 07/11/2026. In the same state the city search failed to open its connection (`Failed to allocate memory`).
 
 **Cause.** With the settings open only **9.7 kB** of internal RAM were free (largest block 4.6 kB). The Wi-Fi link with the ESP32-C6 (`esp_hosted`) and TLS live **only** in internal RAM. LVGL used the system `malloc`, and every block under 256 bytes (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256`) is served from internal RAM; an LVGL object, style or label weighs 100 to 250 bytes: the main screen alone took 52 kB, each settings screen about 40 kB.
@@ -353,6 +443,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 **Seen on** Tab5 ST7121, integrated build `953328d`, 07/11/2026. **Evidence**: before, free internal RAM 74 kB when the time arrives and 9.7 kB with the settings open (minimum 5.5 kB); after, 211 kB and 210 kB (minimum since boot 148,500 B), settings navigated and a scan started by hand by the author, no restart. Drawing speed was not compared with the old allocator. **Status**: resolved on this trial; to watch over a longer run.
 
 #### The weather request fails: `esp-aes: Failed to allocate memory…` or `PK verify failed with error 0x4290`
+
+*Applies to: any ESP32 / ESP-IDF project (with PSRAM; the figures are the P4's).*
 
 **Symptom.** `esp-aes: Failed to allocate memory for the array of DMA descriptors` (or `… for start alignment buffer`) about 80 ms after an HTTPS request starts, or, on later attempts, `esp-x509-crt-bundle: PK verify failed with error 0x4290` after 14 s, then `esp-tls: Failed to open new connection`. The weather stays “unavailable”; free internal RAM is below 20 kB (700 B at the lowest).
 
@@ -364,6 +456,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### The task watchdog fires: `IDLE0 (CPU 0)` … `CPU 0: meteo`
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 **Symptom.** `task_wdt: Task watchdog got triggered … IDLE0 (CPU 0) … CPU 0: meteo`, every 5 s while a TLS handshake runs.
 
 **Cause.** A handshake computes for seconds without ever sleeping. The weather task was at priority 3, above the idle task (0): on the core it runs on, the idle task never gets the CPU and stops feeding the watchdog (`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`, timeout 5 s).
@@ -373,6 +467,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 **Seen on** Tab5 ST7121, `2a05811`, 07/11/2026. **Evidence**: the temporary serial commands `tourner3` and `tourner0` (a task pinned to core 0 computes for 8 s): the watchdog fires 5.0 s after the start at priority 3 and does not fire at priority 0. **Status**: resolved. Since 11/11/2026 these two commands are only in a measurement build (`.\tools\idf.ps1 -DMERIDIEN_BANC_ESSAI=ON build`), never in the normal firmware.
 
 #### Free PSRAM falls by about 200 B per minute while the main screen runs
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** Waveshare 7B, 2 h after a restart, one `memoire` reading every 5 min: free PSRAM falls by 213 B/min after the first 5 minutes (32,050,916 → 31,832,472 B), internal RAM stays flat ([mesures/7b-memoire-interne.md](mesures/7b-memoire-interne.md) § 5). On the Tab5 (`59b5fab`, 30 min): −152 B at every change of minute of the clock, plus steps of −10 to −11 kB every 2 minutes or so during the first 10 minutes. Before `ce3ab9f` the same −152 B/min was seen in internal RAM.
 
@@ -388,6 +484,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### A small Vigie answer is not gzip: the decoder refuses it
 
+*Applies to: this project only (its code, tools or services) (and any client of Vigie).*
+
 **Symptom.** With `Accept-Encoding: gzip` sent, Hamburg's answer (426 bytes, no alert) has no `Content-Encoding` and starts with `{`, not with the gzip bytes `1f 8b`: a client that always inflates rejects it as “invalid header”.
 
 **Cause.** The public instance compresses only bodies of about 500 bytes or more (the 9 other real answers are gzip, chunked, 365 to 1 976 bytes on the wire).
@@ -397,6 +495,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 **Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Evidence**: `test/host/donnees/vigie_hambourg.json` (426 bytes, read by the core tests) and `vigie_captures.json` (`content_encoding: null`). **Status**: handled on the PC; the board has not received any answer yet.
 
 #### Without a `lang` filter, one warning weighs 26 kB
+
+*Applies to: this project only (its code, tools or services) (and any client of Vigie).*
 
 **Symptom.** La Palma without filter: 26 190 bytes of JSON for 9 warnings; Eberswalde: 7 623 bytes for one.
 
@@ -408,6 +508,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### The screen goes quiet for one second at the change of the hour
 
+*Applies to: this project only (its code, tools or services) (and any client of Vigie).*
+
 **Symptom.** When two alerts follow each other, the first ending at `hh:59:59` (AEMET) and the second starting at `hh:00:00` (DWD) or the reverse, nothing is “in force” for one second: the pill can disappear and come back.
 
 **Cause.** The end of an alert is exclusive and issuers do not agree on the last second.
@@ -417,6 +519,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 **Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07, real answers of the public Vigie instance captured 2026-11-07 08:52–08:53 UTC. **Not seen on a board.** **Status**: fixed in the core (PC tests only), never seen on a board, before or after.
 
 #### An issuer text disappears from the screen
+
+*Applies to: this project only (its code, tools or services).*
 
 **Symptom.** A warning is shown with Vigie's own words (“Orange level, rain”) instead of the issuer's title, or a description is missing.
 
@@ -428,6 +532,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### An alert time is cut in two lines (“00:” then “59”)
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 **Symptom.** On the alerts page, the end of an alert written as “dimanche 8 novembre · 00:59” wrapped after the colon: “00:” on one line, “59” on the next (PC render, 720×1280, La Palma, French).
 
 **Cause.** The text engine of the screen (LVGL) treats a colon as a place where a line may break, like a space, so a time at the end of a long line can be cut inside the number.
@@ -437,6 +543,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 **Seen on** PC only (host tests with AddressSanitizer + UBSan, PC render), branch `claude/alertes-vigie-9b13fe`, 2026-11-07. **Not seen on a board.** **Status**: fixed on the PC render; to be checked by eye on the panel.
 
 #### Hooks and tools: traps met while writing the alerts
+
+*Applies to: this project only (its code, tools or services).*
 
 - **`robocopy … /E` is refused** by the guard of the `E:` disk (false positive on the `/E` option): use `Copy-Item -Recurse`.
 - **A mutation that no longer compiles is not a detection.** `-Werror,-Wunused-but-set-variable` turned `if (false)` into a compile error counted as “detected by something else”: the mutation list must show 0 such lines, so the mutation was rewritten (`if (n == 0 && b.autres > 100)`).
@@ -450,6 +558,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### A wrong Wi-Fi password is almost never recognised as such: the radio says 2 and 205
 
+*Applies to: any ESP32 / ESP-IDF project (seen through the ESP32-C6 and esp_hosted).*
+
 **Symptom.** Trying a new network with a wrong password: the disconnect events carry reason **2** (`AUTH_EXPIRE`, “authentication expired”) and **205** (`CONNECTION_FAIL`, “connection failed”), each repeated, and the reason **202** (`AUTH_FAIL`, the one that means “password refused”) came in **1 trial out of 9** (28.9 s after the start); the 8 other times nothing but 2 and 205 until the 30 s limit. A rule “the same sure cause twice” never fires, and the result given to the screen is “other”.
 
 **Cause.** `reseau.cpp` retries the connection 2 s after every disconnect (`kDelaiReessaiWifiUs`) and each attempt ends with a reason code chosen by the radio; on this access point the authentication failure only comes after several attempts. Which codes appear for which fault depends on the access point: **not verified on another one**.
@@ -460,6 +570,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### With no known network, the Wi-Fi keeps retrying a connection every 2 s after a scan
 
+*Applies to: this project only (its code, tools or services).*
+
 **Symptom.** New device (nothing in the NVS, nothing compiled in): after the first network scan the log shows `Wi-Fi coupé (raison 201 …) ; nouvelle tentative dans 2 s` forever (11 times in 45 s), the radio is busy, and the next scan can fail.
 
 **Cause.** `terminer_recherche()` restarted the connection retries whenever the Wi-Fi was not connected, with no network in service to find again (empty configuration → “no access point found”, reason 201).
@@ -469,6 +581,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 **Seen on** Tab5 ST7121, local binary that ignores the compiled network (not committed), 07/11/2026. **Evidence**: before, 11 disconnects in 45 s after the scan; after, none between the scan and the next trial, a failed trial reported at +30.01 s with no retry afterwards, a good network adopted in 6.1 s. The normal path (with a known network) was replayed on the final binary `a244af0`. **Status**: resolved.
 
 #### After the Wi-Fi comes back, the time can arrive late or not be asked again
+
+*Applies to: this project only (its code, tools or services).*
 
 **Symptom.** The time may arrive late or irregularly (reported since 06/11/2026, cause not found on the board). At start-up the direct request `sntp_rapide` sets the clock within 0.3 s of the IP address (20 boots out of 20 on `2a05811`, [mesures/1b.md](mesures/1b.md)); outside that case nothing was measured.
 
@@ -482,6 +596,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### Reading the microphones alone on the I2S port times out
 
+*Applies to: this board only (Tab5).*
+
 **Symptom.** With only the receive channel of the shared I2S port enabled, every read ended on `ESP_ERR_TIMEOUT` (first bench pass of 07/11/2026): no microphone level, no recording.
 **Cause.** **Not elucidated.** The same port read fine as soon as the transmit channel was also enabled. Hypothesis, **not verified**: the port's shared clocks do not run for a receive-only channel in this configuration.
 **Solution.** `tab5_i2s_enable()` enables the transmit channel whenever the receive one is enabled; it then sends silence (the DAC is muted, the amplifier off). No audible effect. Do not “simplify” this away without re-running the bench.
@@ -489,12 +605,16 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### Expander: “can't set level in input mode”
 
+*Applies to: this board only (Tab5); and any board with a PI4IOE5V6408 expander.*
+
 **Symptom.** Driving `CHG_EN` or `nCHG_QC_EN` (expander 0x44) failed with `can't set level in input mode` after the pin had been read.
 **Cause.** After a reset every PI4IOE5V6408 pin is an input, and reading a pin as input leaves its cached direction on “input”; the `esp_io_expander` driver then refuses to set a level.
 **Solution.** In this order: direction (output), level, push-pull mode (`tab5_expander_output()`). The pin takes the output register's value (0 after a reset) for an instant: harmless for `SPEAKER_EN` and `CHG_EN`; `nCHG_QC_EN` is not driven when it is already high.
 **Seen on** Tab5 ST7121, 07/11/2026; fix in `993500f`. **Evidence**: driver message in the first bench pass, then `tab5_alim` lines without error at every start. **Status**: resolved.
 
 #### A pin driven as an output reads 0 in the expander's state register
+
+*Applies to: this board only (Tab5); and any board with a PI4IOE5V6408 expander.*
 
 **Symptom.** `SPEAKER_EN` read back as 0 while the speaker was playing (bench check `audio.ampli_allume` failed three times, once per DAC line, in the passes before `5f797e3`).
 **Cause.** The state register (0x0F) does not show a pin driven as an output (seen on the board; **not verified on the chip's datasheet**). The registers told the truth: during the tone expander 0x43 read direction 0x6F, output 0x22, high impedance 0xDD, so bit 1 is an output, high, not in high impedance.
@@ -507,6 +627,8 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### No host compiler on the PC: the core tests do not run
 
+*Applies to: this project only (its code, tools or services).*
+
 **Cause.** No `gcc`, `clang` or `cl` installed (nor Visual Studio) on the author's PC.
 
 **Provisional solution (until 06/11/2026).** The tests are `constexpr` functions evaluated **at compile time** (`static_assert`) by ESP-IDF's RISC-V cross g++ in `-fsyntax-only`.
@@ -517,17 +639,25 @@ Opening or closing the USB port can reset the chip. Side effect observed on 06/1
 
 #### A 404 when trying an LLM service: error or not?
 
+*Applies to: this project only (its code, tools or services).*
+
 A 404/405 on `GET /models` is **not** an error (valid local service: not all of them expose this route). Only a 404 on the route of the real trial gives the sentence “il manque peut-être /v1” (“/v1 may be missing”; contract, [api-reglages.md](api-reglages.md)). **Status**: resolved in the contract.
 
 #### The fake service copies the received key into its error
+
+*Applies to: this project only (its code, tools or services).*
 
 Intended: the fake service answers 401 with a body that copies the key, to **prove** that the device never retransmits the text of a third-party service. Check of the check: a mutation trial makes two checks fail.
 
 #### The web run needs the network
 
+*Applies to: this project only (its code, tools or services).*
+
 `python web/tests/parcours.py` really calls Open-Meteo (place search, weather): without Internet it fails. Replayed on 06/11/2026 by the coordination session: 49/49 checks, exit code 0. The stylesheet uses `:has()`: on an old phone, only the red outline of an invalid field would be missing (Safari iOS and Firefox: not verified).
 
 #### LVGL 9.5 screens: three pitfalls found while building the settings screens
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom → cause → solution.**
 - A disabled button (the "Continuer" of step 1 before a language is touched) showed the **theme's grey** instead of the palette's disabled look → the default theme styles `LV_STATE_DISABLED` on top of the object's own style → the disabled look is drawn by hand (`bouton_activer(false)`, `main/ui_commun.cpp`: own colours, clickable flag removed).
@@ -537,6 +667,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 **Seen on** PC rendering bench (software LVGL 9.5.0, `tools/rendre.ps1`), branch `claude/reglages-ecran-aea4e2`, 06/11/2026. **Evidence**: rendered boards (disabled button) and the scripted journeys of `tools/rendu/scenes/scene_parcours.cpp` (a disabled "Continuer" does nothing; the keyboard and fields survive a screen change). **Status**: resolved on the PC; not seen on a board.
 
 #### LVGL 9.5 touch targets: slider zone, parents, scroll indicator
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom → cause → solution.**
 - Touch targets measured below the 72 px minimum (Retour 60, "Nouveau code" and "Tester" 60, preset pills 64, "Quitter l'installation" 56) and a brightness slider that could only be grabbed on a 22 px bar → buttons had their height overridden after `creer_bouton()`; for the slider, LVGL 9.5 accepts a touch only on the bar widened by `LV_DPX(8)` (`lv_slider.c:250` sets it, `lv_obj_pos.c:1195-1205` reads it), and the "knob only" test of `lv_slider.c:269-277` runs only when `LV_OBJ_FLAG_ADV_HITTEST` is set, which the slider does not do (only `lv_image.c:694` sets it) → the overrides are gone, `creer_bouton` sets a `min_height` that no caller can undercut, and the slider bar is widened with `lv_obj_set_ext_click_area()` up to 72 px high (`rangee_curseur`, `main/ui_reglages.cpp`).
@@ -549,6 +681,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### On-board test: the virtual finger lands on the wrong object
 
+*Applies to: any ESP32 / ESP-IDF project.*
+
 **Symptom.** In the first two runs of the settings test on the board, a tap on the centre of "Affichage" opened the "Appareil" page, "Retour" did nothing, and the aimed button received no press, no release and no click (counts 0, 0, 0), although `lv_indev_search_obj()` found that button at that very point.
 
 **Cause.** `lv_indev.c:743` calls `lv_display_rotate_point()` on every point a pointer reads, because touch drivers give **raw** panel coordinates (`components/bsp_tab5/tab5_touch.c` says so). The test's virtual pointer gave logical coordinates, so the point was rotated twice: (639, 424) became (855, 639), inside the "Appareil" row; (86, 43) became (1236, 86), on nothing. A `grep rotation` on `lv_indev.c` finds nothing: the function is called `rotate_point`.
@@ -556,6 +690,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 **Solution.** `vers_brut()` in `main/autotest_reglages.cpp` gives the inverse rotation (90, 180, 270); after every press the test compares the point LVGL finally read with the aimed point and records a failure if they differ, so a test that misses cannot pass again. The screens were right; the test was wrong. **Seen on** Tab5 ST7121, commits `7b435eb` and `8f6c28d` (failing) and `176de0d` (fixed), 07/11/2026. **Evidence**: journal lines `GESTE … appui reçu 0, relâchement reçu 0, clic reçu 0` then `1, 1, 1`; 29 checks, 0 failures at `176de0d`. **Status**: resolved (in the test).
 
 #### Internal RAM down to 20 bytes while the settings are open, and the weather failing
+
+*Applies to: any ESP32 / ESP-IDF project (with PSRAM; the figures are the P4's).*
 
 **Symptom.** With the settings open about 13 to 18 s after boot: `MEMOIRE … interne_libre=535 plus_gros_bloc=160 interne_min=20` and `mdns_send: Cannot allocate memory`. On the **normal** binary, settings never opened: `esp-aes: Failed to allocate memory for the array of DMA descriptors` then `meteo: essai raté (HTTP 0)`.
 
@@ -565,11 +701,15 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### A mutation keeps the compiler busy for minutes
 
+*Applies to: this project only (its code, tools or services).*
+
 **Cause.** The proof by mutation compiles the tests with one change in the core. A mutant that removes the exit condition of a `constexpr` loop (here `&& base < PERIODE_S` in `delai_avant_essai_s`) makes clang evaluate the loop up to its limit of 2 billion steps (`-fconstexpr-steps=2000000000`, set so that the tests which read a real response compile): 765 s of CPU measured before the compiler was stopped.
 
 **Solution.** That mutant is left out of `test/host/mutations_meteo_appareil.py` (the reason is written at the top of the file); the real code leaves the loop after 7 turns, and `planning_normal_et_reessais` covers 1 000 000 and `INT_MAX` failures. When writing a mutation, check that it does not remove the end of a loop. **Seen on** the author's PC, 06/11/2026, clang 23.1.5. **Evidence**: process CPU time, mutant no. 32 of the list. **Status**: worked around.
 
 #### Open-Meteo: the rain, probability and UV of an hour show up one hour (or one quarter of an hour) early
+
+*Applies to: this project only (its code, tools or services) (and any client of Open-Meteo).*
 
 **Symptom.** Reading `hourly.precipitation[i]` next to `hourly.temperature_2m[i]` draws the rain of the hour `i` with the value that belongs to the hour before it; the same for `precipitation_probability`, `uv_index` and for `minutely_15.precipitation` (a quarter of an hour).
 
@@ -581,6 +721,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### Open-Meteo: in a time zone that is not on the hour (Newfoundland, Nepal) the series do not start at the current hour
 
+*Applies to: this project only (its code, tools or services) (and any client of Open-Meteo).*
+
 **Symptom.** With `timezone=auto`, the hourly and quarter-hour series begin 45 minutes before `current.time` in Kathmandu (UTC+5:45) and 30 minutes after it in Newfoundland (UTC-3:30), but exactly at it in Lyon, Sydney or Singapore. A screen that looks for “the hour that contains now” finds nothing at the start in Newfoundland.
 
 **Cause.** The series start at the current instant rounded to the UTC hour, minus the remainder of `utc_offset_seconds` modulo 3,600 (sign of C): +20,700 s gives -2,700 s, -12,600 s gives +1,800 s. Measured on two captures; the same rule is expected for +5:30, +3:30, +10:30 (not captured).
@@ -589,6 +731,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 **Seen on** the author's PC, captures of 2026-11-07 00:12 (Paris time), no board. **Evidence**: `hourly.time[0] - current.time` = -2,700 s (Kathmandu), +1,800 s (Newfoundland), 0 (Lyon, Sydney, Singapore). **Status**: resolved in the core; the screen must accept `heure_courante == -1`.
 #### The Open-Meteo reader accepted an “unknown” value written in its own answer
+
+*Applies to: this project only (its code, tools or services).*
 
 **Symptom.** Once the readers of MET Norway and the NWS were added, two core tests of the Open-Meteo reader stopped passing (`valeurs_invraisemblables_et_bornes`, `prevision_par_jour_facultative_mais_complete`): a wind direction of `-1` and a daily rain probability of `-1` written in an Open-Meteo answer were accepted instead of refused (`HorsPlage`).
 
@@ -602,6 +746,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### No time and a near-black sky for the first 13 seconds after a start
 
+*Applies to: this project only (its code, tools or services).*
+
 **Symptom.** After a start the main screen shows no time and a night sky until the first SNTP answer (about 13 s). The author: “the blue background takes a while to appear”.
 
 **Cause.** `ecran_principal.cpp` took the time only once SNTP had answered, although the system time was already right (the board layer resumes it from the RX8130 at 2.6 s after power-up, or it is kept across a software reset). In addition, as long as the weather was not read, the sky judged day and night in UTC (one or two hours of night too many).
@@ -611,6 +757,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 **Seen on** Tab5 ST7121, integrated build `953328d`, 07/11/2026. **Evidence**: log: “09:01” and the date 3.4 s after a restart instead of about 13 s; the sky itself was not looked at by me; a start after a power cut (hardware clock read) not replayed. **Status**: resolved in the log; to confirm by eye.
 
 #### The sky gradient shows visible bands
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** On a sky that goes from dark blue to a lighter blue, steps of colour show across the screen.
 
@@ -623,6 +771,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### The board reboots about 14 s after start, at the first weather request
 
+*Applies to: any ESP32 / ESP-IDF project (with PSRAM; the figures are the P4's).*
+
 **Symptom.** With the new main screen, the Tab5 reboots in a loop: the screen is built (« écran principal 1280x720 chargé »), then, at about 13.7 s, the log prints `abort() was called at PC …` and « Rebooting… », and the next boot reports « plantage (exception) » (code 4). The old main screen, built on the same base commit, does not do it.
 
 **Cause (probable, not isolated allocation by allocation).** Internal RAM runs out when the first weather request (TLS) and the web server start together. Free internal RAM just before that request: 109.2 KB with the old screen, 44.9 to 45.6 KB with the new one, on the same base (`4e7d8af`). ESP-IDF's default `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384` keeps every allocation under 16 KB in internal RAM; the new screen draws much larger digits (the clock and the temperature) than the old one. The two `abort()` call sites, decoded with the ELF, are `lock_init_generic` (`newlib/locks.c:77`) and `esp_aes_intr_alloc` (`mbedtls/port/aes/dma/esp_aes_dma_core.c:117`): both abort when an internal allocation fails.
@@ -634,6 +784,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### Hourly strip, pressure trend and rain amounts are absent on the device
 
+*Applies to: this project only (its code, tools or services).*
+
 **Symptom.** The main screen shows the weather now and the days, but neither the hourly strip, nor the pressure trend, nor the amount of rain, nor « rain in N min ».
 
 **Cause.** The device's weather client (`meteo_client.cpp`, session `meteo-appareil`) does not request or keep those fields yet; the screen shows only what is received and never invents a value (the zone disappears and the others take its place).
@@ -644,6 +796,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### Turkish: Sunday and Monday had the same abbreviation
 
+*Applies to: this project only (its code, tools or services).*
+
 **Symptom.** In the week, both « Pazar » (Sunday) and « Pazartesi » (Monday) were written « Paz ».
 
 **Cause.** The first three letters of the two names are the same.
@@ -652,6 +806,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 - **Seen on**: PC render, `fr de tr`, 2026-11-07. **Status**: *resolved*.
 
 #### The clock, the dates and the sky stay on Paris time whatever the chosen city
+
+*Applies to: this project only (its code, tools or services).*
 
 **Symptom.** Choosing a city in another time zone saved the city and its zone (`zone_ecrire`), but the big clock, the date, sunrise and sunset, the day names and the hours written on the alerts page stayed on Paris time. Without weather the sky was judged on a fixed « 8 h to 18 h », wrong everywhere and all year.
 
@@ -663,6 +819,8 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### A window of hours that crosses a clock change uses one offset; a column at 5:30 is labelled « 5h »
 
+*Applies to: this project only (its code, tools or services).*
+
 **Symptom.** Found by reading the code and by the tests, **not** by a render of the old screen. The « hour by hour » strip converted its whole window with **one** offset (the one in the weather answer when it was received): after a clock change inside the window, the columns on the other side are one hour off. And a column that is not on the hour (Kolkata +5:30, Kathmandu +5:45, when a source gives UTC-round instants) would be written « 5h ».
 
 **Cause.** One offset for the whole window, and a label made of the hour only.
@@ -673,10 +831,14 @@ Intended: the fake service answers 401 with a body that copies the key, to **pro
 
 #### The render refuses to start: « a build is already running (ninja) »
 
+*Applies to: this project only (its code, tools or services).*
+
 `tools
 endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy compilation on the PC. Wait for the other session's build to end (the `build` lock of `verrous.py`), or, if you know what you are doing, `-Forcer`.
 
 #### The wheel's glass band is drawn on the wrong side of the hub
+
+*Applies to: this project only (its code, tools or services).*
 
 **Symptom.** With the wheel open at the centre of the screen, the buttons sit below the hub but a dark blob appears above it, on nothing.
 
@@ -691,6 +853,8 @@ endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy
 
 #### The word of the unfolded family disappears under the second ring
 
+*Applies to: this project only (its code, tools or services).*
+
 **Symptom.** With « Profil ▸ » unfolded (two choices), the last letter of the word « Profil », drawn beside its button of the first ring, is covered by the disk of the neighbouring choice (« Météo »), on the PC renders at 1280×720 and 1024×600. The demonstration family of ADR-0021 does the same with « Affichage ».
 
 **Cause.** A first-ring word is placed on the axis of its button, outwards (`cote_du_mot` in `roue_geometrie.hpp`), which is exactly where the second ring of that family opens: with few choices the nearest disk sits on the word.
@@ -701,6 +865,8 @@ endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy
 
 #### « Hava durumu » is cut at the edge when the wheel opens in the bottom-right corner of a portrait screen
 
+*Applies to: this project only (its code, tools or services).*
+
 **Symptom.** In Turkish, at 720×1280, with a finger at about 95 % × 93 % of the screen and the « Alertes » button present (four buttons), the second ring of « Profil ▸ » does not fit: the word « Hava durumu » (Weather) is cut by the right edge, and the bench journal says “NE TIENT PAS”. The other six languages and the sizes of the two boards (1280×720, 1024×600) fit in the same variant. With five buttons (an alert and a sea spot, variant `roue-profil-complet-coin`) the Turkish 720×1280 corner does not fit either (same journal line); on the two boards, five buttons fit at the centre and in the bottom-right corner.
 
 **Cause.** The geometry reserves the width of the longest choice word (`mot_choix`), but at that corner no placement leaves enough room for that word. Read in the bench journal; the geometry was not explored further.
@@ -710,6 +876,8 @@ endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy
 **Seen on** PC render (LVGL 9.5.0, no board), branch `claude/mode-auto-profil-1bf706`, 08/11/2026. **Evidence**: variant `roue-profil-coin`, Turkish, 720×1280, in `docs/captures/ecran/`. **Status**: open, low priority.
 
 #### GCC 14.2 stops with "internal compiler error: in gimple_add_tmp_var" on `g.second = roue::Anneau{};`
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** `idf.py build` (ESP-IDF 5.5.5, GCC 14.2.0) fails on `main/ui_roue.cpp` with `internal compiler error: in gimple_add_tmp_var, at gimplify.cc:802`, the caret under the `{}` of `g.second = roue::Anneau{};`. clang (the PC bench and the tests) compiles the same line without a word.
 
@@ -723,6 +891,8 @@ endre.ps1` stops when `ninja` or `esphome` runs, so as not to put a second heavy
 
 
 #### `idf.py` ends with code 0 and builds nothing when started from Git Bash
+
+*Applies to: any ESP32 / ESP-IDF project.*
 
 **Symptom.** `.\tools\idf.ps1 ... build` run from a script launched by the Bash tool (Git Bash) prints `MSys/Mingw is no longer supported ...` and ends at once with exit code 0, in about one second; `build/<board>/` stays empty. A "successful" exit code proves nothing here.
 
@@ -749,6 +919,8 @@ Format de chaque entrée : **Symptôme → Cause → Solution**, puis trois lign
 
 Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépannage](https://github.com/Axellum/M5-Tab5-ESPHome-LVGL/blob/main/docs/troubleshooting.md)) : la cause matérielle est la même, mais elle n'a pas encore été revue avec ce firmware natif.
 
+**Qui est concerné.** Sous chaque titre, une ligne en italique dit jusqu'où porte l'entrée, pour qui construit un autre écran : *tout projet ESP32 / ESP-IDF* (ESP-IDF, esptool, LVGL, la compilation sous Windows : 34 entrées), *l'ESP32-P4 seulement* (5), *cette carte seulement* (Tab5 ou Waveshare 7B : 14) ou *ce projet seulement* (son propre code, ses outils, ses services web : 31). Compte du 19/11/2026, 84 entrées. L'étiquette est une lecture de l'entrée, pas un essai sur une autre puce : une entrée marquée « tout ESP32 » a été vue sur le P4.
+
 ### Sommaire
 
 - [Ouverts](#ouverts)
@@ -768,6 +940,8 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 
 #### Après une coupure de courant, l'image n'apparaît qu'après un second geste
 
+*Concerne : cette carte seulement (Tab5).*
+
 **Symptôme.** Coupure de courant du Tab5, puis remise : le premier démarrage ne montre pas d'image ; l'image « Bonjour » et la mire s'affichent après un second geste de l'auteur (démarrage n° 9 propre, ST7121 détecté). Le premier démarrage « sans écran » **n'est pas dans le journal série** : le compteur de démarrages passe de 8 à 9.
 
 **Cause.** **Non trouvée** au 06/11/2026. Le journal ne contient qu'un démarrage après la coupure (n° 9), complet et propre : ST7121 détecté au 1er sondage, première image, rétroéclairage à 75 % à 1598 ms. Donc soit le premier démarrage n'a pas lancé ce firmware, soit il n'a pas été capturé (tablette sur batterie, sans port série). Hypothèses **non vérifiées** : l'alimentation USB du Tab5 n'allume peut-être pas la tablette sans appui sur le bouton ; le reset de l'écran par l'expandeur (qui a besoin d'une seconde, par analogie avec ESPHome) ne semble pas en cause puisque le n° 9 est propre. La cause lue du rallumage est « chien de garde » (`HP_SYS_HP_WDT_RESET`) aux **deux** remises sous tension observées : peut-être la cause normale d'un rallumage de cette carte, non vérifié, aucun plantage (`Guru`, `abort`, `Backtrace`) vu.
@@ -780,9 +954,13 @@ Une entrée « connue ailleurs » vient du firmware ESPHome du Tab5 ([son dépan
 
 #### Retour à ESPHome jamais essayé
 
+*Concerne : cette carte seulement (Tab5).*
+
 La recette de remise en état (trois écritures : début de flash, application, NVS) est dans le `LISEZMOI.md` de la sauvegarde locale de l'auteur, hors de ce dépôt. Elle n'a **jamais été jouée** : tant qu'elle ne l'est pas, le retour est « non vérifié ». **Statut** : ouvert.
 
 #### Le connecteur de batterie lit 8,2 V alors que l'exemplaire « n'a pas de batterie »
+
+*Concerne : cette carte seulement (Tab5).*
 
 **Symptôme.** Le 07/11/2026 l'INA226 lit **8206 mV et +2 mA** au connecteur de batterie, chargeur forcé à l'arrêt, de façon stable pendant tout le banc. Les notes héritées du firmware ESPHome disent « l'exemplaire d'Axel n'a pas de batterie » (1,83 à 1,94 V chargeur coupé).
 **Cause.** **Non trouvée.** Compatible avec un bloc lithium à deux éléments presque plein au repos (une batterie branchée depuis), pas avec un connecteur vide. Rien dans le logiciel ne permet de trancher.
@@ -795,6 +973,8 @@ La recette de remise en état (trois écritures : début de flash, application, 
 
 #### `export.ps1` d'ESP-IDF échoue, puis « python_env doesn't exist »
 
+*Concerne : ce projet seulement (son code, ses outils, ses services) (l'ESP-IDF installé par ESPHome sur le PC de l'auteur).*
+
 **Symptôme.** L'`export.ps1` de l'ESP-IDF installé par ESPHome s'arrête (il cherche `python_env\idf5.5_py3.13_env`) ; ensuite `idf.py set-target` répond « python_env doesn't exist ».
 
 **Cause.** Cet ESP-IDF est installé et possédé par ESPHome, avec une autre organisation de l'environnement Python (`penvs\5.5.5`) que celle attendue par les scripts d'Espressif.
@@ -805,10 +985,14 @@ La recette de remise en état (trois écritures : début de flash, application, 
 
 #### Avertissements et chemins morts sans effet
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 - « Error while generating esp_rom gdbinit » au début d'une compilation : inoffensif, la compilation réussit. *Statut : constaté sur le squelette.*
 - L'`idf-env.json` de l'ESP-IDF d'ESPHome cite encore un chemin sur un autre disque (chemin mort, fichier d'ESPHome non corrigé) : sans effet sur nos compilations jusqu'ici. *Statut : non vérifié au-delà.*
 
 #### Le PC plante pendant une compilation
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Cause.** Trop de tâches en parallèle (le PC a déjà planté à 6) ou deux compilations à la fois.
 
@@ -818,11 +1002,15 @@ La recette de remise en état (trois écritures : début de flash, application, 
 
 #### Une modification de `sdkconfig.defaults*` n'a aucun effet
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 **Cause.** Les valeurs par défaut ne sont relues que lorsque `sdkconfig` n'existe pas.
 
 **Solution.** Supprimer `sdkconfig`, relancer `.\tools\idf.ps1 set-target esp32p4`, puis vérifier la valeur dans le `sdkconfig` généré (pas dans le fichier de défauts). **Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : résolu.
 
 #### Dans un worktree git, CMake échoue : `grabRef.cmake` « file failed to open head-ref »
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** Dans un worktree créé par `git worktree add` (un par session), `idf.py set-target` ou la première compilation s'arrête dans `grabRef.cmake` (`file failed to open head-ref`), alors que le dépôt principal se compile.
 
@@ -834,11 +1022,15 @@ La recette de remise en état (trois écritures : début de flash, application, 
 
 #### La compilation s'arrête sur `-Werror=format-truncation` dans l'interface
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 **Cause.** La compilation d'ESP-IDF utilise `-Werror=all` : un `snprintf` dans un tampon que le compilateur ne peut pas prouver assez grand (ici 40 octets pour « min %s · max %s » avec deux textes de 15 octets) est une erreur, pas un avertissement.
 
 **Solution.** Un tampon dimensionné pour le pire cas du format (48 octets ici). **Vu sur** ESP-IDF 5.5.5, 06/11/2026. **Statut** : résolu.
 
 #### La compilation en `-O2` (`CONFIG_COMPILER_OPTIMIZATION_PERF=y`) s'arrête sur trois avertissements que `-Og` ne montre pas
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** En `-Og` (le défaut d'ESP-IDF) la compilation est propre ; en `-O2` elle s'arrête sur `-Werror=stringop-truncation` dans `main/meteo_zone.cpp` (`strncpy` du nom de la zone et du fuseau), sur `-Werror=format-truncation` dans `main/ui_principal.cpp` (`snprintf` du texte de la puce d'alerte officielle, titre + séparateur + fenêtre) et dans `components/bsp_tab5/tab5_rtc.cpp` (`snprintf` de la date `%04d-%02d-…`).
 
@@ -850,9 +1042,13 @@ La recette de remise en état (trois écritures : début de flash, application, 
 
 #### Un script PowerShell est refusé : suppression visant le dossier d'ESP-IDF
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenant un `Remove-Item` visant le dossier de l'ESP-IDF d'ESPHome, même dans un script écrit ailleurs. Ne pas supprimer dans les scripts ; déplacer ou ignorer. **Statut** : contourné.
 
 #### `idf.py` s'arrête sur « macro expanded to blank string » dès qu'`esp_hosted` est une dépendance
+
+*Concerne : l'ESP32-P4 seulement (esp_hosted, le lien vers la radio ESP32-C6).*
 
 **Symptôme.** Après l'ajout d'`espressif/esp_hosted` 2.12.12, la configuration (`kconfgen`) s'arrête sur le Kconfig de ce composant avec « macro expanded to blank string ».
 
@@ -864,11 +1060,15 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 
 #### `ninja` : « reglages_locaux.cmake is defined as an output multiple times »
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 **Cause.** Un `set_property(DIRECTORY … CMAKE_CONFIGURE_DEPENDS …)` sur un fichier que CMake suit déjà parce que `main/CMakeLists.txt` le lit avec `include()`.
 
 **Solution.** Retirer le `set_property` : CMake relance la configuration tout seul quand un fichier inclus change. **Vu sur** PC de l'auteur, 06/11/2026. **Statut** : résolu.
 
 #### Un script neuf n'apparaît pas dans `git status` : le garde-fou des secrets l'ignorait
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Cause.** Le motif `reglages_locaux*` du `.gitignore` (prévu pour `reglages_locaux.cmake`, généré, qui contient les identifiants Wi-Fi) correspondait aussi à `tools/reglages_locaux.ps1`. Rien ne prévient : le fichier n'apparaît simplement jamais (`git check-ignore -v <fichier>` montre le motif).
 
@@ -876,15 +1076,21 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 
 #### Le garde de traduction ne voit pas les textes ajoutés en 1b
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 `test/host/controle_i18n.py` ne lit que les constantes `kXxx = "…";` de `main/ui_bonjour.cpp` et `main/boot_info.cpp`, confrontées à la section « Écran Bonjour » de la table de traduction. Les textes nouveaux de 1b (horloge, état du réseau) vivent donc dans `main/textes_1b.h`, **hors table** et sans passer par `tr()` ; ils passeront par `tr()` avec la page de réglages. **Statut** : résolu le 11/11/2026 : les textes de `main/textes_1b.h` sont des clés de la table (section « Écran : diagnostic »), `textes_1b.h` a disparu, l'écran de diagnostic traduit chaque texte par `tr()`, et `controle_i18n.py` les lit comme constantes `kXxx` de `ui_bonjour.cpp`. Non vérifié sur carte.
 
 #### `verrous.py` échoue avec « No module named 'filelock' » après une compilation
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Cause.** `tools/idf.ps1` met le Python de l'environnement ESP-IDF en tête du `PATH` pour la suite de la session PowerShell (lu dans le script). Le script de verrous qui dit aux sessions qui compile ou flashe (il vit hors du dépôt) a besoin de `filelock`, que ce Python n'a pas. Prendre le verrou avant la compilation marche ; le rendre après, dans la même session, échoue et laisse le verrou tenu.
 
 **Solution.** Rendre le verrou depuis un autre appel PowerShell (ou avec le Python du PC, pas celui d'ESP-IDF) et vérifier avec la commande `etat` qu'il est libre. **Vu sur** PC de l'auteur, 06/11/2026, commit `793bdfc`. **Preuve** : la trace de l'appel `rendre` après `.\tools\idf.ps1 build` ; le même appel depuis un appel neuf a marché. Revu le 07/11/2026 (branche `claude/source-meteo-client-reseau-29c0af`) : un script de compilation a pris le verrou `build`, lancé `tools\idf.ps1` deux fois, et son `rendre` final a échoué de la même façon, laissant le verrou tenu alors que les deux compilations étaient passées ; vérifié dans un appel neuf que `python` est celui du PC avant `idf.ps1` et `<dossier ESP-IDF>\penvs\5.5.5\Scripts\python.exe` après, puis verrou rendu avec le Python du PC. **Statut** : contourné.
 
 #### Le wrapper partagé `clang++-san.cmd` échoue : « 'clang++' n’est pas reconnu en tant que commande interne ou externe »
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Symptôme.** Après `. <dossier des outils du PC>\env_hote.ps1 -Sanitizers`, chaque test de `python test/host/lancer.py` échoue à la compilation et la sortie dit `'clang++' n’est pas reconnu en tant que commande interne ou externe, un programme exécutable ou un fichier de commandes`, alors que `clang++.exe` est bien dans `_outils\llvm-mingw\bin`.
 
@@ -895,6 +1101,8 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 **Vu sur** le PC de l'auteur (Windows 11), branche `claude/source-meteo-client-reseau-29c0af`, 07/11/2026 ; aucune carte en jeu. **Preuve** : le wrapper partagé lancé à la main sur un programme vide affiche le message ci-dessus ; le fichier fait 265 octets, 0 CR, 3 LF, 6 octets au-dessus de 127 ; avec la copie locale, `python test/host/lancer.py` affiche « complet (compilé + exécuté) ».
 
 #### `idf.py set-target` échoue au téléchargement des composants : « No such file or directory » sur un chemin très long
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** Dans un nouveau worktree git, `.\tools\idf.ps1 set-target esp32p4` s'arrête pendant le téléchargement des composants sur une `FileNotFoundError: [Errno 2] No such file or directory: '…\.cache\composants\service_…\espressif__esp_hosted_2.12.12_…\examples\host_network_split__power_save\…\host_wakeup_demo_using_udp_packet.c'` de Python. Un `build/` à moitié écrit reste, et le `set-target` suivant s'arrête sur « doesn't seem to be a CMake build directory ».
 
@@ -907,6 +1115,8 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 
 #### Un `set-target` en échec suivi d'un `build` compile sans rien dire la carte par défaut (Tab5)
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 **Symptôme.** Après un `set-target` arrêté (un `build/` à moitié écrit : « doesn't seem to be a CMake build directory »), un `.\tools\idf.ps1 build` lancé juste après se termine quand même avec le code 0, mais le binaire est celui du **Tab5**, quelle que soit la carte visée par le `set-target`. Un script qui enchaîne `set-target -DBOARD=waveshare-7b` puis `build` étiquette « 7B » un binaire Tab5. Le signe : deux cartes, des binaires de la même taille à l'octet (3 011 952 octets) et les mêmes chiffres de mémoire.
 
 **Cause.** `set-target` lance d'abord `fullclean`, qui refuse de supprimer un dossier qui n'est pas un dossier de compilation CMake : `set-target` s'arrête avec le code 2 et `-DBOARD=…` n'est jamais donné à CMake. `build` configure alors de zéro sans lui, et `CMakeLists.txt` donne à `BOARD` la valeur par défaut `tab5`.
@@ -916,6 +1126,8 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 **Vu sur** le PC de compilation (Windows 11, ESP-IDF 5.5.5), worktree `claude/mode-auto-accueil-1bf706`, 08/11/2026 ; aucune carte en jeu. **Preuve** : le journal du build « 7B » montre `set-target code 2` puis une ligne CMake sans `-DBOARD` ; son ELF contient `bsp_tab5` et pas `bsp_waveshare_7b`, et les deux binaires pesaient 3 011 952 octets. Le passage suivant, avec `build/` valide, a donné `set-target` code 0, `BOARD:STRING=waveshare-7b` dans le cache, un ELF avec `bsp_waveshare_7b` et sans `bsp_tab5`, et un binaire de 2 992 528 octets. **Statut** : contourné (cause lue dans le journal et dans `CMakeLists.txt`) ; `tools/idf.ps1` n'est pas modifié.
 
 #### Changer de carte : réglages périmés, ou verrou de dépendances réécrit
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** Après avoir changé `BOARD`, la compilation garde la taille de flash, la table de partitions ou le mode PSRAM de la carte précédente ; ou la compilation d'une carte télécharge les pilotes de l'autre et réécrit `dependencies.lock`.
 
@@ -931,6 +1143,8 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 
 #### ESP-IDF refuse de démarrer sur la puce du Tab5
 
+*Concerne : l'ESP32-P4 seulement (les premières révisions de puce, comme la v1.3).*
+
 **Cause.** La puce du Tab5 est un ESP32-P4 **révision 1.3** ; ESP-IDF 5.5.5 exige par défaut une révision ≥ 3.1.
 
 **Solution.** Dans `boards/tab5/sdkconfig.defaults.board` : `CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y` et `CONFIG_ESP32P4_REV_MIN_100=y` (vérifié dans le `sdkconfig` généré : `CONFIG_ESP32P4_REV_MIN_FULL=100`). Les réglages de puce sont propres à chaque carte : la 7B (révision 3.x) a les siens.
@@ -938,6 +1152,8 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 **Vu sur** Tab5 ST7121, 06/11/2026 (relevé par la piste matériel). **Statut** : résolu.
 
 #### Quelle vitesse de ligne DSI pour le ST7121 ? Quatre sources se contredisent
+
+*Concerne : cette carte seulement (Tab5).*
 
 | Source | Valeur |
 |---|---|
@@ -950,15 +1166,21 @@ Le garde-fou de l'outil de session IA de l'auteur refuse toute commande contenan
 
 #### Le composant `esp_lcd_st7123` 1.0.2 ne convient pas au Tab5 tel quel
 
+*Concerne : cette carte seulement (Tab5).*
+
 Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initialisation du Tab5 ST7123 est dans l'esp-bsp (`disp_init_data_1.h`), à porter quand l'exemplaire sera revenu du SAV. Le ST7123 et l'ILI9881C sont **détectés** (journal + `ESP_ERR_NOT_SUPPORTED`), pas initialisés. **Statut** : connu, non traité.
 
 #### Les accents s'affichent en carrés ou manquent
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Cause.** Les polices intégrées de LVGL s'arrêtent à l'ASCII.
 
 **Solution.** Police TinyTTF embarquée (Roboto Bold, licence OFL, `main/assets/`). Toute icône ou glyphe affiché doit exister dans la police chargée : une icône MDI n'est jamais un rectangle vide. **Statut** : résolu (accents) ; icônes : à vérifier quand elles arrivent.
 
 #### Le point tactile est décalé vers la gauche
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** Premier essai sur le Tab5 : le point suit le doigt mais décalé vers la gauche ; un glissement pouvait faire défiler l'écran.
 
@@ -970,6 +1192,8 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 
 #### Paysage : l'anneau tactile est « totalement décalé par rapport au doigt »
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 **Symptôme.** Premier essai du paysage sur le Tab5 : l'image est droite (« Oui, c'est droit »), mais l'anneau vert n'apparaît pas sous le doigt (« pas au bon endroit, totalement décalé »).
 
 **Cause.** Le point tactile était tourné **deux fois** : une fois par `esp_lcd_touch` (miroir Y + échange X/Y demandés dans `tab5_touch.c`), une fois par LVGL lui-même (`lv_indev.c`, `indev_pointer_proc` → `lv_display_rotate_point`, qui pour une rotation de 90° donne `x = ver_res − Y − 1`, `y = X`). Le commentaire d'origine affirmait à tort que LVGL ne tourne pas le tactile. Un doigt en `(x, y)` logique donnait un anneau en `(1279 − y, x)`, hors écran dès que `x > 719`.
@@ -979,9 +1203,13 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 **Vu sur** Tab5 ST7121, symptôme sur le binaire du commit `102077b`, correctif vérifié sur `3b68f42` (version d'essai avec l'autotest du tactile) et `9f82623`, 06/11/2026. **Preuve** : l'autotest injecte six appuis en coordonnées brutes de la dalle (quatre coins, centre, bouton Réglages) et le journal affiche six fois « AUTOTEST appui n/6 … OK » ; 27 appuis réels sont journalisés et la formule `x = 1279 − Y`, `y = X` se vérifie sur chaque ligne ; Axel : « les doigts étaient bons ». **Statut** : résolu (détail dans [mesures/orientation.md](mesures/orientation.md) § 5).
 
 #### Chaque appui sur l'écran redémarrait la carte
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 **Symptôme.** Avec le binaire du commit `557eb44`, « dès que je touche l'écran il redémarre » (Axel, ~22:29). **Cause.** Le rappel du journal par appui appelait `lv_event_get_indev(e)`, or pour les événements d'un périphérique d'entrée LVGL passe le **périphérique comme cible** et l'objet touché comme paramètre (`lv_indev_send_event`) : le rappel lisait un objet comme si c'était un périphérique. Il avait été compilé mais jamais exécuté avant de demander à Axel d'appuyer. **Solution.** `lv_event_get_target(e)` (commit `c1fa7f6`), puis une version d'essai injecte six appuis simulés au démarrage pour que le code d'événement tourne sur la carte **avant** qu'on demande à quelqu'un de toucher. **Vu sur** Tab5 ST7121, `557eb44` puis `c1fa7f6`, 06/11/2026. **Preuve** : autotest 6/6 OK sans redémarrage, puis 27 appuis réels sans redémarrage. **Statut** : résolu.
 
 #### Aucun journal par l'USB, ou une erreur de compilation sur un `|` entre deux drapeaux LVGL
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 - **Pas de journal** : il faut `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y` (la console UART par défaut n'est pas câblée à l'USB du Tab5). Posé dans `boards/tab5/sdkconfig.defaults.board`.
 - **`A | B` sur deux drapeaux LVGL** : en C++ le résultat est un `int` que LVGL refuse ; un appel par drapeau. De même, les macros de configuration d'Espressif (initialiseurs désignés dans un ordre que C++ refuse) : la couche carte (`components/bsp_tab5/`) est donc écrite en **C**, l'application en C++.
@@ -990,9 +1218,13 @@ Ses macros décrivent une dalle 720 × 1560, pas celle du Tab5. La table d'initi
 
 #### Journal `swap_xy is not supported by this panel` au démarrage
 
+*Concerne : tout projet ESP32 / ESP-IDF (esp_lvgl_port ; vu avec une dalle MIPI-DSI).*
+
 Émis par `esp_lvgl_port` à l'initialisation ; sans effet constaté sur l'image (orientation portrait native fixe, aucune rotation logicielle). Cause non explorée. **Vu sur** Tab5 ST7121, commit `e7a4803`, 06/11/2026. **Statut** : connu, sans effet constaté.
 
 #### Marge faible du bootloader et test de la PSRAM
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement, à surveiller si on ajoute des options. Le démarrage prend environ 2,9 s de la remise à zéro à la première image, dont ~0,95 s de test de la PSRAM (`CONFIG_SPIRAM_MEMTEST=y`) et 1 s d'attente de l'expandeur : deux gains possibles, **à mesurer avant de sacrifier quoi que ce soit**, un changement à la fois. Sur la compilation de la 7B (commit `c48c418`, 07/11/2026, PC) : bootloader de 0x5d10 octets, **0x2f0 octets (3 %) de marge**, encore plus serré. **Vu sur** Tab5 ST7121, 06/11/2026. **Statut** : connu, pas traité.
 
@@ -1000,26 +1232,38 @@ Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement,
 
 #### Écran noir après un redémarrage logiciel
 
+*Concerne : cette carte seulement (Tab5) ; la règle de `esp_rom_software_reset_system()` vaut pour tout ESP32-P4.*
+
 *Connu ailleurs ; ici, un seul redémarrage logiciel essayé et réussi (n° 2 du 06/11/2026, `SW_SYS_RESET`, image revenue, Tab5 ST7121), pas de série de 20.* Sur le firmware ESPHome, la broche de reset de l'écran passe par l'expandeur PI4IOE5V6408, qui a besoin d'environ une seconde pour être fiable : reset trop tôt = écran noir. Le firmware natif reprend l'attente de 1 s avant le reset (propre à la carte : la 7B n'en a pas, son reset est une broche du P4). Sur P4, `esp_restart()` ne remet à zéro que les cœurs : terminer par `esp_rom_software_reset_system()`. À vérifier au jalon 1b par 20 redémarrages.
 
 
 #### Waveshare 7B : le rétroéclairage ne devient jamais tout à fait noir
 
+*Concerne : cette carte seulement (Waveshare 7B).*
+
 *Connu ailleurs (le firmware ESPHome de l'auteur sur cette carte, 16–17/10/2026) ; le correctif natif est écrit et **non vérifié sur la carte**.* Le rétroéclairage est analogique (BL_CTRL → filtre RC → AP3032) : à 0 % la dalle reste faiblement éclairée, et la commande « display off » (0x28) seule ne changeait rien de visible. Ce qui a marché sous ESPHome : voile noir, puis 0x28, puis « sleep in » 0x10, et l'inverse au réveil (0x11, 120 ms, 0x29). La couche carte fait pareil dans `board_set_backlight_percent(0)` (`ws7b_panel_plan()`, testé sur le PC). **Vu sur** Waveshare 7B sous ESPHome, 17/10/2026 (observation de l'auteur) ; firmware natif : PC seulement, commit `52f6372`. **Statut** : contourné sous ESPHome ; la version native n'est pas testée sur carte.
 
 #### Waveshare 7B : le C6 ne répond pas à la requête de version
+
+*Concerne : cette carte seulement (Waveshare 7B) ; le firmware d'usine de son ESP32-C6.*
 
 *Connu ailleurs (mesures de l'auteur, 16–19/10/2026).* Le micrologiciel d'origine de l'ESP32-C6 ne répond pas à la requête « version » d'esp_hosted, ce qui peut ressembler à une panne du lien. La couche carte ne la pose pas (`WS7B_READ_C6_VERSION=0`) et ne met jamais le C6 à jour (décision de l'auteur, 16/10/2026). **Vu sur** Waveshare 7B sous ESPHome. **Statut** : contourné ; pas encore vu avec ce firmware.
 
 #### Waveshare 7B : le haut-parleur sature au-dessus de 0 dB
 
+*Concerne : cette carte seulement (Waveshare 7B).*
+
 *Connu ailleurs (essai de l'auteur à l'oreille, 17–18/10/2026, ESPHome).* Registre de volume 0x32 de l'ES8311 : 0xBF = 0 dB (75 % de l'échelle du registre), au-dessus le haut-parleur sature (+32 dB à 0xFF) ; sous 40 % de l'échelle (0x66) « on n'entend rien ». La couche plafonne à 0xBF et fixe le plancher d'un volume non nul à 0x66 ; la courbe est testée sur le PC. **Statut** : contourné ; non testé sur carte.
 
 #### Waveshare 7B : câblage du reset tactile, deux sources se contredisent
 
+*Concerne : cette carte seulement (Waveshare 7B).*
+
 **Symptôme.** Aucun vu pour l'instant. **Cause.** Le schéma et le firmware ESPHome (`reset_pin: GPIO23`) mettent le reset du GT911 sur GPIO23 ; le BSP de Waveshare le déclare non relié / partagé avec le reset de l'écran. La couche envoie l'impulsion sur GPIO23 et ne donne aucune broche de reset au pilote. **Solution.** Aucune appliquée. Au premier essai, vérifier au journal que l'identifiant produit « 911 » est lu en 0x5D (ou 0x14) après l'impulsion ; sinon essayer sans l'impulsion (reset de l'écran seul). **Vu sur** aucune carte. **Statut** : **ouvert**, non vérifié.
 
 #### Waveshare 7B : un bref flash blanc au repos, plusieurs fois par heure
+
+*Concerne : cette carte seulement (Waveshare 7B) ; cause non prouvée ; le correctif suit le conseil d'Espressif pour les dalles DSI du P4.*
 
 **Symptôme.** Sans rien toucher, la dalle devient blanche un instant, plusieurs fois par heure ; jamais vu avec le firmware ESPHome sur la même carte. **Cause.** Non prouvée. Exclu par mesure (journal et une sonde de diagnostic qui journalise chaque passage de rendu de LVGL et lit `INT_ST0`/`INT_ST1` de l'hôte DSI toutes les millisecondes) : un redémarrage, un underrun du pont DSI, une erreur de l'hôte DSI, un repeint plein écran au repos, une requête HTTPS. La seule différence trouvée avec ESPHome est la mémoire : ESPHome exécute le code depuis la PSRAM avec un cache L2 de 256 Ko, ce firmware l'exécutait depuis la flash avec 128 Ko. **Solution.** `CONFIG_SPIRAM_XIP_FROM_PSRAM=y` et `CONFIG_CACHE_L2_CACHE_256KB=y` dans `boards/waveshare-7b/sdkconfig.defaults.board` ([ADR-0028](decisions/0028-7b-code-en-psram-et-cache-l2-256-ko.md)) ; coût : environ 142 Ko de RAM interne libre. **Vu sur** Waveshare 7B (EK79007), binaire d'essai `b9aa06e` + les deux réglages + la sonde, 13/11/2026 : aucun flash vu par l'auteur pendant les 30 premières minutes. **Statut** : contourné ; à confirmer sur une observation plus longue ; laquelle des deux options compte n'est pas connu.
 
@@ -1028,6 +1272,8 @@ Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement,
 ### Flash, port série et sauvegarde
 
 #### Écran noir après `write-flash --after no-reset` : l'application ne démarre pas
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** `esptool write-flash … --after no-reset` réussit (« Hash of data verified ») ; un script de capture qui « remet à zéro » ensuite la carte par une impulsion RTS ne lit rien pendant 35 s, et l'écran reste noir.
 
@@ -1039,11 +1285,15 @@ Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement,
 
 #### `read-flash` échoue : « Packet content transfer stopped »
 
+*Concerne : l'ESP32-P4 seulement (le stub d'esptool sur le P4 ; lire aux adresses de la table de partitions vaut pour tout ESP32).*
+
 **Cause.** Lecture de toute la flash avec le stub d'esptool sur une zone qui ne répond pas ; ici aussi, une erreur d'offset (la NVS n'est pas au début de la flash).
 
 **Solution.** Lire les partitions utiles aux offsets lus dans la **table de partitions de la carte** (ici la NVS d'ESPHome est en `0xf90000`), deux fois, comparer les SHA-256 ; repli `--no-stub` si le stub échoue ; `verify-flash` (somme MD5 calculée par la puce) pour prouver qu'un fichier rangé est identique à la flash. **Vu sur** Tab5 ST7121, esptool 5.3.1, 06/11/2026. **Statut** : résolu (sauvegarde partielle faite, voulue par l'auteur : le code est dans git, pas la NVS).
 
 #### Le port COM n'est pas celui qu'on croit
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Cause.** Le numéro change avec la prise USB ; le 06/11/2026 le Tab5 était sur COM11, et COM14 était un **ESP32-S3 d'un autre projet**.
 
@@ -1051,9 +1301,13 @@ Le bootloader occupe 0x5a30 octets dans ses 24 Kio : **6 % de marge** seulement,
 
 #### Ouvrir le port série redémarre la carte
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constaté le 06/11 : le redémarrage USB a ramené le volume du firmware ESPHome de 85 à 100 (le firmware ESPHome ne le conserve apparemment pas ; non corrigé). Ouvrir le port avec `dtr=False, rts=False` avant `open()` quand on veut écouter sans réinitialiser.
 
 #### Capture série sous Windows : rien ne s'affiche, ou le compteur de démarrages monte seul
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 - Une impulsion RTS n'est transmise que si DTR est aussi mis à jour (esptool le fait) ; une lecture lancée sans délai après l'ouverture bloque.
 - `esptool flash-id` et `read-mac` **remettent la puce à zéro à chaque appel** : le compteur de démarrages du journal monte (le n° 3 du 06/11 est probablement celui-là). Ne pas les lancer pendant un essai de redémarrage.
@@ -1064,9 +1318,13 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Waveshare 7B : sauvegarder la flash de 32 Mo
 
+*Concerne : l'ESP32-P4 seulement (vu sur la flash de 32 Mo de la 7B).*
+
 *Connu ailleurs (les sauvegardes de l'auteur sur cette carte le 20/10/2026, esptool 5.3.1).* Sur l'ESP32-P4, `read-flash` avec le stub échoue à des secteurs fixes : lire par morceaux de 2 Mo (environ 21 s chacun), couper en 8 en cas d'échec, secteurs de 4 Ko en `--no-stub` en dernier recours, `--before default-reset` après un stub coupé, et prouver la copie par `verify-flash` (MD5 calculé dans la puce). La flash réelle fait **32 Mo** (le premier plan en supposait 16). L'otadata (0x9000 et 0xa000) se décode avant de choisir ce qu'on garde : numéro de séquence, CRC `crc32_le(0xFFFFFFFF, seq)`, emplacement `(seq − 1) % 2`. `tools/essai_7b.py` fait tout cela ; son décodeur a été confronté à l'otadata réelle de la sauvegarde du 20/10/2026 (séquences 5 et 4, CRC valides toutes les deux, emplacement 0 choisi). La partie du script qui parle à la carte **n'a pas été exécutée**. **Statut** : contourné ; script écrit, partie carte non exécutée.
 
 #### `essai_7b.py flasher` refuse d'écrire : « partition ota_1 du build … depasse la fin de l'emplacement sauvegarde »
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Symptôme.** Avec une sauvegarde à portée limitée (`sauvegarde --reference`), `essai_7b.py flasher` (donc `essai`) s'arrête sur `[REFUS] partition ota_1 du build (0x410000-0x810000) depasse la fin de l'emplacement sauvegarde (0x410000) : aucune ecriture` ; rien n'est écrit.
 
@@ -1080,6 +1338,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Toucher « Wi-Fi » dans les réglages redémarre la carte : `sem create failed`, puis `assert … port_esp_hosted_host_os.c:589`
 
+*Concerne : l'ESP32-P4 seulement (esp_hosted, le lien vers la radio ESP32-C6).*
+
 **Symptôme.** Réglages ouverts, appui sur « Wi-Fi » (recherche de réseaux) : la carte redémarre. Journal : `sem create failed`, `assert failed: hosted_destroy_semaphore port_esp_hosted_host_os.c:589`, redémarrage. Deux fois le 07/11/2026. Dans le même état, la recherche de ville n'arrivait pas à ouvrir sa connexion (`Failed to allocate memory`).
 
 **Cause.** Réglages ouverts, il ne restait que **9,7 Ko** de mémoire interne libres (plus gros bloc 4,6 Ko). La liaison Wi-Fi avec l'ESP32-C6 (`esp_hosted`) et le TLS ne vivent **qu'en** mémoire interne. LVGL utilisait le `malloc` du système, et tout bloc de moins de 256 octets (`CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256`) va en mémoire interne ; un objet, un style ou une étiquette LVGL pèse 100 à 250 octets : l'écran principal seul en prenait 52 Ko, chaque écran de réglages une quarantaine.
@@ -1089,6 +1349,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 **Vu sur** Tab5 ST7121, build intégré `953328d`, 07/11/2026. **Preuve** : avant, mémoire interne libre 74 Ko à la réception de l'heure et 9,7 Ko réglages ouverts (minimum 5,5 Ko) ; après, 211 Ko et 210 Ko (minimum depuis le démarrage 148 500 o), réglages parcourus et recherche lancée à la main par l'auteur, aucun redémarrage. La vitesse de dessin n'a pas été comparée à l'ancien allocateur. **Statut** : résolu sur cet essai ; à surveiller sur une durée plus longue.
 
 #### La requête météo échoue : `esp-aes: Failed to allocate memory…` ou `PK verify failed with error 0x4290`
+
+*Concerne : tout projet ESP32 / ESP-IDF (avec PSRAM ; les chiffres sont ceux du P4).*
 
 **Symptôme.** `esp-aes: Failed to allocate memory for the array of DMA descriptors` (ou `… for start alignment buffer`) environ 80 ms après le début d'une requête HTTPS, ou, aux essais suivants, `esp-x509-crt-bundle: PK verify failed with error 0x4290` après 14 s, puis `esp-tls: Failed to open new connection`. La météo reste « indisponible » ; la RAM interne libre passe sous 20 Ko (700 o au plus bas).
 
@@ -1100,6 +1362,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Le chien de garde des tâches se déclenche : `IDLE0 (CPU 0)` … `CPU 0: meteo`
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 **Symptôme.** `task_wdt: Task watchdog got triggered … IDLE0 (CPU 0) … CPU 0: meteo`, toutes les 5 s pendant une prise de contact TLS.
 
 **Cause.** Une prise de contact calcule des secondes sans jamais s'endormir. La tâche météo était à la priorité 3, au-dessus de la tâche d'inactivité (0) : sur le cœur qu'elle occupe, la tâche d'inactivité n'obtient plus le processeur et cesse de nourrir le chien de garde (`CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y`, délai de 5 s).
@@ -1109,6 +1373,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 **Vu sur** Tab5 ST7121, `2a05811`, 07/11/2026. **Preuve** : les commandes série provisoires `tourner3` et `tourner0` (une tâche épinglée sur le cœur 0 calcule 8 s) : le chien de garde se déclenche 5,0 s après le début à la priorité 3 et ne se déclenche pas à la priorité 0. **Statut** : résolu. Depuis le 11/11/2026 ces deux commandes ne sont que dans un binaire de mesure (`.\tools\idf.ps1 -DMERIDIEN_BANC_ESSAI=ON build`), jamais dans le firmware normal.
 
 #### La PSRAM libre baisse d'environ 200 o par minute pendant que l'écran principal tourne
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** Waveshare 7B, 2 h après un redémarrage, un relevé `memoire` toutes les 5 min : la PSRAM libre baisse de 213 o/min après les 5 premières minutes (32 050 916 → 31 832 472 o), la RAM interne reste plate ([mesures/7b-memoire-interne.md](mesures/7b-memoire-interne.md) § 5). Sur le Tab5 (`59b5fab`, 30 min) : −152 o à chaque changement de minute de l'horloge, plus des marches de −10 à −11 Ko toutes les 2 minutes environ pendant les 10 premières minutes. Avant `ce3ab9f`, le même −152 o/min se voyait en RAM interne.
 
@@ -1124,6 +1390,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Une petite réponse de Vigie n'est pas en gzip : le décodeur la refuse
 
+*Concerne : ce projet seulement (son code, ses outils, ses services) (et tout client de Vigie).*
+
 **Symptôme.** Avec `Accept-Encoding: gzip` envoyé, la réponse de Hambourg (426 octets, aucune alerte) n'a pas de `Content-Encoding` et commence par `{`, pas par les octets gzip `1f 8b` : un client qui décompresse toujours la rejette comme « en-tête invalide ».
 
 **Cause.** L'instance publique ne compresse que les corps d'environ 500 octets ou plus (les 9 autres réponses réelles sont en gzip, chunked, de 365 à 1 976 octets sur le fil).
@@ -1133,6 +1401,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 **Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Preuve** : `test/host/donnees/vigie_hambourg.json` (426 octets, lu par les tests du noyau) et `vigie_captures.json` (`content_encoding: null`). **Statut** : géré sur le PC ; la carte n'a pas encore reçu de réponse.
 
 #### Sans filtre `lang`, un avertissement pèse 26 Ko
+
+*Concerne : ce projet seulement (son code, ses outils, ses services) (et tout client de Vigie).*
 
 **Symptôme.** La Palma sans filtre : 26 190 octets de JSON pour 9 avertissements ; Eberswalde : 7 623 octets pour un seul.
 
@@ -1144,6 +1414,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### L'écran se tait une seconde au changement d'heure
 
+*Concerne : ce projet seulement (son code, ses outils, ses services) (et tout client de Vigie).*
+
 **Symptôme.** Quand deux alertes se suivent, la première finissant à `hh:59:59` (AEMET) et la seconde commençant à `hh:00:00` (DWD) ou l'inverse, rien n'est « en vigueur » pendant une seconde : la pastille peut disparaître puis revenir.
 
 **Cause.** La fin d'une alerte est exclue et les émetteurs ne s'accordent pas sur la dernière seconde.
@@ -1153,6 +1425,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 **Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026, réponses réelles de l'instance publique de Vigie captées le 07/11/2026 de 08:52 à 08:53 UTC. **Non vu sur une carte.** **Statut** : corrigé dans le noyau (tests sur le PC seulement), jamais vu sur une carte, ni avant ni après.
 
 #### Un texte d'émetteur disparaît de l'écran
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Symptôme.** Un avertissement est montré avec les mots de Vigie (« niveau orange, pluie ») au lieu du titre de l'émetteur, ou une description manque.
 
@@ -1164,6 +1438,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Une heure d'alerte est coupée en deux lignes (« 00: » puis « 59 »)
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 **Symptôme.** Sur la page des alertes, la fin d'une alerte écrite « dimanche 8 novembre · 00:59 » passait à la ligne après les deux-points : « 00: » sur une ligne, « 59 » sur la suivante (rendu PC, 720×1280, La Palma, français).
 
 **Cause.** Le moteur de texte de l'écran (LVGL) traite les deux-points comme un endroit où une ligne peut se couper, comme une espace : une heure en bout de ligne longue peut donc être coupée au milieu du nombre.
@@ -1173,6 +1449,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 **Vu sur** PC seulement (tests du noyau avec AddressSanitizer + UBSan, rendu PC), branche `claude/alertes-vigie-9b13fe`, 07/11/2026. **Non vu sur une carte.** **Statut** : corrigé sur le rendu PC ; à vérifier à l'œil sur la dalle.
 
 #### Crochets et outils : pièges rencontrés en écrivant les alertes
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 - **`robocopy … /E` est refusé** par la garde du disque `E:` (faux positif sur l'option `/E`) : utiliser `Copy-Item -Recurse`.
 - **Une mutation qui ne compile plus n'est pas une détection.** `-Werror,-Wunused-but-set-variable` a transformé `if (false)` en erreur de compilation comptée « détectée par autre chose » : la liste des mutations doit en montrer 0, la mutation a donc été réécrite (`if (n == 0 && b.autres > 100)`).
@@ -1186,6 +1464,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Un mauvais mot de passe Wi-Fi n'est presque jamais reconnu comme tel : la radio dit 2 et 205
 
+*Concerne : tout projet ESP32 / ESP-IDF (vu à travers l'ESP32-C6 et esp_hosted).*
+
 **Symptôme.** Essai d'un nouveau réseau avec un mot de passe faux : les événements de déconnexion portent la raison **2** (`AUTH_EXPIRE`, « authentification expirée ») et **205** (`CONNECTION_FAIL`, « connexion échouée »), chacune répétée, et la raison **202** (`AUTH_FAIL`, celle qui veut dire « mot de passe refusé ») n'est venue que dans **1 essai sur 9** (à 28,9 s du début) ; les 8 autres fois, rien d'autre que 2 et 205 jusqu'au délai de 30 s. Une règle « la même cause sûre deux fois » ne se déclenche jamais, et le résultat rendu à l'écran est « autre ».
 
 **Cause.** `reseau.cpp` réessaie la connexion 2 s après chaque coupure (`kDelaiReessaiWifiUs`) et chaque tentative se termine par un code de raison choisi par la radio ; sur ce point d'accès l'échec d'authentification n'arrive qu'après plusieurs tentatives. Quels codes apparaissent pour quelle faute dépend du point d'accès : **non vérifié sur un autre**.
@@ -1196,6 +1476,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Sans réseau connu, le Wi-Fi réessaie une connexion toutes les 2 s après une recherche
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Symptôme.** Appareil neuf (rien en NVS, rien de compilé) : après la première recherche de réseaux, le journal montre sans fin `Wi-Fi coupé (raison 201 …) ; nouvelle tentative dans 2 s` (11 fois en 45 s), la radio est occupée et la recherche suivante peut échouer.
 
 **Cause.** `terminer_recherche()` relançait les tentatives de connexion dès que le Wi-Fi n'était pas connecté, alors qu'aucun réseau en service n'était à retrouver (configuration vide → « aucun point d'accès », raison 201).
@@ -1205,6 +1487,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 **Vu sur** Tab5 ST7121, binaire local qui ignore le réseau de la compilation (non commité), 07/11/2026. **Preuve** : avant, 11 coupures en 45 s après la recherche ; après, aucune entre la recherche et l'essai suivant, un essai raté signalé à +30,01 s sans réessai ensuite, un bon réseau adopté en 6,1 s. Le chemin normal (avec un réseau connu) a été rejoué sur le binaire final `a244af0`. **Statut** : résolu.
 
 #### Après un retour du Wi-Fi, l'heure peut arriver tard ou n'être jamais redemandée
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Symptôme.** L'heure arrive parfois tard ou irrégulièrement (signalé depuis le 06/11/2026, cause jamais trouvée sur la carte). Au démarrage, la demande directe `sntp_rapide` règle l'horloge moins de 0,3 s après l'adresse IP (20 démarrages sur 20 avec `2a05811`, [mesures/1b.md](mesures/1b.md)) ; hors de ce cas, rien n'a été mesuré.
 
@@ -1218,6 +1502,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### La lecture des microphones seuls sur le port I2S expire
 
+*Concerne : cette carte seulement (Tab5).*
+
 **Symptôme.** Avec seulement le canal de réception du port I2S partagé activé, chaque lecture finissait en `ESP_ERR_TIMEOUT` (premier passage du banc, 07/11/2026) : ni niveau de microphone, ni enregistrement.
 **Cause.** **Non élucidée.** Le même port lisait correctement dès que le canal d'émission était aussi activé. Hypothèse, **non vérifiée** : les horloges partagées du port ne tournent pas pour un canal de réception seul dans cette configuration.
 **Solution.** `tab5_i2s_enable()` active le canal d'émission dès que celui de réception l'est ; il envoie alors du silence (le DAC est en sourdine, l'amplificateur éteint). Aucun effet audible. Ne pas « simplifier » cela sans rejouer le banc.
@@ -1225,12 +1511,16 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Expandeur : « can't set level in input mode »
 
+*Concerne : cette carte seulement (Tab5) ; et toute carte avec un expandeur PI4IOE5V6408.*
+
 **Symptôme.** Piloter `CHG_EN` ou `nCHG_QC_EN` (expandeur 0x44) échouait avec `can't set level in input mode` après que la broche avait été lue.
 **Cause.** Après une remise à zéro toutes les broches du PI4IOE5V6408 sont des entrées, et lire une broche en entrée laisse sa direction mémorisée sur « entrée » ; le pilote `esp_io_expander` refuse alors d'écrire un niveau.
 **Solution.** Dans cet ordre : direction (sortie), niveau, mode push-pull (`tab5_expander_output()`). La broche prend un instant la valeur du registre de sortie (0 après une remise à zéro) : sans effet pour `SPEAKER_EN` et `CHG_EN` ; `nCHG_QC_EN` n'est pas piloté quand elle est déjà haute.
 **Vu sur** Tab5 ST7121, 07/11/2026 ; correctif dans `993500f`. **Preuve** : message du pilote au premier passage du banc, puis lignes `tab5_alim` sans erreur à chaque démarrage. **Statut** : résolu.
 
 #### Une broche pilotée en sortie se lit à 0 dans le registre d'état de l'expandeur
+
+*Concerne : cette carte seulement (Tab5) ; et toute carte avec un expandeur PI4IOE5V6408.*
 
 **Symptôme.** `SPEAKER_EN` était relu à 0 alors que le haut-parleur jouait (le contrôle `audio.ampli_allume` du banc échouait trois fois, une par ligne du DAC, aux passages précédant `5f797e3`).
 **Cause.** Le registre d'état (0x0F) ne montre pas une broche pilotée en sortie (vu sur la carte ; **non vérifié sur la fiche de la puce**). Les registres disaient vrai : pendant le son, l'expandeur 0x43 lisait direction 0x6F, sortie 0x22, haute impédance 0xDD, donc le bit 1 est en sortie, haut, hors haute impédance.
@@ -1243,6 +1533,8 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Aucun compilateur hôte sur le PC : les tests du noyau ne s'exécutent pas
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Cause.** Pas de `gcc`, `clang` ni `cl` installé (ni Visual Studio) sur le PC de l'auteur.
 
 **Solution provisoire (jusqu'au 06/11/2026).** Les tests sont des fonctions `constexpr` évaluées **à la compilation** (`static_assert`) par le g++ croisé RISC-V d'ESP-IDF en `-fsyntax-only`.
@@ -1253,17 +1545,25 @@ Ouvrir ou fermer le port USB peut réinitialiser la puce. Effet de bord constat�
 
 #### Un 404 sur l'essai d'un service LLM : erreur ou pas ?
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 Un 404/405 sur `GET /models` n'est **pas** une erreur (service local valide : tous n'exposent pas cette route). Seul un 404 sur la route de l'essai réel donne la phrase « il manque peut-être /v1 » (contrat, [api-reglages.md](api-reglages.md)). **Statut** : résolu dans le contrat.
 
 #### Le faux service recopie la clé reçue dans son erreur
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **prouver** que l'appareil ne retransmet jamais le texte d'un service tiers. Contrôle du contrôle : un essai de mutation fait échouer deux vérifications.
 
 #### Le parcours web demande le réseau
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 `python web/tests/parcours.py` appelle vraiment Open-Meteo (recherche de lieu, météo) : sans Internet il échoue. Rejoué le 06/11/2026 par la session de coordination : 49/49 vérifications, code de sortie 0. La feuille de style utilise `:has()` : sur un téléphone ancien, seul le contour rouge d'un champ invalide manquerait (Safari iOS et Firefox : non vérifié).
 
 #### Écrans LVGL 9.5 : trois pièges trouvés en construisant les écrans de réglages
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme → cause → solution.**
 - Un bouton désactivé (le « Continuer » de l'étape 1 tant qu'aucune langue n'est touchée) montrait le **gris du thème** au lieu de l'aspect désactivé de la palette → le thème par défaut dessine `LV_STATE_DISABLED` par-dessus le style de l'objet → l'aspect désactivé est dessiné à la main (`bouton_activer(false)`, `main/ui_commun.cpp` : couleurs propres, drapeau cliquable retiré).
@@ -1273,6 +1573,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 **Vu sur** banc de rendu PC (LVGL 9.5.0 logiciel, `tools/rendre.ps1`), branche `claude/reglages-ecran-aea4e2`, 06/11/2026. **Preuve** : planches rendues (bouton désactivé) et parcours de `tools/rendu/scenes/scene_parcours.cpp` (un « Continuer » désactivé ne fait rien ; le clavier et les champs survivent à un changement d'écran). **Statut** : résolu sur le PC ; non vu sur une carte.
 
 #### Zones tactiles LVGL 9.5 : zone du curseur, parents, indicateur de défilement
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme → cause → solution.**
 - Des zones tactiles sous le minimum de 72 px (Retour 60, « Nouveau code » et « Tester » 60, pastilles de préréglage 64, « Quitter l'installation » 56) et un curseur de luminosité qu'on ne saisissait que sur une barre de 22 px → les boutons avaient leur hauteur écrasée après `creer_bouton()` ; pour le curseur, LVGL 9.5 n'accepte le toucher que sur la barre élargie de `LV_DPX(8)` (`lv_slider.c:250` pose l'élargissement, `lv_obj_pos.c:1195-1205` le lit), et le test « rond seul » de `lv_slider.c:269-277` ne tourne que si `LV_OBJ_FLAG_ADV_HITTEST` est posé, ce que le curseur ne fait pas (seul `lv_image.c:694` le pose) → les écrasements sont retirés, `creer_bouton` pose un `min_height` qu'aucun appelant ne peut passer sous, et la barre du curseur est élargie par `lv_obj_set_ext_click_area()` jusqu'à 72 px de haut (`rangee_curseur`, `main/ui_reglages.cpp`).
@@ -1285,6 +1587,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### Essai sur la carte : le doigt virtuel tombe sur le mauvais objet
 
+*Concerne : tout projet ESP32 / ESP-IDF.*
+
 **Symptôme.** Aux deux premiers passages de l'essai des réglages sur la carte, un toucher au centre de « Affichage » ouvrait la page « Appareil », « Retour » ne faisait rien, et le bouton visé ne recevait ni appui, ni relâchement, ni clic (compteurs 0, 0, 0), alors que `lv_indev_search_obj()` trouvait ce bouton à ce point précis.
 
 **Cause.** `lv_indev.c:743` appelle `lv_display_rotate_point()` sur chaque point lu par un pointeur, parce que les pilotes tactiles donnent des coordonnées **brutes** de la dalle (`components/bsp_tab5/tab5_touch.c` le dit). Le pointeur virtuel de l'essai donnait des coordonnées logiques : le point était tourné deux fois. (639, 424) devenait (855, 639), dans la rangée « Appareil » ; (86, 43) devenait (1236, 86), sur rien. Un `grep rotation` sur `lv_indev.c` ne trouve rien : la fonction s'appelle `rotate_point`.
@@ -1292,6 +1596,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 **Solution.** `vers_brut()` dans `main/autotest_reglages.cpp` donne la rotation inverse (90, 180, 270) ; après chaque appui, l'essai compare le point que LVGL a fini par lire au point visé et note un échec s'ils diffèrent : un essai à côté ne peut plus passer. Les écrans étaient justes ; c'est l'essai qui avait tort. **Vu sur** Tab5 ST7121, commits `7b435eb` et `8f6c28d` (échec) et `176de0d` (corrigé), 07/11/2026. **Preuve** : lignes `GESTE … appui reçu 0, relâchement reçu 0, clic reçu 0` puis `1, 1, 1` ; 29 vérifications, 0 échec à `176de0d`. **Statut** : résolu (dans l'essai).
 
 #### RAM interne tombée à 20 octets pendant que les réglages sont ouverts, et la météo qui échoue
+
+*Concerne : tout projet ESP32 / ESP-IDF (avec PSRAM ; les chiffres sont ceux du P4).*
 
 **Symptôme.** Réglages ouverts 13 à 18 s après le démarrage : `MEMOIRE … interne_libre=535 plus_gros_bloc=160 interne_min=20` et `mdns_send: Cannot allocate memory`. Sur le binaire **normal**, réglages jamais ouverts : `esp-aes: Failed to allocate memory for the array of DMA descriptors` puis `meteo: essai raté (HTTP 0)`.
 
@@ -1301,11 +1607,15 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### Une mutation occupe le compilateur pendant des minutes
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Cause.** La preuve par mutation compile les tests avec une modification du noyau. Un mutant qui retire la condition de sortie d'une boucle `constexpr` (ici `&& base < PERIODE_S` dans `delai_avant_essai_s`) fait évaluer la boucle à clang jusqu'à sa limite de 2 milliards de pas (`-fconstexpr-steps=2000000000`, réglée pour que les tests qui relisent une vraie réponse compilent) : 765 s de CPU mesurées avant d'arrêter le compilateur.
 
 **Solution.** Ce mutant est écarté de `test/host/mutations_meteo_appareil.py` (la raison est écrite en tête du fichier) ; le vrai code sort de la boucle après 7 tours, et `planning_normal_et_reessais` couvre 1 000 000 et `INT_MAX` échecs. En écrivant une mutation, vérifier qu'elle ne supprime pas la fin d'une boucle. **Vu sur** PC de l'auteur, 06/11/2026, clang 23.1.5. **Preuve** : temps CPU du processus, mutant n° 32 de la liste. **Statut** : contourné.
 
 #### Open-Meteo : la pluie, la probabilité et l'UV d'une heure arrivent une heure (ou un quart d'heure) trop tôt
+
+*Concerne : ce projet seulement (son code, ses outils, ses services) (et tout client d'Open-Meteo).*
 
 **Symptôme.** Lire `hourly.precipitation[i]` à côté de `hourly.temperature_2m[i]` dessine la pluie de l'heure `i` avec la valeur de l'heure d'avant ; pareil pour `precipitation_probability`, `uv_index` et pour `minutely_15.precipitation` (un quart d'heure).
 
@@ -1317,6 +1627,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### Open-Meteo : dans un fuseau qui n'est pas à l'heure ronde (Terre-Neuve, Népal) les séries ne commencent pas à l'heure courante
 
+*Concerne : ce projet seulement (son code, ses outils, ses services) (et tout client d'Open-Meteo).*
+
 **Symptôme.** Avec `timezone=auto`, les séries horaires et en quarts d'heure commencent 45 minutes avant `current.time` à Katmandou (UTC+5:45) et 30 minutes après à Terre-Neuve (UTC-3:30), mais exactement à `current.time` à Lyon, Sydney ou Singapour. Un écran qui cherche « l'heure qui contient maintenant » ne trouve rien au début à Terre-Neuve.
 
 **Cause.** Les séries commencent à l'instant courant arrondi à l'heure UTC, moins le reste de `utc_offset_seconds` modulo 3 600 (signe du C) : +20 700 s donne -2 700 s, -12 600 s donne +1 800 s. Mesuré sur deux captures ; la même règle est attendue pour +5:30, +3:30, +10:30 (non captés).
@@ -1325,6 +1637,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 **Vu sur** PC de l'auteur, captures du 2026-11-07 00 h 12 (heure de Paris), aucune carte. **Preuve** : `hourly.time[0] - current.time` = -2 700 s (Katmandou), +1 800 s (Terre-Neuve), 0 (Lyon, Sydney, Singapour). **Statut** : résolu dans le noyau ; l'écran doit accepter `heure_courante == -1`.
 #### Le lecteur d'Open-Meteo acceptait une valeur « inconnu » écrite dans sa propre réponse
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Symptôme.** Une fois les lecteurs de MET Norway et du NWS ajoutés, deux tests du noyau du lecteur d'Open-Meteo ne passaient plus (`valeurs_invraisemblables_et_bornes`, `prevision_par_jour_facultative_mais_complete`) : une direction du vent de `-1` et une probabilité de pluie du jour de `-1`, écrites dans une réponse d'Open-Meteo, étaient acceptées au lieu d'être refusées (`HorsPlage`).
 
@@ -1338,6 +1652,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### Pas d'heure et un ciel presque noir pendant les 13 premières secondes
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Symptôme.** Après un démarrage, l'écran principal n'affiche pas l'heure et montre un ciel de nuit jusqu'à la première réponse SNTP (environ 13 s). L'auteur : « le fond bleu met du temps à apparaître ».
 
 **Cause.** `ecran_principal.cpp` ne prenait l'heure qu'une fois SNTP répondu, alors que l'heure du système était déjà juste (la couche carte la reprend du RX8130 à 2,6 s après la mise sous tension, ou elle est gardée à travers un redémarrage logiciel). De plus, tant que la météo n'était pas lue, le ciel jugeait le jour et la nuit en UTC (une à deux heures de nuit de trop).
@@ -1347,6 +1663,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 **Vu sur** Tab5 ST7121, build intégré `953328d`, 07/11/2026. **Preuve** : journal : « 09:01 » et la date 3,4 s après un redémarrage au lieu d'environ 13 s ; le ciel lui-même n'a pas été regardé par moi ; démarrage après une coupure de courant (lecture de l'horloge matérielle) non rejoué. **Statut** : résolu dans le journal ; à confirmer à l'œil.
 
 #### Le dégradé du ciel montre des bandes visibles
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** Sur un ciel qui va du bleu sombre à un bleu plus clair, des paliers de couleur se voient en travers de l'écran.
 
@@ -1359,6 +1677,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### La carte redémarre environ 14 s après le démarrage, à la première requête météo
 
+*Concerne : tout projet ESP32 / ESP-IDF (avec PSRAM ; les chiffres sont ceux du P4).*
+
 **Symptôme.** Avec le nouvel écran principal, le Tab5 redémarre en boucle : l'écran est construit (« écran principal 1280x720 chargé »), puis, vers 13,7 s, le journal écrit `abort() was called at PC …` et « Rebooting… », et le démarrage suivant annonce « plantage (exception) » (code 4). L'ancien écran principal, construit sur le même commit de base, ne le fait pas.
 
 **Cause (probable, non isolée allocation par allocation).** La mémoire interne s'épuise quand la première requête météo (TLS) et le serveur web démarrent ensemble. Mémoire interne libre juste avant cette requête : 109,2 Ko avec l'ancien écran, 44,9 à 45,6 Ko avec le nouveau, sur la même base (`4e7d8af`). Le réglage par défaut d'ESP-IDF `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384` garde en mémoire interne toute allocation de moins de 16 Ko ; le nouvel écran dessine des chiffres bien plus grands (l'heure et la température) que l'ancien. Les deux sites d'`abort()`, décodés avec l'ELF, sont `lock_init_generic` (`newlib/locks.c:77`) et `esp_aes_intr_alloc` (`mbedtls/port/aes/dma/esp_aes_dma_core.c:117`) : tous deux arrêtent le programme quand une allocation interne échoue.
@@ -1370,6 +1690,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### L'heure par heure, la tendance de pression et les cumuls de pluie sont absents sur l'appareil
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Symptôme.** L'écran principal montre la météo du moment et les jours, mais ni la bande heure par heure, ni la tendance de pression, ni le cumul de pluie, ni « pluie dans N min ».
 
 **Cause.** Le client météo de l'appareil (`meteo_client.cpp`, session `meteo-appareil`) ne demande pas encore ces champs ni ne les garde ; l'écran ne montre que ce qu'il reçoit et n'invente jamais une valeur (la zone disparaît et les autres prennent sa place).
@@ -1380,6 +1702,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### Turc : dimanche et lundi avaient la même abréviation
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Symptôme.** Dans la semaine, « Pazar » (dimanche) et « Pazartesi » (lundi) s'écrivaient tous deux « Paz ».
 
 **Cause.** Les trois premières lettres des deux noms sont les mêmes.
@@ -1388,6 +1712,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 - **Vu sur** : rendu PC, `fr de tr`, 07/11/2026. **Statut** : *résolu*.
 
 #### L'horloge, les dates et le ciel restent à l'heure de Paris quelle que soit la ville choisie
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Symptôme.** Choisir une ville d'un autre fuseau enregistrait la ville et sa zone (`zone_ecrire`), mais la grande horloge, la date, le lever et le coucher du soleil, les noms de jours et les heures écrites sur la page des alertes restaient à l'heure de Paris. Sans météo, le ciel était jugé sur un « jour de 8 h à 18 h » fixe, faux partout et toute l'année.
 
@@ -1399,6 +1725,8 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### Une fenêtre d'heures qui traverse un changement d'heure n'a qu'un décalage ; une colonne à 5 h 30 s'écrit « 5h »
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Symptôme.** Trouvé en lisant le code et par les tests, **pas** par un rendu de l'ancien écran. La bande « heure par heure » convertissait toute sa fenêtre avec **un seul** décalage (celui de la réponse météo à sa réception) : après un changement d'heure dans la fenêtre, les colonnes de l'autre côté sont décalées d'une heure. Et une colonne qui n'est pas à l'heure pile (Kolkata +5:30, Katmandou +5:45, avec une source qui donnerait des instants ronds en UTC) s'écrirait « 5h ».
 
 **Cause.** Un décalage pour toute la fenêtre, et une étiquette faite de l'heure seule.
@@ -1409,10 +1737,14 @@ Voulu : le faux service répond 401 avec un corps qui recopie la clé, pour **pr
 
 #### Le rendu refuse de démarrer : « une compilation tourne déjà (ninja) »
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 `tools
 endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une seconde compilation lourde sur le PC. Attendre la fin de la compilation de l'autre session (verrou `build` de `verrous.py`) ou, en connaissance de cause, `-Forcer`.
 
 #### La bande de verre de la roue est dessinée du mauvais côté du moyeu
+
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
 
 **Symptôme.** La roue ouverte au centre de l'écran : les boutons sont sous le moyeu, mais une tache sombre apparaît au-dessus, sur rien.
 
@@ -1427,6 +1759,8 @@ endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une s
 
 #### Le mot de la famille dépliée disparaît sous le second anneau
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Symptôme.** Avec « Profil ▸ » déplié (deux choix), la dernière lettre du mot « Profil », posé à côté de son bouton du premier anneau, est couverte par le disque du choix voisin (« Météo »), sur les rendus du PC à 1280×720 et 1024×600. La famille de démonstration de l'ADR-0021 fait pareil avec « Affichage ».
 
 **Cause.** Le mot d'un bouton du premier anneau est posé dans l'axe de son bouton, vers l'extérieur (`cote_du_mot` dans `roue_geometrie.hpp`), c'est-à-dire exactement là où s'ouvre le second anneau de cette famille : avec peu de choix, le disque le plus proche tombe sur le mot.
@@ -1437,6 +1771,8 @@ endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une s
 
 #### « Hava durumu » est coupé au bord quand la roue s'ouvre dans le coin bas droit d'un écran en portrait
 
+*Concerne : ce projet seulement (son code, ses outils, ses services).*
+
 **Symptôme.** En turc, à 720×1280, avec un doigt vers 95 % × 93 % de l'écran et le bouton « Alertes » présent (quatre boutons), le second anneau de « Profil ▸ » ne tient pas : le mot « Hava durumu » (Météo) est coupé par le bord droit, et le journal du banc dit « NE TIENT PAS ». Les six autres langues et les tailles des deux cartes (1280×720, 1024×600) tiennent dans la même variante. Avec cinq boutons (une alerte et un spot de mer, variante `roue-profil-complet-coin`) le coin turc en 720×1280 ne tient pas non plus (même ligne du journal) ; sur les deux cartes, cinq boutons tiennent au centre et dans le coin bas droit.
 
 **Cause.** La géométrie réserve la largeur du plus long mot des choix (`mot_choix`), mais dans ce coin aucune disposition ne laisse assez de place à ce mot. Lue dans le journal du banc ; la géométrie n'a pas été explorée davantage.
@@ -1446,6 +1782,8 @@ endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une s
 **Vu sur** rendu PC (LVGL 9.5.0, aucune carte), branche `claude/mode-auto-profil-1bf706`, 08/11/2026. **Preuve** : variante `roue-profil-coin`, turc, 720×1280, dans `docs/captures/ecran/`. **Statut** : ouvert, priorité basse.
 
 #### GCC 14.2 plante (« internal compiler error: in gimple_add_tmp_var ») sur `g.second = roue::Anneau{};`
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** `idf.py build` (ESP-IDF 5.5.5, GCC 14.2.0) échoue sur `main/ui_roue.cpp` avec `internal compiler error: in gimple_add_tmp_var, at gimplify.cc:802`, le curseur sous les `{}` de `g.second = roue::Anneau{};`. clang (le banc du PC et les tests) compile la même ligne sans rien dire.
 
@@ -1459,6 +1797,8 @@ endre.ps1` s'arrête quand `ninja` ou `esphome` tourne, pour ne pas mettre une s
 
 
 #### `idf.py` finit avec le code 0 sans rien compiler quand il est lancé depuis Git Bash
+
+*Concerne : tout projet ESP32 / ESP-IDF.*
 
 **Symptôme.** `.\tools\idf.ps1 ... build` lancé depuis un script démarré par l'outil Bash (Git Bash) affiche `MSys/Mingw is no longer supported ...` et se termine aussitôt avec le code 0, en environ une seconde ; `build/<carte>/` reste vide. Un code de sortie « réussi » ne prouve rien ici.
 

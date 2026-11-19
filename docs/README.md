@@ -4,7 +4,7 @@
 
 ---
 
-Native ESP-IDF + LVGL 9 firmware for the ESP32-P4: time and date, weather from an API, a voice assistant linked to an LLM of your choice, a settings page served by the device. No Home Assistant, no ESPHome. Developed on the M5Stack Tab5; the Waveshare 7B has a board layer, written and built but not tried on the board yet (see [the 7B board](carte-7b.md) and [compatibility](compatibilite.md)).
+Native ESP-IDF + LVGL 9 firmware for the ESP32-P4: time and date, weather from an API, a voice assistant linked to an LLM of your choice, a settings page served by the device. No Home Assistant, no ESPHome. Developed on the M5Stack Tab5. It also runs on the Waveshare 7B, the author's screen at home, since 07/11/2026 (serial log; picture judged clean by the author's eye on 09/11/2026; last flash recorded in this repository: the trial build of 13/11/2026, [ADR-0028](decisions/0028-7b-code-en-psram-et-cache-l2-256-ko.md)); a finger on its touch panel and its sound have not been tried (see [the 7B board](carte-7b.md) and [compatibility](compatibilite.md)).
 
 This documentation is kept **at the same time as the code**: every result carries the board and the display revision it was observed on, and every incident is recorded with its cause and its solution. The plan, the cost, the milestone measurements, the research notes and the decisions (ADR) are working documents, written in French.
 
@@ -13,6 +13,7 @@ This documentation is kept **at the same time as the code**: every result carrie
 | understand the project in two minutes | the [repository README](../README.md) |
 | know **which board it runs on** and what is tested where (Tab5 ST7121, ST7123, ILI9881C, Waveshare 7B) | [Compatibility and versions](compatibilite.md) |
 | understand how it is built | [Architecture](architecture.md), then the [decisions](decisions/README.md) |
+| start **my own** ESP32 + LVGL 9 touch screen from this code, on another board | [Starting from Meridien for your own screen](reprendre-le-projet.md): what to keep, what to change, what is specific to the ESP32-P4 |
 | build, flash, find the board again | [repository README](../README.md#build-and-test), [AGENTS.md](../AGENTS.md) |
 | install or find the development tools (the PC's compiler, error detectors, formatting) | [Development tools](outils.md) |
 | fix a symptom already seen (black screen, serial port, build…) | [Troubleshooting](depannage.md): symptom → cause → solution |
@@ -36,7 +37,7 @@ This documentation is kept **at the same time as the code**: every result carrie
 
 ---
 
-Firmware natif ESP-IDF + LVGL 9 pour ESP32-P4 : heure et date, météo par API, assistant vocal relié à un LLM au choix, page de réglages servie par l'appareil. Sans Home Assistant, sans ESPHome. Développé sur le M5Stack Tab5 ; la Waveshare 7B a une couche carte, écrite et compilée mais pas encore essayée sur la carte (voir [la carte 7B](carte-7b.md#version-française) et la [compatibilité](compatibilite.md#version-française)).
+Firmware natif ESP-IDF + LVGL 9 pour ESP32-P4 : heure et date, météo par API, assistant vocal relié à un LLM au choix, page de réglages servie par l'appareil. Sans Home Assistant, sans ESPHome. Développé sur le M5Stack Tab5. Il tourne aussi sur la Waveshare 7B, l'écran de l'auteur à la maison, depuis le 07/11/2026 (journal série ; image jugée propre à l'œil par l'auteur le 09/11/2026 ; dernier flash consigné dans ce dépôt : le binaire d'essai du 13/11/2026, [ADR-0028](decisions/0028-7b-code-en-psram-et-cache-l2-256-ko.md)) ; un doigt sur son écran tactile et son son n'ont pas été essayés (voir [la carte 7B](carte-7b.md#version-française) et la [compatibilité](compatibilite.md#version-française)).
 
 Cette documentation est tenue **en même temps que le code** : chaque résultat porte la carte et la révision d'écran sur lesquelles il a été constaté, et chaque incident est consigné avec sa cause et sa solution. Le plan, le coût, les mesures de jalon, les notes de recherche et les décisions (ADR) sont des documents de travail, écrits en français.
 
@@ -45,6 +46,7 @@ Cette documentation est tenue **en même temps que le code** : chaque résultat 
 | comprendre le projet en deux minutes | le [README du dépôt](../README.md#version-française) |
 | savoir **sur quelle carte ça tourne** et ce qui est testé où (Tab5 ST7121, ST7123, ILI9881C, Waveshare 7B) | [Compatibilité et versions](compatibilite.md#version-française) |
 | comprendre comment c'est construit | [Architecture](architecture.md#version-française), puis les [décisions](decisions/README.md) |
+| partir de ce code pour **mon propre** écran tactile ESP32 + LVGL 9, sur une autre carte | [Partir de Meridien pour son propre écran](reprendre-le-projet.md#version-française) : ce qu'on garde, ce qu'on change, ce qui est propre à l'ESP32-P4 |
 | compiler, flasher, retrouver la carte | [README du dépôt](../README.md#compiler-et-tester), [AGENTS.md](../AGENTS.md) |
 | installer ou retrouver les outils (compilateur du PC, détecteurs d'erreurs, mise en forme) | [Outils de développement](outils.md) |
 | corriger un symptôme déjà vu (écran noir, port série, compilation…) | [Dépannage](depannage.md#version-française) : symptôme → cause → solution |
