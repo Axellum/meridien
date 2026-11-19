@@ -51,7 +51,7 @@ Transitions instantanées, sans fondu. Popups au pixel. Phrases courtes à l'éc
 
 ## Documentation tenue avec le code
 
-- Un résultat constaté (mesure, essai, incident) porte une ligne **« Vu sur »** : carte, révision d'écran, MAC, commit, date. Sans elle il n'est pas utilisable. La 7B reste « prévue » tant qu'aucun essai physique n'a eu lieu.
+- Un résultat constaté (mesure, essai, incident) porte une ligne **« Vu sur »** : carte, révision d'écran, MAC, commit, date. Sans elle il n'est pas utilisable. Une carte reste « prévue » tant qu'aucun essai physique n'a eu lieu (la 7B a le sien depuis le 07/11/2026 : [docs/compatibilite.md](docs/compatibilite.md#version-française)).
 - Tout incident diagnostiqué va dans [docs/depannage.md](docs/depannage.md) (symptôme → cause → solution, preuve, statut) **dans le même commit ou la même session** que le correctif.
 - Le tableau de [docs/compatibilite.md](docs/compatibilite.md) change quand un état change ; une page par jalon dans `docs/mesures/`.
 
