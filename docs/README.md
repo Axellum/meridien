@@ -13,6 +13,7 @@ This documentation is kept **at the same time as the code**: every result carrie
 | understand the project in two minutes | the [repository README](../README.md) |
 | know **which board it runs on** and what is tested where (Tab5 ST7121, ST7123, ILI9881C, Waveshare 7B) | [Compatibility and versions](compatibilite.md) |
 | understand how it is built | [Architecture](architecture.md), then the [decisions](decisions/README.md) |
+| start **my own** ESP32 + LVGL 9 touch screen from this code, on another board | [Starting from Meridien for your own screen](reprendre-le-projet.md): what to keep, what to change, what is specific to the ESP32-P4 |
 | build, flash, find the board again | [repository README](../README.md#build-and-test), [AGENTS.md](../AGENTS.md) |
 | install or find the development tools (the PC's compiler, error detectors, formatting) | [Development tools](outils.md) |
 | fix a symptom already seen (black screen, serial port, build…) | [Troubleshooting](depannage.md): symptom → cause → solution |
@@ -45,6 +46,7 @@ Cette documentation est tenue **en même temps que le code** : chaque résultat 
 | comprendre le projet en deux minutes | le [README du dépôt](../README.md#version-française) |
 | savoir **sur quelle carte ça tourne** et ce qui est testé où (Tab5 ST7121, ST7123, ILI9881C, Waveshare 7B) | [Compatibilité et versions](compatibilite.md#version-française) |
 | comprendre comment c'est construit | [Architecture](architecture.md#version-française), puis les [décisions](decisions/README.md) |
+| partir de ce code pour **mon propre** écran tactile ESP32 + LVGL 9, sur une autre carte | [Partir de Meridien pour son propre écran](reprendre-le-projet.md#version-française) : ce qu'on garde, ce qu'on change, ce qui est propre à l'ESP32-P4 |
 | compiler, flasher, retrouver la carte | [README du dépôt](../README.md#compiler-et-tester), [AGENTS.md](../AGENTS.md) |
 | installer ou retrouver les outils (compilateur du PC, détecteurs d'erreurs, mise en forme) | [Outils de développement](outils.md) |
 | corriger un symptôme déjà vu (écran noir, port série, compilation…) | [Dépannage](depannage.md#version-française) : symptôme → cause → solution |
