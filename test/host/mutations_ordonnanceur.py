@@ -15,8 +15,8 @@ T_ORD = "test_ordonnanceur_reseau.cpp"
 
 MUTATIONS_ORDONNANCEUR = [
     # --- réveil ---
-    (ORD, "    std::int64_t echeance_ms[kNombreSources] = {kJamais, kJamais, kJamais, kJamais};",
-     "    std::int64_t echeance_ms[kNombreSources] = {0, 0, 0, 0};", T_ORD, "rien_ne_passe_sans_reveil",
+    (ORD, "    std::int64_t echeance_ms[kNombreSources] = {kJamais, kJamais, kJamais, kJamais, kJamais};",
+     "    std::int64_t echeance_ms[kNombreSources] = {0, 0, 0, 0, 0};", T_ORD, "rien_ne_passe_sans_reveil",
      "toutes les sources passent au démarrage sans avoir été réveillées (la mer d'un appareil sans spot interroge Vigie)"),
     (ORD, "    {1500, false}, // Meteo", "    {0, false}, // Meteo", T_ORD, "reveil_meteo_attend_l_anti_rebond",
      "la météo repart à chaque changement de zone, sans laisser passer une rafale de changements"),

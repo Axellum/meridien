@@ -92,6 +92,7 @@ bool ui_principal_creer(lv_obj_t *ecran, const RessourcesPrincipal &ressources, 
         g.corps = creer_police(ressources.ttf, ressources.ttf_taille, 32);
         g.petit = creer_police(ressources.ttf, ressources.ttf_taille, 28);
         g.mini = creer_police(ressources.ttf, ressources.ttf_taille, 24);
+        g.micro = creer_police(ressources.ttf, ressources.ttf_taille, 20);
     } else {
         g.heure = creer_police(ressources.ttf, ressources.ttf_taille, g.portrait ? 250 : 270);
         g.temperature = creer_police(ressources.ttf, ressources.ttf_taille, g.portrait ? 128 : 124);
@@ -99,9 +100,10 @@ bool ui_principal_creer(lv_obj_t *ecran, const RessourcesPrincipal &ressources, 
         g.corps = creer_police(ressources.ttf, ressources.ttf_taille, 34);
         g.petit = creer_police(ressources.ttf, ressources.ttf_taille, 28);
         g.mini = creer_police(ressources.ttf, ressources.ttf_taille, 23);
+        g.micro = creer_police(ressources.ttf, ressources.ttf_taille, 19);
     }
     if (g.heure.f == nullptr || g.temperature.f == nullptr || g.titre.f == nullptr || g.corps.f == nullptr ||
-        g.petit.f == nullptr || g.mini.f == nullptr) {
+        g.petit.f == nullptr || g.mini.f == nullptr || g.micro.f == nullptr) {
         return false;
     }
 

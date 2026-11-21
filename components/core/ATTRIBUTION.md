@@ -53,3 +53,13 @@ Texte de la licence MIT de posix_tz_db : voir [outils/posix_tz_db/LICENSE](outil
   sources : leur licence de redistribution n'a **pas été examinée** pour ce dépôt, et aucun test n'en lit le contenu.
 - Les verdicts, les critères et les seuils sont ceux de Vigie, pas d'une règle officielle ; ils ne sont **pas faits pour la sécurité**
   ([ADR-0018](../../docs/decisions/0018-mer-trame-vigie-et-vues.md)).
+
+## Données du noyau « normales climatiques » (`include/ecran/climat_*.hpp`, `test/host/donnees/climat_*`)
+
+- **Fiches climatologiques de Météo-France** (normales 1991-2020 du mois, records du mois), lues à travers **Vigie** (instance publique
+  `vigie.auxfilsdesidees.fr`, `GET /v1/climate/normals?lat=&lon=`). Licence **Licence Ouverte 2.0** (Etalab) : il faut nommer la source et la
+  date d'édition de la fiche, ce que la page « Sources » de l'écran fait (`credits.hpp`). Les trois réponses réelles gardées comme données de
+  test (Lorient, La Réunion, Londres : hors couverture ; captées le 21/11/2026, voir `test/host/donnees/LISEZMOI_climat.md`) sont reproduites
+  **telles quelles, sans modification** ; le noyau les lit et arrondit les valeurs au dixième de degré.
+- Le choix de la station (50 km au plus), sa distance et la comparaison sont ceux de Vigie ; l'écran compare lui-même le maximum prévu à la
+  normale du maximum du mois et n'envoie aucune valeur du jour. Le texte de la licence n'a pas été relu pour ce dépôt.

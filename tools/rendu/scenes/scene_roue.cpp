@@ -156,6 +156,7 @@ void fermer_mer() {
     g_avant_mer = nullptr;
 }
 
+void sans_effet() {}
 void ouvrir_mer() {
     ++g_mer_ouvertures;
     if (g_page_mer != nullptr || g_contexte == nullptr) {
@@ -205,6 +206,11 @@ int composer(EntreeRoue *sortie, bool alertes, int choix_demo, bool mer_choisie 
         case ecran::roue::Entree::Mer:
             sortie[n++] = {ecran::visuel::texte_c("Mer"), ecran::ICONE_MER, ouvrir_mer, nullptr, 0};
             break;
+        case ecran::roue::Entree::Sources: // toujours là (ADR-0029) ; la page elle-même est la scène « sources »
+            sortie[n++] = {ecran::visuel::texte_c("Sources"), ecran::ICONE_SOURCES, sans_effet, nullptr, 0};
+            break;
+        case ecran::roue::Entree::Profil:
+            break; // la famille « Profil » est celle de la scène « auto »
         }
     }
     if (choix_demo > 0) {
@@ -420,20 +426,22 @@ void parcours_mer(const banc::Contexte &c) {
     int32_t x = 0;
     int32_t y = 0;
 
-    // 1. Aucun spot choisi : trois boutons (Réglages, Détails, Alertes), pas de « Mer ».
+    // 1. Aucun spot choisi : quatre boutons (Réglages, Détails, Alertes, Sources), pas de « Mer » (« Sources » est toujours là, ADR-0029).
     lv_obj_send_event(g_principal, LV_EVENT_LONG_PRESSED, nullptr);
     exiger(ecran::ui_roue_ouverte(), "un appui long n'ouvre pas la roue");
     exiger(ecran::ui_roue_centre_bouton(2, &x, &y), "pas de troisième bouton (Alertes)");
-    exiger(!ecran::ui_roue_centre_bouton(3, &x, &y), "la roue montre un quatrième bouton sans spot de mer choisi");
+    exiger(ecran::ui_roue_centre_bouton(3, &x, &y), "pas de quatrième bouton (Sources)");
+    exiger(!ecran::ui_roue_centre_bouton(4, &x, &y), "la roue montre un cinquième bouton sans spot de mer choisi");
     ecran::ui_roue_fermer();
     tourner();
     exiger(!ecran::ui_roue_ouverte(), "la roue ne se ferme pas");
 
-    // 2. Un spot choisi : quatre boutons, « Mer » est le dernier et il n'y en a pas de cinquième.
+    // 2. Un spot choisi : cinq boutons, « Mer » est le quatrième (avant « Sources ») et il n'y en a pas de sixième.
     g_avec_mer = true;
     lv_obj_send_event(g_principal, LV_EVENT_LONG_PRESSED, nullptr);
     exiger(ecran::ui_roue_ouverte() && g_appuis_longs == 2, "la roue ne se rouvre pas pour le spot choisi");
-    exiger(!ecran::ui_roue_centre_bouton(4, &x, &y), "la roue montre un cinquième bouton");
+    exiger(ecran::ui_roue_centre_bouton(4, &x, &y), "pas de cinquième bouton (Sources)");
+    exiger(!ecran::ui_roue_centre_bouton(5, &x, &y), "la roue montre un sixième bouton");
     exiger(ecran::ui_roue_centre_bouton(3, &x, &y), "pas de quatrième bouton (Mer)");
     exiger(!ecran::ui_roue_simuler_toucher(x, y), "toucher « Mer » laisse la roue ouverte");
     tourner();
@@ -592,7 +600,8 @@ void zone_famille(const banc::Contexte &c) {
     compter_les_invalidations(c);
     int32_t bx = 0;
     int32_t by = 0;
-    exiger(ecran::ui_roue_centre_bouton(3, &bx, &by), "le bouton de la famille (le quatrième) n'a pas de centre");
+    exiger(ecran::ui_roue_centre_bouton(4, &bx, &by),
+           "le bouton de la famille (le cinquième, après Sources) n'a pas de centre");
     exiger(ecran::ui_roue_simuler_toucher(bx, by), "toucher la famille ferme la roue au lieu de la déplier");
     lv_refr_now(c.affichage);
     part_invalidee(c, "déplier la famille");

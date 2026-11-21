@@ -294,6 +294,9 @@ int composer(ecran::EntreeRoue *sortie, bool alertes, bool mer, ecran::ChoixRoue
         case ecran::roue::Entree::Mer:
             sortie[n++] = {ecran::visuel::texte_c("Mer"), ecran::ICONE_MER, rien, nullptr, 0};
             break;
+        case ecran::roue::Entree::Sources:
+            sortie[n++] = {ecran::visuel::texte_c("Sources"), ecran::ICONE_SOURCES, rien, nullptr, 0};
+            break;
         case ecran::roue::Entree::Profil:
             sortie[n++] = ecran::entree_profil(choix, nb_profil);
             break;
@@ -361,7 +364,7 @@ void roue_profil(const banc::Contexte &c, ProfilAccueil profil, int fx, int fy, 
     ouvrir_roue(c, fx, fy, alertes, mer, deplier);
 }
 
-// Le premier anneau : Réglages, Détails, Profil ▸ (aucune alerte). La famille est repliée.
+// Le premier anneau : Réglages, Détails, Sources, Profil ▸ (aucune alerte). La famille est repliée.
 void roue_profil_replie(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Auto, 500, 500, false, false, false); }
 // Le second anneau : Auto (marqué) et Météo.
 void roue_profil_auto(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Auto, 500, 500, false, false, true); }
@@ -374,7 +377,7 @@ void roue_profil_alerte(const banc::Contexte &c) { roue_profil(c, ProfilAccueil:
 // Près d'un coin et d'un bord : le second anneau pivote pour tenir.
 void roue_profil_coin(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Meteo, 950, 930, true, false, true); }
 void roue_profil_bord(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Auto, 50, 500, false, false, true); }
-// Le plus plein : alerte en vigueur ET spot de mer choisi, soit cinq boutons au premier anneau (Réglages, Détails, Alertes, Mer, Profil).
+// Le plus plein : alerte en vigueur ET spot de mer choisi, soit six boutons au premier anneau (Réglages, Détails, Alertes, Mer, Sources, Profil).
 void roue_profil_complet(const banc::Contexte &c) { roue_profil(c, ProfilAccueil::Auto, 500, 500, true, true, true); }
 // Les cinq boutons, repliés : le profil épinglé n'apparaît qu'au second anneau.
 void roue_profil_complet_replie(const banc::Contexte &c) {
@@ -399,11 +402,11 @@ void parcours_profil(const banc::Contexte &c) {
     ecran::EntreeRoue entrees_roue[ecran::ENTREES_ROUE_MAX] = {};
     ecran::ChoixRoue choix[ecran::reglages::NOMBRE_PROFILS_ACCUEIL] = {};
     int n = composer(entrees_roue, false, false, choix);
-    exiger(n == 3 && entrees_roue[n - 1].nb_choix == 2,
+    exiger(n == 4 && entrees_roue[n - 1].nb_choix == 2,
            "le premier anneau n'a pas « Profil » avec deux choix à la suite");
     n = composer(entrees_roue, true, true, choix);
-    exiger(n == 5 && entrees_roue[n - 1].nb_choix == 2 && entrees_roue[n - 2].nb_choix == 0,
-           "avec une alerte et un spot de mer, « Profil » n'est pas le cinquième bouton, après « Mer »");
+    exiger(n == 6 && entrees_roue[n - 1].nb_choix == 2 && entrees_roue[n - 2].nb_choix == 0,
+           "avec une alerte et un spot de mer, « Profil » n'est pas le sixième bouton, après « Sources »");
     exiger(choix[0].actif && !choix[1].actif, "« Auto » n'est pas marqué quand rien n'est épinglé");
 
     ouvrir_roue(c, 500, 500, false, false, true);
@@ -459,7 +462,7 @@ const Scene kScenes[] = {
     {"epingle-et-alerte", "Épinglé + alerte orange", epingle_et_alerte},
     {"ville-longue", "Lieu très long et pastille", ville_longue},
     {"exemple", "Pastille et « Exemple »", exemple},
-    {"roue-profil", "Roue : Réglages, Détails, Profil ▸ (repliée)", roue_profil_replie},
+    {"roue-profil", "Roue : Réglages, Détails, Sources, Profil ▸ (repliée)", roue_profil_replie},
     {"roue-profil-auto", "Roue : second anneau de Profil, Auto marqué", roue_profil_auto},
     {"roue-profil-epingle", "Roue : second anneau de Profil, Météo marqué, accueil épinglé", roue_profil_epingle},
     {"roue-profil-alerte", "Roue : quatre boutons (alerte en vigueur), second anneau de Profil", roue_profil_alerte},

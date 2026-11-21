@@ -14,6 +14,7 @@
 #include <new>
 #include <string_view>
 
+#include "ecran/credits.hpp"
 #include "ecran/mer_liste.hpp"
 #include "ecran/mer_reglage.hpp"
 #include "ecran/mer_spots.hpp"
@@ -217,8 +218,7 @@ void sur_resultat(lv_event_t *e) {
 
 // Les spots viennent d'OpenStreetMap (ODbL) : le crédit suit la liste, comme sur la page web (ADR-0025).
 void credit_des_spots(ContexteSpot *c) {
-    creer_texte(c->resultats, T("Spots : © contributeurs d’OpenStreetMap, ODbL."), env().f.petite,
-                env().p->texte_discret);
+    creer_texte(c->resultats, T(credits::SPOTS), env().f.petite, env().p->texte_discret);
 }
 
 // Dessine les résultats (ou la raison pour laquelle il n'y en a pas) selon l'état de la lecture et la recherche.

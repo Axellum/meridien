@@ -16,6 +16,7 @@
 #include <cstdint>
 
 #include "ecran/accueil_pilote.hpp"
+#include "ecran/climat_normales.hpp"
 #include "ecran/heure_fr.hpp"
 #include "ecran/vigie_bandeau.hpp"
 #include "ecran/visuel_themes.hpp"
@@ -51,6 +52,9 @@ struct EntreesPrincipal {
     // drapeaux qui changent la zone du bas (la carte pluie, le bandeau d'alerte agrandi). Valeur par défaut : profil Météo, raison
     // « Auto · Météo », rien d'agrandi. L'écran ne décide rien : il dessine cette présentation (le calcul est dans le noyau pur).
     accueil::Presentation mode_auto;
+    // « +1,0° sur la normale » (ADR-0029) : le jugement du maximum prévu du jour contre la normale du mois, fait par le noyau pur
+    // (climat_normales.hpp) ; `Etat::Aucun` (valeur par défaut) = pas de pastille.
+    climat::Verdict normale;
 };
 
 // Données du jeu d'icônes et de la police : octets embarqués, qui doivent vivre aussi longtemps que l'écran.

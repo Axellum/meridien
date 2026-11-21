@@ -22,49 +22,53 @@ constexpr Liste sans(Presences p = {}) { return entrees_du_premier_anneau(p); }
 
 constexpr int sans_alerte_ni_mer_la_roue_a_reglages_et_details() {
     constexpr Liste l = sans();
-    VERIFIER(l.n == 2);
+    VERIFIER(l.n == 3);
     VERIFIER(est(l, 0, Entree::Reglages));
     VERIFIER(est(l, 1, Entree::Details));
+    VERIFIER(est(l, 2, Entree::Sources)); // « Sources » est toujours là (ADR-0029)
     return 0;
 }
 
 constexpr int avec_les_alertes_seules_elles_viennent_apres_details() {
     constexpr Liste l = sans({true, false});
-    VERIFIER(l.n == 3);
-    VERIFIER(est(l, 0, Entree::Reglages) && est(l, 1, Entree::Details) && est(l, 2, Entree::Alertes));
+    VERIFIER(l.n == 4);
+    VERIFIER(est(l, 0, Entree::Reglages) && est(l, 1, Entree::Details) && est(l, 2, Entree::Alertes) &&
+             est(l, 3, Entree::Sources));
     VERIFIER(rang_de(l, Entree::Mer) == -1);
     return 0;
 }
 
 constexpr int avec_la_mer_seule_elle_vient_apres_details() {
     constexpr Liste l = sans({false, true});
-    VERIFIER(l.n == 3);
-    VERIFIER(est(l, 0, Entree::Reglages) && est(l, 1, Entree::Details) && est(l, 2, Entree::Mer));
+    VERIFIER(l.n == 4);
+    VERIFIER(est(l, 0, Entree::Reglages) && est(l, 1, Entree::Details) && est(l, 2, Entree::Mer) &&
+             est(l, 3, Entree::Sources));
     VERIFIER(rang_de(l, Entree::Alertes) == -1);
     return 0;
 }
 
 constexpr int avec_les_deux_la_mer_est_la_derniere() {
     constexpr Liste l = sans({true, true});
-    VERIFIER(l.n == 4);
+    VERIFIER(l.n == 5);
     VERIFIER(est(l, 0, Entree::Reglages) && est(l, 1, Entree::Details) && est(l, 2, Entree::Alertes) &&
-             est(l, 3, Entree::Mer));
+             est(l, 3, Entree::Mer) && est(l, 4, Entree::Sources));
     return 0;
 }
 
 constexpr int avec_le_profil_seul_il_vient_apres_details() {
     constexpr Liste l = sans({false, false, true});
-    VERIFIER(l.n == 3);
-    VERIFIER(est(l, 0, Entree::Reglages) && est(l, 1, Entree::Details) && est(l, 2, Entree::Profil));
+    VERIFIER(l.n == 4);
+    VERIFIER(est(l, 0, Entree::Reglages) && est(l, 1, Entree::Details) && est(l, 2, Entree::Sources) &&
+             est(l, 3, Entree::Profil));
     VERIFIER(rang_de(l, Entree::Alertes) == -1 && rang_de(l, Entree::Mer) == -1);
     return 0;
 }
 
 constexpr int avec_les_trois_le_profil_est_le_dernier_et_la_mer_le_precede() {
     constexpr Liste l = sans({true, true, true});
-    VERIFIER(l.n == 5);
+    VERIFIER(l.n == 6);
     VERIFIER(est(l, 0, Entree::Reglages) && est(l, 1, Entree::Details) && est(l, 2, Entree::Alertes) &&
-             est(l, 3, Entree::Mer) && est(l, 4, Entree::Profil));
+             est(l, 3, Entree::Mer) && est(l, 4, Entree::Sources) && est(l, 5, Entree::Profil));
     return 0;
 }
 
@@ -86,9 +90,13 @@ constexpr int l_arrivee_de_la_mer_ne_change_le_rang_d_aucune_autre_entree() {
         const Liste sans_mer = sans({a != 0, false});
         const Liste avec_mer = sans({a != 0, true});
         VERIFIER(avec_mer.n == sans_mer.n + 1);
-        for (int i = 0; i < sans_mer.n; i++) {
+        // Tout ce qui PRÉCÈDE la mer garde son rang ; « Sources » (toujours là, après la mer) en prend un de plus, rien d'autre ne bouge.
+        const int jusqu_a_sources = rang_de(sans_mer, Entree::Sources);
+        VERIFIER(jusqu_a_sources == sans_mer.n - 1);
+        for (int i = 0; i < jusqu_a_sources; i++) {
             VERIFIER(avec_mer.entree[i] == sans_mer.entree[i]);
         }
+        VERIFIER(est(avec_mer, jusqu_a_sources, Entree::Mer) && est(avec_mer, jusqu_a_sources + 1, Entree::Sources));
     }
     return 0;
 }
@@ -113,7 +121,7 @@ constexpr int aucune_entree_n_est_en_double_et_le_premier_anneau_les_porte_toute
         for (int m = 0; m < 2; m++) {
             for (int p = 0; p < 2; p++) {
                 const Liste l = sans({a != 0, m != 0, p != 0});
-                VERIFIER(l.n >= 2 && l.n <= ENTREES_MAX && l.n <= BOUTONS_MAX);
+                VERIFIER(l.n >= 3 && l.n <= ENTREES_MAX && l.n <= BOUTONS_MAX);
                 for (int i = 0; i < l.n; i++) {
                     for (int j = i + 1; j < l.n; j++) {
                         VERIFIER(l.entree[i] != l.entree[j]);
@@ -126,13 +134,28 @@ constexpr int aucune_entree_n_est_en_double_et_le_premier_anneau_les_porte_toute
 }
 
 constexpr int le_nombre_d_entrees_est_celui_des_presences() {
-    VERIFIER(sans({false, false}).n == 2);
-    VERIFIER(sans({true, false}).n == 3);
-    VERIFIER(sans({false, true}).n == 3);
-    VERIFIER(sans({true, true}).n == 4);
-    VERIFIER(sans({false, false, true}).n == 3);
-    VERIFIER(sans({true, true, true}).n == 5);
-    VERIFIER(ENTREES_MAX == 5);
+    VERIFIER(sans({false, false}).n == 3);
+    VERIFIER(sans({true, false}).n == 4);
+    VERIFIER(sans({false, true}).n == 4);
+    VERIFIER(sans({true, true}).n == 5);
+    VERIFIER(sans({false, false, true}).n == 4);
+    VERIFIER(sans({true, true, true}).n == 6);
+    VERIFIER(ENTREES_MAX == 6);
+    return 0;
+}
+
+constexpr int sources_est_toujours_la_apres_la_mer_et_avant_le_profil() {
+    for (int a = 0; a < 2; a++) {
+        for (int m = 0; m < 2; m++) {
+            for (int p = 0; p < 2; p++) {
+                const Liste l = sans({a != 0, m != 0, p != 0});
+                const int rang = rang_de(l, Entree::Sources);
+                VERIFIER(rang >= 2);
+                VERIFIER(rang_de(l, Entree::Alertes) < rang && rang_de(l, Entree::Mer) < rang);
+                VERIFIER(rang == (p != 0 ? l.n - 2 : l.n - 1)); // le profil, s'il est là, reste le dernier
+            }
+        }
+    }
     return 0;
 }
 
@@ -157,6 +180,7 @@ constexpr int la_famille_profil_n_est_proposee_qu_a_partir_de_deux_choix() {
     X(l_arrivee_du_profil_ne_change_le_rang_d_aucune_autre_entree)                                                     \
     X(aucune_entree_n_est_en_double_et_le_premier_anneau_les_porte_toutes)                                             \
     X(le_nombre_d_entrees_est_celui_des_presences)                                                                     \
+    X(sources_est_toujours_la_apres_la_mer_et_avant_le_profil)                                                         \
     X(la_famille_profil_n_est_proposee_qu_a_partir_de_deux_choix)
 
 TESTS_A_LA_COMPILATION(LISTE)

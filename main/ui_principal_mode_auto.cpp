@@ -55,6 +55,66 @@ int dessiner_pastille_mode(const Ctx &c, int x, int largeur_max) {
     return fin;
 }
 
+// La pastille « +1,0° sur la normale » (ADR-0029) à droite de celle du mode. Rend le bord droit de ce qui a été dessiné (0 : rien, faute
+// de verdict ou de place). Jamais coupée par « … » : une phrase de normale tronquée dirait autre chose ; si même la plus petite police (20 px de référence) ne
+// tient pas, elle n'est pas dessinée (le lieu et le mode passent avant).
+int dessiner_pastille_normale(const Ctx &c, int x, int largeur_max) {
+    const climat::Verdict &v = g.e.normale;
+    if (v.etat == climat::Etat::Aucun) {
+        return 0;
+    }
+    char ecart[16];
+    char phrase[96];
+    const char sep = i18n::langue_courante() == i18n::Langue::En ? '.' : ',';
+    switch (v.etat) {
+    case climat::Etat::AuDessus:
+    case climat::Etat::EnDessous:
+        climat::ecrire_ecart(v.ecart_dix, sep, ecart, sizeof ecart);
+        std::snprintf(
+            phrase, sizeof phrase,
+            texte_principal::t(v.etat == climat::Etat::AuDessus ? "%s° sur la normale" : "%s° sous la normale"), ecart);
+        break;
+    case climat::Etat::Normal:
+        std::snprintf(phrase, sizeof phrase, "%s", texte_principal::t("Dans la normale"));
+        break;
+    case climat::Etat::RecordChaud:
+        std::snprintf(phrase, sizeof phrase, "%s", texte_principal::t("Record de chaleur battu"));
+        break;
+    case climat::Etat::RecordFroid:
+        std::snprintf(phrase, sizeof phrase, "%s", texte_principal::t("Record de froid battu"));
+        break;
+    case climat::Etat::Aucun:
+        return 0;
+    }
+    const int h = px(32);
+    const int pad = px(11);
+    // Trois tailles, la plus grande qui tient (la pastille du mode a déjà pris sa place : le lieu et le mode passent avant).
+    const dz::Police *police = &g.petit;
+    if (dz::largeur_texte(*police, phrase) + 2 * pad > largeur_max) {
+        police = &g.mini;
+    }
+    if (dz::largeur_texte(*police, phrase) + 2 * pad > largeur_max) {
+        police = &g.micro;
+    }
+    const int w_texte = dz::largeur_texte(*police, phrase);
+    if (w_texte + 2 * pad > largeur_max) {
+        return 0;
+    }
+    const ThemePrincipal &t = *g.theme;
+    std::uint32_t teinte = t.texte_3;
+    if (v.etat == climat::Etat::AuDessus || v.etat == climat::Etat::RecordChaud) {
+        teinte = t.avertissement;
+    } else if (v.etat == climat::Etat::EnDessous || v.etat == climat::Etat::RecordFroid) {
+        teinte = t.pluie;
+    }
+    const int centre = c.y + c.h / 2;
+    const int w = w_texte + 2 * pad;
+    fond_de_puce(c.pc, x, centre - h / 2, w, h, teinte, 51, 166);
+    dz::texte(c.pc, *police, phrase, x + pad, centre - dz::hauteur_ligne(*police) / 2, w_texte + px(4),
+              LV_TEXT_ALIGN_LEFT, t.texte);
+    return x + w;
+}
+
 const char *texte_force_pluie(accueil::NiveauPluie n) {
     switch (n) {
     case accueil::NiveauPluie::FAIBLE:
