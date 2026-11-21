@@ -7,6 +7,8 @@
 //     pas quand une entrée conditionnelle apparaît ou disparaît (ADR-0021, point 4) ;
 //   - « Alertes » vient ensuite quand la page des alertes existe ;
 //   - « Mer » vient ensuite quand un spot de mer est choisi : aucune autre entrée ne change de rang à son arrivée (ADR-0024) ;
+//   - « Sources » (la page des sources et des crédits, ADR-0029) est TOUJOURS là, après « Mer » : ce que l'écran montre et d'où cela
+//     vient se lit où que l'on soit, sans réglage ; elle ne déplace ni « Alertes » ni « Mer » ;
 //   - « Profil » (la famille Auto / profil épinglé, ADR-0023) vient en DERNIER quand l'appareil offre au moins deux choix : il ne
 //     déplace aucune autre entrée, et le rang de « Mer » ne change pas à son arrivée.
 // Aucun texte, aucune icône, aucune action : des identifiants. Ce que chacun montre et fait est dans main/ecran_principal.cpp.
@@ -19,7 +21,7 @@
 
 namespace ecran::roue {
 
-enum class Entree : std::uint8_t { Reglages, Details, Alertes, Mer, Profil };
+enum class Entree : std::uint8_t { Reglages, Details, Alertes, Mer, Sources, Profil };
 
 // Ce que l'appareil sait au moment d'ouvrir la roue.
 struct Presences {
@@ -34,7 +36,7 @@ struct Liste {
 };
 
 // Le plus grand nombre d'entrées possible doit tenir au premier anneau de la géométrie.
-inline constexpr int ENTREES_MAX = 5;
+inline constexpr int ENTREES_MAX = 6;
 static_assert(ENTREES_MAX <= BOUTONS_MAX, "le premier anneau de la roue ne peut pas porter toutes les entrées");
 
 // Le second anneau de « Profil » offre « Auto » et les profils que l'appareil sait dessiner ; avec un seul choix il n'offrirait rien :
@@ -51,6 +53,7 @@ constexpr Liste entrees_du_premier_anneau(const Presences &p) noexcept {
     if (p.mer) {
         liste.entree[liste.n++] = Entree::Mer;
     }
+    liste.entree[liste.n++] = Entree::Sources;
     if (p.profil) {
         liste.entree[liste.n++] = Entree::Profil;
     }

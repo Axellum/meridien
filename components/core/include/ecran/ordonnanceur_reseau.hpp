@@ -1,7 +1,7 @@
-// Noyau pur : l'ordonnanceur de LA tâche réseau des données (météo, alertes de Vigie, mer du spot, liste des spots). Aucune tâche,
+// Noyau pur : l'ordonnanceur de LA tâche réseau des données (météo, alertes de Vigie, mer du spot, liste des spots, normales climatiques). Aucune tâche,
 // aucun minuteur ici : main/tache_donnees.cpp attend, réveille et appelle ; ce fichier dit QUI passe et QUAND.
 //
-// Pourquoi une seule tâche : les quatre clients ne font jamais deux requêtes à la fois (verrou TLS commun, main/verrou_tls.h), mais
+// Pourquoi une seule tâche : les clients ne font jamais deux requêtes à la fois (verrou TLS commun, main/verrou_tls.h), mais
 // chacun gardait sa propre pile de 12 Ko en RAM interne. Chaque client garde son propre rythme : il ne fait qu'un « pas » à la fois
 // (un essai, ou un simple contrôle des réglages) et rend le délai avant son pas suivant. L'ordonnanceur ne fait que les enchaîner.
 //
@@ -25,8 +25,9 @@ enum class Source : std::uint8_t {
     Vigie = 1,
     Mer = 2,
     ListeSpots = 3,
+    Climat = 4, // les normales climatiques de Vigie, une fois par jour (ADR-0029)
 };
-constexpr int kNombreSources = 4;
+constexpr int kNombreSources = 5;
 
 constexpr std::int64_t kJamais = INT64_MAX; // source endormie : seul un réveil la fait passer
 constexpr std::int64_t kPlusRien = -1;      // rendu par un pas : « rien à faire tant qu'on ne me réveille pas »
@@ -49,10 +50,11 @@ constexpr Regle kRegles[kNombreSources] = {
     {0, false},    // Vigie
     {0, false},    // Mer
     {0, true},     // ListeSpots
+    {0, false},    // Climat
 };
 
 struct Ordonnanceur {
-    std::int64_t echeance_ms[kNombreSources] = {kJamais, kJamais, kJamais, kJamais};
+    std::int64_t echeance_ms[kNombreSources] = {kJamais, kJamais, kJamais, kJamais, kJamais};
     bool reveillee[kNombreSources] = {}; // un réveil est arrivé depuis le dernier pas de la source
 
     // Un réveil de `s` à l'instant `maintenant_ms` (changement de réglage, demande de l'écran, démarrage).

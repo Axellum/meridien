@@ -72,6 +72,8 @@ struct Vue {
     bool portrait = false;
     float echelle = 1.0F;
     Police heure, temperature, titre, corps, petit, mini;
+    Police
+        micro; // le plus petit : seulement la pastille « sur la normale » (ADR-0029), pour tenir à côté de celle du mode
     lv_obj_t *ecran = nullptr;
     lv_obj_t *zone[Z_NOMBRE] = {};
     lv_obj_t *pastille =
@@ -242,6 +244,7 @@ PlaceOfficielle placer_puce_officielle();
 
 // ui_principal_mode_auto.cpp
 int dessiner_pastille_mode(const Ctx &c, int x, int largeur_max);
+int dessiner_pastille_normale(const Ctx &c, int x, int largeur_max);
 const char *texte_force_pluie(accueil::NiveauPluie n);
 void dessiner_carte_pluie(const Ctx &c);
 void dessiner_tuile(const Ctx &c);

@@ -56,6 +56,9 @@ target_sources(${COMPONENT_LIB} PRIVATE "ui_details.cpp" "ui_details_ouvrir.cpp"
 # Alertes officielles de Vigie (session alertes-vigie) : client reseau, etat partage, reglages. Meme raison : target_sources() et non la
 # liste SRCS. Le client ne depend ni de meteo_client.cpp ni du client HTTPS commun.
 target_sources(${COMPONENT_LIB} PRIVATE "vigie_etat.cpp" "vigie_client.cpp" "reglages_alertes.cpp" "ui_alertes.cpp")
+# Normales climatiques de Vigie (ADR-0029) : client reseau (une requete par jour), etat partage, et la page « Sources » de la roue (LVGL pur).
+# Meme raison : target_sources() et non la liste SRCS.
+target_sources(${COMPONENT_LIB} PRIVATE "climat_etat.cpp" "climat_client.cpp" "ui_sources.cpp")
 # Mer d'un spot (ADR-0018 et ADR-0019) : client reseau (trame de Vigie), etat partage, registre des spots. Meme raison : target_sources() et
 # non la liste SRCS. Le client passe par le client HTTPS commun (http_commun.cpp).
 target_sources(${COMPONENT_LIB} PRIVATE "mer_etat.cpp" "mer_client.cpp" "mer_liste_client.cpp" "reglages_mer.cpp")

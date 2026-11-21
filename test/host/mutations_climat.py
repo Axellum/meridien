@@ -1,0 +1,107 @@
+"""Mutations du noyau « normales climatiques » (climat_normales.hpp, climat_requete.hpp, climat_planning.hpp, ADR-0029), lues par lancer.py --mutations.
+
+Même format que les autres fichiers de mutations : (fichier du noyau, texte exact à remplacer — il doit apparaître UNE fois —, remplacement,
+test qui doit échouer, nom de la fonction de test qui doit être citée, ce que la mutation simule). Une mutation « non détectée » ou
+« détectée par autre chose » fait échouer le lanceur. Choisies à la main sur les règles de ces fichiers, pas un balayage automatique.
+"""
+
+NOR = "test_climat_normales.cpp"
+REQ = "test_climat_requete.cpp"
+
+N = "climat_normales.hpp"
+R = "climat_requete.hpp"
+P = "climat_planning.hpp"
+
+MUTATIONS_CLIMAT = [
+    # --- lecture de la réponse ---
+    (N, "if (!racine.champ(\"month\").en_entier(mois) || mois < 1 || mois > 12)", "if (!racine.champ(\"month\").en_entier(mois) || mois < 0 || mois > 12)",
+     NOR, "illisible_incoherent", "le mois 0 est accepté : une réponse sans mois vaut « jamais le bon mois » sans le dire"),
+    (N, "if (!racine.champ(\"month\").en_entier(mois) || mois < 1 || mois > 12)", "if (!racine.champ(\"month\").en_entier(mois) || mois < 1 || mois > 13)",
+     NOR, "illisible_incoherent", "le mois 13 est accepté"),
+    (N, "if (etat.texte_egal(\"outside_coverage\")) {", "if (etat.texte_egal(\"outside_coveragE\")) {",
+     NOR, "reponse_reelle_hors_couverture", "« hors couverture » n'est plus reconnu : Londres serait lue comme une réponse inconnue"),
+    (N, "if (!etat.texte_egal(\"available\"))\n        return Statut::Incoherent;", "if (false)\n        return Statut::Incoherent;",
+     NOR, "illisible_incoherent", "un statut inconnu est lu comme « available » avec des valeurs vides"),
+    (N, "racine.trouver(\"normals.tmax_mean_c.value\")", "racine.trouver(\"normals.tmin_mean_c.value\")",
+     NOR, "reponse_reelle_lorient", "la normale du minimum est prise pour celle du maximum"),
+    (N, "racine.trouver(\"records.tmax_c.value\")", "racine.trouver(\"records_all_year.tmax_c.value\")",
+     NOR, "reponse_reelle_lorient", "le record de chaleur de toute l'année est pris pour celui du mois"),
+    (N, "racine.trouver(\"records.tmin_c.value\")", "racine.trouver(\"records.tmax_c.value\")",
+     NOR, "reponse_reelle_lorient", "le record de froid est lu dans le record de chaleur"),
+    (N, "x < DIX_MIN || x > DIX_MAX", "x < DIX_MIN - 1 || x > DIX_MAX + 1",
+     NOR, "valeur_absente_ou_aberrante_est_inconnue", "une valeur à -60,1 °C ou 60,1 °C est crue"),
+    (N, "n.station_active = racine.trouver(\"station.active\").en_booleen(active) && active;", "n.station_active = true;",
+     NOR, "station_arretee_n_est_pas_active", "toute station est tenue pour active : ses records « battus » à tort"),
+    (N, "n.station_active = racine.trouver(\"station.active\").en_booleen(active) && active;", "n.station_active = racine.trouver(\"station.active\").en_booleen(active);",
+     NOR, "station_arretee_n_est_pas_active", "« active » vrai même quand le champ est `false`"),
+    (N, "if (tiret ? tampon[i] != '-' : !est_chiffre(tampon[i]))", "if (tiret ? false : !est_chiffre(tampon[i]))",
+     NOR, "edition_mal_formee_est_ignoree", "les deux tirets de la date d'édition ne sont plus contrôlés (« 2026/11/06 » est montrée)"),
+    (N, "if (v.copier_texte(tampon, sizeof tampon) != EDITION_CAP - 1)", "if (v.copier_texte(tampon, sizeof tampon) < EDITION_CAP - 1)",
+     NOR, "edition_mal_formee_est_ignoree", "une date trop longue est coupée au lieu d'être refusée"),
+    # --- jugement ---
+    (N, "if (!pour_ce_mois(n, mois_local) || age_s < 0 || age_s > VALIDITE_S)", "if (age_s < 0 || age_s > VALIDITE_S)",
+     NOR, "autre_mois_ou_trop_vieux", "la normale du mois d'avant est comparée au jour de la bascule de mois"),
+    (N, "if (!pour_ce_mois(n, mois_local) || age_s < 0 || age_s > VALIDITE_S)", "if (!pour_ce_mois(n, mois_local) || age_s > VALIDITE_S)",
+     NOR, "autre_mois_ou_trop_vieux", "une horloge qui a reculé ne rend plus la réponse suspecte"),
+    (N, "if (!pour_ce_mois(n, mois_local) || age_s < 0 || age_s > VALIDITE_S)", "if (!pour_ce_mois(n, mois_local) || age_s < 0)",
+     NOR, "autre_mois_ou_trop_vieux", "une réponse de plusieurs jours est encore jugée"),
+    (N, "inline constexpr std::int64_t VALIDITE_S = 48 * 3600;", "inline constexpr std::int64_t VALIDITE_S = 24 * 3600;",
+     NOR, "autre_mois_ou_trop_vieux", "la réponse n'est plus valable qu'un jour : la pastille disparaît si une requête rate"),
+    (N, "if (absolu < SEUIL_NORMAL_DIX)", "if (absolu <= SEUIL_NORMAL_DIX)",
+     NOR, "au_dessus_en_dessous_normal", "+1,0° est dit « dans la normale »"),
+    (N, "inline constexpr int SEUIL_NORMAL_DIX = 10;", "inline constexpr int SEUIL_NORMAL_DIX = 20;",
+     NOR, "au_dessus_en_dessous_normal", "le seuil « dans la normale » passe de 1,0° à 2,0°"),
+    (N, "return {ecart > 0 ? Etat::AuDessus : Etat::EnDessous, ecart};", "return {ecart > 0 ? Etat::EnDessous : Etat::AuDessus, ecart};",
+     NOR, "au_dessus_en_dessous_normal", "« au-dessus » et « en dessous » sont inversés"),
+    (N, "const int ecart = *max_dix - *n.tmax_normale_dix;", "const int ecart = *n.tmax_normale_dix - *max_dix;",
+     NOR, "au_dessus_en_dessous_normal", "l'écart est calculé à l'envers"),
+    (N, "if (n.station_active) {\n        if (max_dix", "if (true) {\n        if (max_dix",
+     NOR, "records", "les records d'une station arrêtée sont tenus pour battus"),
+    (N, "*max_dix > *n.tmax_record_dix", "*max_dix >= *n.tmax_record_dix",
+     NOR, "records", "égaler le record de chaleur le bat"),
+    (N, "*min_dix < *n.tmin_record_dix", "*min_dix <= *n.tmin_record_dix",
+     NOR, "records", "égaler le record de froid le bat"),
+    (N, "return {Etat::RecordChaud, 0};\n        if (min_dix", "return {Etat::RecordFroid, 0};\n        if (min_dix",
+     NOR, "records", "un record de chaleur battu s'annonce comme un record de froid"),
+    (N, "if (!max_dix || !n.tmax_normale_dix)\n        return {};", "if (!max_dix)\n        return {};",
+     NOR, "valeurs_inconnues", "sans normale connue, l'écart est calculé avec 0 °C"),
+    # --- écriture de l'écart ---
+    (N, "sortie[p++] = '+';", "sortie[p++] = ' ';",
+     NOR, "ecriture_des_ecarts", "le signe plus disparaît devant un écart positif"),
+    (N, "sortie[p++] = static_cast<char>(0x92);", "sortie[p++] = static_cast<char>(0x90);",
+     NOR, "ecriture_des_ecarts", "le signe moins est un autre caractère (celui de la police ne le dessine pas)"),
+    (N, "if (a > 999U)\n        a = 999U;", "if (a > 99999U)\n        a = 99999U;",
+     NOR, "ecriture_des_ecarts", "un écart absurde n'est plus plafonné : le tampon déborde"),
+    (N, "if (capacite < 1 + nb + 1)\n            return 0;", "if (capacite < nb)\n            return 0;",
+     NOR, "ecriture_tampon_trop_petit", "l'écart positif s'écrit au-delà du tampon"),
+    # --- requête ---
+    (R, "inline constexpr std::string_view REQUETE_DEBUT = \"/v1/climate/normals?lat=\";", "inline constexpr std::string_view REQUETE_DEBUT = \"/v1/climate/normals?tmax=20&lat=\";",
+     REQ, "la_requete_ne_porte_aucune_valeur_du_jour", "la requête envoie le maximum du jour à Vigie"),
+    (R, "inline constexpr std::string_view REQUETE_MILIEU = \"&lon=\";", "inline constexpr std::string_view REQUETE_MILIEU = \"&lng=\";",
+     REQ, "requete_lorient", "le paramètre de longitude change de nom"),
+    (R, "if (latitude_e5 < -vigie::LATITUDE_E5_MAX || latitude_e5 > vigie::LATITUDE_E5_MAX)\n        return 0;", "if (false)\n        return 0;",
+     REQ, "requete_refusee", "une latitude hors de -90..90 part quand même"),
+    (R, "if (longitude_e5 < -vigie::LONGITUDE_E5_MAX || longitude_e5 > vigie::LONGITUDE_E5_MAX)\n        return 0;", "if (false)\n        return 0;",
+     REQ, "requete_refusee", "une longitude hors de -180..180 part quand même"),
+    (R, "if (sortie == nullptr || capacite == 0 || adresse.empty()", "if (sortie == nullptr || capacite == 0",
+     REQ, "requete_refusee", "une requête sans adresse de Vigie est construite"),
+    # --- planning ---
+    (P, "inline constexpr std::int64_t PREMIER_ESSAI_S = 180;", "inline constexpr std::int64_t PREMIER_ESSAI_S = 20;",
+     REQ, "premier_essai", "le premier essai part avant la météo et les alertes"),
+    (P, "return PREMIER_ESSAI_S + 120 * static_cast<std::int64_t>(alea) / 255;", "return PREMIER_ESSAI_S;",
+     REQ, "premier_essai", "plus d'aléa : toutes les cartes interrogent Vigie à la même seconde"),
+    (P, "inline constexpr std::int64_t PERIODE_S = 24 * 3600;", "inline constexpr std::int64_t PERIODE_S = 3600;",
+     REQ, "une_requete_par_jour", "une requête par heure au lieu d'une par jour"),
+    (P, "(echecs_consecutifs > 0 ? base / 10 : 30 * 60)", "(echecs_consecutifs > 0 ? base / 10 : 0)",
+     REQ, "une_requete_par_jour", "plus de décalage après une réponse lue"),
+    (P, "base *= 2;", "base += 300;",
+     REQ, "reessais_doubles_puis_plafonnes", "les réessais ne doublent plus"),
+    (P, "inline constexpr std::int64_t PLAFOND_REESSAI_S = 3600;", "inline constexpr std::int64_t PLAFOND_REESSAI_S = 86400;",
+     REQ, "reessais_doubles_puis_plafonnes", "plus de plafond : l'attente après des échecs devient énorme"),
+    (P, "if (trop_de_requetes && base < PAUSE_TROP_DE_REQUETES_S)", "if (false && base < PAUSE_TROP_DE_REQUETES_S)",
+     REQ, "trop_de_requetes_attend_une_heure_au_moins", "un HTTP 429 ne ralentit plus la carte"),
+    (P, "std::int64_t t = dernier_essai_s + ATTENTE_MOIS_CHANGE_S;", "std::int64_t t = dernier_essai_s + 60;",
+     REQ, "changement_de_mois", "le jour de la bascule de mois, une requête par minute"),
+    (P, "return t < prochain_prevu_s ? t : prochain_prevu_s;", "return t;",
+     REQ, "changement_de_mois", "un essai déjà prévu plus tôt est repoussé"),
+]

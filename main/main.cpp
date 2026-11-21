@@ -9,6 +9,7 @@
 #include "src/display/lv_display_private.h" // le drapeau `flushing` (voir attendre_fin_du_dernier_transfert)
 
 #include "boot_info.h"
+#include "climat_client.h"
 #include "commande_serie.h"
 #include "ecran_principal.h"
 #include "mer_client.h"
@@ -115,6 +116,8 @@ extern "C" void app_main(void) {
     ecran::
         vigie_client_demarrer(); // alertes officielles de Vigie : premier essai 60 à 120 s après que le réseau et l'heure soient prêts
     ecran::memoire_jalon("après le démarrage du client des alertes");
+    ecran::
+        climat_client_demarrer(); // normales du mois (ADR-0029) : une requête par jour, premier essai 3 à 5 min après le réseau
     // Mer du spot choisi (ADR-0019) : le client ne démarre que si le registre des spots n'est pas vide (appareil neuf : rien n'est
     // demandé à Vigie). Premier essai 120 à 180 s après que le réseau et l'heure soient prêts.
     ecran::mer_client_demarrer();

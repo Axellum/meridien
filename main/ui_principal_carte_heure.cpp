@@ -31,8 +31,14 @@ void dessiner_barre_accueil(const Ctx &c) {
         x_fin = x_texte + w;
     }
     const int x_pastille = x_fin + px(16);
-    x_fin =
-        dessiner_pastille_mode(c, x_pastille, c.x + c.w - px(6) - (m.exemple ? w_exemple + px(16) : 0) - x_pastille);
+    const int droite = c.x + c.w - px(6) - (m.exemple ? w_exemple + px(16) : 0);
+    x_fin = dessiner_pastille_mode(c, x_pastille, droite - x_pastille);
+    // « +1,0° sur la normale » (ADR-0029) : après la pastille du mode, avant « Exemple » ; abandonnée faute de place.
+    const int x_normale = (x_fin > 0 ? x_fin : x_pastille - px(12)) + px(12);
+    const int fin_normale = dessiner_pastille_normale(c, x_normale, droite - x_normale);
+    if (fin_normale > 0) {
+        x_fin = fin_normale;
+    }
     if (m.exemple) {
         const int x = (x_fin > 0 ? x_fin : x_pastille - px(16)) + px(16);
         dz::rect(c.pc, x, centre - px(18), w_exemple, px(36), px(18), t.avertissement);

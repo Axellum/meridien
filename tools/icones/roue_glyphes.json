@@ -33,6 +33,12 @@
       "ou": "bouton « Mer » du premier anneau (la page mer, ADR-0024)"
     },
     {
+      "id": "sources",
+      "mdi": "information-outline",
+      "point": "F02FD",
+      "ou": "bouton « Sources » du premier anneau (la page des sources et des crédits, ADR-0029)"
+    },
+    {
       "id": "moyeu",
       "mdi": "compass-rose",
       "point": "F1382",
@@ -59,7 +65,7 @@
   ],
   "sortie": {
     "fichier": "main/assets/mdi_roue.ttf",
-    "sha256": "cff73de8eff840fbc6eb73033cd6582472fe246a2683dd664f508e7d5dd6138c",
-    "taille": 2140
+    "sha256": "736fcf5a47509b9302d1aa71980d8b93342acbee1def6f3da72b9f158b2d221b",
+    "taille": 2276
   }
 }

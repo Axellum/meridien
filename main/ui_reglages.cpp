@@ -11,6 +11,7 @@
 #include <string>
 
 #include "ecran/changement_wifi.hpp"
+#include "ecran/credits.hpp"
 #include "ecran/presets_services.hpp"
 #include "ecran/reglages_alertes.hpp"
 #include "ecran/texte_modele.hpp"
@@ -768,20 +769,14 @@ void rangee_action_ou_info(lv_obj_t *parent, std::string_view id) {
             // Le service qui a RÉELLEMENT donné cette météo, avec la phrase de sa licence : là où la météo est montrée (ADR-0014).
             // Open-Meteo : CC BY 4.0 ; MET Norway : CC BY 4.0 et NLOD 2.0, les valeurs sont converties et complétées ici (« adaptées »,
             // ce que CC BY demande d'indiquer) ; NWS : données ouvertes (formule de la page de son API).
+            // Les phrases sont celles de ecran/credits.hpp, les mêmes que la page « Sources » de la roue (ADR-0029) : une seule table.
             namespace fm = meteo::fournisseurs;
             const Param pl[] = {{"lien", fm::attribution_de(m.origine).nom.data()}};
-            const char *attribution =
-                m.origine == fm::Famille::MetNo
-                    ? remplir("Données météo : {lien} (licences CC BY 4.0 et NLOD 2.0, données adaptées)", pl, 1,
-                              tampon, sizeof tampon)
-                : m.origine == fm::Famille::Nws
-                    ? remplir("Données météo : {lien} (données ouvertes)", pl, 1, tampon, sizeof tampon)
-                    : remplir("Données météo : {lien} (licence CC BY 4.0)", pl, 1, tampon, sizeof tampon);
+            const char *attribution = remplir(credits::phrase_meteo(m.origine), pl, 1, tampon, sizeof tampon);
             creer_texte(c, attribution, env().f.petite, p.texte_discret);
             if (m.origine == fm::Famille::Nws) {
                 // Le NWS demande de ne pas laisser croire à son approbation (ses conditions d'usage, docs/mesures/fournisseurs-meteo.md).
-                creer_texte(c, T("Cet appareil n’est ni approuvé ni parrainé par le National Weather Service."),
-                            env().f.petite, p.texte_discret);
+                creer_texte(c, T(credits::NWS_SANS_APPROBATION), env().f.petite, p.texte_discret);
             }
             const std::int32_t source = h.nombre("meteo.source");
             if (source >= 0 && static_cast<std::size_t>(source) < fm::NOMBRE) {
@@ -1478,8 +1473,8 @@ void remplir_resultats() {
     }
     // Les lieux viennent de GeoNames (CC BY 4.0), via le géocodage d'Open-Meteo : le crédit suit la liste, comme celui des spots. Le label
     // d'état est vide quand il y a des résultats (aucun autre message n'est écrasé) ; sa couleur discrète est posée par lancer_recherche().
-    const Param pg[] = {{"lien", "GeoNames"}};
-    lv_label_set_text(g_ville.etat, remplir("Lieux : {lien} (licence CC BY 4.0)", pg, 1, tampon, sizeof tampon));
+    const Param pg[] = {{"lien", credits::LIEUX_NOM}};
+    lv_label_set_text(g_ville.etat, remplir(credits::LIEUX, pg, 1, tampon, sizeof tampon));
     for (std::size_t i = 0; i < n; ++i) {
         creer_rangee_bouton(
             g_ville.resultats, lieux[i].libelle, nullptr,

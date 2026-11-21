@@ -34,8 +34,16 @@ MUTATIONS_ROUE_ENTREES = [
      ENT, "aucune_entree_n_est_en_double_et_le_premier_anneau_les_porte_toutes", "« Mer » ouvre en réalité les alertes (deux boutons identiques)"),
     (H, "liste.entree[liste.n++] = Entree::Alertes;", "liste.entree[liste.n++] = Entree::Mer;",
      ENT, "avec_les_alertes_seules_elles_viennent_apres_details", "« Alertes » ouvre en réalité la mer"),
-    (H, "inline constexpr int ENTREES_MAX = 5;", "inline constexpr int ENTREES_MAX = 4;",
-     ENT, "le_nombre_d_entrees_est_celui_des_presences", "le nombre maximal d'entrées annoncé ne compte plus le profil"),
+    (H, "inline constexpr int ENTREES_MAX = 6;", "inline constexpr int ENTREES_MAX = 5;",
+     ENT, "le_nombre_d_entrees_est_celui_des_presences", "le nombre maximal d'entrées annoncé ne compte plus « Sources »"),
+    # --- « Sources » : toujours là, après la mer, avant le profil (ADR-0029) ---
+    (H, "    liste.entree[liste.n++] = Entree::Sources;\n", "    if (p.mer) {\n        liste.entree[liste.n++] = Entree::Sources;\n    }\n",
+     ENT, "sans_alerte_ni_mer_la_roue_a_reglages_et_details", "« Sources » disparaît quand aucun spot de mer n'est choisi : la page des crédits n'est plus atteignable"),
+    (H, "    liste.entree[liste.n++] = Entree::Sources;\n    if (p.profil) {\n        liste.entree[liste.n++] = Entree::Profil;\n    }",
+     "    if (p.profil) {\n        liste.entree[liste.n++] = Entree::Profil;\n    }\n    liste.entree[liste.n++] = Entree::Sources;",
+     ENT, "sources_est_toujours_la_apres_la_mer_et_avant_le_profil", "« Sources » passe après « Profil » : le profil n'est plus le dernier bouton"),
+    (H, "liste.entree[liste.n++] = Entree::Sources;", "liste.entree[liste.n++] = Entree::Details;",
+     ENT, "aucune_entree_n_est_en_double_et_le_premier_anneau_les_porte_toutes", "« Sources » ouvre en réalité les détails (deux boutons identiques)"),
     # --- « Profil » : la dernière entrée, seulement quand la famille a de quoi choisir ---
     (H, "if (p.profil) {", "if (!p.profil) {",
      ENT, "avec_le_profil_seul_il_vient_apres_details", "« Profil » apparaît quand la famille n'a rien à offrir, et disparaît quand elle a de quoi choisir"),

@@ -153,6 +153,44 @@ void alerte_et_autres(const banc::Contexte &c) {
     afficher(c, e);
 }
 
+// « +1,0° sur la normale » (ADR-0029) : la pastille sur la ligne du lieu, dans l'esquisse (Lorient ; -Instant 2026-11-08T07:45:00Z). Le
+// jugement est celui du noyau pur ; le banc le pose tel quel (l'appareil le calcule à partir de la réponse de Vigie).
+ecran::EntreesPrincipal avec_normale(const banc::Contexte &c, ecran::climat::Etat etat, int ecart_dix) {
+    ecran::EntreesPrincipal e = entrees(c, 0, vue_esquisse(c.instant_utc_s));
+    e.bandeau = alerte_vent(c.instant_utc_s);
+    e.normale = {etat, ecart_dix};
+    return e;
+}
+void normale_au_dessus(const banc::Contexte &c) { afficher(c, avec_normale(c, ecran::climat::Etat::AuDessus, 10)); }
+void normale_au_dessus_fort(const banc::Contexte &c) {
+    afficher(c, avec_normale(c, ecran::climat::Etat::AuDessus, 142));
+}
+void normale_en_dessous(const banc::Contexte &c) { afficher(c, avec_normale(c, ecran::climat::Etat::EnDessous, -42)); }
+void normale_dans(const banc::Contexte &c) { afficher(c, avec_normale(c, ecran::climat::Etat::Normal, 4)); }
+void normale_record_chaud(const banc::Contexte &c) {
+    afficher(c, avec_normale(c, ecran::climat::Etat::RecordChaud, 0));
+}
+void normale_record_froid(const banc::Contexte &c) {
+    afficher(c, avec_normale(c, ecran::climat::Etat::RecordFroid, 0));
+}
+// Aucun jugement (hors couverture, réponse d'un autre mois, rien en mémoire) : l'accueil de l'esquisse, sans pastille de plus.
+void normale_aucune(const banc::Contexte &c) { afficher(c, avec_normale(c, ecran::climat::Etat::Aucun, 0)); }
+// Pire cas de place : la ville la plus longue, la pastille du mode épinglée (« Auto en pause »), « Exemple » et la normale la plus longue.
+void normale_pires_cas(const banc::Contexte &c) {
+    VueMeteo v = vue(PIRES_CAS, c.instant_utc_s);
+    v.exemple = true;
+    ecran::EntreesPrincipal e = entrees(c, 0, v);
+    e.mode_auto.epingle = true;
+    e.normale = {ecran::climat::Etat::RecordChaud, 0};
+    afficher(c, e);
+}
+void normale_pires_cas_ecart(const banc::Contexte &c) {
+    VueMeteo v = vue(PIRES_CAS, c.instant_utc_s);
+    ecran::EntreesPrincipal e = entrees(c, 0, v);
+    e.normale = {ecran::climat::Etat::EnDessous, -142};
+    afficher(c, e);
+}
+
 } // namespace
 
 namespace banc {
@@ -176,6 +214,15 @@ const Scene kScenes[] = {
     {"calme", "Rien à signaler (ni pluie ni alerte)", calme},
     {"alerte-seule", "Alerte officielle sans pluie", alerte_seule},
     {"alerte-et-autres", "Alerte officielle + 2 autres et pluie", alerte_et_autres},
+    {"normale-au-dessus", "Normales : +1,0° sur la normale (esquisse)", normale_au_dessus},
+    {"normale-au-dessus-fort", "Normales : +14,2° sur la normale (esquisse)", normale_au_dessus_fort},
+    {"normale-en-dessous", "Normales : -4,2° sous la normale (esquisse)", normale_en_dessous},
+    {"normale-dans", "Normales : dans la normale (esquisse)", normale_dans},
+    {"normale-record-chaud", "Normales : record de chaleur battu (esquisse)", normale_record_chaud},
+    {"normale-record-froid", "Normales : record de froid battu (esquisse)", normale_record_froid},
+    {"normale-aucune", "Normales : aucun jugement, pas de pastille (esquisse)", normale_aucune},
+    {"normale-pires-cas", "Normales : ville longue, mode épinglé, « Exemple » et record battu", normale_pires_cas},
+    {"normale-pires-cas-ecart", "Normales : ville longue et -14,2° sous la normale", normale_pires_cas_ecart},
 };
 const std::size_t kNombreScenes = sizeof(kScenes) / sizeof(kScenes[0]);
 

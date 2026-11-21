@@ -3,14 +3,18 @@
 #include <cstdint>
 #include <cstring>
 #include <ctime>
+#include <optional>
 
 #include "board.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "lvgl.h"
 
+#include "climat_etat.h"
 #include "ecran/accueil_epinglage.hpp"
 #include "ecran/accueil_pilote.hpp"
+#include "ecran/climat_normales.hpp"
+#include "ecran/credits.hpp"
 #include "ecran/horloge_materielle.hpp"
 #include "ecran/i18n.hpp"
 #include "ecran/meteo_synthese.hpp"
@@ -35,6 +39,7 @@
 #include "ui_reglages.h"
 #include "ui_roue.h"
 #include "ui_roue_profil.h"
+#include "ui_sources.h"
 #include "vigie_etat.h"
 #include "vue_depuis_detail.h"
 
@@ -161,6 +166,68 @@ void ouvrir_alertes() {
     ESP_LOGI(TAG, "page des alertes ouverte : %u alerte(s) en vigueur", static_cast<unsigned>(vue.nombre));
 }
 
+// « Sources » de la roue (ADR-0029) : la page des sources et des crédits de ce que l'écran affiche à cet instant. Les mentions viennent du
+// noyau pur (ecran/credits.hpp, la même table que la page de réglages) ; ici seulement ce que l'appareil sait : la météo montrée et le
+// service qui l'a donnée, les alertes activées, la réponse des normales du mois local, le spot de mer choisi. La page est une image du
+// moment de l'ouverture.
+bool mer_atteignable(); // définie plus bas, avec « Mer » de la roue
+lv_obj_t *g_ecran_sources = nullptr;
+bool g_meteo_connue = false; // mis à jour à chaque passage de rafraichir() : une météo est montrée
+
+void fermer_sources() {
+    vers_principal();
+    if (g_ecran_sources != nullptr) {
+        lv_obj_delete_async(g_ecran_sources);
+        g_ecran_sources = nullptr;
+    }
+}
+
+credits::Presences presences_des_sources() {
+    credits::Presences pr;
+    pr.meteo = g_meteo_connue;
+    pr.origine = meteo_etat_origine();
+    pr.alertes = reglages_alertes().actives;
+    pr.mer = mer_atteignable();
+    climat::Normales normales;
+    std::int64_t recu_s = 0;
+    heure::HeureLocale local;
+    if (pr.alertes && climat_etat_lire(normales, recu_s) &&
+        horloge_heure_locale(static_cast<std::int64_t>(std::time(nullptr)), local) &&
+        climat::pour_ce_mois(normales, local.mois)) {
+        pr.normales = true;
+        static char edition
+            [climat::EDITION_CAP]; // lue par composer() puis recopiée dans la page : vivante pendant l'appel seulement
+        std::memcpy(edition, normales.edition, sizeof edition);
+        pr.edition = edition;
+    }
+    return pr;
+}
+
+void ouvrir_sources() {
+    const board_info_t *carte = board_get_info();
+    if (g_ecran_sources != nullptr || g_ecran_principal == nullptr || carte == nullptr) {
+        return;
+    }
+    const credits::Liste liste = credits::composer(presences_des_sources());
+    lv_obj_t *ecran = lv_obj_create(nullptr);
+    ContexteSources ctx;
+    ctx.racine = ecran;
+    ctx.ttf = roboto_700_start;
+    ctx.ttf_taille = static_cast<size_t>(roboto_700_end - roboto_700_start);
+    ctx.largeur = carte->width;
+    ctx.hauteur = carte->height;
+    ctx.theme = &theme_du_reglage();
+    ctx.fermer = fermer_sources;
+    if (!ui_sources_creer(ctx, liste)) {
+        ESP_LOGE(TAG, "page des sources non créée (police TrueType) : l'écran principal reste affiché");
+        lv_obj_delete(ecran);
+        return;
+    }
+    g_ecran_sources = ecran;
+    lv_screen_load(ecran);
+    ESP_LOGI(TAG, "page des sources ouverte : %u mention(s)", static_cast<unsigned>(liste.n));
+}
+
 // La page des alertes existe-t-elle à cet instant ? Comme la pastille : alertes activées, heure sûre, une réponse de Vigie en mémoire.
 bool alertes_atteignables() {
     if (!reglages_alertes().actives) {
@@ -234,6 +301,9 @@ int composer_entrees(EntreeRoue *sortie, ChoixRoue *choix_profil) {
             break;
         case roue::Entree::Mer:
             sortie[n++] = {visuel::texte_c("Mer"), ICONE_MER, ouvrir_mer, nullptr, 0};
+            break;
+        case roue::Entree::Sources:
+            sortie[n++] = {visuel::texte_c(credits::TITRE), ICONE_SOURCES, ouvrir_sources, nullptr, 0};
             break;
         case roue::Entree::Profil:
             sortie[n++] = entree_profil(choix_profil, nb_profil);
@@ -356,6 +426,23 @@ void rafraichir(lv_timer_t *) {
     mesures.epingle = epinglage.epingle;
     mesures.profil_epingle = epinglage.profil;
     entrees.mode_auto = g_pilote.avancer(mesures);
+
+    // « +1,0° sur la normale » (ADR-0029) : le maximum prévu du jour contre la normale du mois lue chez Vigie. Rien quand les alertes
+    // (donc Vigie) sont désactivées, que l'heure n'est pas sûre, qu'aucune réponse n'est en mémoire ou qu'elle n'est pas du mois local.
+    g_meteo_connue = entrees.meteo.connue;
+    entrees.normale = {};
+    if (alertes.actives && heure_vraie && entrees.meteo.connue) {
+        climat::Normales normales;
+        std::int64_t recu_s = 0;
+        ecran::heure::HeureLocale local;
+        if (climat_etat_lire(normales, recu_s) && horloge_heure_locale(instant, local)) {
+            const auto en_dixiemes = [](int dix) {
+                return dix == visuel::INCONNU_DIX ? std::optional<int>() : std::optional<int>(dix);
+            };
+            entrees.normale = climat::juger(normales, en_dixiemes(entrees.meteo.max_dix),
+                                            en_dixiemes(entrees.meteo.min_dix), local.mois, instant - recu_s);
+        }
+    }
 
     ui_principal_mettre_a_jour(entrees);
 

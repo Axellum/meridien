@@ -12,6 +12,7 @@ constexpr int M = indice(Source::Meteo);
 constexpr int V = indice(Source::Vigie);
 constexpr int MER = indice(Source::Mer);
 constexpr int L = indice(Source::ListeSpots);
+constexpr int C = indice(Source::Climat);
 
 // ---- réveil -----------------------------------------------------------------------------------------------------------------
 
@@ -234,6 +235,27 @@ constexpr int scenario_demarrage() {
     return 0;
 }
 
+constexpr int climat_sans_anti_rebond_et_apres_une_source_en_retard() {
+    // Les normales climatiques (ADR-0029) : cinquième source, sans anti-rebond ; elle passe tout de suite, puis laisse la place.
+    VERIFIER(kNombreSources == 5 && C == 4);
+    Ordonnanceur o;
+    o.reveiller(Source::Climat, 1000);
+    VERIFIER(o.choisir(1000) == C);
+    o.reveiller(Source::Vigie, 1000);
+    o.prendre_reveil(Source::Climat);
+    o.apres_pas(Source::Climat, 1000, 0);
+    VERIFIER(o.choisir(1000) == V);
+    return 0;
+}
+
+constexpr int climat_attend_son_delai() {
+    Ordonnanceur o;
+    o.apres_pas(Source::Climat, 0, 15000);
+    VERIFIER(o.choisir(14999) == kAucune);
+    VERIFIER(o.choisir(15000) == C);
+    return 0;
+}
+
 } // namespace
 
 #define LISTE(X)                                                                                                       \
@@ -256,7 +278,9 @@ constexpr int scenario_demarrage() {
     X(delai_negatif_vaut_zero)                                                                                         \
     X(delai_compte_depuis_la_fin_du_pas)                                                                               \
     X(attente_jusqu_a_la_prochaine_echeance)                                                                           \
-    X(scenario_demarrage)
+    X(scenario_demarrage)                                                                                              \
+    X(climat_sans_anti_rebond_et_apres_une_source_en_retard)                                                           \
+    X(climat_attend_son_delai)
 
 TESTS_A_LA_COMPILATION(LISTE)
 
