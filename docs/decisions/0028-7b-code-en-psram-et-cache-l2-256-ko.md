@@ -10,9 +10,16 @@
 > matters, and the mechanism, are not known**. Cost, measured on the board: about **142 KB less free internal RAM** (181 KB instead of
 > 323 KB once the time is received; largest DMA-capable block 121 KB instead of 262 KB); weather, alerts and sea still answer HTTP 200.
 > The Tab5 is unchanged. Status: **proposed**, to be confirmed by the author over a longer observation.
+>
+> **Called into question on 25/11/2026**: the author saw the white flash again on the 7B running `main` `4a9a7be`, which has both
+> settings. They do not fix it, so the half hour without a flash on 13/11 was chance (at two or three flashes an hour, a 30-minute
+> window without one happens one time in three to five). With them the cache is no longer switched off during a flash write (ESP-IDF 5.5.5 source), so the
+> mechanism this page suspected is ruled out as well. The settings are kept for now (they match the ESPHome firmware and cost no
+> flash); the cause is still not proven ([below](#revu-le-25112026--le-flash-revient-avec-ces-réglages)).
 
-- **Statut** : **proposée**, écrite le 13/11/2026 après l'essai sur la 7B accepté par Axel (« Oui, flashe l'essai ») ; à confirmer
-  par Axel sur une observation plus longue que la première demi-heure.
+- **Statut** : **proposée**, écrite le 13/11/2026 après l'essai sur la 7B accepté par Axel (« Oui, flashe l'essai ») ; **remise en
+  cause le 25/11/2026** : le flash blanc est revu avec ces réglages (voir [plus bas](#revu-le-25112026--le-flash-revient-avec-ces-réglages)).
+  Les réglages restent en place ; ils ne corrigent pas le flash.
 - **Vu sur** : Waveshare 7B (ESP32-P4 rév. v3.2, dalle EK79007 1024 × 600), 13/11/2026, binaire d'essai = `b9aa06e` + ces deux
   réglages + une sonde de diagnostic (une tâche de 4 Ko et une file de 64 relevés, non fusionnée) ; journal série du démarrage et
   des 30 premières minutes, flashé à 23 h 11.
@@ -83,3 +90,26 @@ des prises de contact TLS ; le débit d'image (le code lit désormais la même P
 
 Un flash blanc revu sur la 7B avec ces réglages ; un manque de RAM interne (échec TLS, `Cannot allocate memory`) ; une mesure qui
 montre qu'une seule des deux options suffit.
+
+## Revu le 25/11/2026 : le flash revient avec ces réglages
+
+Le 25/11/2026, Axel signale que la 7B « perd l'image un très bref moment », toujours, rarement et sans qu'il puisse dire quand.
+La 7B tournait `main` `4a9a7be` (`/api/status` : `jalon-1a-tab5-st7121-495-g4a9a7`), qui contient ces deux réglages depuis le
+14/11/2026. Ce qui en découle :
+
+- **Ces réglages ne corrigent pas le flash.** La demi-heure sans flash du 13/11 ne prouvait rien : à deux ou trois flashs par
+  heure, une fenêtre de 30 minutes sans flash arrive entre une fois sur cinq et une fois sur trois (loi de Poisson : e^-1,5 et
+  e^-1).
+- **Le mécanisme supposé plus haut est exclu.** Dans ESP-IDF 5.5.5, `components/spi_flash/spi_flash_os_func_app.c` ne coupe plus
+  le cache pendant une écriture en flash quand le code et les constantes sont en PSRAM (`SPI_FLASH_CACHE_NO_DISABLE`, vrai avec
+  `CONFIG_SPIRAM_FETCH_INSTRUCTIONS` et `CONFIG_SPIRAM_RODATA`, que pose `CONFIG_SPIRAM_XIP_FROM_PSRAM`). L'écriture de la NVS de la
+  météo ne peut donc plus geler le code ; un flash revu avec ces réglages ne vient pas de là.
+- **Les réglages restent en place** : ce sont ceux du firmware ESPHome sur cette carte, ils ne coûtent pas de flash, et les retirer
+  ne serait utile que si la RAM interne venait à manquer (environ 142 Ko rendus).
+- **Cause : non prouvée.** La sonde de diagnostic n'a jamais tourné pendant un flash vu par quelqu'un. Piste suivie : un repeint
+  complet de l'écran (changement de ciel : moment du jour ou ambiance tirée de l'icône météo, relue toutes les 15 minutes ; verre
+  recuit), vu en direct parce que la dalle lit la seule image pendant que LVGL la réécrit, de haut en bas, pendant 0,36 à 0,5 s.
+  Le 25/11/2026 au soir, la 7B est filmée à 60 images par seconde et son journal série est enregistré en même temps pour le
+  vérifier.
+
+**Non vérifié** : la forme du flash (tout l'écran d'un coup ou un front qui descend) ; son lien avec un changement de ciel.

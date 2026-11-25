@@ -55,8 +55,9 @@ CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
 CONFIG_FREERTOS_HZ=1000
 
 # Code et donnees constantes executes depuis la PSRAM, cache L2 de 256 Ko : les reglages memoire du firmware ESPHome de cette carte
-# (execute_from_psram: true) et ceux que conseille la FAQ LCD d'Espressif pour un ecran DSI. Avec le code en flash et 128 Ko de
-# cache, la dalle faisait un bref flash blanc au repos, plusieurs fois par heure (jamais vu sous ESPHome) ; pas revu avec ces deux
-# reglages. Cout mesure : environ 142 Ko de RAM interne libre en moins. ADR-0028 ; ne pas les retirer sans refaire son essai.
+# (execute_from_psram: true) et ceux que conseille la FAQ LCD d'Espressif pour un ecran DSI. Poses le 13/11/2026 contre un bref
+# flash blanc au repos ; ce flash est REVU le 25/11/2026 avec ces deux reglages (main 4a9a7be) : ils ne le corrigent pas, sa cause
+# n'est pas prouvee. Gardes parce que ce sont les reglages d'ESPHome sur cette carte (le cache n'est plus coupe pendant une
+# ecriture en flash). Cout mesure : environ 142 Ko de RAM interne libre en moins, a rendre si elle venait a manquer. ADR-0028.
 CONFIG_SPIRAM_XIP_FROM_PSRAM=y
 CONFIG_CACHE_L2_CACHE_256KB=y
