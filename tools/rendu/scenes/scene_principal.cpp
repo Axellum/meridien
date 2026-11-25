@@ -68,7 +68,9 @@ void verifier_voiles(const banc::Contexte &c, const ecran::EntreesPrincipal &fin
         lv_refr_now(c.affichage);
         pire = std::max(pire, ecran::ui_principal_images_voile());
     }
-    ecran::ui_principal_mettre_a_jour(final);
+    // Reconstruction finale : les 40 mises à jour portent toutes le même relevé (même `instant_s`), et le ciel ne suit une nouvelle
+    // ambiance qu'au relevé suivant (visuel::stabiliser_ciel) ; recréé, l'écran prend celle de la variante, comme un rendu normal.
+    afficher(c, final);
     lv_refr_now(c.affichage);
     std::fprintf(stderr, "voiles : au plus %d images vivantes sur 40 mises à jour, %d à la fin\n", pire,
                  ecran::ui_principal_images_voile());

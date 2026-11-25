@@ -86,6 +86,8 @@ struct Vue {
     char date_attente[64] = {};
     std::uint32_t empreinte[Z_NOMBRE] = {};
     std::uint32_t empreinte_ciel = 0;
+    visuel::CielStable ciel_stable;      // l'ambiance du ciel ne change que sur deux relevés (visuel::stabiliser_ciel)
+    std::uint32_t changements_ciel = 0;  // changements de ciel (chacun repeint tout l'écran), pour le journal
     lv_draw_buf_t *ciel_image = nullptr; // le ciel tramé (voir appliquer_ciel)
     // Le verre des grandes cartes (heures, cinq jours ou pluie) est cuit dans l'image du ciel (voir cuire_verre) : ces rectangles
     // sont ceux déjà peints, que carte_de_verre ne redessine plus. `nb_verre` 0 : rien de cuit, le verre se dessine comme avant.
@@ -190,7 +192,8 @@ void texte_ajuste(const dz::Pinceau &pc, std::initializer_list<const Police *> p
 
 // ui_principal_donnees.cpp
 MomentJour moment_du_jour();
-Ambiance ambiance_du_moment();
+Ambiance ambiance_observee();  // celle du dernier relevé
+Ambiance ambiance_du_moment(); // celle du ciel : le dernier relevé, une fois confirmé par le suivant
 Alerte alerte_du_jour();
 const char *texte_alerte(Alerte a);
 Piece piece_alerte(Alerte a);

@@ -68,9 +68,16 @@ MomentJour moment_du_jour() {
     return moment_sans_meteo();
 }
 
-Ambiance ambiance_du_moment() {
+Ambiance ambiance_observee() {
     const VueMeteo &m = g.e.meteo;
     return m.connue ? ambiance_pour_code(m.code, m.jour) : Ambiance::COUVERT;
+}
+
+// L'ambiance du CIEL : celle du dernier relevé, une fois confirmée par le suivant (visuel::stabiliser_ciel). Appelée plusieurs
+// fois par passage (empreinte du ciel, appliquer_ciel) : le résultat ne change pas d'un appel à l'autre avec la même météo.
+Ambiance ambiance_du_moment() {
+    const VueMeteo &m = g.e.meteo;
+    return stabiliser_ciel(g.ciel_stable, m.connue, ambiance_observee(), m.instant_s);
 }
 
 Alerte alerte_du_jour() {

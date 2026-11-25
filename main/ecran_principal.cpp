@@ -65,6 +65,63 @@ lv_obj_t *g_ecran_diagnostic = nullptr;
 lv_obj_t *g_diag_retour = nullptr; // l'écran d'où le diagnostic a été ouvert (les réglages), pour y revenir
 int g_compteur = 0;
 bool g_heure_journalisee = false;
+std::uint32_t g_ciel_journalise = UINT32_MAX; // clé du dernier ciel écrit au journal (journaliser_ciel)
+
+const char *nom_moment(visuel::MomentJour m) {
+    switch (m) {
+    case visuel::MomentJour::NUIT:
+        return "nuit";
+    case visuel::MomentJour::AUBE:
+        return "aube";
+    case visuel::MomentJour::JOUR:
+        return "jour";
+    case visuel::MomentJour::CREPUSCULE:
+        return "crépuscule";
+    }
+    return "?";
+}
+
+const char *nom_ambiance(visuel::Ambiance a) {
+    switch (a) {
+    case visuel::Ambiance::CLAIR:
+        return "clair";
+    case visuel::Ambiance::NUAGEUX:
+        return "nuageux";
+    case visuel::Ambiance::COUVERT:
+        return "couvert";
+    case visuel::Ambiance::BRUME:
+        return "brume";
+    case visuel::Ambiance::PLUIE:
+        return "pluie";
+    case visuel::Ambiance::NEIGE:
+        return "neige";
+    case visuel::Ambiance::ORAGE:
+        return "orage";
+    case visuel::Ambiance::NOMBRE:
+        break;
+    }
+    return "?";
+}
+
+// Une ligne quand le ciel change (tout l'écran est repeint) ou quand un relevé propose une autre ambiance (en attente du relevé
+// suivant pour la confirmer) : de quoi recouper un repeint vu sur la dalle avec l'heure du journal.
+void journaliser_ciel() {
+    const EtatCiel c = ui_principal_ciel();
+    const std::uint32_t cle = (c.changements << 16) | (static_cast<std::uint32_t>(c.moment) << 8) |
+                              (static_cast<std::uint32_t>(c.ciel) << 4) | static_cast<std::uint32_t>(c.releve);
+    if (cle == g_ciel_journalise) {
+        return;
+    }
+    g_ciel_journalise = cle;
+    if (c.releve != c.ciel) {
+        ESP_LOGI(TAG, "ciel : %s, %s ; le dernier relevé dit %s, en attente du suivant ; %u changement(s) de ciel",
+                 nom_moment(c.moment), nom_ambiance(c.ciel), nom_ambiance(c.releve),
+                 static_cast<unsigned>(c.changements));
+    } else {
+        ESP_LOGI(TAG, "ciel : %s, %s ; %u changement(s) de ciel (chacun repeint tout l'écran)", nom_moment(c.moment),
+                 nom_ambiance(c.ciel), static_cast<unsigned>(c.changements));
+    }
+}
 char g_ville[sizeof(ZoneMeteo::nom)] = {};
 
 // Le mode automatique de l'accueil (ADR-0023) : le pilote garde l'état de la décision d'un passage au suivant (le dernier changement de
@@ -445,6 +502,7 @@ void rafraichir(lv_timer_t *) {
     }
 
     ui_principal_mettre_a_jour(entrees);
+    journaliser_ciel();
 
     // Trace de ce qui est affiché : à la première heure valide puis chaque minute (l'écran n'est pas photographié).
     if (entrees.heure_connue && (!g_heure_journalisee || g_compteur % kJournalToutesLesN == 0)) {

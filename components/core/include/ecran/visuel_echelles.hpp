@@ -71,6 +71,44 @@ constexpr Ambiance ambiance_pour_code(int code_wmo, bool jour) noexcept {
     return ambiance_pour(meteo::decrire(code_wmo, jour).icone);
 }
 
+// ---- ciel stable ----
+
+// Changer d'ambiance repeint TOUT l'écran (le fond du ciel et le verre des cartes). Le code du temps est relu à chaque relevé
+// (toutes les 15 min) et oscille souvent entre deux familles voisines (peu nuageux / nuageux, couvert / bruine) : le ciel ne
+// change donc que quand DEUX relevés successifs le confirment. Le premier relevé connu s'applique tout de suite ; sans météo,
+// le ciel est neutre (COUVERT) comme avant. Coût : un vrai changement de temps arrive au ciel un relevé plus tard (15 min).
+struct CielStable {
+    Ambiance affichee = Ambiance::COUVERT;
+    bool depuis_un_releve = false; // l'ambiance affichée vient d'un relevé connu
+    Ambiance candidate = Ambiance::COUVERT;
+    std::int64_t releve_candidate_s = 0; // `instant_s` du relevé où la candidate est apparue
+    bool a_candidate = false;
+};
+
+// `connue` et `instant_s` : ceux de la vue météo (`instant_s` change à chaque relevé neuf) ; `observee` : l'ambiance du dernier
+// relevé. Rend l'ambiance à afficher.
+constexpr Ambiance stabiliser_ciel(CielStable &s, bool connue, Ambiance observee, std::int64_t instant_s) noexcept {
+    if (!connue) {
+        s = CielStable{};
+        return s.affichee;
+    }
+    if (!s.depuis_un_releve) {
+        s.affichee = observee;
+        s.depuis_un_releve = true;
+        s.a_candidate = false;
+    } else if (observee == s.affichee) {
+        s.a_candidate = false;
+    } else if (!s.a_candidate || observee != s.candidate) {
+        s.candidate = observee;
+        s.releve_candidate_s = instant_s;
+        s.a_candidate = true;
+    } else if (instant_s != s.releve_candidate_s) {
+        s.affichee = observee; // confirmée par un second relevé
+        s.a_candidate = false;
+    }
+    return s.affichee;
+}
+
 // ---- catégories ----
 
 enum class CategorieUv : std::uint8_t { INCONNU, FAIBLE, MODERE, ELEVE, TRES_ELEVE, EXTREME };
