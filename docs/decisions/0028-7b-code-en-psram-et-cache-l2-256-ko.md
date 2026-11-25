@@ -15,7 +15,9 @@
 > settings. They do not fix it, so the half hour without a flash on 13/11 was chance (at two or three flashes an hour, a 30-minute
 > window without one happens one time in three to five). With them the cache is no longer switched off during a flash write (ESP-IDF 5.5.5 source), so the
 > mechanism this page suspected is ruled out as well. The settings are kept for now (they match the ESPHome firmware and cost no
-> flash); the cause is still not proven ([below](#revu-le-25112026--le-flash-revient-avec-ces-réglages)).
+> flash); the cause is still not proven ([below](#revu-le-25112026--le-flash-revient-avec-ces-réglages)). Filmed the same evening:
+> the flash is the **backlight** getting brighter for about 50 ms with the same picture on the panel, starting about 20 ms after an
+> HTTPS request began, so the HTTPS request ruled out above is a suspect again ([below](#filmé-le-25112026-au-soir--le-rétroéclairage-saute)).
 
 - **Statut** : **proposée**, écrite le 13/11/2026 après l'essai sur la 7B accepté par Axel (« Oui, flashe l'essai ») ; **remise en
   cause le 25/11/2026** : le flash blanc est revu avec ces réglages (voir [plus bas](#revu-le-25112026--le-flash-revient-avec-ces-réglages)).
@@ -40,7 +42,8 @@ zones, pixels redessinés, durée ; registres `INT_ST0` / `INT_ST1` et verrou de
 - **un repeint plein écran au repos** : seule l'horloge est redessinée (11 % de l'écran par minute, 30 % au changement d'heure,
   60 % en 97 ms pour une météo nouvelle) ;
 - **une requête HTTPS** : un flash vu à 22 h 37 tombait pendant une requête à Vigie, mais 20 minutes de requêtes Vigie forcées
-  chaque minute n'ont donné aucun flash.
+  chaque minute n'ont donné aucun flash. **Remis en cause le 25/11/2026** : le flash filmé commence 20 ms après le début d'une
+  requête HTTPS ([plus bas](#filmé-le-25112026-au-soir--le-rétroéclairage-saute)).
 
 Le chemin de la dalle est le même que sous ESPHome (mêmes timings DPI, une seule image, copie DMA2D). La seule différence trouvée
 est la mémoire : ESPHome exécute le code depuis la PSRAM avec un cache L2 de 256 Ko (`execute_from_psram: true`,
@@ -106,10 +109,31 @@ La 7B tournait `main` `4a9a7be` (`/api/status` : `jalon-1a-tab5-st7121-495-g4a9a
   météo ne peut donc plus geler le code ; un flash revu avec ces réglages ne vient pas de là.
 - **Les réglages restent en place** : ce sont ceux du firmware ESPHome sur cette carte, ils ne coûtent pas de flash, et les retirer
   ne serait utile que si la RAM interne venait à manquer (environ 142 Ko rendus).
-- **Cause : non prouvée.** La sonde de diagnostic n'a jamais tourné pendant un flash vu par quelqu'un. Piste suivie : un repeint
-  complet de l'écran (changement de ciel : moment du jour ou ambiance tirée de l'icône météo, relue toutes les 15 minutes ; verre
-  recuit), vu en direct parce que la dalle lit la seule image pendant que LVGL la réécrit, de haut en bas, pendant 0,36 à 0,5 s.
-  Le 25/11/2026 au soir, la 7B est filmée à 60 images par seconde et son journal série est enregistré en même temps pour le
-  vérifier.
+- **Cause : non prouvée.** La sonde de diagnostic n'a jamais tourné pendant un flash vu par quelqu'un, et elle ne voit pas le
+  rétroéclairage. La piste suivie ce jour-là, un repeint complet vu en direct (changement de ciel), est écartée par le film du
+  soir (ci-dessous).
 
-**Non vérifié** : la forme du flash (tout l'écran d'un coup ou un front qui descend) ; son lien avec un changement de ciel.
+### Filmé le 25/11/2026 au soir : le rétroéclairage saute
+
+La 7B (même `main` `4a9a7be`) est filmée au téléphone à 60 images par seconde pendant 29 minutes, avec le Tab5 et un mur à côté
+comme témoins, et son journal série est enregistré en même temps. Axel voit un flash ; le film le contient, et c'est le seul saut
+de luminosité net des 29 minutes.
+
+- **Ce n'est pas l'image.** Pendant 3 à 4 images (environ 50 ms), toute la dalle s'éclaircit d'un coup, zones sombres comprises
+  (la case la plus sombre de la dalle passe de 39 à 62 niveaux de gris sur 255 dans le film), avec la même image dessus ; elle
+  revient après un léger creux. Ni le Tab5 ni le mur ne bougent. Un repeint ou une image perdue changerait le dessin : ici c'est
+  la lumière derrière la dalle qui monte, le **rétroéclairage**.
+- **Il tombe au début d'une requête HTTPS.** Les horloges sont recalées par le changement de minute vu sur la dalle (l'horloge du
+  téléphone avance de 1,35 s sur celle de la carte, à environ 50 ms près) : le flash commence à 22 h 04 min 05,035 s, heure de la
+  carte, 20 ms après la ligne `mer: requête de la mer` (05,016 s) et avant `Certificate validated` (05,279 s). Les six autres
+  requêtes du film (météo, alertes, mer) ne donnent aucun saut. Le flash vu le 13/11 à 22 h 37 tombait lui aussi pendant une
+  requête HTTPS.
+- **Piste** : le rétroéclairage de la 7B est réglé par une tension analogique : signal PWM de 5 kHz sur GPIO32, inversé (broche
+  haute = dalle plus sombre), lissé par un filtre RC vers le pilote AP3032 (`components/bsp_waveshare_7b/ws7b_io.c`). Pendant
+  que la radio Wi-Fi (ESP32-C6) émet, une baisse du 3,3 V, ou une captation radio sur ce nœud, ferait baisser cette tension et
+  éclaircirait la dalle un instant ; l'effet serait plus fort à luminosité basse. C'est une hypothèse.
+
+**Non vérifié** : le mécanisme (aucune mesure électrique) ; le lien avec les requêtes réseau (un seul flash filmé) ; la luminosité
+réglée à ce moment ; le flash avec la luminosité à 100 % (la broche reste alors basse et une baisse d'alimentation ne la déplace
+plus : c'est l'essai qui départage). Les optimisations de l'affichage de l'[ADR-0030](0030-7b-deux-tampons-d-image-synchronises.md)
+ne peuvent pas corriger ce flash.

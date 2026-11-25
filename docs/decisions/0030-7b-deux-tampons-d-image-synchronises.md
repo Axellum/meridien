@@ -9,13 +9,15 @@
 > keeps one frame buffer and the internal-RAM bands, as before; `-DWS7B_SYNCHRO_IMAGE=0` gives the old path for a comparison.
 > Cost: 1.2 MB more PSRAM (2,457,600 bytes for both buffers); the two 51,200-byte internal-RAM draw bands are no longer allocated.
 > The same change makes the sky calmer (it follows a new mood only when two weather readings in a row agree) and the glass of the
-> cards repaints only its own rectangles. Status: **proposed**; **not seen on the board** when written. It is aimed at the brief
-> white flash of the 7B, whose cause is still not proven ([ADR-0028](0028-7b-code-en-psram-et-cache-l2-256-ko.md)).
+> cards repaints only its own rectangles. Status: **proposed**; **not seen on the board** when written. It was aimed at the brief
+> white flash of the 7B and **does not fix it**: filmed the same evening, that flash is the backlight getting brighter for about
+> 50 ms with the same picture on the panel, not a repaint ([ADR-0028](0028-7b-code-en-psram-et-cache-l2-256-ko.md)). It is kept for
+> what it does.
 
 - **Statut** : **proposée**, écrite le 25/11/2026, à la demande d'Axel (« le deux m'a l'air d'être une bonne optimisation »). Non
   vue sur la carte à l'écriture : compilée pour la 7B, tests du noyau sur le PC.
 - **Vu sur** : rien encore. À voir : l'image (aucun balayage visible pendant un repeint complet), le temps d'un passage de rendu,
-  la RAM interne et la PSRAM libres au démarrage, et le flash blanc sur plusieurs heures.
+  la RAM interne et la PSRAM libres au démarrage.
 
 ## Contexte
 
@@ -32,8 +34,10 @@ Comment l'image arrivait à la dalle :
 
 Un passage qui ne touche que l'horloge est court et ne se voit pas. Un **repeint complet** (changement de ciel : moment du jour,
 ou ambiance tirée de l'icône météo relue toutes les 15 minutes ; verre des cartes recuit ; thème ; retour d'une page) dure
-0,36 à 0,5 s sur la 7B : pendant ce temps, la dalle montre une image à moitié réécrite, qui descend de haut en bas. C'est la piste
-suivie pour le flash ; elle n'est **pas prouvée** (la vidéo à 60 images par seconde du 25/11 au soir doit le dire).
+0,36 à 0,5 s sur la 7B : pendant ce temps, la dalle montre une image à moitié réécrite, qui descend de haut en bas. C'était la piste
+suivie pour le flash ; **le film du 25/11 au soir l'écarte** : pendant le flash, la dalle garde la même image et c'est le
+rétroéclairage qui monte, environ 50 ms ([ADR-0028](0028-7b-code-en-psram-et-cache-l2-256-ko.md)). Le changement reste utile pour ce
+qu'il fait : un repeint complet ne se voit plus descendre.
 
 ## Décision
 
@@ -85,7 +89,7 @@ Dans le même lot, deux changements qui réduisent les repeints complets eux-mê
   `BANC_VOILES` reconstruit l'écran à la fin pour reprendre le ciel de la variante.
 
 **Non vérifié** : tout ce qui se voit sur la carte (absence de balayage, fluidité de la roue et des pages, temps d'un passage),
-la mémoire réellement libre, et si le flash blanc disparaît.
+et la mémoire réellement libre.
 
 ## Alternatives écartées
 
