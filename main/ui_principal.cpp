@@ -329,6 +329,7 @@ void ui_principal_mettre_a_jour(const EntreesPrincipal &entrees) {
     ciel_e.u(static_cast<std::uint32_t>(ambiance_du_moment()));
     if (ciel_e.h != g.empreinte_ciel) {
         g.empreinte_ciel = ciel_e.h;
+        ++g.changements_ciel;
         appliquer_ciel();
         tout = true;
     }
@@ -378,6 +379,10 @@ void ui_principal_sur_alertes(void (*rappel)()) { g.ouvrir_alertes = rappel; }
 CoutEcran ui_principal_cout() { return {g.objets, 6}; }
 
 int ui_principal_images_voile() { return images_voile; }
+
+EtatCiel ui_principal_ciel() {
+    return {moment_du_jour(), ambiance_du_moment(), ambiance_observee(), g.changements_ciel};
+}
 
 void ui_principal_differer_verre(bool differer) { s_verre_differe = differer; }
 

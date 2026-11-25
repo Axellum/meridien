@@ -101,6 +101,16 @@ CoutEcran ui_principal_cout();
 // voile réutilise ou rend son image quand il est recuit, et ui_principal_creer les rend toutes.
 int ui_principal_images_voile();
 
+// Le ciel en cours, pour le journal : moment du jour, ambiance du ciel, ambiance du dernier relevé (différente tant qu'un second
+// relevé ne l'a pas confirmée) et nombre de changements de ciel depuis la création de l'écran (chacun repeint tout l'écran).
+struct EtatCiel {
+    visuel::MomentJour moment;
+    visuel::Ambiance ciel;
+    visuel::Ambiance releve;
+    std::uint32_t changements;
+};
+EtatCiel ui_principal_ciel();
+
 // Démarrage : le verre des grandes cartes n'est pas cuit dans l'image du ciel avant la première image (≈ 70 ms de moins avant la
 // lumière, docs/mesures/accueil-cache-verre.md) ; il est dessiné en direct, au même pixel (vérifié au banc, BANC_VERRE_DIFFERE).
 // `ui_principal_differer_verre(true)` AVANT ui_principal_creer ; `ui_principal_cuire_verre_differe()` une fois la lumière allumée :

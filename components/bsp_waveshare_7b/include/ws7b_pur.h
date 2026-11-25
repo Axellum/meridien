@@ -334,6 +334,21 @@ WS7B_FN uint32_t ws7b_draw_buffer_bytes(int lines) {
     return (uint32_t)WS7B_LCD_H_RES * (uint32_t)lines * (WS7B_RGB565_BITS_PER_PIXEL / 8);
 }
 
+// Tampons d'IMAGE (ceux que la dalle balaie), ADR-0030. Avec UN seul tampon, la dalle relit sans cesse l'image que LVGL est en
+// train de reecrire : un repeint complet (changement de ciel, verre recuit, 0,36 a 0,5 s) se voit descendre de haut en bas. Avec
+// DEUX tampons en PSRAM, LVGL dessine directement dans celui que la dalle ne lit pas (mode direct) et le pilote DSI ne passe au
+// neuf qu'a la fin d'un balayage : l'image change d'un coup, entre deux balayages. Seulement en rotation 0 : en 180, la rotation
+// logicielle (PPA) ecrit dans son propre tampon de sortie, incompatible avec le mode direct ; on garde alors un tampon d'image et
+// le dessin par bandes en RAM interne. `synchro` = l'option de compilation WS7B_SYNCHRO_IMAGE (0 = ancien chemin, pour comparer).
+WS7B_FN int ws7b_frame_buffers(int degrees, int synchro) {
+    return (synchro && degrees == WS7B_ROTATION_AS_SCANNED) ? 2 : 1;
+}
+
+// Octets pris en PSRAM par n tampons d'image de la taille de la dalle.
+WS7B_FN uint32_t ws7b_frame_buffer_bytes(int n) {
+    return (uint32_t)WS7B_LCD_H_RES * (uint32_t)WS7B_LCD_V_RES * (WS7B_RGB565_BITS_PER_PIXEL / 8) * (uint32_t)n;
+}
+
 #ifdef __cplusplus
 }
 #endif

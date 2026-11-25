@@ -20,7 +20,17 @@ if(NOT WS7B_ROTATION STREQUAL "0" AND NOT WS7B_ROTATION STREQUAL "180")
 endif()
 target_compile_definitions(${COMPONENT_LIB} PRIVATE WS7B_UI_ROTATION_DEGREES=${WS7B_ROTATION})
 
-# Tampon de dessin LVGL (lignes de 1024 px, double tampon, RAM interne). Defaut dans ws7b_internal.h.
+# Deux tampons d'image en PSRAM, bascule a la fin du balayage (ADR-0030), en rotation 0 seulement. 0 = l'ancien chemin (un tampon
+# d'image, dessin par bandes en RAM interne), pour comparer sur la carte :
+#   .\tools\idf.ps1 "-DWS7B_SYNCHRO_IMAGE=0" build
+set(WS7B_SYNCHRO_IMAGE "1" CACHE STRING "1 : deux tampons d'image synchronises sur la fin du balayage (rotation 0)")
+if(NOT WS7B_SYNCHRO_IMAGE STREQUAL "0" AND NOT WS7B_SYNCHRO_IMAGE STREQUAL "1")
+    message(FATAL_ERROR "WS7B_SYNCHRO_IMAGE doit valoir 0 ou 1 (recu : ${WS7B_SYNCHRO_IMAGE})")
+endif()
+target_compile_definitions(${COMPONENT_LIB} PRIVATE WS7B_SYNCHRO_IMAGE=${WS7B_SYNCHRO_IMAGE})
+
+# Tampon de dessin LVGL (lignes de 1024 px, double tampon, RAM interne), quand il n'y a qu'un tampon d'image (rotation 180, ou
+# WS7B_SYNCHRO_IMAGE=0). Defaut dans ws7b_internal.h.
 set(WS7B_DRAW_BUFFER_LINES "25" CACHE STRING "Hauteur du tampon de dessin LVGL, en lignes")
 target_compile_definitions(${COMPONENT_LIB} PRIVATE WS7B_DRAW_BUFFER_LINES=${WS7B_DRAW_BUFFER_LINES})
 

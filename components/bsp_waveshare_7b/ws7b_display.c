@@ -78,8 +78,9 @@ esp_err_t ws7b_display_create(esp_lcd_panel_handle_t *panel, esp_lcd_panel_io_ha
     dpi.dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT;
     dpi.dpi_clock_freq_mhz = WS7B_DPI_CLOCK_MHZ;
     dpi.in_color_format = LCD_COLOR_FMT_RGB565;
-    dpi.num_fbs =
-        1; // un seul tampon d'image : LVGL dessine par bandes et la dalle est mise a jour par copie (comme le Tab5)
+    // Deux tampons d'image en rotation 0 (ADR-0030) : LVGL dessine dans celui que la dalle ne lit pas, le pilote passe au neuf a la
+    // fin d'un balayage. Un seul en rotation 180 : LVGL dessine par bandes et la dalle est mise a jour par copie (comme le Tab5).
+    dpi.num_fbs = WS7B_FRAME_BUFFERS;
     dpi.video_timing.h_size = WS7B_LCD_H_RES;
     dpi.video_timing.v_size = WS7B_LCD_V_RES;
     dpi.video_timing.hsync_pulse_width = WS7B_DPI_HSYNC_PULSE;
@@ -88,7 +89,7 @@ esp_err_t ws7b_display_create(esp_lcd_panel_handle_t *panel, esp_lcd_panel_io_ha
     dpi.video_timing.vsync_pulse_width = WS7B_DPI_VSYNC_PULSE;
     dpi.video_timing.vsync_back_porch = WS7B_DPI_VSYNC_BACK_PORCH;
     dpi.video_timing.vsync_front_porch = WS7B_DPI_VSYNC_FRONT_PORCH;
-    dpi.flags.use_dma2d = true; // copie des tampons LVGL vers le tampon d'image par DMA2D
+    dpi.flags.use_dma2d = true; // copie des bandes LVGL vers le tampon d'image (sans objet en mode direct)
 
     ek79007_vendor_config_t vendor = {0};
     vendor.init_cmds = s_init_cmds;

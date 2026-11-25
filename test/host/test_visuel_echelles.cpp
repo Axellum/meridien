@@ -44,6 +44,30 @@ constexpr int chaque_code_a_une_ambiance_et_les_familles_sont_les_bonnes() {
     return 0;
 }
 
+// Le ciel (qui repeint tout l'écran) ne suit l'ambiance que si deux relevés successifs la confirment.
+constexpr int le_ciel_change_seulement_sur_deux_releves() {
+    CielStable s;
+    VERIFIER(stabiliser_ciel(s, false, Ambiance::PLUIE, 0) == Ambiance::COUVERT);    // sans météo : ciel neutre
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::NUAGEUX, 900) == Ambiance::NUAGEUX); // premier relevé : tout de suite
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::NUAGEUX, 900) == Ambiance::NUAGEUX);
+    // un relevé « pluie » isolé : rien ne change, même relu toutes les 500 ms
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::PLUIE, 1800) == Ambiance::NUAGEUX);
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::PLUIE, 1800) == Ambiance::NUAGEUX);
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::NUAGEUX, 2700) ==
+             Ambiance::NUAGEUX);                                                    // retour : la candidate est oubliée
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::PLUIE, 3600) == Ambiance::NUAGEUX); // elle doit tout recommencer
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::PLUIE, 4500) == Ambiance::PLUIE); // second relevé de suite : appliquée
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::PLUIE, 5400) == Ambiance::PLUIE);
+    // deux candidates différentes de suite : aucune n'est confirmée
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::COUVERT, 6300) == Ambiance::PLUIE);
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::ORAGE, 7200) == Ambiance::PLUIE);
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::ORAGE, 8100) == Ambiance::ORAGE);
+    // météo perdue puis revenue : le premier relevé s'applique tout de suite
+    VERIFIER(stabiliser_ciel(s, false, Ambiance::ORAGE, 8100) == Ambiance::COUVERT);
+    VERIFIER(stabiliser_ciel(s, true, Ambiance::CLAIR, 9000) == Ambiance::CLAIR);
+    return 0;
+}
+
 constexpr int l_indice_uv_suit_l_echelle_de_l_oms() {
     VERIFIER(categorie_uv(0) == CategorieUv::FAIBLE);
     VERIFIER(categorie_uv(29) == CategorieUv::FAIBLE);
@@ -285,6 +309,7 @@ constexpr int les_formats_de_nombres_utilisent_le_vrai_signe_moins() {
 
 #define LISTE(X)                                                                                                       \
     X(chaque_code_a_une_ambiance_et_les_familles_sont_les_bonnes)                                                      \
+    X(le_ciel_change_seulement_sur_deux_releves)                                                                       \
     X(l_indice_uv_suit_l_echelle_de_l_oms)                                                                             \
     X(le_vent_suit_l_echelle_de_beaufort)                                                                              \
     X(la_tendance_de_pression_a_un_seuil_de_un_hectopascal)                                                            \

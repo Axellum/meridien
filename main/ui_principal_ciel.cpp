@@ -19,6 +19,15 @@ constexpr std::uint8_t BAYER_8[8][8] = {{0, 32, 8, 40, 2, 34, 10, 42},  {48, 16,
                                         {3, 35, 11, 43, 1, 33, 9, 41},  {51, 19, 59, 27, 49, 17, 57, 25},
                                         {15, 47, 7, 39, 13, 45, 5, 37}, {63, 31, 55, 23, 61, 29, 53, 21}};
 
+// Fait repeindre un rectangle de l'écran (coordonnées de l'écran, qui commence en 0, 0).
+void invalider_rect(const Rect &r) {
+    if (r.w <= 0 || r.h <= 0) {
+        return;
+    }
+    const lv_area_t zone = {r.x, r.y, r.x + r.w - 1, r.y + r.h - 1};
+    lv_obj_invalidate_area(g.ecran, &zone);
+}
+
 void remplir_ciel_trame(lv_draw_buf_t *buf, std::uint32_t haut, std::uint32_t bas) {
     const int h = static_cast<int>(buf->header.h);
     const int w = static_cast<int>(buf->header.w);
@@ -90,6 +99,11 @@ void cuire_verre() {
         return;
     }
     g.cle_verre = e.h;
+    Rect ancien[2];
+    const int nb_ancien = g.nb_verre;
+    for (int i = 0; i < nb_ancien; ++i) {
+        ancien[i] = g.verre[i];
+    }
     if (g.nb_verre > 0 && g.ciel_image != nullptr) { // du verre déjà cuit : repartir du ciel nu
         remplir_ciel_trame(g.ciel_image, g.ciel_haut, g.ciel_bas);
     }
@@ -124,8 +138,17 @@ void cuire_verre() {
         }
         g.nb_verre = n;
     }
+    // Seuls les rectangles de verre, l'ancien et le nouveau, ont changé dans l'image : le ciel autour est retramé au même pixel
+    // (remplir_ciel_trame ne dépend que des deux couleurs, inchangées ici) et le verre ne déborde pas de son rectangle (pas
+    // d'ombre, bordure intérieure). Avant, tout l'écran était repeint. Une image de ciel neuve (appliquer_ciel : changement de
+    // ciel ou de thème) change le style du fond, ce qui fait déjà repeindre tout l'écran par LVGL.
     if (g.ecran != nullptr) {
-        lv_obj_invalidate(g.ecran);
+        for (int i = 0; i < nb_ancien; ++i) {
+            invalider_rect(ancien[i]);
+        }
+        for (int i = 0; i < g.nb_verre; ++i) {
+            invalider_rect(g.verre[i]);
+        }
     }
 }
 

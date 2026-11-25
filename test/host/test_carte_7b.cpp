@@ -430,6 +430,18 @@ constexpr int tampon_de_dessin_dans_le_budget_du_tab5() {
     return 0;
 }
 
+// ADR-0030 : deux tampons d'image (bascule a la fin du balayage) en rotation 0 seulement ; en 180 le PPA ecrit dans son propre
+// tampon et le mode direct n'est pas possible.
+constexpr int deux_tampons_d_image_seulement_en_rotation_0() {
+    VERIFIER(ws7b_frame_buffers(0, 1) == 2);
+    VERIFIER(ws7b_frame_buffers(180, 1) == 1);
+    VERIFIER(ws7b_frame_buffers(0, 0) == 1); // option coupee : l'ancien chemin, pour comparer
+    VERIFIER(ws7b_frame_buffers(180, 0) == 1);
+    VERIFIER(ws7b_frame_buffer_bytes(1) == 1228800); // 1024 x 600 x 2 octets
+    VERIFIER(ws7b_frame_buffer_bytes(2) == 2457600); // en PSRAM : rien en RAM interne
+    return 0;
+}
+
 #define LISTE(X)                                                                                                       \
     X(broches_valides_et_distinctes)                                                                                   \
     X(aucune_broche_reservee_n_est_prise)                                                                              \
@@ -464,7 +476,8 @@ constexpr int tampon_de_dessin_dans_le_budget_du_tab5() {
     X(plancher_audible_a_40_pour_cent_de_l_echelle)                                                                    \
     X(volume_croissant_sans_trou_d_un_pas)                                                                             \
     X(echelle_du_registre_de_l_es8311)                                                                                 \
-    X(tampon_de_dessin_dans_le_budget_du_tab5)
+    X(tampon_de_dessin_dans_le_budget_du_tab5)                                                                         \
+    X(deux_tampons_d_image_seulement_en_rotation_0)
 
 TESTS_A_LA_COMPILATION(LISTE)
 

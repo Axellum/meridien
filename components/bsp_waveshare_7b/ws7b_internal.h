@@ -29,7 +29,15 @@
 #error "WS7B_UI_ROTATION_DEGREES : 0 ou 180 seulement (ws7b_rotation_valid)"
 #endif
 
+// 1 (defaut) : deux tampons d'image en PSRAM, LVGL en mode direct, bascule a la fin du balayage (ADR-0030), en rotation 0 ; 0 :
+// l'ancien chemin (un tampon d'image), pour comparer. Le nombre effectif de tampons est ws7b_frame_buffers() (ws7b_pur.h).
+#ifndef WS7B_SYNCHRO_IMAGE
+#define WS7B_SYNCHRO_IMAGE 1
+#endif
+#define WS7B_FRAME_BUFFERS ws7b_frame_buffers(WS7B_UI_ROTATION_DEGREES, WS7B_SYNCHRO_IMAGE)
+
 // Hauteur (en lignes de 1024 px) du tampon de dessin LVGL, en RAM interne (DMA), en double tampon. `-DWS7B_DRAW_BUFFER_LINES=n`.
+// Sert seulement avec un tampon d'image (rotation 180 ou WS7B_SYNCHRO_IMAGE=0) : avec deux, LVGL dessine dans les tampons d'image.
 #ifndef WS7B_DRAW_BUFFER_LINES
 #define WS7B_DRAW_BUFFER_LINES WS7B_DRAW_BUFFER_LINES_DEFAULT
 #endif
