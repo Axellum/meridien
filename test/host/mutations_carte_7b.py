@@ -84,6 +84,12 @@ MUTATIONS_CARTE_7B = [
     # --- memoire ---
     (PUR, "#define WS7B_DRAW_BUFFER_LINES_DEFAULT 25", "#define WS7B_DRAW_BUFFER_LINES_DEFAULT 50", "tampon_de_dessin_dans_le_budget_du_tab5",
      "tampon de dessin plus gros que le budget de memoire interne"),
+    (PUR, "return (synchro && degrees == WS7B_ROTATION_AS_SCANNED) ? 2 : 1;", "return synchro ? 2 : 1;",
+     "deux_tampons_d_image_seulement_en_rotation_0", "mode direct en rotation 180, ou le PPA ecrit hors des tampons d'image"),
+    (PUR, "return (synchro && degrees == WS7B_ROTATION_AS_SCANNED) ? 2 : 1;", "return degrees == WS7B_ROTATION_AS_SCANNED ? 2 : 1;",
+     "deux_tampons_d_image_seulement_en_rotation_0", "l'option de comparaison WS7B_SYNCHRO_IMAGE=0 sans effet"),
+    (PUR, "* (WS7B_RGB565_BITS_PER_PIXEL / 8) * (uint32_t)n;", "* (WS7B_RGB565_BITS_PER_PIXEL / 8);",
+     "deux_tampons_d_image_seulement_en_rotation_0", "PSRAM des tampons d'image comptee pour un seul"),
 ]
 
 

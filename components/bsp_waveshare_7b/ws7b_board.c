@@ -70,10 +70,17 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
     int ui_h = 0;
     ws7b_ui_size(WS7B_UI_ROTATION_DEGREES, &ui_w, &ui_h);
 
+    // Deux tampons d'image (rotation 0, ADR-0030) : LVGL dessine directement dans celui que la dalle ne lit pas (mode direct ; les
+    // tampons, de la taille de l'ecran, sont ceux du pilote DSI, en PSRAM : rien en RAM interne). Au dernier morceau d'un passage,
+    // esp_lvgl_port donne l'image entiere au pilote et attend la fin du balayage en cours (avoid_tearing) : la dalle passe a l'image
+    // neuve d'un coup, jamais a moitie dessinee. LVGL recopie ensuite les zones changees dans l'autre tampon. Un seul tampon
+    // d'image (rotation 180, ou WS7B_SYNCHRO_IMAGE=0) : dessin par bandes de WS7B_DRAW_BUFFER_LINES lignes en RAM interne.
+    const bool synchro = (WS7B_FRAME_BUFFERS == 2);
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io,
         .panel_handle = panel,
-        .buffer_size = WS7B_LCD_H_RES * WS7B_DRAW_BUFFER_LINES,
+        .buffer_size =
+            synchro ? (uint32_t)WS7B_LCD_H_RES * WS7B_LCD_V_RES : (uint32_t)WS7B_LCD_H_RES * WS7B_DRAW_BUFFER_LINES,
         .double_buffer = true,
         .hres = WS7B_LCD_H_RES,
         .vres = WS7B_LCD_V_RES,
@@ -88,12 +95,19 @@ static esp_err_t lvgl_attach(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_hand
                               0), // rotation LOGICIELLE par le PPA du P4 ; rien a faire en rotation 0
                 .swap_bytes = false,
                 .full_refresh = false,
-                .direct_mode = false,
+                .direct_mode = synchro,
             },
     };
-    const lvgl_port_display_dsi_cfg_t dsi_cfg = {.flags = {.avoid_tearing = false}};
+    const lvgl_port_display_dsi_cfg_t dsi_cfg = {.flags = {.avoid_tearing = synchro}};
     s_display = lvgl_port_add_disp_dsi(&disp_cfg, &dsi_cfg);
     ESP_RETURN_ON_FALSE(s_display, ESP_FAIL, TAG, "lvgl_port_add_disp_dsi");
+    if (synchro) {
+        ESP_LOGI(TAG, "image : 2 tampons d'image en PSRAM (%u o), mode direct, bascule a la fin du balayage",
+                 (unsigned)ws7b_frame_buffer_bytes(2));
+    } else {
+        ESP_LOGI(TAG, "image : 1 tampon d'image, dessin par bandes de %d lignes en RAM interne (%u o x 2)",
+                 WS7B_DRAW_BUFFER_LINES, (unsigned)ws7b_draw_buffer_bytes(WS7B_DRAW_BUFFER_LINES));
+    }
 
     lvgl_port_lock(0);
     if (WS7B_UI_ROTATION_DEGREES != 0) {
